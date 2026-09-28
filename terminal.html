@@ -1,0 +1,2988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#050816" />
+  <title>KINGBOT — Trading Command Center</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+
+  <style>
+    :root {
+      --bg: #03050d;
+      --bg2: #070b18;
+      --panel: rgba(10, 15, 32, .78);
+      --panel2: rgba(15, 21, 43, .82);
+      --line: rgba(255,255,255,.09);
+      --text: #f5f7ff;
+      --muted: #7f8ba8;
+
+      --gold: #ffc84a;
+      --gold2: #ff9f1a;
+      --cyan: #19e6ff;
+      --blue: #4787ff;
+      --violet: #9b5cff;
+      --pink: #ff4fd8;
+      --green: #23f7a3;
+      --red: #ff4d6d;
+      --orange: #ff7a18;
+
+      --shadow: 0 25px 80px rgba(0,0,0,.48);
+      --radius: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 8% 10%, rgba(25,230,255,.09), transparent 28%),
+        radial-gradient(circle at 90% 10%, rgba(155,92,255,.11), transparent 28%),
+        radial-gradient(circle at 50% 100%, rgba(255,200,74,.07), transparent 32%),
+        var(--bg);
+      font-family: Inter, sans-serif;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: -2;
+      background-image:
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(to bottom, black, transparent 90%);
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      width: 600px;
+      height: 600px;
+      left: -220px;
+      top: 25%;
+      border-radius: 50%;
+      background: rgba(25,230,255,.06);
+      filter: blur(100px);
+      pointer-events: none;
+      z-index: -1;
+      animation: floatGlow 12s ease-in-out infinite alternate;
+    }
+
+    @keyframes floatGlow {
+      from { transform: translate(0,0); }
+      to { transform: translate(100px,-80px); }
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      border: 0;
+    }
+
+    .mono {
+      font-family: "JetBrains Mono", monospace;
+    }
+
+    .orbitron {
+      font-family: Orbitron, sans-serif;
+    }
+
+    /* ================= HEADER ================= */
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      height: 76px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: rgba(3,5,13,.78);
+      backdrop-filter: blur(22px);
+    }
+
+    .nav {
+      max-width: 1600px;
+      height: 100%;
+      margin: auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 220px;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      font-family: Orbitron;
+      font-weight: 900;
+      color: #05070e;
+      background: linear-gradient(135deg, var(--gold), var(--orange), var(--pink));
+      box-shadow:
+        0 0 22px rgba(255,200,74,.35),
+        inset 0 0 15px rgba(255,255,255,.3);
+    }
+
+    .brand-title {
+      font-family: Orbitron;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: .12em;
+    }
+
+    .brand-sub {
+      color: var(--muted);
+      font-size: 9px;
+      letter-spacing: .22em;
+      margin-top: 3px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 6px;
+    }
+
+    .nav-links a {
+      color: #9ca8c1;
+      padding: 10px 13px;
+      border-radius: 10px;
+      font-size: 12px;
+      transition: .2s;
+    }
+
+    .nav-links a:hover,
+    .nav-links a.active {
+      color: white;
+      background: rgba(255,255,255,.06);
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border: 1px solid rgba(35,247,163,.18);
+      border-radius: 999px;
+      background: rgba(35,247,163,.06);
+      font-size: 10px;
+      color: #b5ffdF;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 12px var(--green);
+    }
+
+    .clock {
+      color: #8894af;
+      font-size: 11px;
+    }
+
+    /* ================= MAIN ================= */
+
+    main {
+      max-width: 1600px;
+      margin: auto;
+      padding: 28px 24px 70px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      min-height: 245px;
+      padding: 38px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 28px;
+      background:
+        radial-gradient(circle at 80% 30%, rgba(155,92,255,.18), transparent 32%),
+        radial-gradient(circle at 55% 100%, rgba(25,230,255,.1), transparent 28%),
+        linear-gradient(135deg, rgba(255,200,74,.055), rgba(255,255,255,.015));
+      box-shadow: var(--shadow);
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      width: 360px;
+      height: 360px;
+      right: -130px;
+      top: -160px;
+      border-radius: 50%;
+      border: 1px solid rgba(25,230,255,.15);
+      box-shadow:
+        0 0 80px rgba(25,230,255,.08),
+        inset 0 0 80px rgba(155,92,255,.06);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 260px;
+      height: 2px;
+      right: 8%;
+      bottom: 25px;
+      background: linear-gradient(90deg, transparent, var(--cyan), var(--violet), transparent);
+      box-shadow: 0 0 20px var(--cyan);
+      transform: rotate(-5deg);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border: 1px solid rgba(255,200,74,.18);
+      border-radius: 999px;
+      color: var(--gold);
+      background: rgba(255,200,74,.055);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .15em;
+    }
+
+    .hero h1 {
+      margin-top: 20px;
+      max-width: 900px;
+      font-family: Orbitron;
+      font-size: clamp(30px, 4vw, 62px);
+      line-height: 1.03;
+      letter-spacing: -.04em;
+    }
+
+    .hero h1 span {
+      background: linear-gradient(
+        90deg,
+        var(--gold),
+        var(--cyan),
+        var(--violet),
+        var(--pink)
+      );
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      background-size: 300%;
+      animation: gradientFlow 7s ease infinite;
+    }
+
+    @keyframes gradientFlow {
+      0%,100% { background-position: 0%; }
+      50% { background-position: 100%; }
+    }
+
+    .hero p {
+      max-width: 760px;
+      margin-top: 14px;
+      color: #9ba7c0;
+      line-height: 1.7;
+      font-size: 13px;
+    }
+
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-top: 23px;
+    }
+
+    .hero-badge {
+      padding: 8px 11px;
+      border-radius: 10px;
+      font-size: 9px;
+      letter-spacing: .08em;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.035);
+      color: #b4bed2;
+    }
+
+    .hero-badge.public {
+      color: var(--cyan);
+      border-color: rgba(25,230,255,.2);
+    }
+
+    .hero-badge.offline {
+      color: var(--orange);
+      border-color: rgba(255,122,24,.2);
+    }
+
+    /* ================= GRID ================= */
+
+    .section {
+      margin-top: 28px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 15px;
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      font-family: Orbitron;
+      font-size: 15px;
+      letter-spacing: .08em;
+    }
+
+    .section-desc {
+      color: var(--muted);
+      font-size: 10px;
+      margin-top: 5px;
+    }
+
+    .section-tag {
+      color: #73809b;
+      font-size: 9px;
+      letter-spacing: .15em;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      background: linear-gradient(145deg, rgba(17,23,45,.82), rgba(5,8,19,.86));
+      box-shadow: 0 15px 45px rgba(0,0,0,.22);
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      padding: 1px;
+      border-radius: inherit;
+      background: conic-gradient(
+        from var(--angle, 0deg),
+        transparent 0deg,
+        rgba(25,230,255,.0) 40deg,
+        rgba(25,230,255,.5) 80deg,
+        rgba(155,92,255,.4) 120deg,
+        rgba(255,79,216,.45) 180deg,
+        transparent 230deg,
+        transparent 360deg
+      );
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+      animation: borderSpin 8s linear infinite;
+    }
+
+    @property --angle {
+      syntax: "<angle>";
+      initial-value: 0deg;
+      inherits: false;
+    }
+
+    @keyframes borderSpin {
+      to { --angle: 360deg; }
+    }
+
+    .metric {
+      padding: 18px;
+      min-height: 112px;
+    }
+
+    .metric-label {
+      color: #76829d;
+      font-size: 9px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      margin-top: 13px;
+      font-family: "JetBrains Mono";
+      font-size: 21px;
+      font-weight: 700;
+      color: #dfe7ff;
+    }
+
+    .metric-value.gold { color: var(--gold); }
+    .metric-value.cyan { color: var(--cyan); }
+    .metric-value.green { color: var(--green); }
+    .metric-value.red { color: var(--red); }
+
+    .metric-note {
+      margin-top: 8px;
+      color: #56617a;
+      font-size: 9px;
+    }
+
+    /* ================= COMMAND GRID ================= */
+
+    .terminal-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.75fr) minmax(320px, .75fr);
+      gap: 14px;
+    }
+
+    .chart-panel {
+      min-height: 610px;
+    }
+
+    .panel-head {
+      min-height: 67px;
+      padding: 15px 17px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .instrument {
+      font-family: Orbitron;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .price {
+      font-family: "JetBrains Mono";
+      font-size: 13px;
+      color: var(--gold);
+    }
+
+    .change {
+      font-family: "JetBrains Mono";
+      font-size: 10px;
+    }
+
+    .positive { color: var(--green); }
+    .negative { color: var(--red); }
+
+    .chart-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .chart-btn {
+      padding: 7px 9px;
+      color: #77839d;
+      background: rgba(255,255,255,.035);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 8px;
+      font-size: 9px;
+    }
+
+    .chart-btn.active,
+    .chart-btn:hover {
+      color: white;
+      border-color: rgba(25,230,255,.3);
+      background: rgba(25,230,255,.07);
+    }
+
+    #chart {
+      width: 100%;
+      height: 465px;
+    }
+
+    .chart-footer {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid rgba(255,255,255,.06);
+    }
+
+    .chart-stat {
+      padding: 13px;
+      border-right: 1px solid rgba(255,255,255,.06);
+    }
+
+    .chart-stat:last-child {
+      border-right: 0;
+    }
+
+    .chart-stat span {
+      display: block;
+      color: #59647c;
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+
+    .chart-stat strong {
+      display: block;
+      margin-top: 6px;
+      font-family: "JetBrains Mono";
+      font-size: 11px;
+      color: #b9c3d8;
+    }
+
+    /* ================= RIGHT PANEL ================= */
+
+    .stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .connection {
+      padding: 19px;
+      min-height: 205px;
+      background:
+        radial-gradient(circle at 90% 20%, rgba(255,122,24,.09), transparent 35%),
+        linear-gradient(145deg, rgba(18,24,46,.92), rgba(5,8,18,.9));
+    }
+
+    .connection-state {
+      margin-top: 18px;
+      padding: 15px;
+      border: 1px solid rgba(255,122,24,.16);
+      border-radius: 13px;
+      background: rgba(255,122,24,.045);
+    }
+
+    .state-label {
+      color: #68748e;
+      font-size: 8px;
+      letter-spacing: .14em;
+    }
+
+    .state-value {
+      margin-top: 6px;
+      font-family: Orbitron;
+      font-size: 14px;
+      color: var(--orange);
+    }
+
+    .connection p {
+      margin-top: 10px;
+      color: #707c96;
+      line-height: 1.6;
+      font-size: 10px;
+    }
+
+    .btn {
+      padding: 11px 14px;
+      border-radius: 10px;
+      color: #070910;
+      font-weight: 800;
+      font-size: 10px;
+      letter-spacing: .04em;
+      background: linear-gradient(135deg, var(--gold), var(--orange));
+      box-shadow: 0 0 25px rgba(255,200,74,.15);
+      transition: .2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 30px rgba(255,200,74,.3);
+    }
+
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: .38;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn.secondary {
+      color: #b8c2d9;
+      background: rgba(255,255,255,.055);
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: none;
+    }
+
+    .orderbook {
+      min-height: 390px;
+    }
+
+    .book-body {
+      padding: 10px 14px 14px;
+    }
+
+    .book-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      padding: 5px 0;
+      font-family: "JetBrains Mono";
+      font-size: 9px;
+    }
+
+    .book-row span:nth-child(2) {
+      text-align: right;
+    }
+
+    .book-row span:last-child {
+      text-align: right;
+      color: #67738e;
+    }
+
+    .ask {
+      color: #ff7187;
+    }
+
+    .bid {
+      color: #35f2ae;
+    }
+
+    .spread {
+      margin: 9px 0;
+      padding: 8px;
+      text-align: center;
+      border-top: 1px solid rgba(255,255,255,.05);
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      color: #7d89a2;
+      font-size: 9px;
+    }
+
+    /* ================= TICKER ================= */
+
+    .ticker-wrap {
+      overflow: hidden;
+      margin-top: 14px;
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 14px;
+      background: rgba(7,10,21,.82);
+    }
+
+    .ticker {
+      display: flex;
+      width: max-content;
+      animation: tickerMove 45s linear infinite;
+    }
+
+    .ticker:hover {
+      animation-play-state: paused;
+    }
+
+    @keyframes tickerMove {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+
+    .ticker-item {
+      min-width: 145px;
+      padding: 11px 15px;
+      border-right: 1px solid rgba(255,255,255,.05);
+    }
+
+    .ticker-symbol {
+      color: #d6dded;
+      font-family: Orbitron;
+      font-size: 9px;
+    }
+
+    .ticker-price {
+      margin-top: 4px;
+      color: #8290ab;
+      font-family: "JetBrains Mono";
+      font-size: 9px;
+    }
+
+    /* ================= BOTS ================= */
+
+    .bot-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 13px;
+    }
+
+    .bot-card {
+      min-height: 325px;
+      overflow: hidden;
+    }
+
+    .bot-image {
+      position: relative;
+      height: 155px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 45%, rgba(25,230,255,.12), transparent 38%),
+        linear-gradient(135deg, #090d1c, #11172b);
+    }
+
+    .bot-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .image-slot {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      background:
+        radial-gradient(circle, rgba(25,230,255,.08), transparent 40%),
+        repeating-linear-gradient(
+          135deg,
+          rgba(255,255,255,.025) 0,
+          rgba(255,255,255,.025) 1px,
+          transparent 1px,
+          transparent 10px
+        );
+    }
+
+    .image-slot-inner {
+      padding: 18px;
+    }
+
+    .image-slot-code {
+      font-family: Orbitron;
+      font-size: 30px;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--cyan), var(--violet), var(--pink));
+      -webkit-background-clip: text;
+      color: transparent;
+    }
+
+    .image-slot-text {
+      margin-top: 8px;
+      color: #69758f;
+      font-size: 8px;
+      letter-spacing: .18em;
+    }
+
+    .bot-content {
+      padding: 15px;
+    }
+
+    .bot-name {
+      font-family: Orbitron;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .bot-desc {
+      min-height: 35px;
+      margin-top: 7px;
+      color: #748099;
+      font-size: 9px;
+      line-height: 1.5;
+    }
+
+    .bot-status {
+      display: inline-flex;
+      margin-top: 11px;
+      padding: 5px 7px;
+      border-radius: 6px;
+      color: #ffad7a;
+      background: rgba(255,122,24,.07);
+      border: 1px solid rgba(255,122,24,.12);
+      font-size: 8px;
+    }
+
+    .bot-controls {
+      display: flex;
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .bot-controls .btn {
+      flex: 1;
+      padding: 8px;
+      font-size: 8px;
+    }
+
+    /* ================= LOWER PANELS ================= */
+
+    .lower-grid {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 14px;
+    }
+
+    .table-panel {
+      min-height: 300px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 680px;
+    }
+
+    th,
+    td {
+      padding: 13px 15px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      font-size: 9px;
+    }
+
+    th {
+      color: #59647d;
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+
+    td {
+      color: #a8b3c9;
+      font-family: "JetBrains Mono";
+    }
+
+    .empty {
+      text-align: center;
+      padding: 55px 20px;
+      color: #58647d;
+      font-size: 10px;
+    }
+
+    .empty strong {
+      display: block;
+      color: #8b97af;
+      font-family: Orbitron;
+      font-size: 11px;
+      margin-bottom: 7px;
+    }
+
+    /* ================= RISK ================= */
+
+    .risk-panel {
+      padding-bottom: 17px;
+    }
+
+    .risk-list {
+      padding: 15px;
+      display: grid;
+      gap: 13px;
+    }
+
+    .risk-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .risk-name {
+      color: #9ba6bd;
+      font-size: 10px;
+    }
+
+    .risk-bar {
+      height: 5px;
+      margin-top: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+    }
+
+    .risk-fill {
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--cyan), var(--violet));
+      box-shadow: 0 0 10px rgba(25,230,255,.3);
+    }
+
+    .risk-limit {
+      color: var(--gold);
+      font-family: "JetBrains Mono";
+      font-size: 9px;
+    }
+
+    .kill {
+      margin: 0 15px;
+      width: calc(100% - 30px);
+      padding: 13px;
+      border-radius: 10px;
+      color: #ff758a;
+      border: 1px solid rgba(255,77,109,.18);
+      background: rgba(255,77,109,.06);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+
+    .kill:hover {
+      background: rgba(255,77,109,.1);
+    }
+
+    /* ================= ACTIVITY ================= */
+
+    .activity {
+      max-height: 300px;
+      overflow: auto;
+      padding: 5px 15px 15px;
+    }
+
+    .activity-item {
+      display: grid;
+      grid-template-columns: 75px 1fr;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+
+    .activity-time {
+      color: #56617a;
+      font-family: "JetBrains Mono";
+      font-size: 8px;
+    }
+
+    .activity-message {
+      color: #8995ad;
+      font-size: 9px;
+      line-height: 1.5;
+    }
+
+    /* ================= FOOTER ================= */
+
+    footer {
+      margin-top: 30px;
+      padding: 20px 5px;
+      display: flex;
+      justify-content: space-between;
+      gap: 15px;
+      color: #515c73;
+      font-size: 8px;
+      border-top: 1px solid rgba(255,255,255,.06);
+    }
+
+    footer span {
+      color: #75819a;
+    }
+
+    /* ================= TOAST ================= */
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 2000;
+      min-width: 260px;
+      padding: 14px 16px;
+      border: 1px solid rgba(25,230,255,.2);
+      border-radius: 12px;
+      background: rgba(8,13,28,.94);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 20px 50px rgba(0,0,0,.45);
+      transform: translateY(130px);
+      opacity: 0;
+      transition: .3s;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast-title {
+      color: var(--cyan);
+      font-family: Orbitron;
+      font-size: 9px;
+      letter-spacing: .1em;
+    }
+
+    .toast-message {
+      margin-top: 5px;
+      color: #8793ad;
+      font-size: 9px;
+    }
+
+    /* ================= RESPONSIVE ================= */
+
+    @media (max-width: 1250px) {
+      .cards {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .bot-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (max-width: 1000px) {
+      .nav-links {
+        display: none;
+      }
+
+      .terminal-grid,
+      .lower-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-panel {
+        min-height: auto;
+      }
+    }
+
+    @media (max-width: 720px) {
+      main {
+        padding: 16px 12px 50px;
+      }
+
+      .nav {
+        padding: 0 12px;
+      }
+
+      .brand {
+        min-width: auto;
+      }
+
+      .brand-sub,
+      .clock {
+        display: none;
+      }
+
+      .status-pill {
+        padding: 7px 9px;
+      }
+
+      .hero {
+        padding: 25px 20px;
+        border-radius: 20px;
+      }
+
+      .hero h1 {
+        font-size: 31px;
+      }
+
+      .cards {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .bot-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-footer {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      #chart {
+        height: 370px;
+      }
+
+      .panel-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      footer {
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 430px) {
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-badges {
+        display: grid;
+      }
+
+      .hero-badge {
+        width: fit-content;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header class="topbar">
+  <nav class="nav">
+
+    <a href="index.html" class="brand">
+      <div class="brand-mark">K</div>
+      <div>
+        <div class="brand-title">BOT KING</div>
+        <div class="brand-sub">FINTECH TECHNOLOGY</div>
+      </div>
+    </a>
+
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="markets.html">Markets</a>
+      <a href="terminal.html" class="active">Terminal</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="academy.html">Academy</a>
+    </div>
+
+    <div class="nav-right">
+      <div class="status-pill">
+        <span class="dot" id="marketDot"></span>
+        <span id="marketStatus">MARKET LIVE</span>
+      </div>
+      <div class="clock mono" id="clock">--:--:--</div>
+    </div>
+
+  </nav>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero">
+
+    <div class="eyebrow">
+      <span>◆</span>
+      KINGBOT COMMAND CENTER
+    </div>
+
+    <h1>
+      Intelligent Trading
+      <span>Infrastructure.</span>
+    </h1>
+
+    <p>
+      A centralized command environment for market intelligence, automated
+      trading systems, risk controls and broker connectivity.
+      Public market data is active now. Account and execution information
+      appears only after a real backend connection is established.
+    </p>
+
+    <div class="hero-badges">
+      <div class="hero-badge public">● PUBLIC MARKET DATA ACTIVE</div>
+      <div class="hero-badge offline">● BROKER ACCOUNT NOT CONNECTED</div>
+      <div class="hero-badge">◆ 5 BOT SYSTEMS</div>
+      <div class="hero-badge">◆ RISK ENGINE READY</div>
+      <div class="hero-badge">◆ API BACKEND READY</div>
+    </div>
+
+  </section>
+
+  <!-- ACCOUNT METRICS -->
+  <section class="section">
+
+    <div class="section-head">
+      <div>
+        <div class="section-title">ACCOUNT COMMAND METRICS</div>
+        <div class="section-desc">
+          Broker values remain unavailable until a real account connection exists.
+        </div>
+      </div>
+
+      <div class="section-tag mono">BROKER_LAYER / ACCOUNT</div>
+    </div>
+
+    <div class="cards">
+
+      <div class="card metric">
+        <div class="metric-label">Balance</div>
+        <div class="metric-value gold" id="accountBalance">—</div>
+        <div class="metric-note">Awaiting broker</div>
+      </div>
+
+      <div class="card metric">
+        <div class="metric-label">Equity</div>
+        <div class="metric-value cyan" id="accountEquity">—</div>
+        <div class="metric-note">Awaiting broker</div>
+      </div>
+
+      <div class="card metric">
+        <div class="metric-label">Free Margin</div>
+        <div class="metric-value" id="freeMargin">—</div>
+        <div class="metric-note">Awaiting broker</div>
+      </div>
+
+      <div class="card metric">
+        <div class="metric-label">Daily P&L</div>
+        <div class="metric-value green" id="dailyPnl">—</div>
+        <div class="metric-note">No fabricated values</div>
+      </div>
+
+      <div class="card metric">
+        <div class="metric-label">Drawdown</div>
+        <div class="metric-value red" id="drawdown">—</div>
+        <div class="metric-note">Risk engine awaiting data</div>
+      </div>
+
+      <div class="card metric">
+        <div class="metric-label">Open Positions</div>
+        <div class="metric-value" id="positionCount">0</div>
+        <div class="metric-note">Broker positions only</div>
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- TICKER -->
+  <div class="ticker-wrap">
+    <div class="ticker" id="ticker"></div>
+  </div>
+
+  <!-- TERMINAL -->
+  <section class="section">
+
+    <div class="section-head">
+      <div>
+        <div class="section-title">LIVE MARKET COMMAND</div>
+        <div class="section-desc">
+          Public exchange data for market visualization and analysis.
+        </div>
+      </div>
+
+      <div class="section-tag mono" id="dataLatency">
+        DATA STREAM / CONNECTING
+      </div>
+    </div>
+
+    <div class="terminal-grid">
+
+      <!-- CHART -->
+      <div class="card chart-panel">
+
+        <div class="panel-head">
+
+          <div class="panel-title">
+            <div class="instrument" id="activeSymbol">BTCUSDT</div>
+            <div class="price" id="activePrice">—</div>
+            <div class="change" id="activeChange">—</div>
+          </div>
+
+          <div class="chart-actions">
+            <button class="chart-btn active" data-symbol="BTCUSDT">BTC</button>
+            <button class="chart-btn" data-symbol="ETHUSDT">ETH</button>
+            <button class="chart-btn" data-symbol="SOLUSDT">SOL</button>
+            <button class="chart-btn" data-symbol="BNBUSDT">BNB</button>
+            <button class="chart-btn" data-symbol="XRPUSDT">XRP</button>
+            <button class="chart-btn" data-symbol="PAXGUSDT">GOLD</button>
+            <button class="chart-btn" data-symbol="EURUSDT">EUR</button>
+            <button class="chart-btn" data-symbol="GBPUSDT">GBP</button>
+          </div>
+
+        </div>
+
+        <div id="chart"></div>
+
+        <div class="chart-footer">
+
+          <div class="chart-stat">
+            <span>Market Signal</span>
+            <strong id="signal">WAITING</strong>
+          </div>
+
+          <div class="chart-stat">
+            <span>Momentum</span>
+            <strong id="momentum">—</strong>
+          </div>
+
+          <div class="chart-stat">
+            <span>Volatility</span>
+            <strong id="volatility">—</strong>
+          </div>
+
+          <div class="chart-stat">
+            <span>Volume</span>
+            <strong id="volume">—</strong>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- RIGHT SIDE -->
+      <div class="stack">
+
+        <!-- BROKER -->
+        <div class="card connection">
+
+          <div class="section-title">BROKER CONNECTION</div>
+
+          <div class="connection-state">
+            <div class="state-label">CURRENT STATE</div>
+            <div class="state-value" id="brokerState">
+              NOT CONNECTED
+            </div>
+          </div>
+
+          <p>
+            Connect the KINGBOT backend to a supported broker layer before
+            account balances, positions, bot execution and trade history
+            become available.
+          </p>
+
+          <div style="margin-top:14px;display:flex;gap:8px;">
+            <button class="btn" id="connectBroker">
+              CONNECT BROKER
+            </button>
+
+            <button class="btn secondary" id="disconnectBroker" disabled>
+              DISCONNECT
+            </button>
+          </div>
+
+        </div>
+
+        <!-- ORDER BOOK -->
+        <div class="card orderbook">
+
+          <div class="panel-head">
+            <div>
+              <div class="section-title">ORDER BOOK</div>
+              <div class="section-desc" id="bookSymbol">
+                BTCUSDT / DEPTH
+              </div>
+            </div>
+
+            <div class="section-tag">PUBLIC DATA</div>
+          </div>
+
+          <div class="book-body">
+
+            <div id="asks"></div>
+
+            <div class="spread">
+              SPREAD <span id="spread">—</span>
+            </div>
+
+            <div id="bids"></div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- BOT SYSTEMS -->
+  <section class="section">
+
+    <div class="section-head">
+      <div>
+        <div class="section-title">KINGBOT SYSTEMS</div>
+        <div class="section-desc">
+          Five specialized automated trading architectures.
+        </div>
+      </div>
+
+      <div class="section-tag mono">AUTOMATION / BOT_LAYER</div>
+    </div>
+
+    <div class="bot-grid">
+
+      <!-- STRATEGIC -->
+      <div class="card bot-card">
+
+        <div class="bot-image">
+          <img
+            src="assets/images/bots/strategic.png"
+            alt="KINGBOT Strategic"
+            loading="lazy"
+            onerror="imageFallback(this,'STR')"
+          />
+
+          <div class="image-slot" id="slot-strategic">
+            <div class="image-slot-inner">
+              <div class="image-slot-code">STR</div>
+              <div class="image-slot-text">
+                SYSTEM IMAGE SLOT
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bot-content">
+          <div class="bot-name">KINGBOT STRATEGIC</div>
+          <div class="bot-desc">
+            Multi-strategy automated trading architecture.
+          </div>
+
+          <div class="bot-status">● OFFLINE / BACKEND REQUIRED</div>
+
+          <div class="bot-controls">
+            <button class="btn" disabled>START</button>
+            <button class="btn secondary" disabled>STOP</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- FLIPPER -->
+      <div class="card bot-card">
+
+        <div class="bot-image">
+          <img
+            src="assets/images/bots/flipper.png"
+            alt="KINGBOT Flipper"
+            loading="lazy"
+            onerror="imageFallback(this,'FLP')"
+          />
+
+          <div class="image-slot" id="slot-flipper">
+            <div class="image-slot-inner">
+              <div class="image-slot-code">FLP</div>
+              <div class="image-slot-text">
+                SYSTEM IMAGE SLOT
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bot-content">
+          <div class="bot-name">KINGBOT FLIPPER</div>
+          <div class="bot-desc">
+            High-speed flipping and short-duration execution architecture.
+          </div>
+
+          <div class="bot-status">● OFFLINE / BACKEND REQUIRED</div>
+
+          <div class="bot-controls">
+            <button class="btn" disabled>START</button>
+            <button class="btn secondary" disabled>STOP</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- BREAKOUT -->
+      <div class="card bot-card">
+
+        <div class="bot-image">
+          <img
+            src="assets/images/bots/breakout.png"
+            alt="KINGBOT Breakout"
+            loading="lazy"
+            onerror="imageFallback(this,'BRK')"
+          />
+
+          <div class="image-slot" id="slot-breakout">
+            <div class="image-slot-inner">
+              <div class="image-slot-code">BRK</div>
+              <div class="image-slot-text">
+                SYSTEM IMAGE SLOT
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bot-content">
+          <div class="bot-name">KINGBOT BREAKOUT</div>
+          <div class="bot-desc">
+            Breakout and momentum-based automation architecture.
+          </div>
+
+          <div class="bot-status">● OFFLINE / BACKEND REQUIRED</div>
+
+          <div class="bot-controls">
+            <button class="btn" disabled>START</button>
+            <button class="btn secondary" disabled>STOP</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SMC -->
+      <div class="card bot-card">
+
+        <div class="bot-image">
+          <img
+            src="assets/images/bots/smc-pro.png"
+            alt="KINGBOT SMC PRO"
+            loading="lazy"
+            onerror="imageFallback(this,'SMC')"
+          />
+
+          <div class="image-slot" id="slot-smc">
+            <div class="image-slot-inner">
+              <div class="image-slot-code">SMC</div>
+              <div class="image-slot-text">
+                SYSTEM IMAGE SLOT
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bot-content">
+          <div class="bot-name">KINGBOT SMC PRO</div>
+          <div class="bot-desc">
+            Smart Money Concepts automation and market-structure logic.
+          </div>
+
+          <div class="bot-status">● OFFLINE / BACKEND REQUIRED</div>
+
+          <div class="bot-controls">
+            <button class="btn" disabled>START</button>
+            <button class="btn secondary" disabled>STOP</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- LADDER -->
+      <div class="card bot-card">
+
+        <div class="bot-image">
+          <img
+            src="assets/images/bots/ladder-flip.png"
+            alt="KINGBOT Ladder Flip V8"
+            loading="lazy"
+            onerror="imageFallback(this,'L8')"
+          />
+
+          <div class="image-slot" id="slot-ladder">
+            <div class="image-slot-inner">
+              <div class="image-slot-code">L8</div>
+              <div class="image-slot-text">
+                SYSTEM IMAGE SLOT
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bot-content">
+          <div class="bot-name">LADDER FLIP V8</div>
+          <div class="bot-desc">
+            Advanced ladder-based automated trading architecture.
+          </div>
+
+          <div class="bot-status">● OFFLINE / BACKEND REQUIRED</div>
+
+          <div class="bot-controls">
+            <button class="btn" disabled>START</button>
+            <button class="btn secondary" disabled>STOP</button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- POSITIONS + RISK -->
+  <section class="section">
+
+    <div class="lower-grid">
+
+      <div class="card table-panel">
+
+        <div class="panel-head">
+          <div>
+            <div class="section-title">LIVE POSITIONS</div>
+            <div class="section-desc">
+              Real broker positions only.
+            </div>
+          </div>
+
+          <div class="section-tag">BROKER DATA</div>
+        </div>
+
+        <div class="table-wrap">
+
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>Volume</th>
+                <th>Entry</th>
+                <th>Current</th>
+                <th>P&L</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+
+            <tbody id="positionsTable">
+              <tr>
+                <td colspan="7">
+                  <div class="empty">
+                    <strong>NO BROKER POSITIONS</strong>
+                    Connect a broker backend to display live positions.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+        </div>
+
+      </div>
+
+      <div class="card risk-panel">
+
+        <div class="panel-head">
+          <div>
+            <div class="section-title">RISK COMMAND</div>
+            <div class="section-desc">
+              Configured policy limits.
+            </div>
+          </div>
+
+          <div class="section-tag">RISK ENGINE</div>
+        </div>
+
+        <div class="risk-list">
+
+          <div class="risk-row">
+            <div>
+              <div class="risk-name">Daily Drawdown Policy</div>
+              <div class="risk-bar">
+                <div class="risk-fill"></div>
+              </div>
+            </div>
+            <div class="risk-limit">5%</div>
+          </div>
+
+          <div class="risk-row">
+            <div>
+              <div class="risk-name">Total Drawdown Policy</div>
+              <div class="risk-bar">
+                <div class="risk-fill"></div>
+              </div>
+            </div>
+            <div class="risk-limit">10%</div>
+          </div>
+
+          <div class="risk-row">
+            <div>
+              <div class="risk-name">Trading-Day Policy</div>
+              <div class="risk-bar">
+                <div class="risk-fill"></div>
+              </div>
+            </div>
+            <div class="risk-limit">7 + 5</div>
+          </div>
+
+        </div>
+
+        <button class="kill" id="killSwitch">
+          ⚠ KILL SWITCH — BACKEND REQUIRED
+        </button>
+
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- ORDERS / ACTIVITY -->
+  <section class="section">
+
+    <div class="lower-grid">
+
+      <div class="card table-panel">
+
+        <div class="panel-head">
+          <div>
+            <div class="section-title">ORDER HISTORY</div>
+            <div class="section-desc">
+              Confirmed broker orders only.
+            </div>
+          </div>
+
+          <div class="section-tag">EXECUTION LEDGER</div>
+        </div>
+
+        <div class="table-wrap">
+
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>Volume</th>
+                <th>Price</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+
+            <tbody id="ordersTable">
+              <tr>
+                <td colspan="6">
+                  <div class="empty">
+                    <strong>NO EXECUTION DATA</strong>
+                    Orders will appear after backend confirmation.
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+        </div>
+
+      </div>
+
+      <div class="card">
+
+        <div class="panel-head">
+          <div>
+            <div class="section-title">ACTIVITY STREAM</div>
+            <div class="section-desc">
+              Terminal and connection events.
+            </div>
+          </div>
+
+          <div class="section-tag">SYSTEM LOG</div>
+        </div>
+
+        <div class="activity" id="activityLog"></div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+  <footer>
+    <div>
+      <span>BOT KING</span> © 2026 — FINTECH TECHNOLOGY
+    </div>
+
+    <div>
+      PUBLIC MARKET DATA:
+      <span>Binance Streams</span> ·
+      BROKER EXECUTION:
+      <span>Backend Required</span>
+    </div>
+
+    <div id="footerStatus">
+      TERMINAL ONLINE
+    </div>
+  </footer>
+
+</main>
+
+<div class="toast" id="toast">
+  <div class="toast-title" id="toastTitle">KINGBOT</div>
+  <div class="toast-message" id="toastMessage"></div>
+</div>
+
+<script>
+/* =========================================================
+   KINGBOT TERMINAL ENGINE
+   Public market data + backend-ready broker architecture
+========================================================= */
+
+const API_BASE = "";
+const REST_HOSTS = [
+  "https://api.binance.com",
+  "https://data-api.binance.vision"
+];
+
+const WS_HOSTS = [
+  "wss://stream.binance.com:9443/stream?streams=",
+  "wss://data-stream.binance.vision/stream?streams="
+];
+
+const symbols = [
+  "BTCUSDT",
+  "ETHUSDT",
+  "SOLUSDT",
+  "BNBUSDT",
+  "XRPUSDT",
+  "DOGEUSDT",
+  "ADAUSDT",
+  "AVAXUSDT",
+  "LINKUSDT",
+  "DOTUSDT",
+  "LTCUSDT",
+  "TRXUSDT",
+  "ATOMUSDT",
+  "UNIUSDT",
+  "NEARUSDT",
+  "ARBUSDT",
+  "OPUSDT",
+  "INJUSDT",
+  "SUIUSDT",
+  "PAXGUSDT",
+  "EURUSDT",
+  "GBPUSDT"
+];
+
+let activeSymbol =
+  new URLSearchParams(location.search).get("s")?.toUpperCase()
+  || "BTCUSDT";
+
+if (!symbols.includes(activeSymbol)) {
+  activeSymbol = "BTCUSDT";
+}
+
+let marketSocket = null;
+let reconnectTimer = null;
+let reconnectAttempt = 0;
+let chart;
+let candleSeries;
+let lastCandleTime = 0;
+let candles = [];
+let currentTicker = {};
+let backendConnected = false;
+
+const $ = id => document.getElementById(id);
+
+/* =========================================================
+   CLOCK
+========================================================= */
+
+function updateClock() {
+  $("clock").textContent =
+    new Date().toLocaleTimeString([], {
+      hour12: false
+    });
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+
+/* =========================================================
+   TOAST
+========================================================= */
+
+let toastTimer;
+
+function toast(title, message) {
+  $("toastTitle").textContent = title;
+  $("toastMessage").textContent = message;
+
+  $("toast").classList.add("show");
+
+  clearTimeout(toastTimer);
+
+  toastTimer = setTimeout(() => {
+    $("toast").classList.remove("show");
+  }, 3500);
+}
+
+/* =========================================================
+   ACTIVITY LOG
+========================================================= */
+
+function logActivity(message) {
+  const time = new Date().toLocaleTimeString([], {
+    hour12: false
+  });
+
+  const item = document.createElement("div");
+  item.className = "activity-item";
+
+  item.innerHTML = `
+    <div class="activity-time">${time}</div>
+    <div class="activity-message">${escapeHtml(message)}</div>
+  `;
+
+  $("activityLog").prepend(item);
+
+  while ($("activityLog").children.length > 30) {
+    $("activityLog").lastElementChild.remove();
+  }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+/* =========================================================
+   IMAGE FALLBACK
+========================================================= */
+
+function imageFallback(img, code) {
+  img.style.display = "none";
+
+  const slotId = {
+    STR: "slot-strategic",
+    FLP: "slot-flipper",
+    BRK: "slot-breakout",
+    SMC: "slot-smc",
+    L8: "slot-ladder"
+  }[code];
+
+  if (slotId) {
+    const slot = $(slotId);
+    if (slot) slot.style.display = "grid";
+  }
+}
+
+document.querySelectorAll(".image-slot").forEach(slot => {
+  slot.style.display = "none";
+});
+
+/* =========================================================
+   CHART
+========================================================= */
+
+function createChart() {
+
+  const container = $("chart");
+
+  chart = LightweightCharts.createChart(container, {
+    layout: {
+      background: {
+        color: "#050916"
+      },
+      textColor: "#69758e"
+    },
+
+    grid: {
+      vertLines: {
+        color: "rgba(255,255,255,.035)"
+      },
+      horzLines: {
+        color: "rgba(255,255,255,.035)"
+      }
+    },
+
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal
+    },
+
+    rightPriceScale: {
+      borderColor: "rgba(255,255,255,.08)"
+    },
+
+    timeScale: {
+      borderColor: "rgba(255,255,255,.08)",
+      timeVisible: true,
+      secondsVisible: false
+    },
+
+    width: container.clientWidth,
+    height: 465
+  });
+
+  candleSeries = chart.addCandlestickSeries({
+    upColor: "#23f7a3",
+    downColor: "#ff4d6d",
+    borderUpColor: "#23f7a3",
+    borderDownColor: "#ff4d6d",
+    wickUpColor: "#23f7a3",
+    wickDownColor: "#ff4d6d"
+  });
+
+  window.addEventListener("resize", () => {
+    chart.applyOptions({
+      width: container.clientWidth
+    });
+  });
+}
+
+createChart();
+
+/* =========================================================
+   REST
+========================================================= */
+
+async function restFetch(path, options = {}) {
+
+  let lastError;
+
+  for (const host of REST_HOSTS) {
+
+    try {
+
+      const controller = new AbortController();
+
+      const timeout = setTimeout(
+        () => controller.abort(),
+        7000
+      );
+
+      const response = await fetch(
+        host + path,
+        {
+          ...options,
+          signal: controller.signal
+        }
+      );
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return await response.json();
+
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("REST unavailable");
+}
+
+/* =========================================================
+   LOAD CANDLES
+========================================================= */
+
+async function loadCandles() {
+
+  try {
+
+    const data = await restFetch(
+      `/api/v3/klines?symbol=${activeSymbol}&interval=1m&limit=240`
+    );
+
+    candles = data.map(k => ({
+      time: Math.floor(k[0] / 1000),
+      open: Number(k[1]),
+      high: Number(k[2]),
+      low: Number(k[3]),
+      close: Number(k[4])
+    }));
+
+    candleSeries.setData(candles);
+
+    lastCandleTime =
+      candles[candles.length - 1]?.time || 0;
+
+    chart.timeScale().fitContent();
+
+    calculateSignal(data);
+
+    logActivity(
+      `${activeSymbol} 1-minute market history loaded`
+    );
+
+  } catch (error) {
+
+    logActivity(
+      `Market history unavailable: ${error.message}`
+    );
+
+  }
+}
+
+/* =========================================================
+   SIGNAL ENGINE
+========================================================= */
+
+function calculateSignal(data) {
+
+  if (!data || data.length < 40) return;
+
+  const closes = data.map(x => Number(x[4]));
+
+  const fast = ema(closes, 9);
+  const slow = ema(closes, 21);
+
+  const latest = closes[closes.length - 1];
+  const fastLatest = fast[fast.length - 1];
+  const slowLatest = slow[slow.length - 1];
+
+  let verdict = "NEUTRAL";
+
+  if (fastLatest > slowLatest && latest > fastLatest) {
+    verdict = "LONG BIAS";
+  }
+
+  if (fastLatest < slowLatest && latest < fastLatest) {
+    verdict = "SHORT BIAS";
+  }
+
+  const signalEl = $("signal");
+
+  signalEl.textContent = verdict;
+
+  if (verdict.includes("LONG")) {
+    signalEl.style.color = "#23f7a3";
+  } else if (verdict.includes("SHORT")) {
+    signalEl.style.color = "#ff4d6d";
+  } else {
+    signalEl.style.color = "#ffc84a";
+  }
+
+  const momentumValue =
+    ((fastLatest - slowLatest) / slowLatest) * 100;
+
+  $("momentum").textContent =
+    `${momentumValue >= 0 ? "+" : ""}${momentumValue.toFixed(3)}%`;
+
+  $("volatility").textContent =
+    calculateVolatility(closes).toFixed(3) + "%";
+
+  const volumes = data.map(x => Number(x[5]));
+  const recentVolume = volumes[volumes.length - 1];
+
+  $("volume").textContent =
+    formatCompact(recentVolume);
+}
+
+function ema(values, period) {
+
+  const k = 2 / (period + 1);
+  let result = [];
+
+  let previous = values[0];
+
+  result.push(previous);
+
+  for (let i = 1; i < values.length; i++) {
+
+    previous =
+      values[i] * k +
+      previous * (1 - k);
+
+    result.push(previous);
+  }
+
+  return result;
+}
+
+function calculateVolatility(values) {
+
+  if (values.length < 10) return 0;
+
+  const recent = values.slice(-20);
+
+  const mean =
+    recent.reduce((a,b) => a + b, 0) /
+    recent.length;
+
+  const variance =
+    recent.reduce(
+      (sum, value) =>
+        sum + Math.pow(value - mean, 2),
+      0
+    ) / recent.length;
+
+  return Math.sqrt(variance) / mean * 100;
+}
+
+/* =========================================================
+   TICKER TAPE
+========================================================= */
+
+function buildTicker() {
+
+  const ticker = $("ticker");
+
+  const duplicated = [...symbols, ...symbols];
+
+  ticker.innerHTML = duplicated.map(symbol => `
+    <div class="ticker-item">
+      <div class="ticker-symbol">${symbol}</div>
+      <div class="ticker-price" id="tick-${symbol}-${Math.random()}">
+        LIVE DATA
+      </div>
+    </div>
+  `).join("");
+}
+
+buildTicker();
+
+/* =========================================================
+   UPDATE TICKER
+========================================================= */
+
+function updateTicker(symbol, price, change) {
+
+  currentTicker[symbol] = {
+    price,
+    change
+  };
+
+  document.querySelectorAll(".ticker-item").forEach(item => {
+
+    const symbolEl =
+      item.querySelector(".ticker-symbol");
+
+    if (!symbolEl || symbolEl.textContent !== symbol) return;
+
+    const priceEl =
+      item.querySelector(".ticker-price");
+
+    if (!priceEl) return;
+
+    priceEl.textContent =
+      `${formatPrice(price)}  ${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
+
+    priceEl.style.color =
+      change >= 0
+        ? "#23f7a3"
+        : "#ff4d6d";
+  });
+
+  if (symbol === activeSymbol) {
+
+    $("activePrice").textContent =
+      formatPrice(price);
+
+    $("activeChange").textContent =
+      `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
+
+    $("activeChange").className =
+      "change " +
+      (change >= 0 ? "positive" : "negative");
+  }
+}
+
+/* =========================================================
+   MARKET WEBSOCKET
+========================================================= */
+
+function connectMarketSocket() {
+
+  if (marketSocket) {
+    try {
+      marketSocket.close();
+    } catch {}
+  }
+
+  const streams = symbols
+    .map(s => `${s.toLowerCase()}@miniTicker`)
+    .concat([
+      `${activeSymbol.toLowerCase()}@kline_1m`,
+      `${activeSymbol.toLowerCase()}@depth20@100ms`,
+      `${activeSymbol.toLowerCase()}@aggTrade`
+    ])
+    .join("/");
+
+  const url =
+    WS_HOSTS[reconnectAttempt % WS_HOSTS.length] +
+    streams;
+
+  marketSocket = new WebSocket(url);
+
+  marketSocket.onopen = () => {
+
+    reconnectAttempt = 0;
+
+    $("marketStatus").textContent =
+      "MARKET LIVE";
+
+    $("marketDot").style.background =
+      "#23f7a3";
+
+    $("marketDot").style.boxShadow =
+      "0 0 12px #23f7a3";
+
+    $("dataLatency").textContent =
+      "DATA STREAM / LIVE";
+
+    $("footerStatus").textContent =
+      "MARKET STREAM ONLINE";
+
+    logActivity(
+      "Public market websocket connected"
+    );
+  };
+
+  marketSocket.onmessage = event => {
+
+    try {
+
+      const packet = JSON.parse(event.data);
+
+      const stream = packet.stream || "";
+      const data = packet.data || {};
+
+      if (stream.includes("@miniticker")) {
+
+        const symbol = data.s;
+
+        const price = Number(data.c);
+
+        const open = Number(data.o);
+
+        const change =
+          open
+            ? ((price - open) / open) * 100
+            : 0;
+
+        updateTicker(
+          symbol,
+          price,
+          change
+        );
+      }
+
+      if (stream.includes("@kline")) {
+
+        const k = data.k;
+
+        const candle = {
+          time: Math.floor(k.t / 1000),
+          open: Number(k.o),
+          high: Number(k.h),
+          low: Number(k.l),
+          close: Number(k.c)
+        };
+
+        candleSeries.update(candle);
+
+        if (candle.time !== lastCandleTime) {
+
+          lastCandleTime = candle.time;
+
+          candles.push(candle);
+
+          if (candles.length > 240) {
+            candles.shift();
+          }
+        }
+      }
+
+      if (stream.includes("@depth")) {
+        renderOrderBook(data);
+      }
+
+      if (stream.includes("@aggtrade")) {
+        $("dataLatency").textContent =
+          `DATA STREAM / LIVE · ${Date.now() % 1000}ms`;
+      }
+
+    } catch {}
+  };
+
+  marketSocket.onerror = () => {
+    $("marketStatus").textContent =
+      "RECONNECTING";
+
+    $("marketDot").style.background =
+      "#ff7a18";
+
+    $("marketDot").style.boxShadow =
+      "0 0 12px #ff7a18";
+  };
+
+  marketSocket.onclose = () => {
+
+    $("marketStatus").textContent =
+      "RECONNECTING";
+
+    $("marketDot").style.background =
+      "#ff7a18";
+
+    $("marketDot").style.boxShadow =
+      "0 0 12px #ff7a18";
+
+    reconnectAttempt++;
+
+    clearTimeout(reconnectTimer);
+
+    reconnectTimer = setTimeout(
+      connectMarketSocket,
+      Math.min(
+        1000 * Math.pow(1.5, reconnectAttempt),
+        15000
+      )
+    );
+  };
+}
+
+/* =========================================================
+   ORDER BOOK
+========================================================= */
+
+function renderOrderBook(data) {
+
+  const asks = (data.a || []).slice(0, 8);
+  const bids = (data.b || []).slice(0, 8);
+
+  $("asks").innerHTML =
+    asks.reverse().map(row => `
+      <div class="book-row">
+        <span class="ask">${formatPrice(Number(row[0]))}</span>
+        <span>${formatCompact(Number(row[1]))}</span>
+        <span>ASK</span>
+      </div>
+    `).join("");
+
+  $("bids").innerHTML =
+    bids.map(row => `
+      <div class="book-row">
+        <span class="bid">${formatPrice(Number(row[0]))}</span>
+        <span>${formatCompact(Number(row[1]))}</span>
+        <span>BID</span>
+      </div>
+    `).join("");
+
+  const bestAsk =
+    Number(data.a?.[0]?.[0]);
+
+  const bestBid =
+    Number(data.b?.[0]?.[0]);
+
+  if (bestAsk && bestBid) {
+
+    $("spread").textContent =
+      formatPrice(bestAsk - bestBid);
+  }
+}
+
+/* =========================================================
+   SYMBOL SWITCH
+========================================================= */
+
+async function selectSymbol(symbol) {
+
+  activeSymbol = symbol;
+
+  $("activeSymbol").textContent =
+    symbol;
+
+  $("bookSymbol").textContent =
+    `${symbol} / DEPTH`;
+
+  document.querySelectorAll(".chart-btn")
+    .forEach(btn => {
+      btn.classList.toggle(
+        "active",
+        btn.dataset.symbol === symbol
+      );
+    });
+
+  candles = [];
+  lastCandleTime = 0;
+
+  candleSeries.setData([]);
+
+  history.replaceState(
+    null,
+    "",
+    `?s=${encodeURIComponent(symbol)}`
+  );
+
+  await loadCandles();
+
+  connectMarketSocket();
+
+  logActivity(
+    `Market instrument switched to ${symbol}`
+  );
+}
+
+document.querySelectorAll(".chart-btn")
+  .forEach(btn => {
+
+    btn.addEventListener("click", () => {
+      selectSymbol(btn.dataset.symbol);
+    });
+
+  });
+
+/* =========================================================
+   BACKEND API
+========================================================= */
+
+async function fetchApi(path, options = {}) {
+
+  const response = await fetch(
+    `${API_BASE}${path}`,
+    {
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      },
+      ...options
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Backend HTTP ${response.status}`
+    );
+  }
+
+  return response.json();
+}
+
+/* =========================================================
+   BACKEND CONNECTION CHECK
+========================================================= */
+
+async function checkBackend() {
+
+  try {
+
+    const data =
+      await fetchApi("/api/connection");
+
+    backendConnected =
+      Boolean(data.connected);
+
+    updateBackendState(
+      backendConnected
+        ? "CONNECTED"
+        : "NOT CONNECTED"
+    );
+
+    if (backendConnected) {
+      await loadAccount();
+      await loadPositions();
+      await loadOrders();
+      await loadBots();
+      await loadRisk();
+    }
+
+  } catch {
+
+    backendConnected = false;
+
+    updateBackendState(
+      "NOT CONNECTED"
+    );
+  }
+}
+
+function updateBackendState(state) {
+
+  $("brokerState").textContent =
+    state;
+
+  if (state === "CONNECTED") {
+
+    $("brokerState").style.color =
+      "#23f7a3";
+
+    $("connectBroker").disabled =
+      true;
+
+    $("disconnectBroker").disabled =
+      false;
+
+  } else {
+
+    $("brokerState").style.color =
+      "#ff7a18";
+
+    $("connectBroker").disabled =
+      false;
+
+    $("disconnectBroker").disabled =
+      true;
+  }
+}
+
+/* =========================================================
+   BROKER CONNECT
+========================================================= */
+
+$("connectBroker").addEventListener(
+  "click",
+  async () => {
+
+    toast(
+      "BROKER LAYER",
+      "Attempting backend connection..."
+    );
+
+    try {
+
+      await fetchApi(
+        "/api/broker/connect",
+        {
+          method: "POST",
+          body: JSON.stringify({})
+        }
+      );
+
+      await checkBackend();
+
+      toast(
+        "BROKER",
+        "Backend connection request completed."
+      );
+
+      logActivity(
+        "Broker connection request sent to backend"
+      );
+
+    } catch {
+
+      toast(
+        "BACKEND OFFLINE",
+        "No broker backend is available yet."
+      );
+
+      logActivity(
+        "Broker connection unavailable — backend not detected"
+      );
+    }
+
+  }
+);
+
+/* =========================================================
+   BROKER DISCONNECT
+========================================================= */
+
+$("disconnectBroker").addEventListener(
+  "click",
+  async () => {
+
+    try {
+
+      await fetchApi(
+        "/api/broker/disconnect",
+        {
+          method: "POST",
+          body: JSON.stringify({})
+        }
+      );
+
+      backendConnected = false;
+
+      updateBackendState(
+        "NOT CONNECTED"
+      );
+
+      toast(
+        "BROKER",
+        "Broker disconnected."
+      );
+
+    } catch {
+
+      toast(
+        "ERROR",
+        "Backend disconnect endpoint unavailable."
+      );
+    }
+
+  }
+);
+
+/* =========================================================
+   ACCOUNT
+========================================================= */
+
+async function loadAccount() {
+
+  const data =
+    await fetchApi("/api/account");
+
+  if (!data) return;
+
+  $("accountBalance").textContent =
+    data.balance ?? "—";
+
+  $("accountEquity").textContent =
+    data.equity ?? "—";
+
+  $("freeMargin").textContent =
+    data.freeMargin ?? "—";
+
+  $("dailyPnl").textContent =
+    data.dailyPnl ?? "—";
+
+  $("drawdown").textContent =
+    data.drawdown ?? "—";
+}
+
+/* =========================================================
+   POSITIONS
+========================================================= */
+
+async function loadPositions() {
+
+  const data =
+    await fetchApi("/api/positions");
+
+  const positions =
+    Array.isArray(data)
+      ? data
+      : data.positions || [];
+
+  $("positionCount").textContent =
+    positions.length;
+
+  const table =
+    $("positionsTable");
+
+  if (!positions.length) {
+
+    table.innerHTML = `
+      <tr>
+        <td colspan="7">
+          <div class="empty">
+            <strong>NO BROKER POSITIONS</strong>
+            No open positions were returned by the backend.
+          </div>
+        </td>
+      </tr>
+    `;
+
+    return;
+  }
+
+  table.innerHTML =
+    positions.map(position => `
+      <tr>
+        <td>${escapeHtml(position.symbol ?? "—")}</td>
+        <td>${escapeHtml(position.side ?? "—")}</td>
+        <td>${escapeHtml(position.volume ?? "—")}</td>
+        <td>${escapeHtml(position.entry ?? "—")}</td>
+        <td>${escapeHtml(position.current ?? "—")}</td>
+        <td>${escapeHtml(position.pnl ?? "—")}</td>
+        <td>${escapeHtml(position.status ?? "—")}</td>
+      </tr>
+    `).join("");
+}
+
+/* =========================================================
+   ORDERS
+========================================================= */
+
+async function loadOrders() {
+
+  const data =
+    await fetchApi("/api/orders");
+
+  const orders =
+    Array.isArray(data)
+      ? data
+      : data.orders || [];
+
+  const table =
+    $("ordersTable");
+
+  if (!orders.length) {
+
+    table.innerHTML = `
+      <tr>
+        <td colspan="6">
+          <div class="empty">
+            <strong>NO EXECUTION DATA</strong>
+            No confirmed broker orders were returned.
+          </div>
+        </td>
+      </tr>
+    `;
+
+    return;
+  }
+
+  table.innerHTML =
+    orders.map(order => `
+      <tr>
+        <td>${escapeHtml(order.time ?? "—")}</td>
+        <td>${escapeHtml(order.symbol ?? "—")}</td>
+        <td>${escapeHtml(order.side ?? "—")}</td>
+        <td>${escapeHtml(order.volume ?? "—")}</td>
+        <td>${escapeHtml(order.price ?? "—")}</td>
+        <td>${escapeHtml(order.status ?? "—")}</td>
+      </tr>
+    `).join("");
+}
+
+/* =========================================================
+   BOTS
+========================================================= */
+
+async function loadBots() {
+
+  const data =
+    await fetchApi("/api/bots");
+
+  const bots =
+    Array.isArray(data)
+      ? data
+      : data.bots || [];
+
+  if (!bots.length) return;
+
+  logActivity(
+    `${bots.length} bot system records received from backend`
+  );
+}
+
+/* =========================================================
+   RISK
+========================================================= */
+
+async function loadRisk() {
+
+  const data =
+    await fetchApi("/api/risk");
+
+  if (!data) return;
+
+  if (data.drawdown !== undefined) {
+    $("drawdown").textContent =
+      data.drawdown;
+  }
+}
+
+/* =========================================================
+   KILL SWITCH
+========================================================= */
+
+$("killSwitch").addEventListener(
+  "click",
+  async () => {
+
+    if (!backendConnected) {
+
+      toast(
+        "RISK ENGINE",
+        "Kill switch requires a connected backend."
+      );
+
+      logActivity(
+        "Kill switch blocked — broker backend unavailable"
+      );
+
+      return;
+    }
+
+    try {
+
+      await fetchApi(
+        "/api/risk/kill-switch",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            reason: "Manual emergency stop from terminal"
+          })
+        }
+      );
+
+      toast(
+        "KILL SWITCH",
+        "Emergency stop request confirmed by backend."
+      );
+
+      logActivity(
+        "Emergency kill-switch request confirmed by backend"
+      );
+
+    } catch {
+
+      toast(
+        "RISK ERROR",
+        "Backend did not confirm the kill switch."
+      );
+    }
+
+  }
+);
+
+/* =========================================================
+   FORMATTING
+========================================================= */
+
+function formatPrice(value) {
+
+  if (!Number.isFinite(value)) return "—";
+
+  if (value >= 10000) {
+    return value.toLocaleString(
+      undefined,
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }
+    );
+  }
+
+  if (value >= 100) {
+    return value.toFixed(2);
+  }
+
+  if (value >= 1) {
+    return value.toFixed(4);
+  }
+
+  return value.toFixed(6);
+}
+
+function formatCompact(value) {
+
+  if (!Number.isFinite(value)) return "—";
+
+  if (Math.abs(value) >= 1e9)
+    return (value / 1e9).toFixed(2) + "B";
+
+  if (Math.abs(value) >= 1e6)
+    return (value / 1e6).toFixed(2) + "M";
+
+  if (Math.abs(value) >= 1e3)
+    return (value / 1e3).toFixed(2) + "K";
+
+  return value.toFixed(2);
+}
+
+/* =========================================================
+   STARTUP
+========================================================= */
+
+(async function init() {
+
+  logActivity(
+    "KINGBOT terminal initialized"
+  );
+
+  logActivity(
+    "Broker execution layer awaiting backend connection"
+  );
+
+  logActivity(
+    "Public market-data layer starting"
+  );
+
+  await loadCandles();
+
+  connectMarketSocket();
+
+  checkBackend();
+
+})();
+</script>
+
+</body>
+</html>
