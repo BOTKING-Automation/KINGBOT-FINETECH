@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>KINGBOT — Automation Core</title>
+
+  <meta
+    name="description"
+    content="KINGBOT intelligent automation infrastructure powered by GIBSONFX TECH."
+  >
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@500;600;700;800;900&display=swap"
+    rel="stylesheet"
+  >
+
+  <style>
+    :root {
+      --bg: #02040b;
+      --panel: rgba(7, 12, 27, 0.82);
+
+      --gold: #ffc84a;
+      --cyan: #19e6ff;
+      --violet: #9b5cff;
+      --pink: #ff4fd8;
+      --green: #23f7a3;
+      --blue: #4787ff;
+
+      --text: #eef2ff;
+      --muted: #8290b5;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+    }
+
+    body {
+      overflow: hidden;
+      background:
+        radial-gradient(
+          circle at 50% 45%,
+          rgba(25, 230, 255, 0.08),
+          transparent 25%
+        ),
+        radial-gradient(
+          circle at 30% 70%,
+          rgba(155, 92, 255, 0.07),
+          transparent 30%
+        ),
+        radial-gradient(
+          circle at 75% 30%,
+          rgba(255, 79, 216, 0.06),
+          transparent 30%
+        ),
+        var(--bg);
+
+      color: var(--text);
+
+      font-family: Inter, sans-serif;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* =========================================
+       BACKGROUND GRID
+    ========================================= */
+
+    .grid {
+      position: fixed;
+      inset: 0;
+
+      background-image:
+        linear-gradient(
+          rgba(25, 230, 255, 0.035) 1px,
+          transparent 1px
+        ),
+        linear-gradient(
+          90deg,
+          rgba(255, 200, 74, 0.035) 1px,
+          transparent 1px
+        );
+
+      background-size: 44px 44px;
+
+      animation: gridMove 16s linear infinite;
+
+      pointer-events: none;
+    }
+
+    @keyframes gridMove {
+      from {
+        transform: translate(0, 0);
+      }
+
+      to {
+        transform: translate(44px, 44px);
+      }
+    }
+
+    /* =========================================
+       AMBIENT LIGHT
+    ========================================= */
+
+    .ambient {
+      position: fixed;
+      width: 520px;
+      height: 520px;
+
+      border-radius: 50%;
+
+      filter: blur(100px);
+
+      opacity: 0.12;
+
+      pointer-events: none;
+    }
+
+    .ambient.one {
+      top: -220px;
+      left: -180px;
+
+      background: var(--cyan);
+    }
+
+    .ambient.two {
+      right: -220px;
+      bottom: -240px;
+
+      background: var(--violet);
+    }
+
+    .ambient.three {
+      left: 50%;
+      top: 40%;
+
+      transform: translate(-50%, -50%);
+
+      background: var(--pink);
+
+      opacity: 0.045;
+    }
+
+    /* =========================================
+       MAIN
+    ========================================= */
+
+    .loader {
+      width: min(620px, 90vw);
+
+      position: relative;
+
+      z-index: 5;
+
+      text-align: center;
+    }
+
+    /* =========================================
+       BRAND
+    ========================================= */
+
+    .brand {
+      font-family: Orbitron, sans-serif;
+
+      font-size: clamp(34px, 7vw, 64px);
+
+      font-weight: 900;
+
+      letter-spacing: 0.17em;
+
+      margin-left: 0.17em;
+
+      color: var(--gold);
+
+      text-shadow:
+        0 0 12px rgba(255, 200, 74, 0.35),
+        0 0 40px rgba(255, 200, 74, 0.12);
+
+      animation: brandPulse 3s ease-in-out infinite;
+    }
+
+    @keyframes brandPulse {
+      0%,
+      100% {
+        opacity: 0.85;
+      }
+
+      50% {
+        opacity: 1;
+      }
+    }
+
+    .system-name {
+      margin-top: 12px;
+
+      color: var(--cyan);
+
+      font-family: "JetBrains Mono", monospace;
+
+      font-size: 11px;
+
+      font-weight: 700;
+
+      letter-spacing: 0.35em;
+
+      text-transform: uppercase;
+    }
+
+    /* =========================================
+       AUTOMATION CORE
+    ========================================= */
+
+    .core {
+      position: relative;
+
+      width: 220px;
+      height: 220px;
+
+      margin: 45px auto 38px;
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+    }
+
+    .core-ring {
+      position: absolute;
+
+      border-radius: 50%;
+
+      inset: 0;
+
+      border: 1px solid rgba(25, 230, 255, 0.35);
+
+      box-shadow:
+        0 0 25px rgba(25, 230, 255, 0.08),
+        inset 0 0 25px rgba(25, 230, 255, 0.04);
+
+      animation: rotate 9s linear infinite;
+    }
+
+    .core-ring::before,
+    .core-ring::after {
+      content: "";
+
+      position: absolute;
+
+      width: 8px;
+      height: 8px;
+
+      border-radius: 50%;
+
+      background: var(--cyan);
+
+      box-shadow:
+        0 0 10px var(--cyan),
+        0 0 25px var(--cyan);
+    }
+
+    .core-ring::before {
+      top: 16px;
+      left: 50%;
+
+      transform: translateX(-50%);
+    }
+
+    .core-ring::after {
+      right: 16px;
+      top: 50%;
+
+      transform: translateY(-50%);
+
+      background: var(--pink);
+
+      box-shadow:
+        0 0 10px var(--pink),
+        0 0 25px var(--pink);
+    }
+
+    .ring-two {
+      inset: 19px;
+
+      border-color: rgba(155, 92, 255, 0.4);
+
+      animation:
+        rotateReverse 6s linear infinite;
+    }
+
+    .ring-three {
+      inset: 40px;
+
+      border-color: rgba(255, 200, 74, 0.45);
+
+      animation:
+        rotate 4s linear infinite;
+    }
+
+    @keyframes rotate {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes rotateReverse {
+      to {
+        transform: rotate(-360deg);
+      }
+    }
+
+    /* =========================================
+       ROBOT CORE
+    ========================================= */
+
+    .robot {
+      position: relative;
+
+      width: 92px;
+      height: 92px;
+
+      border-radius: 27px;
+
+      transform: rotate(45deg);
+
+      border: 1px solid var(--gold);
+
+      background:
+        linear-gradient(
+          135deg,
+          rgba(255, 200, 74, 0.08),
+          rgba(25, 230, 255, 0.05)
+        );
+
+      box-shadow:
+        0 0 35px rgba(255, 200, 74, 0.2),
+        inset 0 0 35px rgba(25, 230, 255, 0.07);
+    }
+
+    .robot::before {
+      content: "";
+
+      position: absolute;
+
+      inset: 16px;
+
+      border-radius: 50%;
+
+      border: 1px solid var(--cyan);
+
+      box-shadow:
+        0 0 18px rgba(25, 230, 255, 0.35);
+    }
+
+    .robot::after {
+      content: "";
+
+      position: absolute;
+
+      inset: 30px;
+
+      border-radius: 50%;
+
+      border: 2px solid var(--pink);
+
+      box-shadow:
+        0 0 18px rgba(255, 79, 216, 0.4);
+    }
+
+    /* =========================================
+       DATA LINES
+    ========================================= */
+
+    .line {
+      position: absolute;
+
+      height: 1px;
+
+      transform-origin: left center;
+
+      opacity: 0.55;
+
+      overflow: hidden;
+    }
+
+    .line::after {
+      content: "";
+
+      position: absolute;
+
+      width: 80px;
+      height: 100%;
+
+      background: linear-gradient(
+        90deg,
+        transparent,
+        currentColor,
+        transparent
+      );
+
+      animation: lineFlow 2.5s linear infinite;
+    }
+
+    .line.one {
+      width: 130px;
+
+      left: -70px;
+      top: 75px;
+
+      color: var(--cyan);
+
+      transform: rotate(-20deg);
+    }
+
+    .line.two {
+      width: 145px;
+
+      right: -85px;
+      top: 110px;
+
+      color: var(--pink);
+
+      transform: rotate(18deg);
+    }
+
+    .line.three {
+      width: 120px;
+
+      left: -60px;
+      bottom: 55px;
+
+      color: var(--gold);
+
+      transform: rotate(15deg);
+    }
+
+    .line.four {
+      width: 135px;
+
+      right: -75px;
+      bottom: 58px;
+
+      color: var(--violet);
+
+      transform: rotate(-15deg);
+    }
+
+    @keyframes lineFlow {
+      from {
+        left: -90px;
+      }
+
+      to {
+        left: 150px;
+      }
+    }
+
+    /* =========================================
+       STATUS PANEL
+    ========================================= */
+
+    .status {
+      display: grid;
+
+      gap: 8px;
+
+      text-align: left;
+
+      font-family: "JetBrains Mono", monospace;
+
+      font-size: 11px;
+    }
+
+    .status-row {
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      padding: 12px 15px;
+
+      border: 1px solid rgba(255, 255, 255, 0.07);
+
+      border-radius: 9px;
+
+      background: var(--panel);
+
+      backdrop-filter: blur(14px);
+
+      box-shadow:
+        inset 0 0 20px rgba(255, 255, 255, 0.015);
+    }
+
+    .status-label {
+      color: var(--muted);
+
+      letter-spacing: 0.08em;
+    }
+
+    .status-value {
+      color: var(--green);
+
+      font-weight: 700;
+
+      display: flex;
+
+      align-items: center;
+
+      gap: 7px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+
+      border-radius: 50%;
+
+      background: var(--green);
+
+      box-shadow:
+        0 0 8px var(--green),
+        0 0 15px rgba(35, 247, 163, 0.6);
+
+      animation: statusPulse 1.6s infinite;
+    }
+
+    @keyframes statusPulse {
+      0%,
+      100% {
+        opacity: 0.45;
+      }
+
+      50% {
+        opacity: 1;
+      }
+    }
+
+    /* =========================================
+       PROGRESS
+    ========================================= */
+
+    .progress-section {
+      margin-top: 22px;
+    }
+
+    .progress-track {
+      width: 100%;
+
+      height: 5px;
+
+      overflow: hidden;
+
+      border-radius: 10px;
+
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .progress-bar {
+      width: 0%;
+
+      height: 100%;
+
+      border-radius: inherit;
+
+      background:
+        linear-gradient(
+          90deg,
+          var(--cyan),
+          var(--violet),
+          var(--pink),
+          var(--gold)
+        );
+
+      box-shadow:
+        0 0 12px rgba(25, 230, 255, 0.8);
+
+      transition: width 0.15s ease;
+    }
+
+    .progress-text {
+      margin-top: 10px;
+
+      color: var(--muted);
+
+      font-family: "JetBrains Mono", monospace;
+
+      font-size: 10px;
+
+      letter-spacing: 0.08em;
+    }
+
+    /* =========================================
+       FOOTER BRAND
+    ========================================= */
+
+    .powered {
+      margin-top: 28px;
+
+      color: var(--muted);
+
+      font-size: 10px;
+
+      letter-spacing: 0.28em;
+
+      text-transform: uppercase;
+    }
+
+    .powered strong {
+      color: var(--gold);
+
+      font-weight: 700;
+    }
+
+    /* =========================================
+       MOBILE
+    ========================================= */
+
+    @media (max-width: 600px) {
+
+      .loader {
+        width: 88vw;
+      }
+
+      .core {
+        width: 180px;
+        height: 180px;
+
+        margin-top: 35px;
+        margin-bottom: 30px;
+      }
+
+      .robot {
+        width: 76px;
+        height: 76px;
+      }
+
+      .brand {
+        font-size: 34px;
+      }
+
+      .system-name {
+        font-size: 9px;
+      }
+
+      .status {
+        font-size: 9px;
+      }
+
+      .status-row {
+        padding: 10px 12px;
+      }
+
+      .line {
+        display: none;
+      }
+    }
+
+    /* =========================================
+       REDUCED MOTION
+    ========================================= */
+
+    @media (prefers-reduced-motion: reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="grid"></div>
+
+  <div class="ambient one"></div>
+  <div class="ambient two"></div>
+  <div class="ambient three"></div>
+
+  <main class="loader">
+
+    <div class="brand">
+      KINGBOT
+    </div>
+
+    <div class="system-name">
+      AUTOMATION CORE
+    </div>
+
+    <!-- =====================================
+         HIGH-TECH AUTOMATION VISUAL
+    ====================================== -->
+
+    <div class="core">
+
+      <div class="core-ring"></div>
+
+      <div class="core-ring ring-two"></div>
+
+      <div class="core-ring ring-three"></div>
+
+      <div class="line one"></div>
+      <div class="line two"></div>
+      <div class="line three"></div>
+      <div class="line four"></div>
+
+      <div class="robot"></div>
+
+    </div>
+
+    <!-- =====================================
+         SYSTEM INITIALIZATION
+    ====================================== -->
+
+    <section class="status">
+
+      <div class="status-row">
+        <span class="status-label">
+          AI CORE
+        </span>
+
+        <span class="status-value">
+          <span class="status-dot"></span>
+          READY
+        </span>
+      </div>
+
+      <div class="status-row">
+        <span class="status-label">
+          AUTOMATION
+        </span>
+
+        <span class="status-value">
+          <span class="status-dot"></span>
+          READY
+        </span>
+      </div>
+
+      <div class="status-row">
+        <span class="status-label">
+          RISK ENGINE
+        </span>
+
+        <span class="status-value">
+          <span class="status-dot"></span>
+          READY
+        </span>
+      </div>
+
+      <div class="status-row">
+        <span class="status-label">
+          SECURITY
+        </span>
+
+        <span class="status-value">
+          <span class="status-dot"></span>
+          READY
+        </span>
+      </div>
+
+      <div class="status-row">
+        <span class="status-label">
+          PLATFORM
+        </span>
+
+        <span class="status-value">
+          <span class="status-dot"></span>
+          READY
+        </span>
+      </div>
+
+    </section>
+
+    <!-- =====================================
+         PROGRESS
+    ====================================== -->
+
+    <div class="progress-section">
+
+      <div class="progress-track">
+        <div
+          class="progress-bar"
+          id="progressBar"
+        ></div>
+      </div>
+
+      <div
+        class="progress-text"
+        id="progressText"
+      >
+        SYSTEM INITIALIZATION 0%
+      </div>
+
+    </div>
+
+    <div class="powered">
+      POWERED BY
+      <strong>GIBSONFX TECH</strong>
+    </div>
+
+  </main>
+
+  <script>
+
+    /*
+      KINGBOT AUTOMATION LOADER
+
+      IMPORTANT:
+      This screen intentionally contains NO:
+
+      - Market prices
+      - Trading signals
+      - Buy/Sell indicators
+      - Candlestick charts
+      - Profit figures
+      - Trading performance
+      - XAUUSD/EURUSD/BTCUSD data
+
+      It is purely the platform initialization layer.
+    */
+
+    const progressBar =
+      document.getElementById("progressBar");
+
+    const progressText =
+      document.getElementById("progressText");
+
+    let progress = 0;
+
+    /*
+      Simulated visual initialization only.
+
+      This does NOT represent backend health.
+      Real backend checks will be connected later.
+    */
+
+    const loaderTimer = setInterval(() => {
+
+      const increment =
+        Math.floor(Math.random() * 7) + 3;
+
+      progress += increment;
+
+      if (progress >= 100) {
+        progress = 100;
+
+        clearInterval(loaderTimer);
+
+        progressBar.style.width =
+          progress + "%";
+
+        progressText.textContent =
+          "SYSTEM INITIALIZATION 100%";
+
+        /*
+          Short transition before authentication.
+        */
+
+        setTimeout(() => {
+
+          window.location.href =
+            "../signin.html";
+
+        }, 650);
+
+        return;
+      }
+
+      progressBar.style.width =
+        progress + "%";
+
+      progressText.textContent =
+        "SYSTEM INITIALIZATION " +
+        progress +
+        "%";
+
+    }, 110);
+
+  </script>
+
+</body>
+</html>
