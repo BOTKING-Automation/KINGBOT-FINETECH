@@ -1,0 +1,2463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>KINGBOT — Institutional Analytics OS</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Orbitron:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root{
+    --bg:#02040a;
+    --bg2:#050916;
+    --panel:rgba(8,13,27,.82);
+    --panel2:rgba(12,19,38,.92);
+
+    --gold:#ffc84a;
+    --gold2:#ff9f1a;
+
+    --cyan:#19e6ff;
+    --blue:#4787ff;
+    --violet:#9b5cff;
+    --pink:#ff4fd8;
+
+    --green:#23f7a3;
+    --red:#ff4d6d;
+    --orange:#ff7a18;
+
+    --text:#f4f7ff;
+    --muted:#8792ad;
+    --muted2:#56627c;
+
+    --border:rgba(255,255,255,.08);
+    --border2:rgba(25,230,255,.16);
+
+    --radius:20px;
+    --shadow:0 24px 70px rgba(0,0,0,.42);
+}
+
+*{
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
+}
+
+html{
+    scroll-behavior:smooth;
+}
+
+body{
+    min-height:100vh;
+    color:var(--text);
+    background:
+        radial-gradient(circle at 8% 8%,rgba(25,230,255,.09),transparent 25%),
+        radial-gradient(circle at 88% 12%,rgba(155,92,255,.10),transparent 25%),
+        radial-gradient(circle at 52% 90%,rgba(255,200,74,.06),transparent 30%),
+        var(--bg);
+    font-family:Inter,system-ui,sans-serif;
+    overflow-x:hidden;
+}
+
+/* GRID */
+body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:-2;
+    background-image:
+        linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+    background-size:42px 42px;
+    mask-image:linear-gradient(to bottom,black,transparent 90%);
+}
+
+/* AMBIENT LIGHT */
+body::after{
+    content:"";
+    position:fixed;
+    width:650px;
+    height:650px;
+    top:-280px;
+    right:-180px;
+    border-radius:50%;
+    background:radial-gradient(circle,rgba(25,230,255,.10),transparent 68%);
+    filter:blur(25px);
+    pointer-events:none;
+    z-index:-1;
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{
+    width:7px;
+}
+
+::-webkit-scrollbar-track{
+    background:#02040a;
+}
+
+::-webkit-scrollbar-thumb{
+    background:linear-gradient(var(--cyan),var(--violet));
+    border-radius:20px;
+}
+
+/* TOPBAR */
+.topbar{
+    position:sticky;
+    top:0;
+    z-index:100;
+    height:76px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 28px;
+    border-bottom:1px solid rgba(255,255,255,.07);
+    background:rgba(2,4,10,.78);
+    backdrop-filter:blur(22px);
+}
+
+.brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    min-width:220px;
+}
+
+.brand-mark{
+    width:42px;
+    height:42px;
+    border-radius:13px;
+    display:grid;
+    place-items:center;
+    font-family:Orbitron,sans-serif;
+    font-weight:800;
+    color:#05070c;
+    background:linear-gradient(135deg,var(--gold),var(--cyan));
+    box-shadow:
+        0 0 24px rgba(255,200,74,.20),
+        0 0 35px rgba(25,230,255,.14);
+}
+
+.brand-text strong{
+    display:block;
+    font-family:Orbitron,sans-serif;
+    font-size:14px;
+    letter-spacing:1.5px;
+}
+
+.brand-text span{
+    display:block;
+    margin-top:3px;
+    color:var(--muted);
+    font-size:10px;
+    letter-spacing:1.7px;
+    text-transform:uppercase;
+}
+
+.nav{
+    display:flex;
+    align-items:center;
+    gap:5px;
+}
+
+.nav a{
+    color:#aab4c9;
+    text-decoration:none;
+    font-size:13px;
+    font-weight:600;
+    padding:11px 13px;
+    border-radius:11px;
+    transition:.25s;
+}
+
+.nav a:hover,
+.nav a.active{
+    color:#fff;
+    background:rgba(255,255,255,.055);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+}
+
+.top-status{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:220px;
+    justify-content:flex-end;
+}
+
+.status-pill{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:9px 12px;
+    border:1px solid rgba(35,247,163,.17);
+    border-radius:999px;
+    background:rgba(35,247,163,.055);
+    color:#bafee2;
+    font-size:11px;
+    font-family:"JetBrains Mono",monospace;
+}
+
+.dot{
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:var(--green);
+    box-shadow:0 0 12px var(--green);
+}
+
+/* PAGE */
+.page{
+    width:min(1680px,calc(100% - 40px));
+    margin:0 auto;
+    padding:32px 0 70px;
+}
+
+/* HERO */
+.hero{
+    position:relative;
+    padding:28px;
+    margin-bottom:20px;
+    overflow:hidden;
+    border:1px solid var(--border);
+    border-radius:25px;
+    background:
+        linear-gradient(120deg,rgba(255,200,74,.035),rgba(25,230,255,.025),rgba(155,92,255,.035)),
+        var(--panel);
+    box-shadow:var(--shadow);
+}
+
+.hero::before{
+    content:"";
+    position:absolute;
+    width:480px;
+    height:480px;
+    top:-320px;
+    right:-100px;
+    border-radius:50%;
+    background:radial-gradient(circle,rgba(25,230,255,.13),transparent 70%);
+}
+
+.hero-grid{
+    position:relative;
+    z-index:2;
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:25px;
+    align-items:center;
+}
+
+.eyebrow{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    color:var(--cyan);
+    font-family:"JetBrains Mono",monospace;
+    font-size:10px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    margin-bottom:13px;
+}
+
+.hero h1{
+    font-family:Orbitron,sans-serif;
+    font-size:clamp(26px,4vw,46px);
+    line-height:1.08;
+    letter-spacing:-1px;
+}
+
+.gradient-text{
+    background:linear-gradient(90deg,var(--gold),var(--cyan),var(--violet),var(--pink));
+    -webkit-background-clip:text;
+    color:transparent;
+}
+
+.hero p{
+    max-width:780px;
+    margin-top:13px;
+    color:#8f9ab3;
+    line-height:1.65;
+    font-size:14px;
+}
+
+.hero-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+}
+
+.btn{
+    border:1px solid rgba(255,255,255,.09);
+    color:#fff;
+    background:rgba(255,255,255,.04);
+    padding:12px 15px;
+    border-radius:12px;
+    font-weight:700;
+    font-size:12px;
+    cursor:pointer;
+    transition:.25s;
+}
+
+.btn:hover{
+    transform:translateY(-2px);
+    border-color:rgba(25,230,255,.3);
+    box-shadow:0 10px 30px rgba(0,0,0,.25);
+}
+
+.btn.primary{
+    color:#05070c;
+    border:0;
+    background:linear-gradient(135deg,var(--gold),var(--gold2));
+    box-shadow:0 0 25px rgba(255,200,74,.13);
+}
+
+/* CONTROL BAR */
+.controls{
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    gap:10px;
+    padding:13px;
+    margin-bottom:18px;
+    border:1px solid var(--border);
+    border-radius:18px;
+    background:rgba(7,11,23,.78);
+    backdrop-filter:blur(18px);
+}
+
+.control{
+    min-width:0;
+}
+
+.control label{
+    display:block;
+    margin:0 0 6px 3px;
+    color:var(--muted2);
+    font-size:9px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    font-family:"JetBrains Mono",monospace;
+}
+
+.control select,
+.control input{
+    width:100%;
+    height:39px;
+    color:#e9edfa;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:10px;
+    outline:none;
+    padding:0 10px;
+    background:#080d1a;
+    font-size:11px;
+}
+
+.control select:focus,
+.control input:focus{
+    border-color:rgba(25,230,255,.35);
+}
+
+/* KPI GRID */
+.kpis{
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    gap:12px;
+    margin-bottom:18px;
+}
+
+.card{
+    position:relative;
+    overflow:hidden;
+    border:1px solid var(--border);
+    border-radius:18px;
+    background:linear-gradient(145deg,rgba(11,17,33,.92),rgba(5,9,19,.92));
+    box-shadow:0 16px 45px rgba(0,0,0,.25);
+}
+
+.edge{
+    position:absolute;
+    inset:-1px;
+    border-radius:inherit;
+    pointer-events:none;
+    opacity:.6;
+    background:conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        transparent 250deg,
+        var(--cyan) 285deg,
+        var(--violet) 310deg,
+        var(--gold) 335deg,
+        transparent 355deg
+    );
+    mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;
+    mask-composite:exclude;
+    padding:1px;
+    animation:spinEdge 7s linear infinite;
+}
+
+@keyframes spinEdge{
+    to{transform:rotate(360deg)}
+}
+
+.kpi{
+    padding:18px;
+}
+
+.kpi-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    color:#78849e;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+}
+
+.kpi-icon{
+    width:27px;
+    height:27px;
+    display:grid;
+    place-items:center;
+    border-radius:8px;
+    background:rgba(255,255,255,.045);
+    color:var(--cyan);
+    font-size:13px;
+}
+
+.kpi-value{
+    margin-top:17px;
+    font-family:"JetBrains Mono",monospace;
+    font-size:23px;
+    font-weight:700;
+    letter-spacing:-1px;
+}
+
+.kpi-sub{
+    margin-top:7px;
+    font-size:10px;
+    color:var(--muted2);
+}
+
+.unavailable{
+    color:#69748c;
+}
+
+.mini-line{
+    height:3px;
+    width:100%;
+    margin-top:16px;
+    border-radius:5px;
+    background:linear-gradient(90deg,var(--cyan),var(--violet),transparent);
+    opacity:.55;
+}
+
+/* MAIN GRID */
+.main-grid{
+    display:grid;
+    grid-template-columns:minmax(0,2fr) minmax(310px,1fr);
+    gap:18px;
+    margin-bottom:18px;
+}
+
+.panel{
+    padding:19px;
+}
+
+.panel-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:15px;
+    margin-bottom:18px;
+}
+
+.panel-title{
+    font-family:Orbitron,sans-serif;
+    font-size:13px;
+    letter-spacing:.8px;
+}
+
+.panel-sub{
+    margin-top:5px;
+    color:var(--muted2);
+    font-size:10px;
+}
+
+.panel-tools{
+    display:flex;
+    align-items:center;
+    gap:7px;
+}
+
+.tag{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:7px 9px;
+    border-radius:8px;
+    background:rgba(255,255,255,.035);
+    border:1px solid rgba(255,255,255,.06);
+    color:#9ca7bd;
+    font-size:9px;
+    font-family:"JetBrains Mono",monospace;
+}
+
+.tag.live{
+    color:#9effd3;
+    border-color:rgba(35,247,163,.14);
+    background:rgba(35,247,163,.045);
+}
+
+/* CHART */
+.chart-wrap{
+    position:relative;
+    height:390px;
+}
+
+.chart-overlay{
+    position:absolute;
+    left:15px;
+    top:13px;
+    z-index:3;
+    display:flex;
+    gap:7px;
+    flex-wrap:wrap;
+}
+
+.chart-legend{
+    position:absolute;
+    right:10px;
+    bottom:5px;
+    display:flex;
+    gap:15px;
+    font-size:9px;
+    color:var(--muted2);
+    font-family:"JetBrains Mono",monospace;
+}
+
+/* SIDE RISK */
+.risk-stack{
+    display:grid;
+    gap:12px;
+}
+
+.risk-item{
+    padding:14px;
+    border-radius:13px;
+    border:1px solid rgba(255,255,255,.055);
+    background:rgba(255,255,255,.025);
+}
+
+.risk-line{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:9px;
+}
+
+.risk-name{
+    font-size:11px;
+    color:#aab4c8;
+}
+
+.risk-value{
+    font-family:"JetBrains Mono",monospace;
+    font-size:10px;
+    color:#78849d;
+}
+
+.progress{
+    height:7px;
+    border-radius:99px;
+    overflow:hidden;
+    background:#11182a;
+}
+
+.progress span{
+    display:block;
+    width:0%;
+    height:100%;
+    border-radius:99px;
+    background:linear-gradient(90deg,var(--cyan),var(--violet));
+    box-shadow:0 0 14px rgba(25,230,255,.25);
+}
+
+.risk-note{
+    padding:14px;
+    border-radius:13px;
+    border:1px solid rgba(255,200,74,.12);
+    background:rgba(255,200,74,.035);
+    color:#9c957d;
+    font-size:10px;
+    line-height:1.6;
+}
+
+/* SECTION GRID */
+.section-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:18px;
+    margin-bottom:18px;
+}
+
+/* STRATEGY TABLE */
+.table-wrap{
+    overflow-x:auto;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:720px;
+}
+
+th{
+    color:#606c84;
+    font-size:9px;
+    text-align:left;
+    text-transform:uppercase;
+    letter-spacing:1.2px;
+    font-family:"JetBrains Mono",monospace;
+    font-weight:500;
+    padding:11px 10px;
+    border-bottom:1px solid rgba(255,255,255,.055);
+}
+
+td{
+    padding:13px 10px;
+    border-bottom:1px solid rgba(255,255,255,.035);
+    font-size:11px;
+    color:#aeb8cb;
+}
+
+tr:hover td{
+    background:rgba(255,255,255,.018);
+}
+
+.strategy{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    color:#e7ebf5;
+    font-weight:700;
+}
+
+.strategy-dot{
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:var(--cyan);
+    box-shadow:0 0 12px var(--cyan);
+}
+
+.waiting{
+    color:#69748a;
+    font-family:"JetBrains Mono",monospace;
+    font-size:10px;
+}
+
+.status{
+    display:inline-flex;
+    padding:5px 7px;
+    border-radius:7px;
+    font-size:8px;
+    text-transform:uppercase;
+    letter-spacing:.8px;
+}
+
+.status.wait{
+    color:#8e99ae;
+    background:rgba(255,255,255,.045);
+}
+
+.status.ready{
+    color:#a4ffe0;
+    background:rgba(35,247,163,.055);
+}
+
+/* MATRIX */
+.matrix{
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    gap:3px;
+    margin-top:7px;
+}
+
+.matrix-cell{
+    min-height:45px;
+    display:grid;
+    place-items:center;
+    border-radius:5px;
+    font-size:8px;
+    font-family:"JetBrains Mono",monospace;
+    color:#79859d;
+    background:rgba(255,255,255,.025);
+}
+
+.matrix-label{
+    color:#8d98ad;
+    font-weight:600;
+}
+
+.matrix-cell.positive{
+    background:rgba(35,247,163,.09);
+    color:#80e9c0;
+}
+
+.matrix-cell.negative{
+    background:rgba(255,77,109,.09);
+    color:#f28a9e;
+}
+
+.matrix-cell.neutral{
+    background:rgba(25,230,255,.06);
+    color:#79cbd5;
+}
+
+/* DISTRIBUTION */
+.distribution{
+    height:250px;
+}
+
+/* EXPOSURE */
+.exposure-list{
+    display:grid;
+    gap:10px;
+}
+
+.exposure-row{
+    display:grid;
+    grid-template-columns:100px 1fr 55px;
+    gap:10px;
+    align-items:center;
+}
+
+.exposure-name{
+    color:#a9b3c7;
+    font-size:10px;
+    font-family:"JetBrains Mono",monospace;
+}
+
+.exposure-bar{
+    height:9px;
+    border-radius:20px;
+    background:#11182a;
+    overflow:hidden;
+}
+
+.exposure-bar span{
+    display:block;
+    width:0%;
+    height:100%;
+    background:linear-gradient(90deg,var(--violet),var(--pink));
+}
+
+.exposure-value{
+    text-align:right;
+    color:#707c94;
+    font-size:9px;
+}
+
+/* AI */
+.ai-panel{
+    background:
+        radial-gradient(circle at 95% 0%,rgba(155,92,255,.10),transparent 30%),
+        radial-gradient(circle at 0% 100%,rgba(25,230,255,.07),transparent 30%),
+        var(--panel);
+}
+
+.ai-head{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.ai-core{
+    width:42px;
+    height:42px;
+    border-radius:13px;
+    display:grid;
+    place-items:center;
+    color:#05070c;
+    font-family:Orbitron,sans-serif;
+    font-weight:800;
+    background:linear-gradient(135deg,var(--cyan),var(--violet));
+    box-shadow:0 0 25px rgba(25,230,255,.16);
+}
+
+.ai-status{
+    color:#8c98ae;
+    font-size:10px;
+}
+
+.ai-insight{
+    margin-top:17px;
+    padding:16px;
+    border-radius:14px;
+    border:1px solid rgba(25,230,255,.11);
+    background:rgba(25,230,255,.035);
+}
+
+.ai-insight strong{
+    display:block;
+    color:#d9fbff;
+    font-size:11px;
+    margin-bottom:7px;
+}
+
+.ai-insight p{
+    color:#77839b;
+    font-size:10px;
+    line-height:1.7;
+}
+
+.ai-signals{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+    margin-top:12px;
+}
+
+.ai-signal{
+    padding:11px;
+    border-radius:10px;
+    background:rgba(255,255,255,.025);
+    border:1px solid rgba(255,255,255,.05);
+}
+
+.ai-signal span{
+    display:block;
+    color:#606b82;
+    font-size:8px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+}
+
+.ai-signal b{
+    display:block;
+    margin-top:7px;
+    font-family:"JetBrains Mono",monospace;
+    font-size:10px;
+    color:#8e99ad;
+}
+
+/* EXECUTION */
+.exec-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+}
+
+.exec-card{
+    padding:15px;
+    border-radius:13px;
+    border:1px solid rgba(255,255,255,.055);
+    background:rgba(255,255,255,.025);
+}
+
+.exec-card label{
+    display:block;
+    color:#626e86;
+    font-size:8px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+}
+
+.exec-card strong{
+    display:block;
+    margin-top:9px;
+    color:#b7c0d1;
+    font-family:"JetBrains Mono",monospace;
+    font-size:14px;
+}
+
+/* BOTTOM */
+.bottom-grid{
+    display:grid;
+    grid-template-columns:1.4fr 1fr;
+    gap:18px;
+}
+
+/* DATA STATE */
+.data-state{
+    display:flex;
+    align-items:center;
+    gap:11px;
+    padding:12px 14px;
+    border-radius:12px;
+    border:1px solid rgba(25,230,255,.10);
+    background:rgba(25,230,255,.025);
+    margin-top:15px;
+}
+
+.data-state-icon{
+    width:28px;
+    height:28px;
+    display:grid;
+    place-items:center;
+    border-radius:9px;
+    background:rgba(25,230,255,.08);
+    color:var(--cyan);
+}
+
+.data-state strong{
+    display:block;
+    font-size:10px;
+}
+
+.data-state span{
+    display:block;
+    margin-top:3px;
+    color:#66738c;
+    font-size:9px;
+}
+
+/* FOOTER */
+footer{
+    padding:25px 4px 0;
+    color:#4d5870;
+    font-size:9px;
+    line-height:1.7;
+    text-align:center;
+}
+
+footer strong{
+    color:#707b91;
+}
+
+/* MOBILE */
+@media(max-width:1250px){
+    .kpis{
+        grid-template-columns:repeat(3,1fr);
+    }
+
+    .controls{
+        grid-template-columns:repeat(3,1fr);
+    }
+
+    .nav{
+        display:none;
+    }
+}
+
+@media(max-width:950px){
+    .main-grid,
+    .bottom-grid,
+    .section-grid{
+        grid-template-columns:1fr;
+    }
+
+    .hero-grid{
+        grid-template-columns:1fr;
+    }
+
+    .hero-actions{
+        justify-content:flex-start;
+    }
+
+    .top-status{
+        min-width:auto;
+    }
+}
+
+@media(max-width:650px){
+    .page{
+        width:min(100% - 20px,1680px);
+        padding-top:18px;
+    }
+
+    .topbar{
+        height:65px;
+        padding:0 12px;
+    }
+
+    .brand{
+        min-width:auto;
+    }
+
+    .brand-text span{
+        display:none;
+    }
+
+    .top-status .status-pill{
+        padding:8px;
+    }
+
+    .top-status .status-pill span:last-child{
+        display:none;
+    }
+
+    .hero,
+    .panel{
+        padding:15px;
+    }
+
+    .controls{
+        grid-template-columns:repeat(2,1fr);
+    }
+
+    .kpis{
+        grid-template-columns:repeat(2,1fr);
+    }
+
+    .kpi{
+        padding:14px;
+    }
+
+    .kpi-value{
+        font-size:18px;
+    }
+
+    .chart-wrap{
+        height:300px;
+    }
+
+    .exec-grid{
+        grid-template-columns:repeat(2,1fr);
+    }
+
+    .matrix{
+        min-width:500px;
+    }
+
+    .table-wrap{
+        padding-bottom:4px;
+    }
+
+    .hero h1{
+        font-size:26px;
+    }
+}
+
+@media(max-width:400px){
+    .controls,
+    .kpis{
+        grid-template-columns:1fr;
+    }
+
+    .exec-grid{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header class="topbar">
+
+    <a href="index.html" class="brand" style="text-decoration:none;color:inherit;">
+        <div class="brand-mark">K</div>
+
+        <div class="brand-text">
+            <strong>KINGBOT</strong>
+            <span>Institutional Trading OS</span>
+        </div>
+    </a>
+
+    <nav class="nav">
+        <a href="index.html">Home</a>
+        <a href="markets.html">Markets</a>
+        <a href="terminal.html">Terminal</a>
+        <a href="analytics.html" class="active">Analytics</a>
+        <a href="ai.html">AI Intelligence</a>
+        <a href="pricing.html">Pricing</a>
+    </nav>
+
+    <div class="top-status">
+        <div class="status-pill">
+            <span class="dot"></span>
+            <span id="globalStatus">DATA STANDBY</span>
+        </div>
+    </div>
+
+</header>
+
+
+<main class="page">
+
+    <!-- HERO -->
+    <section class="hero">
+
+        <div class="hero-grid">
+
+            <div>
+
+                <div class="eyebrow">
+                    <span class="dot"></span>
+                    KINGBOT INTELLIGENCE / ANALYTICS
+                </div>
+
+                <h1>
+                    See the entire
+                    <span class="gradient-text">trading system.</span>
+                </h1>
+
+                <p>
+                    Institutional-grade performance, risk, exposure and
+                    strategy intelligence in one command environment.
+                    Verified account metrics appear here only when available.
+                </p>
+
+            </div>
+
+            <div class="hero-actions">
+
+                <button class="btn" onclick="refreshAnalytics()">
+                    ↻ Refresh
+                </button>
+
+                <button class="btn" onclick="window.print()">
+                    ⤓ Export Report
+                </button>
+
+                <button class="btn primary" onclick="window.location.href='terminal.html'">
+                    Open Terminal →
+                </button>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- FILTERS -->
+    <section class="controls">
+
+        <div class="control">
+            <label>Account</label>
+            <select id="accountFilter">
+                <option>Current Account</option>
+            </select>
+        </div>
+
+        <div class="control">
+            <label>Strategy</label>
+            <select id="strategyFilter">
+                <option>All Systems</option>
+                <option>Strategic</option>
+                <option>Flipper</option>
+                <option>Breakout</option>
+                <option>SMC Pro</option>
+                <option>Ladder Flip V8</option>
+            </select>
+        </div>
+
+        <div class="control">
+            <label>Instrument</label>
+            <select id="symbolFilter">
+                <option>All Instruments</option>
+                <option>XAUUSD</option>
+                <option>EURUSD</option>
+                <option>GBPUSD</option>
+                <option>USDJPY</option>
+                <option>BTCUSD</option>
+            </select>
+        </div>
+
+        <div class="control">
+            <label>Timeframe</label>
+            <select id="timeframeFilter">
+                <option>All</option>
+                <option>Today</option>
+                <option>7 Days</option>
+                <option>30 Days</option>
+                <option>90 Days</option>
+                <option>1 Year</option>
+            </select>
+        </div>
+
+        <div class="control">
+            <label>Start Date</label>
+            <input type="date" id="startDate">
+        </div>
+
+        <div class="control">
+            <label>End Date</label>
+            <input type="date" id="endDate">
+        </div>
+
+    </section>
+
+
+    <!-- KPI COMMAND CARDS -->
+    <section class="kpis">
+
+        <div class="card kpi">
+            <div class="edge"></div>
+
+            <div class="kpi-top">
+                <span>Net P&L</span>
+                <div class="kpi-icon">↗</div>
+            </div>
+
+            <div class="kpi-value unavailable" id="netPnl">—</div>
+            <div class="kpi-sub">Verified account performance</div>
+            <div class="mini-line"></div>
+        </div>
+
+
+        <div class="card kpi">
+            <div class="edge"></div>
+
+            <div class="kpi-top">
+                <span>Return</span>
+                <div class="kpi-icon">%</div>
+            </div>
+
+            <div class="kpi-value unavailable" id="returnValue">—</div>
+            <div class="kpi-sub">Cumulative account return</div>
+            <div class="mini-line"></div>
+        </div>
+
+
+        <div class="card kpi">
+            <div class="edge"></div>
+
+            <div class="kpi-top">
+                <span>Win Rate</span>
+                <div class="kpi-icon">W</div>
+            </div>
+
+            <div class="kpi-value unavailable" id="winRate">—</div>
+            <div class="kpi-sub">Closed trade outcome ratio</div>
+            <div class="mini-line"></div>
+        </div>
+
+
+        <div class="card kpi">
+            <div class="edge"></div>
+
+            <div class="kpi-top">
+                <span>Profit Factor</span>
+                <div class="kpi-icon">PF</div>
+            </div>
+
+            <div class="kpi-value unavailable" id="profitFactor">—</div>
+            <div class="kpi-sub">Gross profit / gross loss</div>
+            <div class="mini-line"></div>
+        </div>
+
+
+        <div class="card kpi">
+            <div class="edge"></div>
+
+            <div class="kpi-top">
+                <span>Max Drawdown</span>
+                <div class="kpi-icon">↓</div>
+            </div>
+
+            <div class="kpi-value unavailable" id="maxDrawdown">—</div>
+            <div class="kpi-sub">Peak-to-trough decline</div>
+            <div class="mini-line"></div>
+        </div>
+
+
+        <div class="card kpi">
+            <div class="edge"></div>
+
+            <div class="kpi-top">
+                <span>Risk Utilization</span>
+                <div class="kpi-icon">R</div>
+            </div>
+
+            <div class="kpi-value unavailable" id="riskUtilization">—</div>
+            <div class="kpi-sub">Current policy utilization</div>
+            <div class="mini-line"></div>
+        </div>
+
+    </section>
+
+
+    <!-- EQUITY + RISK -->
+    <section class="main-grid">
+
+        <div class="card panel">
+
+            <div class="panel-head">
+
+                <div>
+                    <div class="panel-title">Equity & Drawdown Intelligence</div>
+                    <div class="panel-sub">
+                        Portfolio trajectory and risk deterioration
+                    </div>
+                </div>
+
+                <div class="panel-tools">
+                    <span class="tag live">
+                        ● VERIFIED DATA
+                    </span>
+
+                    <span class="tag">90D</span>
+                </div>
+
+            </div>
+
+            <div class="chart-wrap">
+
+                <div class="chart-overlay">
+                    <span class="tag">EQUITY</span>
+                    <span class="tag">DRAWDOWN</span>
+                </div>
+
+                <canvas id="equityChart"></canvas>
+
+                <div class="chart-legend">
+                    <span>— EQUITY</span>
+                    <span>— DRAWDOWN</span>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="card panel">
+
+            <div class="panel-head">
+
+                <div>
+                    <div class="panel-title">Risk Intelligence</div>
+                    <div class="panel-sub">
+                        Capital protection framework
+                    </div>
+                </div>
+
+                <span class="tag">POLICY</span>
+
+            </div>
+
+
+            <div class="risk-stack">
+
+                <div class="risk-item">
+
+                    <div class="risk-line">
+                        <span class="risk-name">Daily Drawdown</span>
+                        <span class="risk-value">5% LIMIT</span>
+                    </div>
+
+                    <div class="progress">
+                        <span id="dailyRiskBar"></span>
+                    </div>
+
+                </div>
+
+
+                <div class="risk-item">
+
+                    <div class="risk-line">
+                        <span class="risk-name">Total Drawdown</span>
+                        <span class="risk-value">10% LIMIT</span>
+                    </div>
+
+                    <div class="progress">
+                        <span id="totalRiskBar"></span>
+                    </div>
+
+                </div>
+
+
+                <div class="risk-item">
+
+                    <div class="risk-line">
+                        <span class="risk-name">Margin Utilization</span>
+                        <span class="risk-value">—</span>
+                    </div>
+
+                    <div class="progress">
+                        <span></span>
+                    </div>
+
+                </div>
+
+
+                <div class="risk-item">
+
+                    <div class="risk-line">
+                        <span class="risk-name">Concentration</span>
+                        <span class="risk-value">—</span>
+                    </div>
+
+                    <div class="progress">
+                        <span></span>
+                    </div>
+
+                </div>
+
+
+                <div class="risk-item">
+
+                    <div class="risk-line">
+                        <span class="risk-name">Correlation Exposure</span>
+                        <span class="risk-value">—</span>
+                    </div>
+
+                    <div class="progress">
+                        <span></span>
+                    </div>
+
+                </div>
+
+
+                <div class="risk-note">
+                    Risk limits are policy controls. Actual utilization
+                    requires verified account, position and trade data.
+                    Browser-side analytics never override the protection
+                    layer.
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- STRATEGY ATTRIBUTION -->
+    <section class="card panel" style="margin-bottom:18px;">
+
+        <div class="panel-head">
+
+            <div>
+                <div class="panel-title">KINGBOT Strategy Attribution</div>
+                <div class="panel-sub">
+                    Contribution, consistency and risk profile across the five trading systems
+                </div>
+            </div>
+
+            <span class="tag">5 SYSTEMS</span>
+
+        </div>
+
+
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>System</th>
+                        <th>Return</th>
+                        <th>Win Rate</th>
+                        <th>Drawdown</th>
+                        <th>Trades</th>
+                        <th>Expectancy</th>
+                        <th>Contribution</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    <tr>
+                        <td>
+                            <div class="strategy">
+                                <span class="strategy-dot"></span>
+                                KINGBOT STRATEGIC
+                            </div>
+                        </td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td><span class="status wait">Awaiting data</span></td>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            <div class="strategy">
+                                <span class="strategy-dot"></span>
+                                KINGBOT FLIPPER
+                            </div>
+                        </td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td><span class="status wait">Awaiting data</span></td>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            <div class="strategy">
+                                <span class="strategy-dot"></span>
+                                KINGBOT BREAKOUT
+                            </div>
+                        </td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td><span class="status wait">Awaiting data</span></td>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            <div class="strategy">
+                                <span class="strategy-dot"></span>
+                                KINGBOT SMC PRO
+                            </div>
+                        </td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td><span class="status wait">Awaiting data</span></td>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            <div class="strategy">
+                                <span class="strategy-dot"></span>
+                                KINGBOT LADDER FLIP V8
+                            </div>
+                        </td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td class="waiting">—</td>
+                        <td><span class="status wait">Awaiting data</span></td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+
+    <!-- EXPOSURE + CORRELATION -->
+    <section class="section-grid">
+
+        <div class="card panel">
+
+            <div class="panel-head">
+
+                <div>
+                    <div class="panel-title">Portfolio Exposure</div>
+                    <div class="panel-sub">
+                        Capital allocation by instrument
+                    </div>
+                </div>
+
+                <span class="tag">LIVE</span>
+
+            </div>
+
+
+            <div class="exposure-list">
+
+                <div class="exposure-row">
+                    <div class="exposure-name">XAUUSD</div>
+                    <div class="exposure-bar"><span></span></div>
+                    <div class="exposure-value">—</div>
+                </div>
+
+                <div class="exposure-row">
+                    <div class="exposure-name">EURUSD</div>
+                    <div class="exposure-bar"><span></span></div>
+                    <div class="exposure-value">—</div>
+                </div>
+
+                <div class="exposure-row">
+                    <div class="exposure-name">GBPUSD</div>
+                    <div class="exposure-bar"><span></span></div>
+                    <div class="exposure-value">—</div>
+                </div>
+
+                <div class="exposure-row">
+                    <div class="exposure-name">USDJPY</div>
+                    <div class="exposure-bar"><span></span></div>
+                    <div class="exposure-value">—</div>
+                </div>
+
+                <div class="exposure-row">
+                    <div class="exposure-name">BTCUSD</div>
+                    <div class="exposure-bar"><span></span></div>
+                    <div class="exposure-value">—</div>
+                </div>
+
+                <div class="exposure-row">
+                    <div class="exposure-name">OTHER</div>
+                    <div class="exposure-bar"><span></span></div>
+                    <div class="exposure-value">—</div>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="card panel">
+
+            <div class="panel-head">
+
+                <div>
+                    <div class="panel-title">Correlation Matrix</div>
+                    <div class="panel-sub">
+                        Portfolio relationship intelligence
+                    </div>
+                </div>
+
+                <span class="tag">ANALYTICS</span>
+
+            </div>
+
+
+            <div style="overflow-x:auto;">
+
+                <div class="matrix">
+
+                    <div class="matrix-cell matrix-label"></div>
+                    <div class="matrix-cell matrix-label">XAU</div>
+                    <div class="matrix-cell matrix-label">EUR</div>
+                    <div class="matrix-cell matrix-label">GBP</div>
+                    <div class="matrix-cell matrix-label">JPY</div>
+                    <div class="matrix-cell matrix-label">BTC</div>
+
+                    <div class="matrix-cell matrix-label">XAU</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+
+                    <div class="matrix-cell matrix-label">EUR</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+
+                    <div class="matrix-cell matrix-label">GBP</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+
+                    <div class="matrix-cell matrix-label">JPY</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+
+                    <div class="matrix-cell matrix-label">BTC</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+                    <div class="matrix-cell neutral">—</div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- DISTRIBUTION + INSTRUMENT -->
+    <section class="section-grid">
+
+        <div class="card panel">
+
+            <div class="panel-head">
+
+                <div>
+                    <div class="panel-title">Trade Distribution</div>
+                    <div class="panel-sub">
+                        Winning and losing outcome distribution
+                    </div>
+                </div>
+
+                <span class="tag">TRADE DATA</span>
+
+            </div>
+
+            <div class="distribution">
+                <canvas id="distributionChart"></canvas>
+            </div>
+
+        </div>
+
+
+        <div class="card panel">
+
+            <div class="panel-head">
+
+                <div>
+                    <div class="panel-title">Instrument Performance</div>
+                    <div class="panel-sub">
+                        Contribution by traded market
+                    </div>
+                </div>
+
+                <span class="tag">MULTI-ASSET</span>
+
+            </div>
+
+            <div class="table-wrap">
+
+                <table>
+
+                    <thead>
+                        <tr>
+                            <th>Instrument</th>
+                            <th>Trades</th>
+                            <th>Win Rate</th>
+                            <th>P&L</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        <tr>
+                            <td>XAUUSD</td>
+                            <td class="waiting">—</td>
+                            <td class="waiting">—</td>
+                            <td class="waiting">—</td>
+                        </tr>
+
+                        <tr>
+                            <td>EURUSD</td>
+                            <td class="waiting">—</td>
+                            <td class="waiting">—</td>
+                            <td class="waiting">—</td>
+                        </tr>
+
+                        <tr>
+                            <td>GBPUSD</td>
+                            <td class="waiting">—</td>
+                            <td class="waiting">—</td>
+                            <td class="waiting">—</td>
+                        </tr>
+
+                        <tr>
+                            <td>USDJPY</td>
+                            <td class="waiting">—</td>
+                            <td class="waiting">—</td>
+                            <td class="waiting">—</td>
+                        </tr>
+
+                        <tr>
+                            <td>BTCUSD</td>
+                            <td class="waiting">—</td>
+                            <td class="waiting">—</td>
+                            <td class="waiting">—</td>
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- AI INTELLIGENCE -->
+    <section class="card panel ai-panel" style="margin-bottom:18px;">
+
+        <div class="panel-head">
+
+            <div class="ai-head">
+
+                <div class="ai-core">AI</div>
+
+                <div>
+                    <div class="panel-title">KINGBOT Intelligence Layer</div>
+                    <div class="ai-status">
+                        Portfolio reasoning and diagnostics
+                    </div>
+                </div>
+
+            </div>
+
+            <span class="tag">AI READY</span>
+
+        </div>
+
+
+        <div class="ai-insight">
+
+            <strong>Current Intelligence State</strong>
+
+            <p id="aiInsight">
+                Awaiting verified account analytics. Once synchronized,
+                this intelligence layer can evaluate performance,
+                risk utilization, strategy attribution, exposure,
+                drawdown behavior and execution quality.
+            </p>
+
+        </div>
+
+
+        <div class="ai-signals">
+
+            <div class="ai-signal">
+                <span>Performance</span>
+                <b id="aiPerformance">AWAITING DATA</b>
+            </div>
+
+            <div class="ai-signal">
+                <span>Risk</span>
+                <b id="aiRisk">AWAITING DATA</b>
+            </div>
+
+            <div class="ai-signal">
+                <span>Portfolio</span>
+                <b id="aiPortfolio">AWAITING DATA</b>
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- EXECUTION QUALITY -->
+    <section class="card panel">
+
+        <div class="panel-head">
+
+            <div>
+                <div class="panel-title">Execution Quality</div>
+                <div class="panel-sub">
+                    Institutional execution diagnostics
+                </div>
+            </div>
+
+            <span class="tag">VERIFIED ONLY</span>
+
+        </div>
+
+
+        <div class="exec-grid">
+
+            <div class="exec-card">
+                <label>Average Slippage</label>
+                <strong>—</strong>
+            </div>
+
+            <div class="exec-card">
+                <label>Average Spread</label>
+                <strong>—</strong>
+            </div>
+
+            <div class="exec-card">
+                <label>Execution Latency</label>
+                <strong>—</strong>
+            </div>
+
+            <div class="exec-card">
+                <label>Fill Rate</label>
+                <strong>—</strong>
+            </div>
+
+        </div>
+
+
+        <div class="data-state">
+
+            <div class="data-state-icon">✓</div>
+
+            <div>
+                <strong>Analytics integrity protected</strong>
+                <span>
+                    Only confirmed account and execution records should populate performance analytics.
+                </span>
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <footer>
+        <strong>KINGBOT FINTECH</strong> · Institutional Trading Intelligence ·
+        Analytics are informational until verified account synchronization is active.
+        Trading involves substantial risk and historical performance does not guarantee future results.
+    </footer>
+
+</main>
+
+
+<script>
+/* =========================================================
+   KINGBOT ANALYTICS OS
+   Customer-facing analytics layer
+   ========================================================= */
+
+const API = {
+    analytics: "/api/analytics",
+    account: "/api/account",
+    connection: "/api/connection"
+};
+
+
+/* ---------------------------------------------------------
+   CHARTS
+--------------------------------------------------------- */
+
+const equityCtx =
+    document.getElementById("equityChart").getContext("2d");
+
+const distributionCtx =
+    document.getElementById("distributionChart").getContext("2d");
+
+
+const equityGradient =
+    equityCtx.createLinearGradient(0,0,0,390);
+
+equityGradient.addColorStop(0,"rgba(25,230,255,.20)");
+equityGradient.addColorStop(1,"rgba(25,230,255,0)");
+
+
+const equityChart = new Chart(equityCtx,{
+    type:"line",
+
+    data:{
+        labels:[],
+        datasets:[
+            {
+                label:"Equity",
+                data:[],
+                borderColor:"#19e6ff",
+                backgroundColor:equityGradient,
+                fill:true,
+                tension:.35,
+                pointRadius:0,
+                borderWidth:2
+            },
+            {
+                label:"Drawdown",
+                data:[],
+                borderColor:"#ff4d6d",
+                backgroundColor:"transparent",
+                fill:false,
+                tension:.35,
+                pointRadius:0,
+                borderWidth:1.5
+            }
+        ]
+    },
+
+    options:{
+        responsive:true,
+        maintainAspectRatio:false,
+
+        interaction:{
+            intersect:false,
+            mode:"index"
+        },
+
+        plugins:{
+            legend:{
+                display:false
+            },
+
+            tooltip:{
+                backgroundColor:"#080d1a",
+                borderColor:"rgba(255,255,255,.08)",
+                borderWidth:1,
+                titleFont:{
+                    family:"JetBrains Mono"
+                },
+                bodyFont:{
+                    family:"JetBrains Mono"
+                }
+            }
+        },
+
+        scales:{
+            x:{
+                display:false,
+                grid:{
+                    display:false
+                }
+            },
+
+            y:{
+                ticks:{
+                    color:"#56627c",
+                    font:{
+                        family:"JetBrains Mono",
+                        size:9
+                    }
+                },
+
+                grid:{
+                    color:"rgba(255,255,255,.035)"
+                }
+            }
+        }
+    }
+});
+
+
+const distributionChart = new Chart(distributionCtx,{
+    type:"bar",
+
+    data:{
+        labels:[],
+        datasets:[
+            {
+                label:"Trade Outcomes",
+                data:[],
+                backgroundColor:[
+                    "rgba(35,247,163,.42)"
+                ],
+                borderWidth:0,
+                borderRadius:5
+            }
+        ]
+    },
+
+    options:{
+        responsive:true,
+        maintainAspectRatio:false,
+
+        plugins:{
+            legend:{
+                display:false
+            }
+        },
+
+        scales:{
+            x:{
+                ticks:{
+                    color:"#56627c",
+                    font:{
+                        family:"JetBrains Mono",
+                        size:8
+                    }
+                },
+
+                grid:{
+                    display:false
+                }
+            },
+
+            y:{
+                ticks:{
+                    color:"#56627c",
+                    font:{
+                        family:"JetBrains Mono",
+                        size:8
+                    }
+                },
+
+                grid:{
+                    color:"rgba(255,255,255,.035)"
+                }
+            }
+        }
+    }
+});
+
+
+/* ---------------------------------------------------------
+   SAFE DATA HANDLING
+--------------------------------------------------------- */
+
+function safeNumber(value){
+
+    if(
+        value === null ||
+        value === undefined ||
+        value === "" ||
+        Number.isNaN(Number(value))
+    ){
+        return null;
+    }
+
+    return Number(value);
+}
+
+
+function displayMetric(value,suffix=""){
+
+    const n = safeNumber(value);
+
+    if(n === null){
+        return "—";
+    }
+
+    return `${n}${suffix}`;
+}
+
+
+function formatMoney(value,currency="USD"){
+
+    const n = safeNumber(value);
+
+    if(n === null){
+        return "—";
+    }
+
+    try{
+
+        return new Intl.NumberFormat(
+            undefined,
+            {
+                style:"currency",
+                currency,
+                maximumFractionDigits:2
+            }
+        ).format(n);
+
+    }catch{
+
+        return n.toFixed(2);
+
+    }
+}
+
+
+/* ---------------------------------------------------------
+   CUSTOMER-FACING STATE
+--------------------------------------------------------- */
+
+function setGlobalStatus(state){
+
+    const el =
+        document.getElementById("globalStatus");
+
+    if(state === "connected"){
+
+        el.textContent = "LIVE DATA";
+
+    }else{
+
+        el.textContent = "DATA STANDBY";
+
+    }
+
+}
+
+
+/* ---------------------------------------------------------
+   LOAD ANALYTICS
+--------------------------------------------------------- */
+
+async function refreshAnalytics(){
+
+    setGlobalStatus("loading");
+
+    try{
+
+        const response =
+            await fetch(API.analytics,{
+                method:"GET",
+                credentials:"include",
+                headers:{
+                    "Accept":"application/json"
+                }
+            });
+
+        if(!response.ok){
+
+            throw new Error("Analytics unavailable");
+
+        }
+
+        const data =
+            await response.json();
+
+        renderAnalytics(data);
+
+        setGlobalStatus("connected");
+
+    }catch(error){
+
+        /*
+         Do not expose implementation details
+         to the customer.
+        */
+
+        setGlobalStatus("offline");
+
+        clearAnalyticsState();
+
+    }
+
+}
+
+
+/* ---------------------------------------------------------
+   RENDER VERIFIED ANALYTICS
+--------------------------------------------------------- */
+
+function renderAnalytics(data){
+
+    if(!data){
+        clearAnalyticsState();
+        return;
+    }
+
+
+    /* KPI */
+
+    document.getElementById("netPnl").textContent =
+        formatMoney(data.netPnl,data.currency || "USD");
+
+    document.getElementById("returnValue").textContent =
+        displayMetric(data.return,"%");
+
+    document.getElementById("winRate").textContent =
+        displayMetric(data.winRate,"%");
+
+    document.getElementById("profitFactor").textContent =
+        displayMetric(data.profitFactor);
+
+    document.getElementById("maxDrawdown").textContent =
+        displayMetric(data.maxDrawdown,"%");
+
+    document.getElementById("riskUtilization").textContent =
+        displayMetric(data.riskUtilization,"%");
+
+
+    /* EQUITY */
+
+    if(
+        Array.isArray(data.equity) &&
+        data.equity.length
+    ){
+
+        equityChart.data.labels =
+            data.equity.map(x => x.time || "");
+
+        equityChart.data.datasets[0].data =
+            data.equity.map(x => safeNumber(x.value));
+
+        equityChart.data.datasets[1].data =
+            Array.isArray(data.drawdown)
+                ? data.drawdown.map(x => safeNumber(x.value))
+                : [];
+
+        equityChart.update();
+
+    }
+
+
+    /* DISTRIBUTION */
+
+    if(
+        Array.isArray(data.distribution) &&
+        data.distribution.length
+    ){
+
+        distributionChart.data.labels =
+            data.distribution.map(x => x.label);
+
+        distributionChart.data.datasets[0].data =
+            data.distribution.map(x => safeNumber(x.value));
+
+        distributionChart.update();
+
+    }
+
+
+    /* RISK */
+
+    if(data.risk){
+
+        setProgress(
+            "dailyRiskBar",
+            data.risk.dailyDrawdownPercent,
+            5
+        );
+
+        setProgress(
+            "totalRiskBar",
+            data.risk.totalDrawdownPercent,
+            10
+        );
+
+    }
+
+
+    /* AI */
+
+    if(data.ai){
+
+        document.getElementById("aiInsight").textContent =
+            data.ai.insight ||
+            "Analytics intelligence is awaiting sufficient verified data.";
+
+        document.getElementById("aiPerformance").textContent =
+            data.ai.performance ||
+            "AWAITING DATA";
+
+        document.getElementById("aiRisk").textContent =
+            data.ai.risk ||
+            "AWAITING DATA";
+
+        document.getElementById("aiPortfolio").textContent =
+            data.ai.portfolio ||
+            "AWAITING DATA";
+
+    }
+
+}
+
+
+function setProgress(id,value,limit){
+
+    const element =
+        document.getElementById(id);
+
+    const n = safeNumber(value);
+
+    if(n === null){
+
+        element.style.width = "0%";
+        return;
+
+    }
+
+    const percentage =
+        Math.max(
+            0,
+            Math.min(
+                100,
+                (Math.abs(n) / limit) * 100
+            )
+        );
+
+    element.style.width =
+        percentage + "%";
+
+}
+
+
+/* ---------------------------------------------------------
+   EMPTY / SAFE STATE
+--------------------------------------------------------- */
+
+function clearAnalyticsState(){
+
+    equityChart.data.labels = [];
+    equityChart.data.datasets[0].data = [];
+    equityChart.data.datasets[1].data = [];
+
+    equityChart.update();
+
+
+    distributionChart.data.labels = [];
+    distributionChart.data.datasets[0].data = [];
+
+    distributionChart.update();
+
+
+    [
+        "netPnl",
+        "returnValue",
+        "winRate",
+        "profitFactor",
+        "maxDrawdown",
+        "riskUtilization"
+    ].forEach(id => {
+
+        const el =
+            document.getElementById(id);
+
+        el.textContent = "—";
+
+        el.classList.add("unavailable");
+
+    });
+
+
+    document.getElementById("dailyRiskBar")
+        .style.width = "0%";
+
+    document.getElementById("totalRiskBar")
+        .style.width = "0%";
+
+}
+
+
+/* ---------------------------------------------------------
+   FILTERS
+--------------------------------------------------------- */
+
+[
+    "accountFilter",
+    "strategyFilter",
+    "symbolFilter",
+    "timeframeFilter",
+    "startDate",
+    "endDate"
+].forEach(id => {
+
+    document.getElementById(id)
+        .addEventListener("change",() => {
+
+            /*
+             Filters are intentionally kept
+             customer-facing. Their selected values
+             can later be passed to the verified
+             analytics service.
+            */
+
+            refreshAnalytics();
+
+        });
+
+});
+
+
+/* ---------------------------------------------------------
+   INITIAL STATE
+--------------------------------------------------------- */
+
+clearAnalyticsState();
+
+refreshAnalytics();
+
+
+/* ---------------------------------------------------------
+   PERIODIC REFRESH
+--------------------------------------------------------- */
+
+setInterval(
+    refreshAnalytics,
+    30000
+);
+
+</script>
+
+</body>
+</html>
