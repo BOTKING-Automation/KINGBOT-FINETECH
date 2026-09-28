@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KINGBOT — Secure Sign In</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+:root{
+ --bg:#02040a;
+ --panel:#070b15;
+ --gold:#ffc84a;
+ --cyan:#19e6ff;
+ --violet:#9b5cff;
+ --pink:#ff4fd8;
+ --green:#23f7a3;
+ --red:#ff4d6d;
+ --muted:#8490a8;
+ --line:rgba(255,255,255,.09);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+ min-height:100vh;
+ display:grid;
+ place-items:center;
+ padding:20px;
+ font-family:Inter,sans-serif;
+ color:white;
+ background:
+ radial-gradient(circle at 20% 20%,rgba(25,230,255,.13),transparent 28%),
+ radial-gradient(circle at 80% 80%,rgba(155,92,255,.13),transparent 30%),
+ #02040a;
+}
+
+body:before{
+ content:"";
+ position:fixed;
+ inset:0;
+ pointer-events:none;
+ opacity:.2;
+ background-image:
+ linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+ background-size:44px 44px;
+}
+
+.card{
+ width:min(100%,470px);
+ padding:38px;
+ border:1px solid var(--line);
+ border-radius:28px;
+ background:rgba(7,11,21,.93);
+ box-shadow:0 40px 100px rgba(0,0,0,.55);
+ position:relative;
+}
+
+.card:before{
+ content:"";
+ position:absolute;
+ inset:-1px;
+ z-index:-1;
+ border-radius:29px;
+ background:conic-gradient(
+  from 0deg,
+  transparent,
+  var(--cyan),
+  transparent 25%,
+  var(--violet),
+  transparent 50%,
+  var(--gold),
+  transparent 75%
+ );
+ animation:spin 8s linear infinite;
+ opacity:.55;
+}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.brand{
+ text-align:center;
+ margin-bottom:32px;
+}
+
+.logo{
+ width:62px;
+ height:62px;
+ margin:auto;
+ border-radius:18px;
+ border:1px solid rgba(255,200,74,.3);
+ display:grid;
+ place-items:center;
+ overflow:hidden;
+ box-shadow:0 0 40px rgba(255,200,74,.12);
+}
+
+.logo img{
+ width:100%;
+ height:100%;
+ object-fit:contain;
+}
+
+.logo span{
+ font-family:Orbitron;
+ font-size:25px;
+ font-weight:800;
+ color:var(--gold);
+}
+
+.brand h1{
+ font-family:Orbitron;
+ font-size:25px;
+ margin-top:17px;
+}
+
+.brand p{
+ color:var(--muted);
+ font-size:12px;
+ margin-top:7px;
+}
+
+.label{
+ display:block;
+ color:#c8d0de;
+ font-size:12px;
+ margin-bottom:8px;
+ font-weight:700;
+}
+
+.field{
+ margin-bottom:17px;
+}
+
+input{
+ width:100%;
+ padding:15px;
+ color:white;
+ background:rgba(255,255,255,.035);
+ border:1px solid var(--line);
+ border-radius:13px;
+ outline:none;
+}
+
+input:focus{
+ border-color:var(--cyan);
+ box-shadow:0 0 25px rgba(25,230,255,.1);
+}
+
+button{
+ width:100%;
+ padding:15px;
+ border:0;
+ border-radius:14px;
+ font-weight:800;
+ cursor:pointer;
+ background:linear-gradient(100deg,var(--gold),#ffe28b,var(--cyan));
+ color:#05070d;
+}
+
+button:disabled{
+ opacity:.6;
+ cursor:not-allowed;
+}
+
+.options{
+ display:flex;
+ justify-content:space-between;
+ margin:4px 0 20px;
+ font-size:11px;
+ color:var(--muted);
+}
+
+a{
+ color:var(--cyan);
+ text-decoration:none;
+ font-weight:700;
+}
+
+.message{
+ display:none;
+ margin-top:15px;
+ padding:12px;
+ border-radius:12px;
+ font-size:12px;
+ line-height:1.5;
+}
+
+.message.error{
+ display:block;
+ background:rgba(255,77,109,.08);
+ color:#ffb8c5;
+ border:1px solid rgba(255,77,109,.2);
+}
+
+.message.success{
+ display:block;
+ background:rgba(35,247,163,.07);
+ color:#a8ffda;
+ border:1px solid rgba(35,247,163,.18);
+}
+
+.signup{
+ text-align:center;
+ color:var(--muted);
+ font-size:13px;
+ margin-top:22px;
+}
+
+.status{
+ margin-top:25px;
+ display:flex;
+ justify-content:center;
+ gap:8px;
+ color:#667189;
+ font:10px Orbitron;
+ letter-spacing:1px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+ <div class="brand">
+
+  <div class="logo">
+   <img src="assets/images/kingbot-logo.png"
+        alt="KINGBOT"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+   <span style="display:none">K</span>
+  </div>
+
+  <h1>KINGBOT FINTECH</h1>
+
+  <p>Secure access to your trading command center</p>
+
+ </div>
+
+ <form id="loginForm">
+
+  <div class="field">
+   <label class="label">EMAIL</label>
+   <input id="email" type="email" autocomplete="email" required>
+  </div>
+
+  <div class="field">
+   <label class="label">PASSWORD</label>
+   <input id="password" type="password" autocomplete="current-password" required>
+  </div>
+
+  <div class="options">
+   <label>
+    <input id="remember" type="checkbox" style="width:auto">
+    Remember session
+   </label>
+
+   <a href="#">Forgot password?</a>
+  </div>
+
+  <button id="loginBtn" type="submit">
+   SECURE SIGN IN
+  </button>
+
+  <div id="message" class="message"></div>
+
+ </form>
+
+ <div class="signup">
+  New to KINGBOT?
+  <a href="signup.html">Create account</a>
+ </div>
+
+ <div class="status">
+  <span>SECURE</span>
+  <span>•</span>
+  <span>VERIFIED ACCESS</span>
+ </div>
+
+</div>
+
+<script>
+
+const form = document.getElementById("loginForm");
+const button = document.getElementById("loginBtn");
+const message = document.getElementById("message");
+
+function showMessage(text,type){
+ message.textContent=text;
+ message.className="message "+type;
+}
+
+form.addEventListener("submit",async e=>{
+
+ e.preventDefault();
+
+ button.disabled=true;
+ button.textContent="AUTHENTICATING...";
+
+ try{
+
+  const response=await fetch("/api/auth/signin",{
+   method:"POST",
+   headers:{
+    "Content-Type":"application/json"
+   },
+   credentials:"include",
+   body:JSON.stringify({
+    email:document.getElementById("email").value.trim(),
+    password:document.getElementById("password").value,
+    remember:document.getElementById("remember").checked
+   })
+  });
+
+  const data=await response.json().catch(()=>({}));
+
+  if(!response.ok){
+   throw new Error(data.message||"Sign in failed.");
+  }
+
+  /*
+   * The backend decides whether verification is complete.
+   * Never trust a frontend flag for authentication.
+   */
+
+  if(data.emailVerified===false || data.phoneVerified===false){
+
+   sessionStorage.setItem(
+    "verification_email",
+    document.getElementById("email").value.trim()
+   );
+
+   window.location.href="verify.html";
+   return;
+  }
+
+  window.location.href="dashboard.html";
+
+ }catch(error){
+
+  showMessage(
+   error.message||"Authentication service unavailable.",
+   "error"
+  );
+
+  button.disabled=false;
+  button.textContent="SECURE SIGN IN";
+ }
+
+});
+
+</script>
+
+</body>
+</html>
