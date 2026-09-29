@@ -59,6 +59,14 @@ export function createSubscriptionRouter({pool}) {
     } catch(err){console.error("[KINGBOT BILLING]",err?.message||err);res.status(500).json({ok:false,error:"Payment submission failed."});}
   });
 
+  router.get("/access/:botId",async(req,res)=>{
+    const u=await requireUser(pool,req,res); if(!u)return;
+    const bot=String(req.params.botId||"").trim().toLowerCase();
+    if(!BOT_NAMES[bot]) return res.status(404).json({ok:false,error:"Unknown bot engine."});
+    const q=await pool.query("SELECT 1 FROM kingbot_bot_entitlements e JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 AND e.bot_id=$2 AND e.active=TRUE AND s.status='active' AND (s.expires_at IS NULL OR s.expires_at>NOW()) LIMIT 1",[u.id,bot]);
+    res.json({ok:true,botId:bot,botName:BOT_NAMES[bot],allowed:Boolean(q.rowCount)});
+  });
+
   router.get("/admin/payments",async(req,res)=>{
     const a=await requireAdmin(pool,req,res);if(!a)return;
     try {
