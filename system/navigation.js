@@ -30,7 +30,7 @@ PURPOSE
           label: "Home",
           href: "index.html",
           icon: "⌂",
-          permission: "platform"
+          permission: null
         },
 
         {
@@ -69,19 +69,7 @@ PURPOSE
         }
       ],
 
-      accountLinks: [
-        {
-          label: "Profile",
-          href: "profile.html",
-          icon: "◎"
-        },
-
-        {
-          label: "Settings",
-          href: "settings.html",
-          icon: "⚙"
-        }
-      ]
+      accountLinks: []
 
     },
 
@@ -209,6 +197,17 @@ PURPOSE
     canShow(link) {
 
       if (!link.permission) {
+        return true;
+      }
+
+      // Navigation remains discoverable even when a protected
+      // module is locked. auth-gate/access-control handles entry.
+      if ([
+        "terminal",
+        "analytics",
+        "ai",
+        "bots"
+      ].includes(link.permission)) {
         return true;
       }
 
