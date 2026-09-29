@@ -71,7 +71,17 @@ export function createBotRuntimeRouter({pool,broker}){
     const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id);
     if(!r||r.state!=="RUNNING")return res.status(409).json({ok:false,error:"BOT_NOT_RUNNING"});
     if(s.killSwitch)return res.status(409).json({ok:false,error:"KILL_SWITCH_ACTIVE"});
-    const market=req.body?.market||req.body||{};
+    if(!broker.connected)return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Verified broker connection is required before market validation. No order was submitted."});
+    const requestedSymbol=String(req.body?.symbol||"").trim().toUpperCase();
+    if(!requestedSymbol)return res.status(400).json({ok:false,error:"SYMBOL_REQUIRED",message:"A broker symbol is required."});
+    let quote;
+    try{ quote=await broker.getQuote(requestedSymbol,user.id); }
+    catch(error){ return res.status(503).json({ok:false,error:"MARKET_DATA_UNAVAILABLE",reason:error?.message||"BROKER_QUOTE_FAILED",message:"Broker market data could not be verified. No order was submitted."}); }
+    const quoteData=quote?.data||{};
+    const bid=Number(quoteData.bid);
+    const ask=Number(quoteData.ask);
+    if(!Number.isFinite(bid)||!Number.isFinite(ask)||bid<=0||ask<=0||ask<bid)return res.status(503).json({ok:false,error:"INVALID_BROKER_QUOTE",message:"Broker returned an invalid market quote. No order was submitted."});
+    const market={...req.body?.market,symbol:requestedSymbol,bid,ask,price:Number(req.body?.price)||ask};
     const analysis=evaluateBot(b.id,market);
     if(!analysis.ok)return res.status(400).json(analysis);
     const riskContext=req.body?.riskContext||{};
@@ -79,7 +89,6 @@ export function createBotRuntimeRouter({pool,broker}){
     const signal=analysis.signal;
     let action="NO_ACTION",order=null;
     if(signal!=="NO_SIGNAL"&&risk.allowed){
-        if(!broker.connected)return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",analysis,risk});
         const side=signal==="LONG_CANDIDATE"?"BUY":"SELL";
         const volume=Number(req.body?.volume);
         if(!Number.isFinite(volume)||volume<=0)return res.status(400).json({ok:false,error:"ORDER_VOLUME_REQUIRED",message:"Supply a broker-valid order volume; no order was submitted.",analysis,risk});
