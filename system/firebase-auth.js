@@ -32,10 +32,11 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-async function saveUserProfile(user, extra={}) {
+async function saveUserProfile(user, extra={}, initialize=false) {
   if (!user) throw new Error("Cannot save a missing Firebase user.");
   const ref = doc(db, "users", user.uid);
   const now = serverTimestamp();
+
   const profile = {
     uid: user.uid,
     email: user.email || "",
@@ -45,17 +46,24 @@ async function saveUserProfile(user, extra={}) {
     lastName: extra.lastName || "",
     phone: extra.phone || "",
     lastLoginAt: now,
-    updatedAt: now,
-    botRunning: false,
-    lastTradeTime: 0,
-    trades: [],
-    totalTrades: 0,
-    wins: 0,
-    losses: 0,
-    balance: 0
+    updatedAt: now
   };
 
-  // Write directly. Signup/sign-in must not depend on a prior profile read.
+  // Initialize trading/account fields only when the account is first created.
+  // Sign-in updates identity metadata without resetting trading state.
+  if (initialize) {
+    Object.assign(profile, {
+      createdAt: now,
+      botRunning: false,
+      lastTradeTime: 0,
+      trades: [],
+      totalTrades: 0,
+      wins: 0,
+      losses: 0,
+      balance: 0
+    });
+  }
+
   await setDoc(ref, profile, { merge: true });
   return { ...profile, uid: user.uid, email: user.email || "" };
 }
@@ -109,7 +117,7 @@ window.KINGBOT_FIREBASE={
     let backendSynced=false;
     let syncError=null;
     try{
-      await saveUserProfile(user,{firstName,lastName,phone,displayName});
+      await saveUserProfile(user,{firstName,lastName,phone,displayName},true);
     }catch(error){
       console.error("[KINGBOT AUTH] Firestore profile save failed:",error?.message||error);
       throw new Error("Account was created, but the user profile could not be saved. Check Firebase Firestore rules.");
