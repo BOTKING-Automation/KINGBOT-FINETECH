@@ -21,8 +21,8 @@
 
   const guestAccountLinks = [
     ["subscription.html","Subscription"],
-    ["signin.html","Sign in"],
-    ["signup.html","Create account"]
+    ["access.html#signin","Sign in"],
+    ["access.html#signup","Create account"]
   ];
 
   const authenticatedAccountLinks = [
