@@ -20,7 +20,12 @@ const timeframeMinutes={"1m":1,"2m":2,"3m":3,"4m":4,"5m":5,"6m":6,"10m":10,"12m"
 
 async function ensureWorkerSchema(){
   if(!pool) throw new Error("DATABASE_URL_REQUIRED");
-  // Worker can boot before the HTTP service, so establish shared schemas in dependency order.\n  await ensureAuthSchema(pool);\n  await ensureSubscriptionSchema(pool);\n  await ensureBotEngineSchema(pool);\n  await ensureBotRuntimeSchema(pool);\n  await broker.ensureSchema();
+  // Worker can boot before the HTTP service, so establish shared schemas in dependency order.
+  await ensureAuthSchema(pool);
+  await ensureSubscriptionSchema(pool);
+  await ensureBotEngineSchema(pool);
+  await ensureBotRuntimeSchema(pool);
+  await broker.ensureSchema();
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_account_risk_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,baseline_date DATE NOT NULL,day_start_equity NUMERIC NOT NULL,peak_equity NUMERIC NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,provider,account_id))");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_execution_journal (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,execution_mode TEXT NOT NULL,symbol TEXT NOT NULL,side TEXT NOT NULL,volume NUMERIC NOT NULL,status TEXT NOT NULL,broker_result JSONB,error_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
 }

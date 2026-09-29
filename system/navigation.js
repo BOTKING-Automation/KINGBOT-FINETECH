@@ -28,7 +28,7 @@ const KINGBOT_NAV={
  state:{initialized:false,user:null,open:false},
  async initialize(){
   if(this.state.initialized)return;
-  this.injectStyles(); this.ensureMount(); this.loadUser().then(()=>this.refreshUser()).catch(()=>{});
+    this.injectStyles(); this.ensureMount(); this.normalizeLegacyMenus(); this.loadUser().then(()=>this.refreshUser()).catch(()=>{});
   this.state.initialized=true;
   window.dispatchEvent(new CustomEvent("kingbot:navigation-ready"));
  },
@@ -42,6 +42,21 @@ const KINGBOT_NAV={
  },
  current(){return(window.location.pathname.split("/").filter(Boolean).pop()||"index.html").toLowerCase();},
  active(href){return this.current()===href.toLowerCase();},
+ normalizeLegacyMenus(){
+  document.querySelectorAll("body > nav .nav-links,header .nav-links").forEach(menu=>{
+   const links=[...menu.querySelectorAll("a")];
+   links.forEach(link=>{
+    const target=new URL(link.href,window.location.href);
+    if(target.pathname!==window.location.pathname||!target.hash)link.hidden=true;
+   });
+   if(!menu.querySelector("a:not([hidden])")){
+    menu.hidden=true;
+    const container=menu.closest("header")||menu.closest("nav");
+    const toggle=container?.querySelector(".mobile-toggle,[aria-label*='navigation' i],[id*='toggle' i]");
+    if(toggle)toggle.hidden=true;
+   }
+  });
+ },
  name(){return this.state.user?(this.state.user.name||this.state.user.displayName||this.state.user.email||"KINGBOT User"):"KINGBOT User";},
  email(){return this.state.user?(this.state.user.email||"Secure Account"):"Secure Account";},
  initials(){

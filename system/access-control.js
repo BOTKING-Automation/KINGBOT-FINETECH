@@ -63,7 +63,7 @@ No fake trading permissions.
       */
 
       permissionsEndpoint:
-        "https://kingbot-fintech-api-etfv.onrender.com/api/subscription/me"
+        "/subscription/me"
 
     },
 
@@ -161,19 +161,13 @@ No fake trading permissions.
         */
 
         const response =
-          await fetch(
+          await window.KINGBOT_API.request(
             this.config.permissionsEndpoint,
             {
               method: "GET",
-
-              credentials: "include",
-
               headers: {
-                "Accept": "application/json",
                 "Cache-Control": "no-cache"
-              },
-
-              cache: "no-store"
+              }
             }
           );
 

@@ -1418,6 +1418,13 @@
                <input id="metaApiAccountToken" type="password" autocomplete="new-password" placeholder="Your MetaApi API token"
                  style="width:100%;margin-top:6px;padding:11px;border-radius:10px;border:1px solid rgba(155,92,255,.25);background:rgba(4,12,28,.7);color:#fff;">
              </label>
+             <label style="display:block;">
+               <span class="state-label">EXECUTION MODE</span>
+               <select id="brokerExecutionMode" style="width:100%;margin-top:6px;padding:11px;border-radius:10px;border:1px solid rgba(25,230,255,.25);background:rgba(4,12,28,.7);color:#fff;">
+                 <option value="PAPER">PAPER · DEMO ACCOUNT</option>
+                 <option value="LIVE">LIVE · REAL ACCOUNT</option>
+               </select>
+             </label>
            </div>
 
            <div style="margin-top:8px;font-size:12px;opacity:.72;">
@@ -1971,7 +1978,6 @@
    Public market data + backend-ready broker architecture
 ========================================================= */
 
-const API_BASE = "https://kingbot-fintech-api.onrender.com";
 const REST_HOSTS = [
   "https://api.binance.com",
   "https://data-api.binance.vision"
@@ -2678,26 +2684,12 @@ document.querySelectorAll(".chart-btn")
 ========================================================= */
 
 async function fetchApi(path, options = {}) {
-
-  const response = await fetch(
-    `${API_BASE}${path}`,
-    {
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {})
-      },
-      ...options
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Backend HTTP ${response.status}`
-    );
+  const response = await window.KINGBOT_API.request(path, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data.error || data.reason || data.message || `Backend HTTP ${response.status}`);
   }
-
-  return response.json();
+  return data;
 }
 
 /* =========================================================
@@ -2784,19 +2776,35 @@ $("connectBroker").addEventListener(
     );
 
     try {
+      const accountId = document.getElementById("metaApiAccountId")?.value.trim();
+      const accountToken = document.getElementById("metaApiAccountToken")?.value.trim();
+      const executionMode = document.getElementById("brokerExecutionMode")?.value || "PAPER";
+      if (!accountId || !accountToken) {
+        throw new Error("Enter your MetaApi account ID and account token first.");
+      }
+      if (executionMode === "LIVE" && !window.confirm("Connect a real-money trading account? Bot risk limits still apply.")) {
+        return;
+      }
+
+      await fetchApi(
+        "/api/broker/account",
+        {
+          method: "POST",
+          body: JSON.stringify({ accountId, accountToken, executionMode })
+        }
+      );
 
       await fetchApi(
         "/api/broker/connect",
         {
           method: "POST",
           body: JSON.stringify({
-            accountId: document.getElementById("metaApiAccountId")?.value.trim(),
-            accountToken: document.getElementById("metaApiAccountToken")?.value.trim(),
-            executionMode: "PAPER"
+            executionMode
           })
         }
       );
 
+      document.getElementById("metaApiAccountToken").value = "";
       await checkBackend();
 
       toast(
@@ -2808,15 +2816,15 @@ $("connectBroker").addEventListener(
         "Broker connection request sent to backend"
       );
 
-    } catch {
+    } catch (error) {
 
       toast(
-        "BACKEND OFFLINE",
-        "No broker backend is available yet."
+        "BROKER CONNECTION FAILED",
+        error.message || "The broker connection could not be completed."
       );
 
       logActivity(
-        "Broker connection unavailable — backend not detected"
+        `Broker connection failed: ${error.message || "unknown backend error"}`
       );
     }
 

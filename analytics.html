@@ -2182,7 +2182,7 @@ async function refreshAnalytics(){
     try{
 
         const response =
-            await fetch(API.analytics,{
+            await window.KINGBOT_API.request(API.analytics,{
                 method:"GET",
                 credentials:"include",
                 headers:{

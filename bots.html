@@ -96,7 +96,6 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 <script>
 (function(){
 "use strict";
-const API="https://kingbot-fintech-api.onrender.com/api";
 const $=id=>document.getElementById(id);
 let bots=[],selected=null;
 const fields={executionMode:$("executionMode"),symbol:$("symbol"),timeframe:$("timeframe"),maxRisk:$("maxRisk"),dailyDd:$("dailyDd"),totalDd:$("totalDd"),maxPositions:$("maxPositions"),spreadRatio:$("spreadRatio"),staleMs:$("staleMs"),lossStreak:$("lossStreak"),autoPause:$("autoPause"),killSwitch:$("killSwitch")};
@@ -118,12 +117,14 @@ function putSettings(s,mode,kill){
  $("symbol").value=selected?.symbol||"";$("timeframe").value=selected?.timeframe||"1m";$("strategies").innerHTML=(selected?.strategies||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join("");
 }
 async function api(path,options={}){
- const r=await fetch(API+path,{...options,credentials:"include",headers:{"Content-Type":"application/json",...(options.headers||{})}});
+ const r=await window.KINGBOT_API.request(path,options);
  let data={};try{data=await r.json()}catch{}
- if(!r.ok)throw new Error(data.error||data.reason||("HTTP "+r.status));
+ if(!r.ok||data?.ok===false)throw new Error(data.error||data.reason||data.message||("HTTP "+r.status));
  return data;
 }
-async function refreshRuntime(){if(!selected)return;try{const r=await api("/runtime/"+encodeURIComponent(selected.id));selected.runtime=r.state||"STOPPED";selected.executionMode=r.executionMode||selected.executionMode;selected.symbol=r.symbol||selected.symbol||"";selected.timeframe=r.timeframe||selected.timeframe||"1m";$("mRuntime").textContent=selected.runtime;$("mMode").textContent=selected.executionMode||"NOT_CONNECTED";$("mSymbol").textContent=selected.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected.timeframe||"—";$("enginePill").textContent=selected.runtime}catch{}}\nsetInterval(refreshRuntime,5000);\nasync function selectBot(id){
+async function refreshRuntime(){if(!selected)return;try{const r=await api("/runtime/"+encodeURIComponent(selected.id));selected.runtime=r.state||"STOPPED";selected.executionMode=r.executionMode||selected.executionMode;selected.symbol=r.symbol||selected.symbol||"";selected.timeframe=r.timeframe||selected.timeframe||"1m";$("mRuntime").textContent=selected.runtime;$("mMode").textContent=selected.executionMode||"NOT_CONNECTED";$("mSymbol").textContent=selected.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected.timeframe||"—";$("enginePill").textContent=selected.runtime}catch{}}
+setInterval(refreshRuntime,5000);
+async function selectBot(id){
  selected=bots.find(x=>x.id===id);if(!selected)return;renderBots();
  const imageMap={"strategic":"assets/images/bots/strategic.png","flipper":"assets/images/bots/flipper.png","breakout":"assets/images/bots/breakout.png","smc-pro":"assets/images/bots/smc-pro.png","ladder-flip":"assets/images/bots/ladder-flip.png"};
  const roleMap={"strategic":"MULTI-STRATEGY ENGINE","flipper":"HIGH-SPEED FLIPPING","breakout":"BREAKOUT & MOMENTUM","smc-pro":"SMART MONEY CONCEPTS","ladder-flip":"ADAPTIVE LADDER SYSTEM"};
@@ -137,7 +138,10 @@ async function load(){
   const first=bots.find(b=>b.entitled);if(first)await selectBot(first.id);else{setTelemetry("ENTITLEMENT REQUIRED","No active bot entitlement was returned.");msg("No entitled bot is available for this account.","error")}
  }catch(e){setTelemetry("BACKEND UNAVAILABLE","No authoritative bot state loaded.");msg(e.message,"error")}
 }
-$("configBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");const symbol=fields.symbol.value.trim().toUpperCase(),timeframe=fields.timeframe.value;if(!symbol)return msg("Broker symbol is required.","error");msg("Saving market configuration…");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/config",{method:"POST",body:JSON.stringify({symbol,timeframe})});selected.symbol=d.symbol;selected.timeframe=d.timeframe;$("mSymbol").textContent=d.symbol;$("mTimeframe").textContent=d.timeframe;msg("Market configuration saved. Engine remains stopped until explicitly started.","ok")}catch(e){msg(e.message,"error")}});\n$("startBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");msg("Authorizing engine start…");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/start",{method:"POST",body:"{}"});selected.runtime=d.state;selected.executionMode=d.executionMode;$("mRuntime").textContent=d.state;$("enginePill").textContent="RUNNING";msg("Engine started. Broker and server risk gates remain authoritative.","ok")}catch(e){msg(e.message,"error")}});\n$("stopBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/stop",{method:"POST",body:"{}"});selected.runtime=d.state;$("mRuntime").textContent=d.state;$("enginePill").textContent="STOPPED";msg("Engine stopped. No new autonomous orders will be submitted.","ok")}catch(e){msg(e.message,"error")}});\n$("saveBtn").addEventListener("click",async()=>{
+$("configBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");const symbol=fields.symbol.value.trim().toUpperCase(),timeframe=fields.timeframe.value;if(!symbol)return msg("Broker symbol is required.","error");msg("Saving market configuration…");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/config",{method:"POST",body:JSON.stringify({symbol,timeframe})});selected.symbol=d.symbol;selected.timeframe=d.timeframe;$("mSymbol").textContent=d.symbol;$("mTimeframe").textContent=d.timeframe;msg("Market configuration saved. Engine remains stopped until explicitly started.","ok")}catch(e){msg(e.message,"error")}});
+$("startBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");msg("Authorizing engine start…");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/start",{method:"POST",body:"{}"});selected.runtime=d.state;selected.executionMode=d.executionMode;$("mRuntime").textContent=d.state;$("enginePill").textContent="RUNNING";msg("Engine started. Broker and server risk gates remain authoritative.","ok")}catch(e){msg(e.message,"error")}});
+$("stopBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/stop",{method:"POST",body:"{}"});selected.runtime=d.state;$("mRuntime").textContent=d.state;$("enginePill").textContent="STOPPED";msg("Engine stopped. No new autonomous orders will be submitted.","ok")}catch(e){msg(e.message,"error")}});
+$("saveBtn").addEventListener("click",async()=>{
  if(!selected)return msg("Select a bot first.","error");
  const payload={executionMode:fields.executionMode.value,maxRiskPerTradePct:Number(fields.maxRisk.value),dailyDrawdownPct:Number(fields.dailyDd.value),totalDrawdownPct:Number(fields.totalDd.value),maxPositions:Number(fields.maxPositions.value),maxSpreadAtrRatio:Number(fields.spreadRatio.value),staleDataMs:Number(fields.staleMs.value),maxConsecutiveLosses:Number(fields.lossStreak.value),autoPauseOnLossStreak:fields.autoPause.checked,killSwitch:fields.killSwitch.checked};
  if(payload.totalDrawdownPct<payload.dailyDrawdownPct)return msg("Total drawdown must be at least the daily drawdown limit.","error");

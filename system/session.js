@@ -7,13 +7,50 @@
 (function(window){
 "use strict";
 const API_BASE="https://kingbot-fintech-api-etfv.onrender.com/api";
+const API_ORIGIN=API_BASE.replace(/\/api\/?$/i,"");
 const state={checked:false,checking:false,authenticated:false,user:null,error:null,checkedAt:0};
+async function firebaseClient(){
+ if(window.KINGBOT_FIREBASE)return window.KINGBOT_FIREBASE;
+ try{await import(new URL("system/firebase-auth.js",window.location.href).href);}catch{}
+ return window.KINGBOT_FIREBASE||null;
+}
+function apiUrl(path){
+ const value=String(path||"");
+ if(/^https?:\/\//i.test(value))return value;
+ return value.startsWith("/api/")?API_ORIGIN+value:API_BASE+(value.startsWith("/")?value:"/"+value);
+}
+async function apiRequest(path,options={}){
+ const firebase=await firebaseClient();
+ const headers=new Headers(options.headers||{});
+ headers.set("Accept","application/json");
+ if(options.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
+ let token=null;
+ try{token=await firebase?.getToken(false)||null;}catch{}
+ const send=authorization=>{
+  const requestHeaders=new Headers(headers);
+  if(authorization)requestHeaders.set("Authorization","Bearer "+authorization);
+  return fetch(apiUrl(path),{...options,headers:requestHeaders,credentials:"omit",cache:"no-store"});
+ };
+ let response=await send(token);
+ if(response.status===401&&token){
+  try{const refreshed=await firebase?.getToken(true);if(refreshed)response=await send(refreshed);}catch{}
+ }
+ return response;
+}
+async function apiJson(path,options={}){
+ const response=await apiRequest(path,options);
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||data?.ok===false)throw new Error(data.error||data.reason||data.message||("Backend HTTP "+response.status));
+ return data;
+}
+window.KINGBOT_API={baseUrl:API_BASE,request:apiRequest,json:apiJson};
 const session={
- config:{sessionEndpoint:API_BASE+"/auth/session",logoutEndpoint:API_BASE+"/auth/logout",cacheDuration:15000},
+ config:{apiBase:API_BASE,sessionEndpoint:API_BASE+"/auth/session",logoutEndpoint:API_BASE+"/auth/logout",cacheDuration:15000},
  async check(options={}){
   const force=Boolean(options.force);
   if(!force&&state.checked&&Date.now()-state.checkedAt<this.config.cacheDuration)return this.getState();
-  if(!window.KINGBOT_FIREBASE){try{await import(new URL("system/firebase-auth.js",window.location.href).href);}catch(error){state.error=error;} }\n  if(!window.KINGBOT_FIREBASE){state.error=state.error||new Error("Firebase Authentication is not loaded.");state.checked=true;state.checkedAt=Date.now();state.authenticated=false;state.user=null;return this.getState();}
+    if(!window.KINGBOT_FIREBASE){try{await import(new URL("system/firebase-auth.js",window.location.href).href);}catch(error){state.error=error;} }
+    if(!window.KINGBOT_FIREBASE){state.error=state.error||new Error("Firebase Authentication is not loaded.");state.checked=true;state.checkedAt=Date.now();state.authenticated=false;state.user=null;return this.getState();}
   state.checking=true;state.error=null;
   try{
    const fb=await new Promise(resolve=>{

@@ -91,6 +91,23 @@ export class UserBrokerManager {
         return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_CONNECTION_FAILED"};
       }
     }
+    try{
+      const accountInfo=await entry.connection.getAccountInformation();
+      if(mode==="PAPER"&&accountInfo.type!=="ACCOUNT_TRADE_MODE_DEMO"){
+        await entry.connection.close();
+        this.connections.delete(key);
+        return {connected:false,mode:"NOT_CONNECTED",reason:"PAPER_REQUIRES_DEMO_ACCOUNT"};
+      }
+      if(mode==="LIVE"&&accountInfo.type!=="ACCOUNT_TRADE_MODE_REAL"){
+        await entry.connection.close();
+        this.connections.delete(key);
+        return {connected:false,mode:"NOT_CONNECTED",reason:"LIVE_REQUIRES_REAL_ACCOUNT"};
+      }
+    }catch(error){
+      try{await entry.connection.close();}catch{}
+      this.connections.delete(key);
+      return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_ACCOUNT_VALIDATION_FAILED"};
+    }
     entry.executionMode=mode;
     return {connected:true,mode,broker:mapping.provider,accountId:mapping.account_id};
   }

@@ -14,6 +14,10 @@ services:
         fromDatabase:
           name: kingbot-fintech-db
           property: connectionString
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: BROKER_CREDENTIALS_KEY
+        sync: false
 
   - type: web
     name: kingbot-fintech-worker
@@ -29,3 +33,5 @@ services:
         fromDatabase:
           name: kingbot-fintech-db
           property: connectionString
+      - key: BROKER_CREDENTIALS_KEY
+        sync: false

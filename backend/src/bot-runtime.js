@@ -83,6 +83,7 @@ export function createBotRuntimeRouter({pool,broker}){
   });
 
   router.post("/:botId/tick",async(req,res)=>{
+    return res.status(409).json({ok:false,error:"WORKER_EXECUTION_ONLY",message:"Autonomous orders are produced only by the worker from broker-verified market data. No order was submitted."});
     const user=await requireUser(pool,req,res);if(!user)return;
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
     if(!(await entitlement(pool,user.id,b.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
