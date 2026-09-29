@@ -2992,16 +2992,26 @@ async function loadBots() {
 ========================================================= */
 
 async function loadRisk() {
-
-  const data =
-    await fetchApi("/api/risk");
-
+  const data = await fetchApi("/api/risk");
   if (!data) return;
 
-  if (data.drawdown !== undefined) {
-    $("drawdown").textContent =
-      data.drawdown;
+  const rows = Array.isArray(data.bots) ? data.bots : [];
+  const active = rows.filter(row => String(row.execution_mode || "").toUpperCase() === "LIVE");
+  const blocked = rows.filter(row => Boolean(row.kill_switch));
+
+  if ($("drawdown")) {
+    $("drawdown").textContent = rows.length
+      ? `${rows.length} bot risk profiles`
+      : "—";
   }
+
+  const riskLog = blocked.length
+    ? `Risk telemetry: ${blocked.length} kill switch${blocked.length === 1 ? "" : "es"} active`
+    : active.length
+      ? `Risk telemetry: ${active.length} LIVE profile${active.length === 1 ? "" : "s"} configured`
+      : "Risk telemetry: no LIVE profiles configured";
+
+  logActivity(riskLog);
 }
 
 /* =========================================================
