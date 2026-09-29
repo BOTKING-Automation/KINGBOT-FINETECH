@@ -81,18 +81,24 @@
   }
 
   async function requestJson(url, options = {}, auth = true) {
-    const headers = {
-      Accept: "application/json",
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(options.headers || {})
+    const makeRequest = async (forceRefresh = false) => {
+      const headers = {
+        Accept: "application/json",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {})
+      };
+      if (auth) headers.Authorization = "Bearer " + await getToken(forceRefresh);
+      return fetch(url, {
+        ...options,
+        headers,
+        credentials: "omit",
+        cache: "no-store"
+      });
     };
-    if (auth) headers.Authorization = "Bearer " + await getToken();
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      credentials: "omit",
-      cache: "no-store"
-    });
+
+    let response = await makeRequest(false);
+    if (auth && response.status === 401) response = await makeRequest(true);
+
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data.ok === false) {
       const message = data.error || data.message || ("Request failed (HTTP " + response.status + ").");
@@ -137,7 +143,11 @@
     const connected = Boolean(broker.connected);
     setTelemetry("brokerStatus", connected ? "CONNECTED" : "NOT CONNECTED", connected ? "good" : "muted");
     setTelemetry("accountStatus", account?.available ? "VERIFIED" : "UNAVAILABLE", account?.available ? "good" : "warn");
-    setTelemetry("positionStatus", account?.available ? String(positions.length) : "—", account?.available ? "" : "muted");
+    const positionStatus = byId("positionStatus");
+    if (positionStatus) {
+      positionStatus.textContent = "POSITIONS: " + (account?.available ? String(positions.length) : "—");
+      positionStatus.className = "status-tag";
+    }
     setTelemetry("contextStatus", data?.generatedAt ? "SYNCED" : "WAITING", data?.generatedAt ? "good" : "muted");
 
     setText("brokerMode", connected ? String(broker.executionMode || "CONNECTED") : "—");
@@ -197,9 +207,16 @@
           row.className = "position-row";
           const symbol = String(position.symbol || "—");
           const type = String(position.type || position.side || "POSITION");
-          row.innerHTML =
-            '<div><strong>' + symbol + '</strong><span>' + type + ' · ' + formatCompactNumber(position.volume) + '</span></div>' +
-            '<div class="position-profit">' + formatMoney(position.profit, account?.currency || "") + '</div>';
+          const left=document.createElement("div");
+          const strong=document.createElement("strong");
+          strong.textContent=symbol;
+          const meta=document.createElement("span");
+          meta.textContent=type + " · " + formatCompactNumber(position.volume);
+          left.append(strong,meta);
+          const profit=document.createElement("div");
+          profit.className="position-profit";
+          profit.textContent=formatMoney(position.profit, account?.currency || "");
+          row.append(left,profit);
           positionsList.appendChild(row);
         });
       }
@@ -371,7 +388,9 @@
     button?.addEventListener("click", () => runQuery(input?.value || ""));
     setInterval(loadContext, 20000);
     loadHealth();
-    loadContext();
+    window.setTimeout(loadContext, 700);
+    window.addEventListener("kingbot:session-change", () => loadContext());
+    window.addEventListener("kingbot:access-ready", () => loadContext(), { once: true });
   }
 
   function init() {
