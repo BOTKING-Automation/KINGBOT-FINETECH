@@ -9,6 +9,7 @@ import cookieParser from "cookie-parser";
 import pg from "pg";
 import { createAuthRouter, ensureAuthSchema } from "./auth.js";
 import { createSubscriptionRouter, ensureSubscriptionSchema } from "./subscriptions.js";
+import { createBotEngineRouter } from "./bot-engines.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -27,6 +28,7 @@ app.use(cors({ origin: allowedOrigin || true, credentials: true, methods: ["GET"
 const authLimiter = rateLimit({ windowMs: 15*60*1000, limit: 12, standardHeaders: "draft-8", legacyHeaders: false });
 app.use("/api/auth", createAuthRouter({ pool, sessionTtlHours: Number(process.env.SESSION_TTL_HOURS || 24), limiter: authLimiter }));
 app.use("/api/subscription", createSubscriptionRouter({ pool }));
+app.use("/api/bots", createBotEngineRouter({ pool }));
 
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000,
