@@ -6,9 +6,8 @@ const ALGORITHM="aes-256-gcm";
 function masterKey(){
   const raw=String(process.env.BROKER_CREDENTIALS_KEY||"").trim();
   if(!raw) throw new Error("BROKER_CREDENTIALS_KEY_NOT_CONFIGURED");
-  const key=Buffer.from(raw,"base64");
-  if(key.length!==32) throw new Error("BROKER_CREDENTIALS_KEY_INVALID");
-  return key;
+  if(raw.length < 32) throw new Error("BROKER_CREDENTIALS_KEY_TOO_SHORT");
+  return crypto.createHash("sha256").update(raw,"utf8").digest();
 }
 function encryptSecret(value){
   const iv=crypto.randomBytes(12);
