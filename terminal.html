@@ -2013,9 +2013,17 @@ const symbols = [
   "GBPUSDT"
 ];
 
+const SYMBOL_ALIASES = {
+  XAUUSD: "PAXGUSDT",
+  EURUSD: "EURUSDT",
+  GBPUSD: "GBPUSDT"
+};
+
 let activeSymbol =
   new URLSearchParams(location.search).get("s")?.toUpperCase()
   || "BTCUSDT";
+
+activeSymbol = SYMBOL_ALIASES[activeSymbol] || activeSymbol;
 
 if (!symbols.includes(activeSymbol)) {
   activeSymbol = "BTCUSDT";
