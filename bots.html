@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Protected bot control center.">
+<title>KINGBOT BOT SYSTEMS</title>
+<link rel="stylesheet" href="system/platform.css">
+<style>
+body{margin:0;min-height:100vh;background:#030712;color:#eef2ff;font-family:Inter,system-ui,sans-serif}
+main{width:min(1200px,calc(100% - 32px));margin:auto;padding:70px 0}
+.panel{border:1px solid rgba(255,255,255,.09);border-radius:24px;padding:36px;background:linear-gradient(145deg,rgba(12,20,40,.92),rgba(3,7,18,.96));box-shadow:0 25px 80px rgba(0,0,0,.35)}
+.eyebrow{color:#19e6ff;font:11px "JetBrains Mono",monospace;letter-spacing:2px}
+h1{font-family:Orbitron,Inter,sans-serif;font-size:clamp(28px,5vw,54px);margin:14px 0}
+p{color:#9da8c0;line-height:1.8;max-width:800px}
+.status{margin-top:28px;padding:16px;border:1px solid rgba(25,230,255,.15);border-radius:14px;background:rgba(25,230,255,.04);color:#aeb9d0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:26px}
+.card{padding:20px;border:1px solid rgba(255,255,255,.07);border-radius:16px;background:rgba(255,255,255,.025)}
+.card strong{display:block;color:#ffc84a;margin-bottom:8px}
+a{color:#19e6ff}
+</style>
+</head>
+<body>
+<div data-kingbot-navigation></div>
+<main>
+<section class="panel">
+<div class="eyebrow">BOTS</div>
+<h1>KINGBOT BOT SYSTEMS</h1>
+<p>Protected bot control center.</p>
+<div class="grid">
+<div class="card"><strong>SECURE SYSTEM</strong><span>Connected services use verified backend state. No fabricated account data.</span></div>
+<div class="card"><strong>LIVE DATA POLICY</strong><span>Balances, positions, orders and performance remain unavailable until verified backend data exists.</span></div>
+<div class="card"><strong>CONSISTENCY · RESILIENCE · INNOVATION</strong><span>KINGBOT FINTECH by GIBSONFX Tech.</span></div>
+</div>
+<div class="status">This module is part of the KINGBOT FINTECH architecture and is being connected to its production services.</div>
+</section>
+</main>
+<script src="system/session.js"></script>
+<script src="system/auth-gate.js"></script>
+<script src="system/access-control.js"></script>
+<script src="system/navigation.js"></script>
+</body>
+</html>
