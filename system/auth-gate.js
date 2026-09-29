@@ -43,13 +43,14 @@ IMPORTANT:
       authPages: [
         "signin.html",
         "signup.html",
+        "access-stable.html",
         "verify.html",
         "verification.html"
       ],
 
-      loaderPath: "system/loader.html",
-      signInPath: "signin.html",
-      signUpPath: "signup.html",
+      loaderPath: "loader.html",
+      signInPath: "access-stable.html#signin",
+      signUpPath: "access-stable.html#signup",
       verifyPath: "verify.html",
       homePath: "index.html"
     },
