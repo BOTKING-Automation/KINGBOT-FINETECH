@@ -34,7 +34,7 @@ html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
 .kb-boot-readout b{color:#eef3ff}
 .kb-boot-status{min-height:21px;margin-top:18px;font:800 9px Orbitron,sans-serif;letter-spacing:.16em;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3);-webkit-background-clip:text;background-clip:text;color:transparent}
 .kb-boot-progress{width:min(520px,90vw);height:4px;margin:12px auto 0;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden;border:1px solid rgba(255,255,255,.07)}
-.kb-boot-progress i{display:block;width:0;height:100%;border-radius:999px;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3);box-shadow:0 0 16px rgba(25,230,255,.45);animation:kbBootProgress 5s linear forwards}
+.kb-boot-progress i{display:block;width:0;height:100%;border-radius:999px;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3);box-shadow:0 0 16px rgba(25,230,255,.45);animation:kbBootProgress 20s linear forwards}
 .kb-boot-foot{margin-top:14px;color:#4f5d78;font:600 6px JetBrains Mono,monospace;letter-spacing:.10em}
 @keyframes kbBootGradient{to{background-position:350% center}} @keyframes kbBootSpin{to{transform:rotate(360deg)}} @keyframes kbBootSpinReverse{to{transform:rotate(-360deg)}} @keyframes kbBootHue{0%,100%{filter:drop-shadow(0 0 15px rgba(25,230,255,.24)) hue-rotate(0deg)}50%{filter:drop-shadow(0 0 23px rgba(255,79,216,.38)) hue-rotate(120deg)}} @keyframes kbBootFloat{50%{transform:translateY(-7px)}} @keyframes kbBootPulse{50%{transform:translate(-50%,-50%) scale(1.7);opacity:.45}} @keyframes kbCandleGlow{to{transform:translateY(-3px);filter:brightness(1.3)}} @keyframes kbBootProgress{to{width:100%}}
 @media(prefers-reduced-motion:reduce){#kb-boot-loader *{animation-duration:.01ms!important;animation-iteration-count:1!important}}
@@ -66,14 +66,14 @@ html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
   <div class="kb-boot-readout"><span>AI CORE <b>ACTIVE</b></span><span>MARKET MATRIX <b>LINKING</b></span><span>AUTH <b>READY</b></span></div>
   <div class="kb-boot-status" id="kb-boot-status">NEURAL CORE INITIALIZING</div>
   <div class="kb-boot-progress"><i></i></div>
-  <div class="kb-boot-foot">GIBSONFX TECH · KINGBOT FINTECH · 05.00 SEC STARTUP SEQUENCE</div>
+  <div class="kb-boot-foot">GIBSONFX TECH · KINGBOT FINTECH · 20.00 SEC STARTUP SEQUENCE</div>
  </div>`;
  document.body.prepend(el);
  const states=["NEURAL CORE INITIALIZING","MARKET MATRIX LINKING","BOT BRAIN SYNCHRONIZING","RISK ENGINE ONLINE","AUTH GATE READY"];
  let n=0;const status=el.querySelector("#kb-boot-status"),ticker=setInterval(()=>{n=(n+1)%states.length;status.textContent=states[n]},900);
  const remove=()=>{clearInterval(ticker);el.style.transition="opacity .45s ease";el.style.opacity="0";setTimeout(()=>{el.remove();document.documentElement.classList.remove("kb-boot-lock")},460)};
  const ready=window.KINGBOT_SESSION?.check?window.KINGBOT_SESSION.check({force:true}):Promise.resolve({authenticated:false});
- Promise.all([new Promise(r=>setTimeout(r,5000)),ready]).then(([,session])=>{
+ Promise.all([new Promise(r=>setTimeout(r,20000)),ready]).then(([,session])=>{
   if(!session?.authenticated)window.location.replace("access.html");
   else if(!session?.user?.verified)window.location.replace("verify.html");
   else remove();
