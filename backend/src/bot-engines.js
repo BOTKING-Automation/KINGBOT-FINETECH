@@ -222,7 +222,8 @@ export function createBotEngineRouter({ pool }) {
     const user=await requireUser(pool,req,res); if(!user)return;
     const bot=BOT_DEFINITIONS[req.params.botId]; if(!bot)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
     if(!(await hasEntitlement(pool,user.id,bot.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
-    const current=(await getRiskSettings(pool,user.id,bot.id))||defaultRisk(bot);\n    res.json({ok:true,botId:bot.id,settings:current,defaults:defaultRisk(bot),executionMode:current.executionMode||"PAPER",killSwitch:Boolean(current.killSwitch)});
+    const current=(await getRiskSettings(pool,user.id,bot.id))||defaultRisk(bot);
+    res.json({ok:true,botId:bot.id,settings:current,defaults:defaultRisk(bot),executionMode:current.executionMode||"PAPER",killSwitch:Boolean(current.killSwitch)});
   });
 
   router.put("/:botId/risk", async (req,res)=>{
@@ -238,30 +239,6 @@ export function createBotEngineRouter({ pool }) {
       await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'BOT_RISK_SETTINGS_UPDATED',$2::jsonb)",[user.id,JSON.stringify({botId:bot.id,executionMode:mode,settings:s,killSwitch:Boolean(req.body?.killSwitch)})]);
       res.json({ok:true,botId:bot.id,settings:s,executionMode:mode,killSwitch:Boolean(req.body?.killSwitch),message:"Risk profile saved to the KINGBOT risk engine."});
     }catch(err){console.error("[KINGBOT RISK]",err?.message||err);res.status(500).json({ok:false,error:"Risk settings could not be saved."});}
-  });
-
-  router.post("/:botId/start", async (req, res) => {
-    const user = await requireUser(pool, req, res);
-    if (!user) return;
-    const botId = req.params.botId;
-    if (!BOT_DEFINITIONS[botId]) return res.status(404).json({ ok: false, error: "BOT_NOT_FOUND" });
-    if (!(await hasEntitlement(pool, user.id, botId))) {
-      return res.status(403).json({ ok: false, allowed: false, reason: "BOT_NOT_INCLUDED_IN_SUBSCRIPTION" });
-    }
-    return res.status(409).json({
-      ok: false,
-      error: "EXECUTION_LAYER_NOT_CONNECTED",
-      status: "NOT_CONNECTED",
-      message: "Bot entitlement is valid, but a verified broker execution adapter is not connected. No order was submitted."
-    });
-  });
-
-  router.post("/:botId/stop", async (req, res) => {
-    const user = await requireUser(pool, req, res);
-    if (!user) return;
-    const botId = req.params.botId;
-    if (!BOT_DEFINITIONS[botId]) return res.status(404).json({ ok: false, error: "BOT_NOT_FOUND" });
-    res.json({ ok: true, bot: botId, runtime: "STOPPED", ordersSubmitted: 0 });
   });
 
   return router;
