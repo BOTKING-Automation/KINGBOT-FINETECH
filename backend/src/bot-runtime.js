@@ -64,6 +64,21 @@ export function createBotRuntimeRouter({pool,broker}){
     res.json({ok:true,botId:b.id,state:"STOPPED"});
   });
 
+  router.post("/:botId/config",async(req,res)=>{
+    const user=await requireUser(pool,req,res);if(!user)return;
+    const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
+    if(!(await entitlement(pool,user.id,b.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
+    const symbol=String(req.body?.symbol||"").trim().toUpperCase();
+    const timeframe=String(req.body?.timeframe||"1m").trim();
+    if(!/^[A-Z0-9._-]{3,30}$/.test(symbol))return res.status(400).json({ok:false,error:"INVALID_SYMBOL"});
+    const allowed=["1m","2m","3m","4m","5m","6m","10m","12m","15m","20m","30m","1h","2h","3h","4h","6h","8h","12h","1d","1w","1mn"];
+    if(!allowed.includes(timeframe))return res.status(400).json({ok:false,error:"INVALID_TIMEFRAME"});
+    await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS symbol TEXT, ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '1m'");
+    await pool.query("INSERT INTO kingbot_bot_runtime(user_id,bot_id,state,symbol,timeframe,updated_at) VALUES($1,$2,'STOPPED',$3,$4,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET symbol=EXCLUDED.symbol,timeframe=EXCLUDED.timeframe,updated_at=NOW()",[user.id,b.id,symbol,timeframe]);
+    await audit(pool,user.id,"BOT_RUNTIME_CONFIG_UPDATED",{botId:b.id,symbol,timeframe});
+    res.json({ok:true,botId:b.id,symbol,timeframe});
+  });
+
   router.post("/:botId/tick",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
@@ -177,5 +192,5 @@ export async function ensureBotRuntimeSchema(pool){
   if(!pool)return;
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_risk_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,baseline_date DATE NOT NULL,day_start_equity NUMERIC NOT NULL,peak_equity NUMERIC NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,bot_id))");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_execution_journal (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,execution_mode TEXT NOT NULL,symbol TEXT NOT NULL,side TEXT NOT NULL,volume NUMERIC NOT NULL,status TEXT NOT NULL,broker_result JSONB,error_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
-  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_runtime (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'STOPPED',last_signal JSONB,last_run_at TIMESTAMPTZ,last_error TEXT,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,bot_id))");
+  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_runtime (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'STOPPED',last_signal JSONB,last_run_at TIMESTAMPTZ,last_error TEXT,symbol TEXT,timeframe TEXT DEFAULT '1m',updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,bot_id))");
 }
