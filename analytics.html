@@ -2230,6 +2230,34 @@ function renderAnalytics(data){
         return;
     }
 
+    /*
+      The backend currently returns authoritative runtime/risk telemetry.
+      Performance KPIs remain unavailable until verified broker history is present.
+      Never synthesize customer performance values.
+    */
+    if(!data.available){
+        [
+            "netPnl","returnValue","winRate","profitFactor",
+            "maxDrawdown","riskUtilization"
+        ].forEach(id=>{
+            const el=document.getElementById(id);
+            if(el) el.textContent="—";
+        });
+    }
+
+    if(Array.isArray(data.risk) && data.risk.length){
+        const activeKill = data.risk.some(x=>x.kill_switch);
+        const activeBots = Array.isArray(data.runtime)
+            ? data.runtime.filter(x=>x.state==="RUNNING").length
+            : 0;
+        const riskNote = document.getElementById("aiRisk");
+        if(riskNote){
+            riskNote.textContent =
+                activeKill
+                    ? "KILL SWITCH ACTIVE"
+                    : `${activeBots} bot runtime(s) reporting from the control plane`;
+        }
+    }
 
     /* KPI */
 
