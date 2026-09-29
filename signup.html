@@ -652,98 +652,37 @@
 
 </main>
 
-<script>
-  const form = document.getElementById("signupForm");
-  const message = document.getElementById("message");
-  const button = document.getElementById("submitBtn");
-
-  function showMessage(text, type){
-    message.textContent = text;
-    message.className = "message " + type;
-  }
-
-  form.addEventListener("submit", async function(e){
-
-    e.preventDefault();
-
-    const password = document.getElementById("password").value;
-    const confirm = document.getElementById("confirmPassword").value;
-
-    if(password !== confirm){
-      showMessage("Passwords do not match.", "error");
-      return;
-    }
-
-    if(password.length < 8){
-      showMessage("Password must contain at least 8 characters.", "error");
-      return;
-    }
-
-    button.disabled = true;
-    button.textContent = "CREATING ACCOUNT...";
-
-    const payload = {
-      firstName: document.getElementById("firstName").value.trim(),
-      lastName: document.getElementById("lastName").value.trim(),
-      email: document.getElementById("email").value.trim(),
-      phone:
-        document.getElementById("countryCode").value +
-        document.getElementById("phone").value.trim(),
-      password
-    };
-
-    try{
-
-      /*
-       * Production:
-       * The backend must create the account.
-       * Never store the password in localStorage.
-       */
-
-      const response = await fetch("https://kingbot-fintech-api.onrender.com/api/auth/signup", {
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json"
-        },
-        credentials:"include",
-        body:JSON.stringify(payload)
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if(!response.ok){
-        throw new Error(data.error || data.message || "Account creation failed.");
-      }
-
-      sessionStorage.setItem("signup_email", payload.email);
-      sessionStorage.setItem("signup_phone", payload.phone);
-
-      showMessage(
-        "Account created. Check your email for the six-digit verification code.",
-        "success"
-      );
-
-      setTimeout(() => {
-        window.location.href = "verify.html";
-      }, 900);
-
-    }catch(error){
-
-      /*
-       * During frontend-only development, this will display the
-       * connection requirement rather than pretending registration worked.
-       */
-
-      showMessage(
-        error.message || "Authentication service is currently unavailable.",
-        "error"
-      );
-
-      button.disabled = false;
-      button.textContent = "CREATE SECURE ACCOUNT";
-    }
-
-  });
+<script type="module">
+import "./system/firebase-auth.js";
+const form=document.getElementById("signupForm"),message=document.getElementById("message"),button=document.getElementById("submitBtn");
+function showMessage(text,type){message.textContent=text;message.className="message "+type;}
+form.addEventListener("submit",async e=>{
+ e.preventDefault();
+ const password=document.getElementById("password").value, confirm=document.getElementById("confirmPassword").value;
+ if(password!==confirm){showMessage("Passwords do not match.","error");return;}
+ if(password.length<8){showMessage("Password must contain at least 8 characters.","error");return;}
+ button.disabled=true;button.textContent="CREATING ACCOUNT...";
+ const payload={
+  firstName:document.getElementById("firstName").value.trim(),
+  lastName:document.getElementById("lastName").value.trim(),
+  email:document.getElementById("email").value.trim(),
+  phone:document.getElementById("countryCode").value+document.getElementById("phone").value.trim(),
+  password
+ };
+ try{
+  await window.KINGBOT_FIREBASE.createAccount(payload);
+  sessionStorage.setItem("signup_email",payload.email);
+  sessionStorage.setItem("signup_phone",payload.phone);
+  showMessage("Account created. Firebase has sent a verification email. Open it to verify your account, then sign in.","success");
+  setTimeout(()=>window.location.href="verify.html",900);
+ }catch(error){
+  const code=String(error?.code||"");
+  const messages={"auth/email-already-in-use":"An account with this email already exists.","auth/invalid-email":"Enter a valid email address.","auth/weak-password":"Choose a stronger password.","auth/network-request-failed":"Network error. Check your connection."};
+  showMessage(messages[code]||error.message||"Account creation failed.","error");
+  button.disabled=false;button.textContent="CREATE SECURE ACCOUNT";
+ }
+});
+</script>
 </script>
 
 </body>
