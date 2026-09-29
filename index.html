@@ -17,34 +17,49 @@
 <link rel="stylesheet" href="system/platform.css">
 <style id="kb-static-boot-style">
 html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
-#kb-boot-loader{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;overflow:hidden;background:#02040a;color:#eef3ff;font-family:Inter,system-ui,sans-serif}
-#kb-boot-loader:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 42%,rgba(25,230,255,.14),transparent 22%),radial-gradient(circle at 12% 18%,rgba(255,79,216,.11),transparent 28%),radial-gradient(circle at 88% 82%,rgba(246,185,59,.11),transparent 30%),linear-gradient(145deg,#02040a,#050b18)}
-#kb-boot-loader:after{content:"";position:absolute;inset:0;opacity:.25;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:44px 44px}
-.kb-boot-core{position:relative;z-index:2;width:min(760px,94vw);text-align:center;padding:28px 18px}
-.kb-boot-brand{font:900 18px Orbitron,sans-serif;letter-spacing:.16em;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3,#19e6ff);background-size:350% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:kbBootGradient 4s linear infinite}
-.kb-boot-sub{margin-top:9px;color:#7885a5;font:700 8px 'JetBrains Mono',monospace;letter-spacing:.2em}
-.kb-boot-stage{position:relative;width:min(560px,94vw);height:330px;margin:18px auto 12px;display:grid;place-items:center}
-.kb-boot-halo{position:absolute;width:315px;height:315px;border-radius:50%;border:1px solid rgba(25,230,255,.22);box-shadow:0 0 90px rgba(25,230,255,.12),inset 0 0 65px rgba(246,185,59,.06);animation:kbBootSpin 12s linear infinite}
-.kb-boot-halo:before,.kb-boot-halo:after{content:"";position:absolute;inset:27px;border-radius:50%;border:1px dashed rgba(155,92,255,.28);animation:kbBootSpinReverse 8s linear infinite}
-.kb-boot-halo:after{inset:58px;border-style:solid;border-color:rgba(246,185,59,.2);animation-duration:11s}
-.kb-boot-brain{position:relative;width:280px;height:225px;filter:drop-shadow(0 0 22px rgba(25,230,255,.35));animation:kbBootHue 5s linear infinite,kbBootFloat 2.2s ease-in-out infinite}
-.kb-boot-brain svg{width:100%;height:100%;overflow:visible}
-.kb-boot-brain .brain-fill{fill:url(#kbBrainGradient);fill-opacity:.2;stroke:url(#kbBrainStroke);stroke-width:2.5}
-.kb-boot-brain .brain-line{fill:none;stroke:url(#kbBrainStroke);stroke-width:2;stroke-linecap:round;filter:drop-shadow(0 0 7px rgba(25,230,255,.7))}
-.kb-boot-pulse{position:absolute;top:47%;left:50%;width:19px;height:19px;border-radius:50%;background:#19e6ff;box-shadow:0 0 24px #19e6ff,0 0 70px rgba(25,230,255,.65);transform:translate(-50%,-50%);animation:kbBootPulse 1s ease-in-out infinite}
-.kb-boot-candles{position:absolute;left:50%;bottom:27px;transform:translateX(-50%);width:230px;height:100px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 12px;border-bottom:1px solid rgba(25,230,255,.3);background:linear-gradient(180deg,rgba(25,230,255,.04),rgba(155,92,255,.07));box-shadow:0 0 35px rgba(25,230,255,.08)}
-.kb-candle{width:16px;height:var(--h);position:relative;background:linear-gradient(180deg,#23f7a3,#19e6ff);box-shadow:0 0 14px rgba(35,247,163,.65);animation:kbCandleGlow 1s ease-in-out infinite alternate}
-.kb-candle:nth-child(2n){background:linear-gradient(180deg,#ff4fd8,#9b5cff);box-shadow:0 0 14px rgba(255,79,216,.6)}
-.kb-candle:nth-child(3n){background:linear-gradient(180deg,#ffd977,#f6b93b);box-shadow:0 0 14px rgba(246,185,59,.58)}
-.kb-candle:before,.kb-candle:after{content:"";position:absolute;left:50%;width:1px;transform:translateX(-50%);background:currentColor;box-shadow:0 0 10px currentColor}
-.kb-candle:before{top:-17px;height:17px}.kb-candle:after{bottom:-13px;height:13px}
-.kb-boot-readout{display:flex;justify-content:center;gap:20px;flex-wrap:wrap;color:#657492;font:700 7px 'JetBrains Mono',monospace;letter-spacing:.08em}.kb-boot-readout b{color:#eef3ff}
-.kb-boot-status{min-height:23px;margin-top:18px;font:900 10px Orbitron,sans-serif;letter-spacing:.17em;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3);-webkit-background-clip:text;background-clip:text;color:transparent}
-.kb-boot-progress{width:min(560px,92vw);height:5px;margin:10px auto 0;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}.kb-boot-progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3);box-shadow:0 0 18px rgba(25,230,255,.6);animation:kbBootProgress 20s linear forwards}
-.kb-boot-foot{margin-top:15px;color:#4f5d78;font:600 7px 'JetBrains Mono',monospace;letter-spacing:.1em}
-@keyframes kbBootGradient{to{background-position:350% center}}@keyframes kbBootSpin{to{transform:rotate(360deg)}}@keyframes kbBootSpinReverse{to{transform:rotate(-360deg)}}@keyframes kbBootHue{0%,100%{filter:drop-shadow(0 0 18px rgba(25,230,255,.3)) hue-rotate(0deg)}50%{filter:drop-shadow(0 0 30px rgba(255,79,216,.48)) hue-rotate(120deg)}}@keyframes kbBootFloat{50%{transform:translateY(-8px)}}@keyframes kbBootPulse{50%{transform:translate(-50%,-50%) scale(1.8);opacity:.45}}@keyframes kbCandleGlow{to{transform:translateY(-4px);filter:brightness(1.4)}}@keyframes kbBootProgress{to{width:100%}}
+#kb-boot-loader{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;overflow:hidden;background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208 100%);color:#eef3ff;font-family:Inter,system-ui,sans-serif}
+#kb-boot-loader:before{content:"";position:absolute;inset:-20%;background:conic-gradient(from 90deg,rgba(25,230,255,.08),rgba(155,92,255,.09),rgba(255,79,216,.08),rgba(246,185,59,.08),rgba(35,247,163,.07),rgba(25,230,255,.08));filter:blur(40px);animation:kbBootAura 8s ease-in-out infinite}
+#kb-boot-loader:after{content:"";position:absolute;inset:0;opacity:.3;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:42px 42px;mask-image:radial-gradient(circle at 50% 50%,black 20%,transparent 85%)}
+.kb-boot-core{position:relative;z-index:2;width:min(900px,95vw);text-align:center;padding:24px 16px}
+.kb-boot-brand{font:900 19px Orbitron,sans-serif;letter-spacing:.18em;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3,#19e6ff);background-size:500% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:kbBootGradient 3.2s linear infinite}
+.kb-boot-sub{margin-top:8px;color:#7b89ab;font:700 8px 'JetBrains Mono',monospace;letter-spacing:.22em}
+.kb-boot-stage{position:relative;width:min(720px,95vw);height:360px;margin:10px auto 5px;display:grid;place-items:center;perspective:1200px}
+.kb-boot-halo{position:absolute;width:335px;height:335px;border-radius:50%;border:1px solid rgba(25,230,255,.22);box-shadow:0 0 100px rgba(25,230,255,.12),inset 0 0 80px rgba(246,185,59,.06);animation:kbBootSpin 12s linear infinite}
+.kb-boot-halo:before,.kb-boot-halo:after{content:"";position:absolute;border-radius:50%;inset:24px;border:1px dashed rgba(155,92,255,.3);animation:kbBootSpinReverse 8s linear infinite}
+.kb-boot-halo:after{inset:55px;border-style:solid;border-color:rgba(246,185,59,.22);animation-duration:11s}
+.kb-boot-brain{position:relative;width:min(360px,82vw);height:270px;transform-style:preserve-3d;filter:drop-shadow(0 0 18px rgba(25,230,255,.3));animation:kbBootFloat 2.4s ease-in-out infinite}
+.kb-brain-shell{position:absolute;inset:0;transform-style:preserve-3d}
+.kb-brain-layer{position:absolute;inset:0;fill:none;stroke:url(#kbBrainStroke);stroke-linecap:round;stroke-linejoin:round;stroke-width:2.6}
+.kb-brain-back{transform:translateZ(-18px) scale(.965);opacity:.35;filter:blur(.3px)}
+.kb-brain-mid{transform:translateZ(-7px) scale(.985);opacity:.58}
+.kb-brain-front{transform:translateZ(8px);filter:url(#kbGlow)}
+.kb-brain-rim{transform:translateZ(18px) scale(1.02);opacity:.9;filter:url(#kbGlow)}
+.kb-brain-fill{fill:url(#kbBrainFill);fill-opacity:.18;stroke:none}
+.kb-neural-path{fill:none;stroke:url(#kbNeuralStroke);stroke-width:1.8;stroke-linecap:round;stroke-dasharray:7 11;filter:url(#kbGlow);animation:kbNeuralFlow 2.7s linear infinite}
+.kb-neural-path.p2{animation-duration:3.7s;animation-delay:-1.1s}
+.kb-neural-path.p3{animation-duration:4.4s;animation-delay:-2s}
+.kb-neural-node{fill:#fff;stroke:url(#kbBrainStroke);stroke-width:1.2;filter:url(#kbGlow);animation:kbNodePulse 1.3s ease-in-out infinite alternate}
+.kb-boot-pulse{position:absolute;top:49%;left:50%;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 0 18px #19e6ff,0 0 36px #ff4fd8,0 0 68px rgba(246,185,59,.55);transform:translate(-50%,-50%) translateZ(35px);animation:kbBootPulse 1s ease-in-out infinite}
+.kb-market-plane{position:absolute;left:50%;bottom:17px;width:410px;height:112px;transform:translateX(-50%) rotateX(58deg) rotateZ(-1deg);transform-style:preserve-3d;opacity:.95}
+.kb-market-grid{position:absolute;inset:0;border:1px solid rgba(25,230,255,.15);background:linear-gradient(rgba(25,230,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(155,92,255,.025) 1px,transparent 1px);background-size:32px 18px;box-shadow:0 0 35px rgba(25,230,255,.05),inset 0 0 25px rgba(155,92,255,.05)}
+.kb-market-line{position:absolute;inset:4px;width:calc(100% - 8px);height:calc(100% - 8px);filter:url(#kbGlow)}
+.kb-market-line polyline{fill:none;stroke:url(#kbLineStroke);stroke-width:2.7;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:14 8;animation:kbTrace 3s linear infinite}
+.kb-boot-candles{position:absolute;inset:8px 18px 10px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 14px}
+.kb-candle{position:relative;width:20px;height:var(--h);border-radius:3px 4px 2px 2px;background:linear-gradient(90deg,rgba(255,255,255,.72) 0%,rgba(255,255,255,.18) 14%,var(--c1) 32%,var(--c2) 76%,rgba(0,0,0,.45) 100%);box-shadow:0 0 13px var(--glow),0 0 30px color-mix(in srgb,var(--glow),transparent 65%);transform:translateZ(16px) skewY(-3deg);animation:kbCandleFloat 1.15s ease-in-out infinite alternate}
+.kb-candle:before{content:"";position:absolute;left:50%;top:-22px;width:2px;height:22px;transform:translateX(-50%);background:linear-gradient(var(--glow),rgba(255,255,255,.4));box-shadow:0 0 10px var(--glow),0 0 18px var(--glow)}
+.kb-candle:after{content:"";position:absolute;left:50%;bottom:-15px;width:2px;height:15px;transform:translateX(-50%);background:linear-gradient(rgba(255,255,255,.35),var(--glow));box-shadow:0 0 8px var(--glow)}
+.kb-candle:nth-child(2n){animation-delay:.15s}.kb-candle:nth-child(3n){animation-delay:.3s}.kb-candle:nth-child(4n){animation-delay:.44s}
+.kb-boot-readout{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;color:#657492;font:700 7px 'JetBrains Mono',monospace;letter-spacing:.08em}.kb-boot-readout b{color:#eef3ff}
+.kb-boot-status{min-height:23px;margin-top:10px;font:900 10px Orbitron,sans-serif;letter-spacing:.17em;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3);-webkit-background-clip:text;background-clip:text;color:transparent}
+.kb-boot-progress{width:min(560px,92vw);height:5px;margin:10px auto 0;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;box-shadow:inset 0 0 8px rgba(0,0,0,.7)}
+.kb-boot-progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3);box-shadow:0 0 20px rgba(25,230,255,.7);animation:kbBootProgress 10s linear forwards}
+.kb-boot-foot{margin-top:13px;color:#4f5d78;font:600 7px 'JetBrains Mono',monospace;letter-spacing:.1em}
+@keyframes kbBootAura{0%,100%{transform:scale(1) rotate(0deg);opacity:.75}50%{transform:scale(1.08) rotate(35deg);opacity:1}}
+@keyframes kbBootGradient{to{background-position:500% center}}@keyframes kbBootSpin{to{transform:rotate(360deg)}}@keyframes kbBootSpinReverse{to{transform:rotate(-360deg)}}@keyframes kbBootFloat{50%{transform:translateY(-8px) rotateY(-4deg) rotateX(2deg)}}@keyframes kbBootPulse{50%{transform:translate(-50%,-50%) translateZ(35px) scale(1.8);opacity:.45}}@keyframes kbNeuralFlow{to{stroke-dashoffset:-54}}@keyframes kbNodePulse{to{r:4;opacity:.55}}@keyframes kbTrace{to{stroke-dashoffset:-88}}@keyframes kbCandleFloat{to{transform:translateZ(28px) translateY(-4px) skewY(-3deg);filter:brightness(1.35)}}@keyframes kbBootProgress{to{width:100%}}
+@media(max-width:640px){.kb-boot-stage{height:300px}.kb-boot-brain{width:300px;height:225px}.kb-market-plane{width:335px}.kb-boot-brand{font-size:15px}.kb-boot-sub{font-size:6px}.kb-candle{width:15px}}
+@media(prefers-reduced-motion:reduce){#kb-boot-loader *{animation-duration:.01ms!important;animation-iteration-count:1!important}}
 </style>
-<script src="system/boot-loader.js?v=22"></script>
+<script src="system/boot-loader.js?v=23"></script>
   
 <style>
 
@@ -2004,24 +2019,49 @@ footer{
 <div class="kb-boot-stage">
 <div class="kb-boot-halo"></div>
 <div class="kb-boot-brain">
-<svg viewBox="0 0 280 225" aria-label="KINGBOT automated trading brain">
+<div class="kb-brain-shell">
+<svg class="kb-brain-layer kb-brain-back" viewBox="0 0 360 270" aria-hidden="true"><path class="kb-brain-fill" d="M180 31c-25-27-75-22-90 15-34-11-67 14-63 50-22 18-18 57 10 72-8 37 22 60 54 52 14 38 70 41 89 8 19 33 75 30 89-8 32 8 62-15 54-52 28-15 32-54 10-72 4-36-29-61-63-50-15-37-65-42-90-15Z"/></svg>
+<svg class="kb-brain-layer kb-brain-mid" viewBox="0 0 360 270" aria-hidden="true"><path d="M180 31c-25-27-75-22-90 15-34-11-67 14-63 50-22 18-18 57 10 72-8 37 22 60 54 52 14 38 70 41 89 8 19 33 75 30 89-8 32 8 62-15 54-52 28-15 32-54 10-72 4-36-29-61-63-50-15-37-65-42-90-15Z"/></svg>
+<svg class="kb-brain-layer kb-brain-front" viewBox="0 0 360 270" aria-hidden="true">
 <defs>
-<linearGradient id="kbBrainGradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#19e6ff"/><stop offset="25%" stop-color="#9b5cff"/><stop offset="52%" stop-color="#ff4fd8"/><stop offset="76%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
-<linearGradient id="kbBrainStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#19e6ff"/><stop offset="25%" stop-color="#9b5cff"/><stop offset="52%" stop-color="#ff4fd8"/><stop offset="76%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
+<linearGradient id="kbBrainFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#19e6ff"/><stop offset="28%" stop-color="#9b5cff"/><stop offset="54%" stop-color="#ff4fd8"/><stop offset="78%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
+<linearGradient id="kbBrainStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#19e6ff"/><stop offset="28%" stop-color="#9b5cff"/><stop offset="54%" stop-color="#ff4fd8"/><stop offset="78%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
+<linearGradient id="kbNeuralStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="18%" stop-color="#19e6ff"/><stop offset="46%" stop-color="#ff4fd8"/><stop offset="72%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
+<filter id="kbGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
-<path class="brain-fill" d="M138 27c-20-22-61-18-73 13C37 32 11 52 14 80c-18 15-15 46 8 58-6 30 19 49 46 43 12 31 57 33 70 7 13 26 58 24 70-7 27 6 52-13 46-43 23-12 26-43 8-58 3-28-23-48-51-40-12-31-53-35-73-13Z"/>
-<path class="brain-line" d="M140 31v164M91 44c20 18 23 40 20 61-4 20 6 37 27 45M55 81c22 3 31 17 32 34M47 123c20-7 35 0 42 19M92 164c15-8 29-7 40 6M189 44c-20 18-23 40-20 61 4 20-6 37-27 45M225 81c-22 3-31 17-32 34M233 123c-20-7-35 0-42 19M188 164c-15-8-29-7-40 6M113 78c8-9 15-11 27-4M167 78c-8-9-15-11-27-4M108 123c12-10 23-10 32 1M172 123c-12-10-23-10-32 1"/>
+<path class="kb-brain-fill" d="M180 31c-25-27-75-22-90 15-34-11-67 14-63 50-22 18-18 57 10 72-8 37 22 60 54 52 14 38 70 41 89 8 19 33 75 30 89-8 32 8 62-15 54-52 28-15 32-54 10-72 4-36-29-61-63-50-15-37-65-42-90-15Z"/>
+<path class="kb-brain-rim" d="M180 31c-25-27-75-22-90 15-34-11-67 14-63 50-22 18-18 57 10 72-8 37 22 60 54 52 14 38 70 41 89 8 19 33 75 30 89-8 32 8 62-15 54-52 28-15 32-54 10-72 4-36-29-61-63-50-15-37-65-42-90-15Z"/>
+<path class="kb-neural-path" d="M180 40v190M125 54c25 23 31 48 27 74-5 25 7 46 34 57M235 54c-25 23-31 48-27 74 5 25-7 46-34 57M80 97c32 4 44 24 46 47M280 97c-32 4-44 24-46 47M73 145c29-9 49 2 59 28M287 145c-29-9-49 2-59 28M126 196c20-11 36-10 54 4M234 196c-20-11-36-10-54 4"/>
+<path class="kb-neural-path p2" d="M106 66c25 7 37 24 39 47M254 66c-25 7-37 24-39 47M106 168c17-17 31-18 50-7M254 168c-17-17-31-18-50-7"/>
+<path class="kb-neural-path p3" d="M145 82c12-13 25-15 35-6M215 82c-12-13-25-15-35-6M139 119c15-13 29-13 41 0M221 119c-15-13-29-13-41 0"/>
+<circle class="kb-neural-node" cx="180" cy="40" r="3"/><circle class="kb-neural-node" cx="126" cy="54" r="3"/><circle class="kb-neural-node" cx="234" cy="54" r="3"/><circle class="kb-neural-node" cx="80" cy="97" r="3"/><circle class="kb-neural-node" cx="280" cy="97" r="3"/><circle class="kb-neural-node" cx="132" cy="173" r="3"/><circle class="kb-neural-node" cx="228" cy="173" r="3"/>
 </svg>
+</div>
 <div class="kb-boot-pulse"></div>
+<div class="kb-market-plane">
+<div class="kb-market-grid"></div>
+<svg class="kb-market-line" viewBox="0 0 410 112" preserveAspectRatio="none" aria-hidden="true">
+<defs><linearGradient id="kbLineStroke" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#19e6ff"/><stop offset="26%" stop-color="#9b5cff"/><stop offset="50%" stop-color="#ff4fd8"/><stop offset="72%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient></defs>
+<polyline points="4,88 42,76 71,82 102,58 133,65 161,41 192,55 218,28 246,45 276,20 301,35 330,14 360,29 406,7"/>
+</svg>
 <div class="kb-boot-candles">
-<i class="kb-candle" style="--h:28px;color:#23f7a3"></i><i class="kb-candle" style="--h:46px;color:#ff4fd8"></i><i class="kb-candle" style="--h:62px;color:#f6b93b"></i><i class="kb-candle" style="--h:38px;color:#19e6ff"></i><i class="kb-candle" style="--h:72px;color:#9b5cff"></i><i class="kb-candle" style="--h:51px;color:#ff4fd8"></i><i class="kb-candle" style="--h:78px;color:#23f7a3"></i><i class="kb-candle" style="--h:43px;color:#f6b93b"></i><i class="kb-candle" style="--h:65px;color:#19e6ff"></i>
+<i class="kb-candle" style="--h:27px;--c1:#23f7a3;--c2:#19e6ff;--glow:#23f7a3"></i>
+<i class="kb-candle" style="--h:44px;--c1:#ff4fd8;--c2:#9b5cff;--glow:#ff4fd8"></i>
+<i class="kb-candle" style="--h:62px;--c1:#ffd977;--c2:#f6b93b;--glow:#f6b93b"></i>
+<i class="kb-candle" style="--h:38px;--c1:#19e6ff;--c2:#4d8dff;--glow:#19e6ff"></i>
+<i class="kb-candle" style="--h:72px;--c1:#9b5cff;--c2:#ff4fd8;--glow:#9b5cff"></i>
+<i class="kb-candle" style="--h:51px;--c1:#ff4fd8;--c2:#f6b93b;--glow:#ff4fd8"></i>
+<i class="kb-candle" style="--h:79px;--c1:#23f7a3;--c2:#19e6ff;--glow:#23f7a3"></i>
+<i class="kb-candle" style="--h:43px;--c1:#ffd977;--c2:#ff7a18;--glow:#f6b93b"></i>
+<i class="kb-candle" style="--h:65px;--c1:#19e6ff;--c2:#9b5cff;--glow:#19e6ff"></i>
 </div>
 </div>
 </div>
-<div class="kb-boot-readout"><span>AI CORE <b>ACTIVE</b></span><span>MARKET MATRIX <b>LINKING</b></span><span>AUTH <b>READY</b></span></div>
+</div>
+<div class="kb-boot-readout"><span>AI CORE <b>ACTIVE</b></span><span>3D NEURAL MATRIX <b>ONLINE</b></span><span>MARKET ENGINE <b>LINKING</b></span></div>
 <div class="kb-boot-status" id="kb-boot-status">NEURAL CORE INITIALIZING</div>
 <div class="kb-boot-progress"><i></i></div>
-<div class="kb-boot-foot">GIBSONFX TECH · KINGBOT FINTECH · 20.00 SEC STARTUP SEQUENCE</div>
+<div class="kb-boot-foot">GIBSONFX TECH · KINGBOT FINTECH · 10.00 SEC STARTUP SEQUENCE</div>
 </div>
 </div>
 
