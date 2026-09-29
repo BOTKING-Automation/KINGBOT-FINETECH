@@ -26,7 +26,7 @@ export async function resolveFirebaseUser(pool,req){
  }
  return null;
 }
-export async function createAuthRouter({pool}){
+export function createAuthRouter({pool}){
  const router=Router();
  router.post("/sync",async(req,res)=>{
   if(!pool)return res.status(503).json({ok:false,error:"Account service is not configured."});
