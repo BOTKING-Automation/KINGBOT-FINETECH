@@ -12,6 +12,11 @@ export class UserBrokerManager {
     await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_broker_accounts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'PAPER' CHECK(execution_mode IN ('PAPER','LIVE')),enabled BOOLEAN NOT NULL DEFAULT TRUE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,provider,account_id))");
   }
 
+  async isConnected(userId){
+    for(const [key] of this.connections){ if(key.startsWith(String(userId)+":")) return true; }
+    return false;
+  }
+
   async getMapping(userId){
     if(!this.pool||!userId)return null;
     const q=await this.pool.query("SELECT id,user_id,provider,account_id,execution_mode,enabled FROM kingbot_broker_accounts WHERE user_id=$1 AND enabled=TRUE ORDER BY updated_at DESC LIMIT 1",[userId]);
