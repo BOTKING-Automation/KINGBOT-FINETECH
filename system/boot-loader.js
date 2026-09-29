@@ -3,7 +3,6 @@
 "use strict";
 if(document.documentElement.dataset.kingbotBootLoaded==="1")return;
 document.documentElement.dataset.kingbotBootLoaded="1";
-if(!/index\\.html?$/i.test(window.location.pathname.split("/").pop()||"index.html"))return;
 
 const states=["NEURAL CORE INITIALIZING","MARKET MATRIX LINKING","BOT BRAIN SYNCHRONIZING","RISK ENGINE ONLINE","AUTH GATE READY"];
 let el=document.getElementById("kb-boot-loader");
