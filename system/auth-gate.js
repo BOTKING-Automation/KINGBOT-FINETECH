@@ -305,44 +305,42 @@ IMPORTANT:
 
     async handleAuthPage() {
 
-      if (!window.KINGBOT_SESSION) {
-        return;
-      }
-
-      const session =
-        await window.KINGBOT_SESSION.check();
-
       /*
       ---------------------------------------------------
-      Already authenticated and verified.
-      Send user into the platform.
+      AUTH PAGES ARE USER-DRIVEN.
+      
+      Never redirect from an authentication screen merely
+      because Firebase restored an existing session.
+
+      The user must explicitly submit Sign In / Create
+      Account. This prevents the blank-sign-in -> landing
+      page loop caused by an already-restored Firebase
+      session.
       ---------------------------------------------------
       */
 
+      const page = this.getPageName();
+
       if (
-        session.authenticated === true &&
-        session.user &&
-        session.user.verified === true
+        page === "signin.html" ||
+        page === "signup.html" ||
+        page === "access.html" ||
+        page === "access-stable.html"
       ) {
+        return;
+      }
 
-        /*
-        Do not force redirect if user is already on a
-        verification page because backend may still need
-        to process a verification action.
-        */
+      /*
+      Verification is also user-driven. verify.html has its
+      own CHECK VERIFICATION action and controls navigation
+      after the user confirms the email.
+      */
 
-        const page =
-          this.getPageName();
-
-        if (
-          page !== "verify.html" &&
-          page !== "verification.html"
-        ) {
-
-          this.redirectAfterAuthentication();
-
-        }
-
+      if (
+        page === "verify.html" ||
+        page === "verification.html"
+      ) {
+        return;
       }
 
     },
