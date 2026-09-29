@@ -444,6 +444,13 @@ async function check(){
   emailDisplay.textContent=user.email||"";emailDisplay.style.display="block";
   if(user.emailVerified){
    await user.getIdToken(true);
+   try{
+    await window.KINGBOT_FIREBASE.syncAccount();
+    sessionStorage.removeItem("auth_sync_pending");
+   }catch(syncError){
+    console.warn("[KINGBOT AUTH] Verification sync deferred:",syncError?.message||syncError);
+    sessionStorage.setItem("auth_sync_pending","1");
+   }
    sessionStorage.removeItem("verification_email");sessionStorage.removeItem("signup_email");
    show("Email verified successfully. Opening KINGBOT...","success");
    setTimeout(()=>location.replace(new URLSearchParams(location.search).get("return")||"index.html"),700);
