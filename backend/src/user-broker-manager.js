@@ -17,6 +17,11 @@ export class UserBrokerManager {
     return false;
   }
 
+  async getStatus(userId){
+    const mapping=await this.getMapping(userId);
+    return {configured:Boolean(mapping),connected:await this.isConnected(userId),broker:mapping?.provider||null,accountId:mapping?.account_id||null,executionMode:mapping?.execution_mode||"NOT_CONNECTED"};
+  }
+
   async getMapping(userId){
     if(!this.pool||!userId)return null;
     const q=await this.pool.query("SELECT id,user_id,provider,account_id,execution_mode,enabled FROM kingbot_broker_accounts WHERE user_id=$1 AND enabled=TRUE ORDER BY updated_at DESC LIMIT 1",[userId]);
