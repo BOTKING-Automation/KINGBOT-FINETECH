@@ -61,7 +61,15 @@ app.get("/api/analytics", async (req,res)=>{
     pool.query("SELECT bot_id,execution_mode,kill_switch,max_risk_per_trade_pct,daily_drawdown_pct,total_drawdown_pct FROM kingbot_bot_risk_settings WHERE user_id=$1 ORDER BY bot_id",[user.id]),
     (async()=>{try{return await broker.getTrades({startTime:req.query.startTime,endTime:req.query.endTime});}catch{return {connected:false,data:{orders:[],deals:[]}};}})()
   ]);
-  res.json({ok:true,runtime:runtime.rows,risk:risk.rows,broker:trades});
+  const brokerConnected = Boolean(trades?.connected);
+  res.json({
+    ok:true,
+    available: brokerConnected,
+    availabilityReason: brokerConnected ? null : "VERIFIED_BROKER_DATA_UNAVAILABLE",
+    runtime: runtime.rows,
+    risk: risk.rows,
+    broker: trades
+  });
 });
 
 app.get("/api/connection", async (req,res)=>{
