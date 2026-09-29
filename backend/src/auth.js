@@ -20,6 +20,8 @@ async function sendPasswordCodeEmail({email,code}){
  if(!response.ok){const body=await response.text().catch(()=> "");throw new Error("PASSWORD_EMAIL_SEND_FAILED:"+body.slice(0,300));}
 }
 
+const recoveryMemory=new Map();
+function pruneRecoveryMemory(){const now=Date.now();for(const [email,row] of recoveryMemory.entries()){if(row.expiresAt<=now||row.consumed)recoveryMemory.delete(email);}}
 function safeName(displayName,email){
  const n=String(displayName||"").trim();
  if(n)return n.slice(0,160);
@@ -79,56 +81,77 @@ export function createAuthRouter({pool}){
   }catch(error){console.error("[KINGBOT AUTH] Firebase session failed:",error?.message||error);res.status(401).json({ok:false,error:"Authentication session unavailable."});}
  });
  router.post("/password/request-code",async(req,res)=>{
-  if(!pool)return res.status(503).json({ok:false,error:"Account service is not configured."});
   const email=normalizeEmail(req.body?.email);
   if(!email)return res.status(400).json({ok:false,error:"Enter your email address."});
   const generic={ok:true,message:"If a KINGBOT account exists for that email, a six-digit verification code has been sent."};
+  pruneRecoveryMemory();
   try{
-   const recent=await pool.query("SELECT COUNT(*)::int AS count FROM kingbot_password_resets WHERE email=$1 AND created_at>NOW()-INTERVAL '15 minutes'",[email]);
-   if(Number(recent.rows[0]?.count||0)>=3)return res.json(generic);
+   const recent=recoveryMemory.get(email);
+   if(recent&&recent.lastSentAt>Date.now()-15*60*1000&&recent.sendCount>=3)return res.json(generic);
    let fbUser;
    try{fbUser=await getFirebaseAuth().getUserByEmail(email);}catch{return res.json(generic);}
    if(!fbUser?.uid)return res.json(generic);
    const code=makeSixDigitCode();
-   await pool.query("UPDATE kingbot_password_resets SET consumed_at=COALESCE(consumed_at,NOW()) WHERE email=$1 AND consumed_at IS NULL",[email]);
-   await pool.query("INSERT INTO kingbot_password_resets(firebase_uid,email,code_hash,expires_at,attempts,created_at) VALUES($1,$2,$3,NOW()+INTERVAL '10 minutes',0,NOW())",[fbUser.uid,email,hashRecoveryValue(code)]);
    try{await sendPasswordCodeEmail({email,code});}
-   catch(error){await pool.query("UPDATE kingbot_password_resets SET consumed_at=NOW() WHERE email=$1 AND consumed_at IS NULL",[email]);console.error("[KINGBOT AUTH] Password code email failed:",error?.message||error);return res.status(503).json({ok:false,error:"Password recovery email service is not configured or unavailable."});}
+   catch(error){console.error("[KINGBOT AUTH] Password code email failed:",error?.message||error);return res.status(503).json({ok:false,error:"Password recovery email service is not configured or unavailable."});}
+   recoveryMemory.set(email,{firebaseUid:fbUser.uid,codeHash:hashRecoveryValue(code),expiresAt:Date.now()+10*60*1000,attempts:0,verified:false,recoveryTokenHash:"",recoveryExpiresAt:0,lastSentAt:Date.now(),sendCount:(recent?.sendCount||0)+1,consumed:false});
+   if(pool){
+    try{
+     await pool.query("UPDATE kingbot_password_resets SET consumed_at=COALESCE(consumed_at,NOW()) WHERE email=$1 AND consumed_at IS NULL",[email]);
+     await pool.query("INSERT INTO kingbot_password_resets(firebase_uid,email,code_hash,expires_at,attempts,created_at) VALUES($1,$2,$3,NOW()+INTERVAL '10 minutes',0,NOW())",[fbUser.uid,email,hashRecoveryValue(code)]);
+    }catch(error){console.warn("[KINGBOT AUTH] Persistent password recovery storage unavailable; using secure memory fallback:",error?.message||error);}
+   }
    return res.json(generic);
   }catch(error){console.error("[KINGBOT AUTH] Password code request failed:",error?.message||error);return res.status(500).json({ok:false,error:"Password recovery is temporarily unavailable."});}
  });
  router.post("/password/verify-code",async(req,res)=>{
-  if(!pool)return res.status(503).json({ok:false,error:"Account service is not configured."});
   const email=normalizeEmail(req.body?.email),code=String(req.body?.code||"").replace(/\D/g,"").slice(0,6);
   if(!email||code.length!==6)return res.status(400).json({ok:false,error:"Enter the six-digit verification code."});
+  pruneRecoveryMemory();
   try{
-   const q=await pool.query("SELECT id,firebase_uid,code_hash,expires_at,attempts FROM kingbot_password_resets WHERE email=$1 AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1",[email]);
-   if(!q.rowCount)return res.status(400).json({ok:false,error:"The code is invalid or expired."});
-   const row=q.rows[0];
+   const memory=recoveryMemory.get(email);
+   let row=null;
+   if(memory)row={id:null,firebase_uid:memory.firebaseUid,code_hash:memory.codeHash,expires_at:new Date(memory.expiresAt),attempts:memory.attempts};
+   if(!row&&pool){
+    const q=await pool.query("SELECT id,firebase_uid,code_hash,expires_at,attempts FROM kingbot_password_resets WHERE email=$1 AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1",[email]);
+    if(q.rowCount)row=q.rows[0];
+   }
+   if(!row)return res.status(400).json({ok:false,error:"The code is invalid or expired."});
    if(new Date(row.expires_at).getTime()<=Date.now())return res.status(400).json({ok:false,error:"The code has expired. Request a new code."});
    if(Number(row.attempts)>=5)return res.status(429).json({ok:false,error:"Too many code attempts. Request a new code."});
-   await pool.query("UPDATE kingbot_password_resets SET attempts=attempts+1 WHERE id=$1",[row.id]);
+   if(memory)memory.attempts=Number(memory.attempts||0)+1;
+   else if(pool)await pool.query("UPDATE kingbot_password_resets SET attempts=attempts+1 WHERE id=$1",[row.id]);
    if(hashRecoveryValue(code)!==row.code_hash)return res.status(400).json({ok:false,error:"The code is invalid or expired."});
-   const recoveryToken=makeRecoveryToken();
-   await pool.query("UPDATE kingbot_password_resets SET verified_at=NOW(),recovery_token_hash=$2,recovery_expires_at=NOW()+INTERVAL '10 minutes' WHERE id=$1",[row.id,hashRecoveryValue(recoveryToken)]);
+   const recoveryToken=makeRecoveryToken(),expiresAt=Date.now()+10*60*1000;
+   if(memory){memory.verified=true;memory.recoveryTokenHash=hashRecoveryValue(recoveryToken);memory.recoveryExpiresAt=expiresAt;}
+   if(pool&&row.id){await pool.query("UPDATE kingbot_password_resets SET verified_at=NOW(),recovery_token_hash=$2,recovery_expires_at=NOW()+INTERVAL '10 minutes' WHERE id=$1",[row.id,hashRecoveryValue(recoveryToken)]);}
    return res.json({ok:true,verified:true,recoveryToken,expiresInSeconds:600});
   }catch(error){console.error("[KINGBOT AUTH] Password code verification failed:",error?.message||error);return res.status(500).json({ok:false,error:"Password verification is temporarily unavailable."});}
  });
  router.post("/password/reset",async(req,res)=>{
-  if(!pool)return res.status(503).json({ok:false,error:"Account service is not configured."});
   const email=normalizeEmail(req.body?.email),token=String(req.body?.recoveryToken||""),password=String(req.body?.password||"");
   if(!email||!token)return res.status(400).json({ok:false,error:"Password recovery session is missing."});
   if(password.length<8)return res.status(400).json({ok:false,error:"Password must contain at least 8 characters."});
+  pruneRecoveryMemory();
   try{
-   const q=await pool.query("SELECT id,firebase_uid,recovery_token_hash,recovery_expires_at,verified_at,consumed_at FROM kingbot_password_resets WHERE email=$1 ORDER BY created_at DESC LIMIT 1",[email]);
-   if(!q.rowCount)return res.status(400).json({ok:false,error:"Password recovery session is invalid or expired."});
-   const row=q.rows[0];
-   if(row.consumed_at||!row.verified_at||!row.recovery_expires_at||new Date(row.recovery_expires_at).getTime()<=Date.now()||hashRecoveryValue(token)!==row.recovery_token_hash)return res.status(400).json({ok:false,error:"Password recovery session is invalid or expired."});
+   let uid=null,valid=false,dbRow=null;
+   const memory=recoveryMemory.get(email);
+   if(memory&&memory.verified&&memory.recoveryExpiresAt>Date.now()&&hashRecoveryValue(token)===memory.recoveryTokenHash){uid=memory.firebaseUid;valid=true;}
+   if(!valid&&pool){
+    const q=await pool.query("SELECT id,firebase_uid,recovery_token_hash,recovery_expires_at,verified_at,consumed_at FROM kingbot_password_resets WHERE email=$1 ORDER BY created_at DESC LIMIT 1",[email]);
+    if(q.rowCount){
+     dbRow=q.rows[0];
+     valid=!dbRow.consumed_at&&dbRow.verified_at&&dbRow.recovery_expires_at&&new Date(dbRow.recovery_expires_at).getTime()>Date.now()&&hashRecoveryValue(token)===dbRow.recovery_token_hash;
+     if(valid)uid=dbRow.firebase_uid;
+    }
+   }
+   if(!valid||!uid)return res.status(400).json({ok:false,error:"Password recovery session is invalid or expired."});
    const firebaseAuth=getFirebaseAuth();
-   const fbUser=await firebaseAuth.getUser(row.firebase_uid);
+   const fbUser=await firebaseAuth.getUser(uid);
    await firebaseAuth.updateUser(fbUser.uid,{password});
    await firebaseAuth.revokeRefreshTokens(fbUser.uid);
-   await pool.query("UPDATE kingbot_password_resets SET consumed_at=NOW() WHERE id=$1",[row.id]);
+   if(dbRow?.id)await pool.query("UPDATE kingbot_password_resets SET consumed_at=NOW() WHERE id=$1",[dbRow.id]);
+   recoveryMemory.delete(email);
    return res.json({ok:true,passwordReset:true,message:"Password reset successfully. You can sign in with your new password."});
   }catch(error){console.error("[KINGBOT AUTH] Password reset failed:",error?.message||error);return res.status(500).json({ok:false,error:"Password reset failed. Please request a new code and try again."});}
  });
