@@ -896,49 +896,55 @@
       on the KINGBOT FINTECH home/landing page.
     */
     const HOME_PRICES={
-      starter:100,
-      pro:250,
-      institutional:1200
+      starter:130,
+      pro:465,
+      institutional:800
     };
 
     const HOME_PLANS={
       starter:{
-        name:"STARTER BOT",
-        price:100,
+        name:"BASIC",
+        price:130,
         tier:"ENTRY",
         description:"1 bot system · SMC Lite · basic risk controls · equity tracking.",
         features:[
-          "1 bot system",
-          "SMC Lite",
-          "Basic risk controls",
-          "Equity tracking"
+          "Core market intelligence",
+          "Live market monitoring",
+          "KINGBOT platform access",
+          "Core bot access",
+          "Account monitoring",
+          "Risk monitoring"
         ]
       },
       pro:{
-        name:"PRO TRADER BOT",
-        price:250,
+        name:"PROFESSIONAL",
+        price:465,
         tier:"PRO",
-        description:"Up to 5 bot systems · AI explanations · live dashboard capability · automated risk controls · drawdown protection.",
+        description:"Expanded automation, analytics and premium system access for active users.",
         features:[
-          "Up to 5 bot systems",
-          "AI explanations",
-          "Live dashboard capability",
-          "Automated risk controls",
-          "Drawdown protection"
+          "All Basic capabilities",
+          "Expanded bot ecosystem",
+          "Premium bot access",
+          "Advanced analytics",
+          "AI Intelligence",
+          "Increased account capacity",
+          "Advanced risk monitoring"
         ]
       },
       institutional:{
-        name:"INSTITUTIONAL OS",
-        price:1200,
+        name:"INSTITUTIONAL",
+        price:800,
         tier:"INSTITUTIONAL",
-        description:"Expanded bot infrastructure · Trading OS · MT5 integration layer · AI intelligence · prop-style controls · kill switch.",
+        description:"Maximum KINGBOT platform access with the complete automated trading ecosystem.",
         features:[
-          "Expanded bot infrastructure",
-          "Trading OS",
-          "MT5 integration layer",
-          "AI intelligence",
-          "Prop-style controls",
-          "Kill switch"
+          "Full platform access",
+          "Full five-system ecosystem",
+          "Premium Flipper access",
+          "Advanced Ladder Flip access",
+          "Institutional analytics",
+          "AI Intelligence layer",
+          "Expanded account capacity",
+          "Advanced risk infrastructure"
         ]
       }
     };
@@ -1066,7 +1072,7 @@
 
         receiver.innerHTML=
           '<div class="mpesa-title">PAY VIA M-PESA</div>'+
-          '<div class="receiver">Send payment to <strong>'+esc(data.mpesaReceiver||"the configured M-Pesa receiver")+'</strong>. Use the exact amount communicated for your selected payment and submit the transaction code below.</div>'+
+          '<div class="receiver">Send payment to <strong>'+esc(data.mpesaReceiver||"the configured M-Pesa receiver")+'</strong>. Use the exact amount shown for your selected plan and submit the transaction code below.</div>'+
           '<span class="secure-tag">● SECURE SUBMISSION · MANUAL REVIEW</span>';
 
         select.innerHTML=plans.map(p=>{
