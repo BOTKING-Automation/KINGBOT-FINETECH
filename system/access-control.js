@@ -63,7 +63,7 @@ No fake trading permissions.
       */
 
       permissionsEndpoint:
-        "https://kingbot-fintech-api.onrender.com/api/subscription/me"
+        "https://kingbot-fintech-api-etfv.onrender.com/api/subscription/me"
 
     },
 
