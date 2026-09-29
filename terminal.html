@@ -2961,6 +2961,27 @@ function formatCompact(value) {
   return value.toFixed(2);
 }
 
+
+/* KINGBOT RUNTIME CONTROL */
+async function loadRuntimeState(){
+  try{
+    const d=await fetchApi("/api/runtime");
+    const map=new Map((d.bots||[]).map(x=>[x.botId,x]));
+    document.querySelectorAll("[data-runtime-bot]").forEach(el=>{const x=map.get(el.dataset.runtimeBot);if(x)el.textContent=x.runtime+" / "+x.executionMode;});
+    return d;
+  }catch{return null;}
+}
+async function controlBotRuntime(botId,action){
+  try{
+    const d=await fetchApi("/api/runtime/"+encodeURIComponent(botId)+"/"+action,{method:"POST",body:JSON.stringify({})});
+    toast("BOT RUNTIME",botId.toUpperCase()+" → "+(d.state||action).toUpperCase());
+    logActivity("Runtime "+action+" confirmed for "+botId);
+    await loadRuntimeState();
+    return d;
+  }catch(e){toast("RUNTIME BLOCKED",e.message||"Runtime request rejected.");logActivity("Runtime request rejected for "+botId);}
+}
+window.KINGBOT_RUNTIME={load:loadRuntimeState,control:controlBotRuntime};
+
 /* =========================================================
    STARTUP
 ========================================================= */
