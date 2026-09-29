@@ -3,37 +3,65 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Protected bot control center.">
-<title>KINGBOT BOT SYSTEMS</title>
+<meta name="description" content="KINGBOT automated trading systems and bot intelligence.">
+<title>KINGBOT — Automated Bot Systems</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;800&family=Orbitron:wght@500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="system/platform.css">
 <style>
-body{margin:0;min-height:100vh;background:#030712;color:#eef2ff;font-family:Inter,system-ui,sans-serif}
-main{width:min(1200px,calc(100% - 32px));margin:auto;padding:70px 0}
-.panel{border:1px solid rgba(255,255,255,.09);border-radius:24px;padding:36px;background:linear-gradient(145deg,rgba(12,20,40,.92),rgba(3,7,18,.96));box-shadow:0 25px 80px rgba(0,0,0,.35)}
-.eyebrow{color:#19e6ff;font:11px "JetBrains Mono",monospace;letter-spacing:2px}
-h1{font-family:Orbitron,Inter,sans-serif;font-size:clamp(28px,5vw,54px);margin:14px 0}
-p{color:#9da8c0;line-height:1.8;max-width:800px}
-.status{margin-top:28px;padding:16px;border:1px solid rgba(25,230,255,.15);border-radius:14px;background:rgba(25,230,255,.04);color:#aeb9d0}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:26px}
-.card{padding:20px;border:1px solid rgba(255,255,255,.07);border-radius:16px;background:rgba(255,255,255,.025)}
-.card strong{display:block;color:#ffc84a;margin-bottom:8px}
-a{color:#19e6ff}
+body{min-height:100vh;background:radial-gradient(circle at 8% 8%,rgba(25,230,255,.10),transparent 28%),radial-gradient(circle at 90% 12%,rgba(155,92,255,.12),transparent 30%),radial-gradient(circle at 50% 85%,rgba(246,185,59,.07),transparent 32%),#02040a;color:#eef2ff;font-family:Inter,sans-serif}
+main{width:min(1500px,calc(100% - 40px));margin:auto;padding:38px 0 80px}
+.hero{position:relative;overflow:hidden;padding:38px;border:1px solid rgba(25,230,255,.15);border-radius:26px;background:linear-gradient(135deg,rgba(10,18,40,.90),rgba(3,7,18,.96));box-shadow:0 25px 90px rgba(0,0,0,.45)}
+.hero:after{content:"";position:absolute;width:430px;height:430px;right:-180px;top:-220px;border-radius:50%;background:rgba(25,230,255,.08);filter:blur(60px);pointer-events:none}
+.eyebrow{font:800 10px "JetBrains Mono",monospace;letter-spacing:.22em;color:#19e6ff;text-shadow:0 0 15px rgba(25,230,255,.55)}
+h1{margin:13px 0 12px;font:900 clamp(30px,5vw,64px) Orbitron,sans-serif;letter-spacing:.045em;text-transform:uppercase;background:linear-gradient(110deg,#f6b93b,#ffd977 30%,#19e6ff 63%,#9b5cff);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 28px rgba(25,230,255,.12)}
+.hero p{max-width:850px;color:#aab5cd;line-height:1.8}
+.meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.badge{padding:9px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.025);font:700 9px "JetBrains Mono",monospace;letter-spacing:.08em;color:#aeb9d0}
+.badge.cyan{color:#19e6ff;border-color:rgba(25,230,255,.22);box-shadow:0 0 20px rgba(25,230,255,.06)}
+.badge.gold{color:#ffd977;border-color:rgba(246,185,59,.22);box-shadow:0 0 20px rgba(246,185,59,.06)}
+.section-head{display:flex;align-items:end;justify-content:space-between;gap:20px;margin:34px 2px 15px}
+.section-head h2{font:800 19px Orbitron,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:#f4f7ff;text-shadow:0 0 18px rgba(246,185,59,.12)}
+.section-head span{font:700 9px "JetBrains Mono",monospace;color:#66738f;letter-spacing:.13em}
+.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+.card{position:relative;min-height:270px;overflow:hidden;padding:22px;border:1px solid rgba(255,255,255,.08);border-radius:20px;background:linear-gradient(155deg,rgba(10,18,40,.88),rgba(4,8,19,.96));box-shadow:0 18px 55px rgba(0,0,0,.30);transition:.25s ease}
+.card:before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(25,230,255,.055),transparent 35%,rgba(155,92,255,.045));pointer-events:none}
+.card:hover{transform:translateY(-5px);border-color:rgba(25,230,255,.22);box-shadow:0 24px 70px rgba(0,0,0,.42),0 0 30px rgba(25,230,255,.07)}
+.num{font:800 9px "JetBrains Mono",monospace;color:#66738f;letter-spacing:.16em}
+.icon{width:48px;height:48px;margin:20px 0 18px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(135deg,rgba(246,185,59,.18),rgba(25,230,255,.10));border:1px solid rgba(246,185,59,.22);font:900 16px Orbitron,sans-serif;color:#ffd977;box-shadow:0 0 25px rgba(246,185,59,.08)}
+.card h3{font:800 15px Orbitron,sans-serif;letter-spacing:.055em;color:#eef2ff;text-shadow:0 0 15px rgba(25,230,255,.10)}
+.card h3 span{color:#19e6ff}
+.card p{margin-top:10px;color:#8794ae;font-size:12px;line-height:1.65}
+.card .state{position:absolute;bottom:19px;left:22px;right:22px;padding-top:11px;border-top:1px solid rgba(255,255,255,.06);font:700 9px "JetBrains Mono",monospace;color:#6e7b96;letter-spacing:.08em}
+.note{margin-top:18px;padding:17px 20px;border:1px solid rgba(246,185,59,.14);border-radius:16px;background:rgba(246,185,59,.035);color:#8f9bb4;font-size:11px;line-height:1.7}
+.note strong{color:#ffd977}
+@media(max-width:1050px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){main{width:min(100% - 24px,1500px);padding-top:20px}.hero{padding:25px 20px}.grid{grid-template-columns:1fr}h1{font-size:32px}}
 </style>
 </head>
 <body>
 <div data-kingbot-navigation></div>
 <main>
-<section class="panel">
-<div class="eyebrow">BOTS</div>
-<h1>KINGBOT BOT SYSTEMS</h1>
-<p>Protected bot control center.</p>
-<div class="grid">
-<div class="card"><strong>SECURE SYSTEM</strong><span>Connected services use verified backend state. No fabricated account data.</span></div>
-<div class="card"><strong>LIVE DATA POLICY</strong><span>Balances, positions, orders and performance remain unavailable until verified backend data exists.</span></div>
-<div class="card"><strong>CONSISTENCY · RESILIENCE · INNOVATION</strong><span>KINGBOT FINTECH by GIBSONFX Tech.</span></div>
+<section class="hero">
+<div class="eyebrow">KINGBOT AUTOMATION CORE / BOT ECOSYSTEM</div>
+<h1>Five Specialized Systems.<br>One Institutional Engine.</h1>
+<p>Explore the KINGBOT automated trading architecture. Each system is designed around a distinct trading methodology while sharing the platform's risk, security and execution infrastructure.</p>
+<div class="meta">
+<span class="badge cyan">5 SPECIALIZED EAs</span>
+<span class="badge gold">RISK ENGINE INTEGRATED</span>
+<span class="badge">VERIFIED DATA ONLY</span>
 </div>
-<div class="status">This module is part of the KINGBOT FINTECH architecture and is being connected to its production services.</div>
 </section>
+<div class="section-head"><h2>Bot Systems</h2><span>CONSISTENCY · RESILIENCE · INNOVATION</span></div>
+<section class="grid">
+<article class="card"><div class="num">SYSTEM 01 / MULTI-STRATEGY</div><div class="icon">KS</div><h3>KINGBOT <span>STRATEGIC</span></h3><p>Multi-strategy automation architecture built to coordinate diversified trading logic.</p><div class="state">STATUS · AWAITING VERIFIED BACKEND</div></article>
+<article class="card"><div class="num">SYSTEM 02 / HIGH-SPEED</div><div class="icon">KF</div><h3>KINGBOT <span>FLIPPER</span></h3><p>High-speed flipping framework focused on disciplined entry, exit and risk controls.</p><div class="state">STATUS · AWAITING VERIFIED BACKEND</div></article>
+<article class="card"><div class="num">SYSTEM 03 / MOMENTUM</div><div class="icon">KB</div><h3>KINGBOT <span>BREAKOUT</span></h3><p>Breakout and momentum architecture for structured market expansion events.</p><div class="state">STATUS · AWAITING VERIFIED BACKEND</div></article>
+<article class="card"><div class="num">SYSTEM 04 / SMART MONEY</div><div class="icon">SM</div><h3>KINGBOT <span>SMC PRO</span></h3><p>Smart Money Concepts framework organized around market structure and liquidity behavior.</p><div class="state">STATUS · AWAITING VERIFIED BACKEND</div></article>
+<article class="card"><div class="num">SYSTEM 05 / ADVANCED LADDER</div><div class="icon">LV</div><h3>KINGBOT <span>LADDER FLIP V8</span></h3><p>Advanced ladder architecture with platform-level risk controls and execution safeguards.</p><div class="state">STATUS · AWAITING VERIFIED BACKEND</div></article>
+</section>
+<div class="note"><strong>LIVE-DATA POLICY:</strong> Bot state, account exposure, orders and performance will only be displayed when returned by the authenticated backend. This page never fabricates trading activity or results.</div>
 </main>
 <script src="system/session.js"></script>
 <script src="system/auth-gate.js"></script>
