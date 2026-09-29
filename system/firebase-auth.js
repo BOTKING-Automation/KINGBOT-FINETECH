@@ -56,7 +56,23 @@ window.KINGBOT_FIREBASE={
   app,auth,API_BASE,persist,
   createAccount:async({email,password,firstName,lastName,phone,remember=true})=>{
     await persist(remember);
-    const credential=await createUserWithEmailAndPassword(auth,email,password);
+    let credential;
+    try{
+      credential=await createUserWithEmailAndPassword(auth,email,password);
+    }catch(error){
+      if(error?.code!=="auth/email-already-in-use") throw error;
+      try{
+        credential=await signInWithEmailAndPassword(auth,email,password);
+        await reload(credential.user);
+        if(!credential.user.emailVerified){
+          await sendEmailVerification(credential.user);
+          return {user:credential.user,existing:true,verified:false,backendSynced:false,syncError:null};
+        }
+      }catch(signInError){
+        throw error;
+      }
+      throw error;
+    }
     const user=credential.user;
     const displayName=[firstName,lastName].filter(Boolean).join(" ").trim();
     await sendEmailVerification(user);
