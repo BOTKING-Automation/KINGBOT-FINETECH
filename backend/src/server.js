@@ -10,6 +10,8 @@ import pg from "pg";
 import { createAuthRouter, ensureAuthSchema } from "./auth.js";
 import { createSubscriptionRouter, ensureSubscriptionSchema } from "./subscriptions.js";
 import { createBotEngineRouter, ensureBotEngineSchema } from "./bot-engines.js";
+import { createBroker } from "./broker-adapter.js";
+import { requireUser } from "./subscriptions.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -18,6 +20,7 @@ const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 const API_KEY = process.env.GEMINI_API_KEY || "";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const pool = DATABASE_URL ? new pg.Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false } }) : null;
+const broker = createBroker();
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "16kb" }));
@@ -29,6 +32,37 @@ const authLimiter = rateLimit({ windowMs: 15*60*1000, limit: 12, standardHeaders
 app.use("/api/auth", createAuthRouter({ pool, sessionTtlHours: Number(process.env.SESSION_TTL_HOURS || 24), limiter: authLimiter }));
 app.use("/api/subscription", createSubscriptionRouter({ pool }));
 app.use("/api/bots", createBotEngineRouter({ pool }));
+
+app.get("/api/connection", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  res.json({ok:true,connected:Boolean(broker.connected),broker:broker.id,executionMode:broker.executionMode,accountConfigured:broker.id!=="noop"});
+});
+app.post("/api/broker/connect", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  const mode=String(req.body?.executionMode||"PAPER").toUpperCase();
+  try{const result=await broker.connect({executionMode:mode}); if(!result.connected)return res.status(503).json({ok:false,...result}); res.json({ok:true,...result});}
+  catch(error){console.error("[KINGBOT BROKER] connect failed:",error?.message||error);res.status(502).json({ok:false,error:"Broker connection failed.",reason:error?.message||"BROKER_CONNECTION_FAILED"});}
+});
+app.post("/api/broker/disconnect", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  try{res.json({ok:true,...await broker.disconnect()});}catch(error){res.status(502).json({ok:false,error:"Broker disconnect failed."});}
+});
+app.get("/api/account", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  try{const x=await broker.getAccount();res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Account telemetry unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
+});
+app.get("/api/positions", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  try{const x=await broker.getPositions();res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Position telemetry unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
+});
+app.get("/api/orders", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  try{const x=await broker.getOrders();res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Order telemetry unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
+});
+app.get("/api/trades", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  try{const x=await broker.getTrades({startTime:req.query.startTime,endTime:req.query.endTime});res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Trade history unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
+});
 
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000,
