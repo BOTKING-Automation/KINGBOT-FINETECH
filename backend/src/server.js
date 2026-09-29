@@ -163,6 +163,8 @@ app.get("/api/health", (_req, res) => {
 app.get("/health", (_req,res) => res.json({ok:true,service:"KINGBOT Intelligence",aiReady:Boolean(ai),accountServiceReady:Boolean(pool)}));
 
 app.post("/api/ai/query", aiLimiter, async (req, res) => {
+  const aiUser = await requireUser(pool, req, res);
+  if (!aiUser) return;
   const message = typeof req.body?.message === "string"
     ? req.body.message.trim()
     : "";
