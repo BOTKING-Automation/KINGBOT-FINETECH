@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KINGBOT FINTECH — Neural Startup</title>
+<style>
+:root{--cyan:#19e6ff;--violet:#9b5cff;--pink:#ff4fd8;--gold:#f6b93b;--green:#23f7a3}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}
+body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208 100%);color:#eef3ff;font-family:Inter,system-ui,sans-serif}
+#kb-loader{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208 100%);overflow:hidden}
+#kb-loader:before{content:"";position:absolute;inset:-20%;background:conic-gradient(from 90deg,rgba(25,230,255,.08),rgba(155,92,255,.09),rgba(255,79,216,.08),rgba(246,185,59,.08),rgba(35,247,163,.07),rgba(25,230,255,.08));filter:blur(40px);animation:aura 8s ease-in-out infinite}
+#kb-loader:after{content:"";position:absolute;inset:0;opacity:.3;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:42px 42px;mask-image:radial-gradient(circle at 50% 50%,black 20%,transparent 85%)}
+.core{position:relative;z-index:2;width:min(920px,95vw);text-align:center;padding:24px 16px}
+.brand{font:900 20px Orbitron,Inter,sans-serif;letter-spacing:.18em;background:linear-gradient(90deg,var(--cyan),var(--violet),var(--pink),var(--gold),var(--green),var(--cyan));background-size:500% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradient 3.2s linear infinite}
+.sub{margin-top:8px;color:#7b89ab;font:700 8px "JetBrains Mono",monospace;letter-spacing:.22em}
+.stage{position:relative;width:min(760px,95vw);height:360px;margin:10px auto 5px;display:grid;place-items:center;perspective:1200px}
+.halo{position:absolute;width:335px;height:335px;border-radius:50%;border:1px solid rgba(25,230,255,.22);box-shadow:0 0 100px rgba(25,230,255,.12),inset 0 0 80px rgba(246,185,59,.06);animation:spin 12s linear infinite}
+.halo:before,.halo:after{content:"";position:absolute;border-radius:50%;inset:24px;border:1px dashed rgba(155,92,255,.3);animation:spinReverse 8s linear infinite}
+.halo:after{inset:55px;border-style:solid;border-color:rgba(246,185,59,.22);animation-duration:11s}
+.brain{position:relative;width:min(370px,82vw);height:280px;transform-style:preserve-3d;animation:float 2.4s ease-in-out infinite}
+.brain svg{width:100%;height:100%;overflow:visible}
+.rim{fill:none;stroke:url(#stroke);stroke-width:1.2;opacity:.58;transform:translateZ(-20px) scale(.94)}
+.body{fill:url(#fill);fill-opacity:.12;stroke:url(#stroke);stroke-width:2.8;filter:url(#glow)}
+.circuit{fill:none;stroke:url(#circuit);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:9 5;filter:url(#glow);animation:flow 1.6s linear infinite}
+.circuit.s2{animation-duration:2.5s;animation-delay:-.7s}.circuit.s3{animation-duration:3.1s;animation-delay:-1.4s}
+.node{fill:#fff;stroke:url(#circuit);stroke-width:1.2;filter:url(#glow);animation:node 1s ease-in-out infinite alternate}
+.chip{fill:rgba(4,12,28,.78);stroke:url(#circuit);stroke-width:1.4;filter:url(#glow)}
+.chipline{stroke:url(#circuit);stroke-width:1.1}
+.scan{fill:none;stroke:url(#circuit);stroke-width:2;stroke-dasharray:25 18;filter:url(#glow);animation:scan 2.2s linear infinite}
+.pulse{position:absolute;top:49%;left:50%;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 0 18px var(--cyan),0 0 36px var(--pink),0 0 68px rgba(246,185,59,.55);transform:translate(-50%,-50%) translateZ(35px);animation:pulse 1s ease-in-out infinite}
+.market{position:absolute;left:50%;bottom:17px;width:min(420px,84vw);height:112px;transform:translateX(-50%) rotateX(58deg) rotateZ(-1deg);transform-style:preserve-3d}
+.grid{position:absolute;inset:0;border:1px solid rgba(25,230,255,.15);background:linear-gradient(rgba(25,230,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(155,92,255,.025) 1px,transparent 1px);background-size:32px 18px;box-shadow:0 0 35px rgba(25,230,255,.05),inset 0 0 25px rgba(155,92,255,.05)}
+.line{position:absolute;inset:4px;width:calc(100% - 8px);height:calc(100% - 8px);filter:url(#glow)}
+.line polyline{fill:none;stroke:url(#line);stroke-width:2.7;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:14 8;animation:trace 3s linear infinite}
+.candles{position:absolute;inset:8px 18px 10px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 14px}
+.candle{position:relative;width:18px;height:var(--h);border-radius:3px;background:linear-gradient(90deg,rgba(255,255,255,.7),rgba(255,255,255,.14) 15%,var(--c1) 33%,var(--c2) 78%,rgba(0,0,0,.45));border:1px solid rgba(255,255,255,.25);box-shadow:0 0 10px var(--glow),0 0 26px var(--glow);animation:cfloat 1.15s ease-in-out infinite alternate}
+.candle:before,.candle:after{content:"";position:absolute;left:50%;width:2px;transform:translateX(-50%);background:linear-gradient(var(--glow),rgba(255,255,255,.4));box-shadow:0 0 9px var(--glow)}
+.candle:before{top:-20px;height:20px}.candle:after{bottom:-13px;height:13px}
+.readout{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;color:#657492;font:700 7px "JetBrains Mono",monospace;letter-spacing:.08em}.readout b{color:#eef3ff}
+.status{min-height:23px;margin-top:10px;font:900 10px Orbitron,Inter,sans-serif;letter-spacing:.17em;background:linear-gradient(90deg,var(--cyan),var(--violet),var(--pink),var(--gold),var(--green));-webkit-background-clip:text;background-clip:text;color:transparent}
+.progress{width:min(560px,92vw);height:5px;margin:10px auto 0;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
+.progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--cyan),var(--violet),var(--pink),var(--gold),var(--green));box-shadow:0 0 20px rgba(25,230,255,.7);animation:progress 10s linear forwards}
+.foot{margin-top:13px;color:#4f5d78;font:600 7px "JetBrains Mono",monospace;letter-spacing:.1em}
+@keyframes aura{0%,100%{transform:scale(1) rotate(0);opacity:.75}50%{transform:scale(1.08) rotate(35deg);opacity:1}}
+@keyframes gradient{to{background-position:500% center}}@keyframes spin{to{transform:rotate(360deg)}}@keyframes spinReverse{to{transform:rotate(-360deg)}}@keyframes float{50%{transform:translateY(-8px) rotateY(-4deg) rotateX(2deg)}}@keyframes flow{to{stroke-dashoffset:-56}}@keyframes node{to{opacity:.38}}@keyframes scan{to{stroke-dashoffset:-86}}@keyframes pulse{50%{transform:translate(-50%,-50%) translateZ(35px) scale(1.8);opacity:.45}}@keyframes trace{to{stroke-dashoffset:-88}}@keyframes cfloat{to{transform:translateY(-4px);filter:brightness(1.35)}}@keyframes progress{to{width:100%}}
+@media(max-width:640px){.stage{height:300px}.brain{width:300px;height:225px}.market{width:335px}.brand{font-size:15px}.sub{font-size:6px}.candle{width:14px}}
+</style>
+</head>
+<body>
+<div id="kb-loader">
+<div class="core">
+<div class="brand">KINGBOT FINTECH</div>
+<div class="sub">NEURAL TRADING INFRASTRUCTURE · SECURE INITIALIZATION</div>
+<div class="stage">
+<div class="halo"></div>
+<div class="brain">
+<svg viewBox="0 0 360 270" aria-label="KINGBOT high-tech neural brain">
+<defs>
+<linearGradient id="fill" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#19e6ff"/><stop offset="30%" stop-color="#5e7cff"/><stop offset="55%" stop-color="#ff4fd8"/><stop offset="76%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
+<linearGradient id="stroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#19e6ff"/><stop offset="24%" stop-color="#9b5cff"/><stop offset="50%" stop-color="#ff4fd8"/><stop offset="74%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
+<linearGradient id="circuit" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#23f7a3"/><stop offset="25%" stop-color="#19e6ff"/><stop offset="50%" stop-color="#9b5cff"/><stop offset="72%" stop-color="#ff4fd8"/><stop offset="100%" stop-color="#ffd977"/></linearGradient>
+<linearGradient id="line" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#19e6ff"/><stop offset="35%" stop-color="#9b5cff"/><stop offset="58%" stop-color="#ff4fd8"/><stop offset="78%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
+<filter id="glow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<path class="rim" d="M180 26c-28-28-76-18-89 17-37-8-67 17-63 54-23 18-20 55 7 70-9 39 23 65 56 57 15 35 67 37 89 6 22 31 74 29 89-6 33 8 65-18 56-57 27-15 30-52 7-70 4-37-26-62-63-54-13-35-61-45-89-17Z"/>
+<path class="body" d="M180 32c-25-24-67-16-78 18-33-8-59 15-56 47-21 16-17 45 7 58-8 33 19 54 47 48 13 30 58 33 80 4 22 29 67 26 80-4 28 6 55-15 47-48 24-13 28-42 7-58 3-32-23-55-56-47-11-34-53-42-78-18Z"/>
+<path class="circuit" d="M180 47V76h-31v26h-27v32h-24M180 47v29h31v27h27v31h24M149 102h-19V78h-22M211 103h19V79h22M98 134H74v-22H58M262 134h24v-22h16M129 134h25v22h26v37M231 134h-25v22h-26v37M128 78v-20h-18M232 78v-20h18M105 169h-22v18H67M255 169h22v18h16"/>
+<path class="circuit s2" d="M180 78v24M154 102v32M206 102v32M155 156h25M205 156h-25M180 190v27M130 134h-30M230 134h30"/>
+<path class="circuit s3" d="M111 58l17 17M249 58l-17 17M74 113l24 21M286 113l-24 21M84 187l21-18M276 187l-21-18"/>
+<rect class="chip" x="161" y="108" width="38" height="32" rx="5"/>
+<path class="chipline" d="M166 115h28M166 122h28M166 129h28M166 136h28M172 108v-7M181 108v-8M190 108v-7M172 140v7M181 140v8M190 140v-7"/>
+<circle class="node" cx="180" cy="47" r="3"/><circle class="node" cx="149" cy="102" r="3"/><circle class="node" cx="211" cy="102" r="3"/><circle class="node" cx="98" cy="134" r="3"/><circle class="node" cx="262" cy="134" r="3"/><circle class="node" cx="118" cy="193" r="3"/><circle class="node" cx="242" cy="193" r="3"/>
+<path class="scan" d="M68 220 Q180 188 292 220"/>
+</svg>
+<div class="pulse"></div>
+<div class="market">
+<div class="grid"></div>
+<svg class="line" viewBox="0 0 410 112" preserveAspectRatio="none" aria-hidden="true"><polyline points="5,94 34,90 62,84 88,86 111,75 137,79 163,66 188,68 213,53 238,58 263,43 288,47 314,32 341,35 368,18 405,8"/></svg>
+<div class="candles">
+<i class="candle" style="--h:24px;--c1:#23f7a3;--c2:#19e6ff;--glow:#23f7a3"></i>
+<i class="candle" style="--h:31px;--c1:#23f7a3;--c2:#19e6ff;--glow:#23f7a3"></i>
+<i class="candle" style="--h:27px;--c1:#ff687f;--c2:#ff3b9f;--glow:#ff4f8f"></i>
+<i class="candle" style="--h:39px;--c1:#23f7a3;--c2:#19e6ff;--glow:#23f7a3"></i>
+<i class="candle" style="--h:48px;--c1:#9b5cff;--c2:#ff4fd8;--glow:#9b5cff"></i>
+<i class="candle" style="--h:44px;--c1:#23f7a3;--c2:#19e6ff;--glow:#23f7a3"></i>
+<i class="candle" style="--h:50px;--c1:#ff687f;--c2:#ff3b9f;--glow:#ff4f8f"></i>
+<i class="candle" style="--h:61px;--c1:#ffd977;--c2:#f6b93b;--glow:#f6b93b"></i>
+<i class="candle" style="--h:69px;--c1:#23f7a3;--c2:#19e6ff;--glow:#23f7a3"></i>
+</div></div></div></div>
+<div class="readout"><span>AI CORE <b>ACTIVE</b></span><span>CYBER NEURAL CORE <b>ONLINE</b></span><span>UPTREND MATRIX <b>LINKING</b></span></div>
+<div class="status" id="status">NEURAL CORE INITIALIZING</div>
+<div class="progress"><i></i></div>
+<div class="foot">GIBSONFX TECH · KINGBOT FINTECH · 10.00 SEC STARTUP SEQUENCE</div>
+</div></div>
+
+<script type="module">
+import "./system/firebase-auth.js";
+const states=["NEURAL CORE INITIALIZING","MARKET MATRIX LINKING","BOT BRAIN SYNCHRONIZING","RISK ENGINE ONLINE","AUTH GATE READY"];
+const status=document.getElementById("status");
+let i=0;
+setInterval(()=>{i=(i+1)%states.length;status.textContent=states[i]},900);
+
+setTimeout(async()=>{
+  let user=null;
+  try{
+    user=window.KINGBOT_FIREBASE?.auth?.currentUser||null;
+    if(!user && window.KINGBOT_SESSION?.check){
+      const checked=await window.KINGBOT_SESSION.check({force:true});
+      if(checked?.authenticated) user={emailVerified:Boolean(checked.user?.verified)};
+    }
+  }catch(e){console.warn("[KINGBOT LOADER]",e);}
+  if(user?.emailVerified){
+    window.location.replace("index.html");
+  }else if(user){
+    window.location.replace("verify.html");
+  }else{
+    window.location.replace("access.html#signin");
+  }
+},10000);
+</script>
+</body>
+</html>
