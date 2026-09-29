@@ -13,7 +13,7 @@ const session={
  async check(options={}){
   const force=Boolean(options.force);
   if(!force&&state.checked&&Date.now()-state.checkedAt<this.config.cacheDuration)return this.getState();
-  if(!window.KINGBOT_FIREBASE){state.error=new Error("Firebase Authentication is not loaded.");state.checked=true;state.checkedAt=Date.now();state.authenticated=false;state.user=null;return this.getState();}
+  if(!window.KINGBOT_FIREBASE){try{await import(new URL("system/firebase-auth.js",window.location.href).href);}catch(error){state.error=error;} }\n  if(!window.KINGBOT_FIREBASE){state.error=state.error||new Error("Firebase Authentication is not loaded.");state.checked=true;state.checkedAt=Date.now();state.authenticated=false;state.user=null;return this.getState();}
   state.checking=true;state.error=null;
   try{
    const fb=await new Promise(resolve=>{
