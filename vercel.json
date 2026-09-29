@@ -34,5 +34,12 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/loader.html",
+      "permanent": false
+    }
   ]
 }
