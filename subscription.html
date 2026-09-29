@@ -664,6 +664,11 @@
       text-align:center;
     }
 
+    .bot-choice{margin-top:10px;padding:12px;border:1px solid rgba(25,230,255,.12);border-radius:12px;background:linear-gradient(135deg,rgba(25,230,255,.035),rgba(155,92,255,.035),rgba(246,185,59,.03))}
+    .bot-choice[hidden]{display:none}
+    .bot-choice-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:9px;color:#687590;font:800 7px var(--mono);letter-spacing:.12em}
+    .bot-choice-head b{color:#ffe28a}
+    .bot-choice-note{margin-top:7px;color:#6f7e9b;font-size:8px;line-height:1.55}
     @media(max-width:1100px){
       .layout{grid-template-columns:1fr}
       .plans{grid-template-columns:repeat(3,1fr)}
@@ -769,6 +774,18 @@
                     <label for="amountKes">Amount paid (KES)</label>
                     <input id="amountKes" type="number" min="1" step="0.01" placeholder="Exact amount paid" required>
                   </div>
+                </div>
+
+                <div id="basicBotChoice" class="bot-choice" hidden>
+                  <div class="bot-choice-head">
+                    <span>PLAN CONFIGURATION</span><b>BASIC / CHOOSE 1 BOT</b>
+                  </div>
+                  <label for="basicBotId">Choose your Basic bot</label>
+                  <select id="basicBotId">
+                    <option value="strategic">KINGBOT STRATEGIC</option>
+                    <option value="breakout">KINGBOT BREAKOUT</option>
+                  </select>
+                  <div class="bot-choice-note">Your Basic subscription unlocks only the one engine selected here for the active monthly period.</div>
                 </div>
 
                 <div class="row">
@@ -902,53 +919,10 @@
     };
 
     const HOME_PLANS={
-      starter:{
-        name:"BASIC",
-        price:130,
-        tier:"ENTRY",
-        description:"1 bot system · SMC Lite · basic risk controls · equity tracking.",
-        features:[
-          "Core market intelligence",
-          "Live market monitoring",
-          "KINGBOT platform access",
-          "Core bot access",
-          "Account monitoring",
-          "Risk monitoring"
-        ]
-      },
-      pro:{
-        name:"PROFESSIONAL",
-        price:465,
-        tier:"PRO",
-        description:"Expanded automation, analytics and premium system access for active users.",
-        features:[
-          "All Basic capabilities",
-          "Expanded bot ecosystem",
-          "Premium bot access",
-          "Advanced analytics",
-          "AI Intelligence",
-          "Increased account capacity",
-          "Advanced risk monitoring"
-        ]
-      },
-      institutional:{
-        name:"INSTITUTIONAL",
-        price:800,
-        tier:"INSTITUTIONAL",
-        description:"Maximum KINGBOT platform access with the complete automated trading ecosystem.",
-        features:[
-          "Full platform access",
-          "Full five-system ecosystem",
-          "Premium Flipper access",
-          "Advanced Ladder Flip access",
-          "Institutional analytics",
-          "AI Intelligence layer",
-          "Expanded account capacity",
-          "Advanced risk infrastructure"
-        ]
-      }
+      starter:{name:"BASIC",price:130,tier:"ENTRY",description:"Choose 1 of 2 bot engines: Strategic or Breakout. Monthly access expires automatically.",features:["1 of 5 bot engines","Choose STRATEGIC or BREAKOUT","Core risk controls","Equity tracking","Monthly entitlement"]},
+      pro:{name:"PROFESSIONAL",price:465,tier:"PRO",description:"Access 3 of 5 bot engines: Strategic, Breakout and SMC PRO.",features:["3 of 5 bot engines","STRATEGIC + BREAKOUT","SMC PRO","Advanced analytics","AI Intelligence","Monthly entitlement"]},
+      institutional:{name:"INSTITUTIONAL",price:800,tier:"INSTITUTIONAL",description:"Access the complete five-engine KINGBOT ecosystem for one active monthly period.",features:["All 5 bot engines","STRATEGIC + BREAKOUT + SMC PRO","FLIPPER + LADDER FLIP V8","Full Trading OS","Advanced intelligence","Monthly entitlement"]}
     };
-
     let plans=[];
 
     function esc(value){
@@ -1008,7 +982,7 @@
       summaryName.textContent=p.name;
       summaryStatus.textContent=p.tier;
       summaryPrice.innerHTML="$"+p.price.toLocaleString()+" <span>USD PLAN PRICE</span>";
-      summaryBots.textContent=p.key==="starter"?"1 BOT":p.key==="pro"?"UP TO 5 BOTS":"EXPANDED";
+      summaryBots.textContent=p.key==="starter"?"1 OF 2 · SELECT ONE":p.key==="pro"?"3 OF 5":"5 OF 5";
       summaryTier.textContent=p.tier;
       summaryNote.textContent=p.description;
 
@@ -1050,6 +1024,15 @@
       });
 
       renderSummary();
+    }
+
+    function syncBasicBotChoice(){
+      const picker=document.getElementById("basicBotChoice");
+      const botSelect=document.getElementById("basicBotId");
+      const basic=selectedKey()==="starter";
+      picker.hidden=!basic;
+      botSelect.disabled=!basic;
+      if(basic)summaryBots.textContent="1 OF 2 · "+botSelect.options[botSelect.selectedIndex].text.replace("KINGBOT ","");
     }
 
     async function load(){
@@ -1150,7 +1133,8 @@
       }
     }
 
-    select.addEventListener("change",renderSummary);
+    select.addEventListener("change",()=>{renderSummary();syncBasicBotChoice();});
+    document.getElementById("basicBotId").addEventListener("change",syncBasicBotChoice);
 
     document.getElementById("paymentForm").addEventListener("submit",async event=>{
       event.preventDefault();
@@ -1166,6 +1150,7 @@
       const amountKes=Number(document.getElementById("amountKes").value);
       const mpesaCode=document.getElementById("mpesaCode").value.trim();
       const payerPhone=document.getElementById("payerPhone").value.trim();
+      const selectedBotId=selectedPlan.key==="starter" ? document.getElementById("basicBotId").value : null;
 
       if(!Number.isFinite(amountKes)||amountKes<=0){
         status.textContent="Enter the exact KES amount paid.";
@@ -1189,7 +1174,8 @@
             planId:selectedPlan.id,
             amountKes,
             mpesaCode,
-            payerPhone
+            payerPhone,
+            selectedBotId
           })
         });
 
