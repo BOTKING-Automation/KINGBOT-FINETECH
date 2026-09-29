@@ -1,4 +1,4 @@
-import MetaApi from "metaapi.cloud-sdk";
+import MetaApi from "metaapi.cloud-sdk/esm-node";
 
 export class MetaApiBroker {
   constructor({token=process.env.METAAPI_TOKEN,accountId=process.env.METAAPI_ACCOUNT_ID}={}) {
