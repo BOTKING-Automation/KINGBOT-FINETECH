@@ -91,6 +91,11 @@ export class UserBrokerManager {
     return {connected:true,data:{orders,deals}};
   }
 
+  async getSymbolSpecification(symbol,userId){
+    const connection=await this.connectionFor(userId);
+    return {connected:true,data:await connection.getSymbolSpecification(String(symbol).trim().toUpperCase())};
+  }
+
   async getQuote(symbol,userId){
     const connection=await this.connectionFor(userId);
     return {connected:true,data:await connection.getSymbolPrice(String(symbol).trim().toUpperCase())};
