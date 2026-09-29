@@ -30,7 +30,7 @@ export function createBotRuntimeRouter({pool,broker}){
 
   router.get("/",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
-    const bots=await Promise.all(Object.values(getBotDefinitions()).map(async b=>({botId:b.id,name:b.name,runtime:(await runtime(pool,user.id,b.id))?.state||"STOPPED",executionMode:(await settings(pool,user.id,b.id)).executionMode,killSwitch:(await settings(pool,user.id,b.id)).killSwitch})));
+    const bots=await Promise.all(Object.values(getBotDefinitions()).map(async b=>{const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id);return {botId:b.id,name:b.name,runtime:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||"1m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null};}));
     res.json({ok:true,bots});
   });
 
@@ -39,7 +39,7 @@ export function createBotRuntimeRouter({pool,broker}){
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
     if(!(await entitlement(pool,user.id,b.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id);
-    res.json({ok:true,botId:b.id,state:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null});
+    res.json({ok:true,botId:b.id,state:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||"1m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null});
   });
 
   router.post("/:botId/start",async(req,res)=>{
