@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireUser } from "./subscriptions.js";
-import { evaluateRisk, authorizeOrder } from "./risk-engine.js";
+import { evaluateRisk, authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
 
 const BOT_DEFINITIONS = {
   strategic: {
@@ -164,6 +164,21 @@ async function hasEntitlement(pool, userId, botId) {
   return q.rowCount > 0;
 }
 
+async function getRiskSettings(pool,userId,botId){
+ if(!pool)return null;
+ const q=await pool.query("SELECT daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch,updated_at FROM kingbot_bot_risk_settings WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
+ if(!q.rowCount)return null;
+ const x=q.rows[0];
+ return normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak});
+}
+function defaultRisk(bot){return normalizeRiskSettings(bot.risk);}
+function validateUserRisk(body,bot){
+ const s=normalizeRiskSettings(body||{},bot.risk);
+ if(s.totalDrawdownPct<s.dailyDrawdownPct)return {error:"TOTAL_DRAWDOWN_MUST_BE_AT_LEAST_DAILY_DRAWDOWN"};
+ if(s.maxRiskPerTradePct>bot.risk.maxRiskPerTradePct*3)return {error:"MAX_RISK_PER_TRADE_EXCEEDS_BOT_SAFETY_CEILING"};
+ return {settings:s};
+}
+
 export function createBotEngineRouter({ pool }) {
   const router = Router();
 
@@ -185,7 +200,7 @@ export function createBotEngineRouter({ pool }) {
     const bot = BOT_DEFINITIONS[req.params.botId];
     if (!bot) return res.status(404).json({ ok: false, error: "BOT_NOT_FOUND" });
     const entitled = await hasEntitlement(pool, user.id, bot.id);
-    res.json({ ok: true, bot: { ...bot, entitled, runtime: "STOPPED", executionMode: "NOT_CONNECTED" } });
+    res.json({ ok: true, bot: { ...bot, entitled, runtime: "STOPPED", executionMode: "NOT_CONNECTED", riskSettings: (await getRiskSettings(pool,user.id,bot.id)) || defaultRisk(bot) } });
   });
 
   router.post("/:botId/analyze", async (req, res) => {
@@ -196,7 +211,33 @@ export function createBotEngineRouter({ pool }) {
     if (!(await hasEntitlement(pool, user.id, botId))) {
       return res.status(403).json({ ok: false, allowed: false, reason: "BOT_NOT_INCLUDED_IN_SUBSCRIPTION" });
     }
-    res.json(evaluateBot(botId, req.body?.market || req.body || {}));
+    const saved=(await getRiskSettings(pool,user.id,botId)) || defaultRisk(BOT_DEFINITIONS[botId]);
+    const result=evaluateBot(botId, req.body?.market || req.body || {});
+    result.riskSettings=saved;
+    if(result.ok && req.body?.riskContext){ result.riskCheck=evaluateRisk({...req.body.riskContext,limits:saved}); }
+    res.json(result);
+  });
+
+  router.get("/:botId/risk", async (req,res)=>{
+    const user=await requireUser(pool,req,res); if(!user)return;
+    const bot=BOT_DEFINITIONS[req.params.botId]; if(!bot)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
+    if(!(await hasEntitlement(pool,user.id,bot.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
+    res.json({ok:true,botId:bot.id,settings:(await getRiskSettings(pool,user.id,bot.id))||defaultRisk(bot),defaults:defaultRisk(bot)});
+  });
+
+  router.put("/:botId/risk", async (req,res)=>{
+    const user=await requireUser(pool,req,res); if(!user)return;
+    const bot=BOT_DEFINITIONS[req.params.botId]; if(!bot)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
+    if(!(await hasEntitlement(pool,user.id,bot.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
+    const checked=validateUserRisk(req.body,bot); if(checked.error)return res.status(400).json({ok:false,error:checked.error});
+    const s=checked.settings;
+    const mode=String(req.body?.executionMode||"SIMULATION").toUpperCase();
+    if(!["SIMULATION","PAPER","LIVE"].includes(mode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+    try{
+      await pool.query("INSERT INTO kingbot_bot_risk_settings(user_id,bot_id,daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(user_id,bot_id) DO UPDATE SET daily_drawdown_pct=EXCLUDED.daily_drawdown_pct,total_drawdown_pct=EXCLUDED.total_drawdown_pct,max_risk_per_trade_pct=EXCLUDED.max_risk_per_trade_pct,max_positions=EXCLUDED.max_positions,max_spread_atr_ratio=EXCLUDED.max_spread_atr_ratio,stale_data_ms=EXCLUDED.stale_data_ms,max_consecutive_losses=EXCLUDED.max_consecutive_losses,auto_pause_on_loss_streak=EXCLUDED.auto_pause_on_loss_streak,execution_mode=EXCLUDED.execution_mode,kill_switch=EXCLUDED.kill_switch,updated_at=NOW()",[user.id,bot.id,s.dailyDrawdownPct,s.totalDrawdownPct,s.maxRiskPerTradePct,s.maxPositions,s.maxSpreadAtrRatio,s.staleDataMs,s.maxConsecutiveLosses,s.autoPauseOnLossStreak,mode,Boolean(req.body?.killSwitch)]);
+      await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'BOT_RISK_SETTINGS_UPDATED',$2::jsonb)",[user.id,JSON.stringify({botId:bot.id,executionMode:mode,settings:s,killSwitch:Boolean(req.body?.killSwitch)})]);
+      res.json({ok:true,botId:bot.id,settings:s,executionMode:mode,killSwitch:Boolean(req.body?.killSwitch),message:"Risk profile saved to the KINGBOT risk engine."});
+    }catch(err){console.error("[KINGBOT RISK]",err?.message||err);res.status(500).json({ok:false,error:"Risk settings could not be saved."});}
   });
 
   router.post("/:botId/start", async (req, res) => {
@@ -224,4 +265,9 @@ export function createBotEngineRouter({ pool }) {
   });
 
   return router;
+}
+
+export async function ensureBotEngineSchema(pool){
+ if(!pool)return;
+ await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_risk_settings (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, bot_id TEXT NOT NULL, daily_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 5, total_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 10, max_risk_per_trade_pct NUMERIC(6,2) NOT NULL DEFAULT 1, max_positions INTEGER NOT NULL DEFAULT 3, max_spread_atr_ratio NUMERIC(6,3) NOT NULL DEFAULT 0.25, stale_data_ms INTEGER NOT NULL DEFAULT 5000, max_consecutive_losses INTEGER NOT NULL DEFAULT 3, auto_pause_on_loss_streak BOOLEAN NOT NULL DEFAULT TRUE, execution_mode TEXT NOT NULL DEFAULT 'SIMULATION', kill_switch BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id,bot_id))");
 }
