@@ -63,7 +63,7 @@ No fake trading permissions.
       */
 
       permissionsEndpoint:
-        "/api/access/permissions"
+        "https://kingbot-fintech-api.onrender.com/api/subscription/me"
 
     },
 
@@ -242,11 +242,11 @@ No fake trading permissions.
 
         this.state.permissions = {
           ...this.config.defaultPermissions,
-          ...(data.permissions || {})
+          ...(() => { const active=Boolean(data.subscription); const pro=["pro","institutional"].includes(String(data.subscription?.plan_id||"")); const entitlements=Array.isArray(data.entitlements)?data.entitlements:[]; return {platform:true,markets:true,terminal:active,analytics:active,ai:active&&pro,bots:active&&entitlements.length>0,broker:active,trading:active,withdrawals:false,billing:true,admin:false}; })()
         };
 
         this.state.subscription =
-          data.subscription || null;
+          data.subscription ? {...data.subscription,active:true} : null;
 
         this.state.loaded = true;
         this.state.checkedAt = Date.now();
