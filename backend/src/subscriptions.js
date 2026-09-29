@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { Router } from "express";
+import { resolveFirebaseUser } from "./auth.js";
 
 const PLANS = {
   starter: { id:"starter", name:"Starter", priceUsd:100, botLimit:1, bots:["smc-pro"], features:["One bot engine","Core risk controls","Equity tracking"] },
@@ -12,9 +13,7 @@ const planId = value => String(value || "").trim().toLowerCase();
 const mpesaCode = value => String(value || "").trim().toUpperCase().replace(/\s+/g,"");
 
 async function currentUser(pool, req) {
-  if (!pool || !req.cookies?.kingbot_session) return null;
-  const q = await pool.query("SELECT u.id,u.email,u.first_name,u.last_name,u.email_verified FROM kingbot_sessions s JOIN kingbot_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()",[hashToken(req.cookies.kingbot_session)]);
-  return q.rowCount ? q.rows[0] : null;
+  return resolveFirebaseUser(pool, req);
 }
 export async function requireUser(pool, req, res) {
   const u = await currentUser(pool,req);
