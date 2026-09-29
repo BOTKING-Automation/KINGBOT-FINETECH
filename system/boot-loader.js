@@ -1,4 +1,4 @@
-/* KINGBOT FINTECH — 5-second neural startup sequence */
+/* KINGBOT FINTECH — 20-second neural startup sequence */
 (function(window,document){
 "use strict";
 if(document.documentElement.dataset.kingbotBootLoaded==="1")return;
@@ -68,7 +68,7 @@ html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
   <div class="kb-boot-progress"><i></i></div>
   <div class="kb-boot-foot">GIBSONFX TECH · KINGBOT FINTECH · 20.00 SEC STARTUP SEQUENCE</div>
  </div>`;
- document.body.prepend(el);
+ (document.body || document.documentElement).prepend(el);
  const states=["NEURAL CORE INITIALIZING","MARKET MATRIX LINKING","BOT BRAIN SYNCHRONIZING","RISK ENGINE ONLINE","AUTH GATE READY"];
  let n=0;const status=el.querySelector("#kb-boot-status"),ticker=setInterval(()=>{n=(n+1)%states.length;status.textContent=states[n]},900);
  const remove=()=>{clearInterval(ticker);el.style.transition="opacity .45s ease";el.style.opacity="0";setTimeout(()=>{el.remove();document.documentElement.classList.remove("kb-boot-lock")},460)};
@@ -114,5 +114,5 @@ html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
 
  setTimeout(routeAfterBoot,20000);
 }
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",inject,{once:true});else inject();
+inject();
 })(window);
