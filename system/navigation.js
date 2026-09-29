@@ -52,7 +52,6 @@ const KINGBOT_NAV={
  ensureMount(){
   let m=document.querySelector("[data-kingbot-navigation]");
   if(!m){m=document.createElement("div");m.setAttribute("data-kingbot-navigation","");document.body.insertBefore(m,document.body.firstChild);}
-  document.querySelectorAll("body > nav").forEach(n=>n.remove());
   this.render(m);
  },
  render(m){
