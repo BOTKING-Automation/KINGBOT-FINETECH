@@ -14,8 +14,37 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="system/platform.css">
-<script src="system/boot-loader.js?v=21"></script>
+<link rel="stylesheet" href="system/platform.css">\n
+<style id="kb-static-boot-style">
+html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
+#kb-boot-loader{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;overflow:hidden;background:#02040a;color:#eef3ff;font-family:Inter,system-ui,sans-serif}
+#kb-boot-loader:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 42%,rgba(25,230,255,.14),transparent 22%),radial-gradient(circle at 12% 18%,rgba(255,79,216,.11),transparent 28%),radial-gradient(circle at 88% 82%,rgba(246,185,59,.11),transparent 30%),linear-gradient(145deg,#02040a,#050b18)}
+#kb-boot-loader:after{content:"";position:absolute;inset:0;opacity:.25;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:44px 44px}
+.kb-boot-core{position:relative;z-index:2;width:min(760px,94vw);text-align:center;padding:28px 18px}
+.kb-boot-brand{font:900 18px Orbitron,sans-serif;letter-spacing:.16em;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3,#19e6ff);background-size:350% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:kbBootGradient 4s linear infinite}
+.kb-boot-sub{margin-top:9px;color:#7885a5;font:700 8px 'JetBrains Mono',monospace;letter-spacing:.2em}
+.kb-boot-stage{position:relative;width:min(560px,94vw);height:330px;margin:18px auto 12px;display:grid;place-items:center}
+.kb-boot-halo{position:absolute;width:315px;height:315px;border-radius:50%;border:1px solid rgba(25,230,255,.22);box-shadow:0 0 90px rgba(25,230,255,.12),inset 0 0 65px rgba(246,185,59,.06);animation:kbBootSpin 12s linear infinite}
+.kb-boot-halo:before,.kb-boot-halo:after{content:"";position:absolute;inset:27px;border-radius:50%;border:1px dashed rgba(155,92,255,.28);animation:kbBootSpinReverse 8s linear infinite}
+.kb-boot-halo:after{inset:58px;border-style:solid;border-color:rgba(246,185,59,.2);animation-duration:11s}
+.kb-boot-brain{position:relative;width:280px;height:225px;filter:drop-shadow(0 0 22px rgba(25,230,255,.35));animation:kbBootHue 5s linear infinite,kbBootFloat 2.2s ease-in-out infinite}
+.kb-boot-brain svg{width:100%;height:100%;overflow:visible}
+.kb-boot-brain .brain-fill{fill:url(#kbBrainGradient);fill-opacity:.2;stroke:url(#kbBrainStroke);stroke-width:2.5}
+.kb-boot-brain .brain-line{fill:none;stroke:url(#kbBrainStroke);stroke-width:2;stroke-linecap:round;filter:drop-shadow(0 0 7px rgba(25,230,255,.7))}
+.kb-boot-pulse{position:absolute;top:47%;left:50%;width:19px;height:19px;border-radius:50%;background:#19e6ff;box-shadow:0 0 24px #19e6ff,0 0 70px rgba(25,230,255,.65);transform:translate(-50%,-50%);animation:kbBootPulse 1s ease-in-out infinite}
+.kb-boot-candles{position:absolute;left:50%;bottom:27px;transform:translateX(-50%);width:230px;height:100px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 12px;border-bottom:1px solid rgba(25,230,255,.3);background:linear-gradient(180deg,rgba(25,230,255,.04),rgba(155,92,255,.07));box-shadow:0 0 35px rgba(25,230,255,.08)}
+.kb-candle{width:16px;height:var(--h);position:relative;background:linear-gradient(180deg,#23f7a3,#19e6ff);box-shadow:0 0 14px rgba(35,247,163,.65);animation:kbCandleGlow 1s ease-in-out infinite alternate}
+.kb-candle:nth-child(2n){background:linear-gradient(180deg,#ff4fd8,#9b5cff);box-shadow:0 0 14px rgba(255,79,216,.6)}
+.kb-candle:nth-child(3n){background:linear-gradient(180deg,#ffd977,#f6b93b);box-shadow:0 0 14px rgba(246,185,59,.58)}
+.kb-candle:before,.kb-candle:after{content:"";position:absolute;left:50%;width:1px;transform:translateX(-50%);background:currentColor;box-shadow:0 0 10px currentColor}
+.kb-candle:before{top:-17px;height:17px}.kb-candle:after{bottom:-13px;height:13px}
+.kb-boot-readout{display:flex;justify-content:center;gap:20px;flex-wrap:wrap;color:#657492;font:700 7px 'JetBrains Mono',monospace;letter-spacing:.08em}.kb-boot-readout b{color:#eef3ff}
+.kb-boot-status{min-height:23px;margin-top:18px;font:900 10px Orbitron,sans-serif;letter-spacing:.17em;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3);-webkit-background-clip:text;background-clip:text;color:transparent}
+.kb-boot-progress{width:min(560px,92vw);height:5px;margin:10px auto 0;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}.kb-boot-progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3);box-shadow:0 0 18px rgba(25,230,255,.6);animation:kbBootProgress 20s linear forwards}
+.kb-boot-foot{margin-top:15px;color:#4f5d78;font:600 7px 'JetBrains Mono',monospace;letter-spacing:.1em}
+@keyframes kbBootGradient{to{background-position:350% center}}@keyframes kbBootSpin{to{transform:rotate(360deg)}}@keyframes kbBootSpinReverse{to{transform:rotate(-360deg)}}@keyframes kbBootHue{0%,100%{filter:drop-shadow(0 0 18px rgba(25,230,255,.3)) hue-rotate(0deg)}50%{filter:drop-shadow(0 0 30px rgba(255,79,216,.48)) hue-rotate(120deg)}}@keyframes kbBootFloat{50%{transform:translateY(-8px)}}@keyframes kbBootPulse{50%{transform:translate(-50%,-50%) scale(1.8);opacity:.45}}@keyframes kbCandleGlow{to{transform:translateY(-4px);filter:brightness(1.4)}}@keyframes kbBootProgress{to{width:100%}}
+</style>
+<script src="system/boot-loader.js?v=22"></script>
   
 <style>
 
