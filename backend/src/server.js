@@ -12,6 +12,7 @@ import { createSubscriptionRouter, ensureSubscriptionSchema } from "./subscripti
 import { createBotEngineRouter, ensureBotEngineSchema } from "./bot-engines.js";
 import { createBroker } from "./broker-adapter.js";
 import { requireUser } from "./subscriptions.js";
+import { createBotRuntimeRouter, ensureBotRuntimeSchema } from "./bot-runtime.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -32,6 +33,36 @@ const authLimiter = rateLimit({ windowMs: 15*60*1000, limit: 12, standardHeaders
 app.use("/api/auth", createAuthRouter({ pool, sessionTtlHours: Number(process.env.SESSION_TTL_HOURS || 24), limiter: authLimiter }));
 app.use("/api/subscription", createSubscriptionRouter({ pool }));
 app.use("/api/bots", createBotEngineRouter({ pool }));
+app.use("/api/runtime", createBotRuntimeRouter({ pool, broker }));
+
+app.get("/api/risk", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  const q=await pool.query("SELECT bot_id,daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch,updated_at FROM kingbot_bot_risk_settings WHERE user_id=$1 ORDER BY bot_id",[user.id]);
+  res.json({ok:true,bots:q.rows});
+});
+app.post("/api/risk/kill-switch", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  const active=Boolean(req.body?.active);
+  const botId=req.body?.botId ? String(req.body.botId) : null;
+  if(botId){
+    const q=await pool.query("UPDATE kingbot_bot_risk_settings SET kill_switch=$3,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2 RETURNING bot_id,kill_switch,updated_at",[user.id,botId,active]);
+    if(!q.rowCount)return res.status(404).json({ok:false,error:"BOT_RISK_SETTINGS_NOT_FOUND"});
+  }else{
+    await pool.query("UPDATE kingbot_bot_risk_settings SET kill_switch=$2,updated_at=NOW() WHERE user_id=$1",[user.id,active]);
+  }
+  await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'GLOBAL_KILL_SWITCH_UPDATED',$2::jsonb)",[user.id,JSON.stringify({active,botId})]);
+  res.json({ok:true,active,botId});
+});
+
+app.get("/api/analytics", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  const [runtime,risk,trades]=await Promise.all([
+    pool.query("SELECT bot_id,state,last_signal,last_run_at,last_error FROM kingbot_bot_runtime WHERE user_id=$1 ORDER BY bot_id",[user.id]),
+    pool.query("SELECT bot_id,execution_mode,kill_switch,max_risk_per_trade_pct,daily_drawdown_pct,total_drawdown_pct FROM kingbot_bot_risk_settings WHERE user_id=$1 ORDER BY bot_id",[user.id]),
+    (async()=>{try{return await broker.getTrades({startTime:req.query.startTime,endTime:req.query.endTime});}catch{return {connected:false,data:{orders:[],deals:[]}};}})()
+  ]);
+  res.json({ok:true,runtime:runtime.rows,risk:risk.rows,broker:trades});
+});
 
 app.get("/api/connection", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
@@ -191,7 +222,7 @@ app.use((_req, res) => {
   });
 });
 
-ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => {
+ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => {
 app.listen(PORT, () => {
   console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
 });
