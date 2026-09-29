@@ -1,22 +1,219 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KINGBOT — Admin Payment Control</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@600;800&family=Orbitron:wght@600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="system/platform.css"><style>main{width:min(1250px,calc(100% - 30px));margin:auto;padding:40px 0 70px}.panel{padding:28px;border:1px solid rgba(246,185,59,.16);border-radius:24px;background:linear-gradient(145deg,rgba(10,18,40,.94),rgba(3,7,18,.98))}.ey{font:800 10px "JetBrains Mono";letter-spacing:.2em;color:#19e6ff}.title{font:900 42px Orbitron;margin:12px 0;background:linear-gradient(100deg,#f6b93b,#19e6ff,#9b5cff,#ff4fd8);-webkit-background-clip:text;color:transparent}.notice{padding:15px;border-radius:13px;background:rgba(25,230,255,.05);border:1px solid rgba(25,230,255,.12);color:#aebbd2}.queue{display:grid;gap:14px;margin-top:18px}.card{padding:20px;border-radius:18px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025)}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.label{font:700 9px "JetBrains Mono";color:#687590;letter-spacing:.1em}.value{color:#edf3ff;font-weight:700;margin-top:4px;word-break:break-word}.actions{display:flex;gap:10px;margin-top:15px;flex-wrap:wrap}button{padding:11px 15px;border-radius:10px;border:0;font-weight:900;cursor:pointer}.approve{background:linear-gradient(90deg,#19e6ff,#9b5cff);color:#06101d}.reject{background:rgba(255,75,125,.1);border:1px solid rgba(255,75,125,.3);color:#ff9ab6}.muted{color:#7f8ba5}@media(max-width:850px){.grid{grid-template-columns:repeat(2,1fr)}.title{font-size:31px}}@media(max-width:520px){.grid{grid-template-columns:1fr}}</style></head><body><div data-kingbot-navigation></div><main><section class="panel"><div class="ey">DEVELOPER / PAYMENT OPERATIONS</div><h1 class="title">Payment Verification Center</h1><div id="state" class="notice">Loading secure payment queue…</div><div id="queue" class="queue"></div></section></main><script src="system/session.js"></script><script src="system/auth-gate.js"></script><script src="system/navigation.js"></script><script>
-(async()=>{
-const state=document.getElementById("state"),queue=document.getElementById("queue");
-function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
-async function load(){
- const r=await window.KINGBOT_API.request("/api/subscription/admin/payments");const d=await r.json().catch(()=>({}));
- if(!r.ok){state.textContent=d.error||"Administrator access required.";queue.innerHTML="";return}
- const pending=(d.payments||[]).filter(p=>p.status==="pending").length;state.textContent="Secure queue • "+pending+" pending payment(s)";
- queue.innerHTML=(d.payments||[]).map(p=>{
-  const buttons=p.status==="pending"?"<div class='actions'><button class='approve' data-action='approve' data-id='"+esc(p.id)+"'>VERIFY & GRANT ACCESS</button><button class='reject' data-action='reject' data-id='"+esc(p.id)+"'>REJECT</button></div>":"<div class='muted' style='margin-top:12px'>Reviewed by "+esc(p.reviewed_by||"admin")+"</div>";
-  return "<article class='card'><div class='grid'><div><div class='label'>CUSTOMER</div><div class='value'>"+esc(p.first_name)+" "+esc(p.last_name)+"</div></div><div><div class='label'>PLAN</div><div class='value'>"+esc(p.plan_id)+"</div></div><div><div class='label'>BOT SELECTION</div><div class='value'>"+esc(p.selected_bot_id||"PLAN DEFAULT")+"</div></div><div><div class='label'>M-PESA CODE</div><div class='value'>"+esc(p.mpesa_code)+"</div></div><div><div class='label'>AMOUNT KES</div><div class='value'>"+esc(p.amount_kes)+"</div></div><div><div class='label'>EMAIL</div><div class='value'>"+esc(p.email)+"</div></div><div><div class='label'>PAYER PHONE</div><div class='value'>"+esc(p.payer_phone||p.phone)+"</div></div><div><div class='label'>STATUS</div><div class='value'>"+esc(p.status)+"</div></div><div><div class='label'>SUBMITTED</div><div class='value'>"+esc(new Date(p.submitted_at).toLocaleString())+"</div></div></div>"+buttons+"</article>";
- }).join("")||"<div class='muted'>No payment submissions yet.</div>";
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#050914">
+<title>KINGBOT FINTECH — Admin Operations Center</title>
+<link rel="stylesheet" href="system/platform.css">
+<style>
+:root{
+ --a:#19e6ff;--b:#9b5cff;--c:#ff4fd8;--g:#f6b93b;--ok:#23f7a3;--bad:#ff4d6d;--wait:#ffb52e;
+ --bg:#02050d;--panel:rgba(8,15,31,.92);--line:rgba(255,255,255,.08);--muted:#7785a2;--text:#edf3ff;
 }
-queue.addEventListener("click",async e=>{
- const b=e.target.closest("button");if(!b)return;const action=b.dataset.action,id=b.dataset.id;let note="";
- if(action==="reject"){note=prompt("Reason for rejection:")||"";if(!note)return}else{if(!confirm("Verify this M-Pesa payment and grant the subscription entitlements?"))return;note=prompt("Optional approval note:")||""}
- const r=await window.KINGBOT_API.request("/api/subscription/admin/payments/"+encodeURIComponent(id)+"/"+action,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({note})});const d=await r.json().catch(()=>({}));
- alert(d.ok?(action==="approve"?"Payment verified and bot access granted.":"Payment rejected."):d.error||"Request failed.");if(d.ok)load();
+body{background:
+ radial-gradient(circle at 5% 0%,rgba(25,230,255,.10),transparent 25%),
+ radial-gradient(circle at 95% 5%,rgba(155,92,255,.12),transparent 25%),
+ radial-gradient(circle at 50% 100%,rgba(246,185,59,.07),transparent 30%),
+ linear-gradient(180deg,#02050d,#050914 55%,#02040a);}
+.admin-shell{width:min(1500px,calc(100% - 28px));margin:auto;padding:25px 0 70px}
+.lock-screen{min-height:78vh;display:grid;place-items:center}
+.lock-card{width:min(520px,100%);padding:36px;border:1px solid rgba(25,230,255,.18);border-radius:24px;background:linear-gradient(145deg,rgba(9,17,37,.96),rgba(2,6,16,.98));box-shadow:0 30px 100px rgba(0,0,0,.48);text-align:center}
+.lock-icon{font-size:42px;filter:drop-shadow(0 0 18px rgba(25,230,255,.5))}
+.lock-card h1{margin:17px 0 10px;font:900 28px Orbitron;background:linear-gradient(90deg,var(--g),var(--a),var(--b),var(--c));-webkit-background-clip:text;color:transparent}
+.lock-card p{color:var(--muted);line-height:1.7;font-size:13px}
+.topbar{display:flex;justify-content:space-between;gap:18px;align-items:end;padding:23px;border:1px solid rgba(25,230,255,.14);border-radius:22px;background:linear-gradient(145deg,rgba(9,18,40,.95),rgba(3,7,18,.98));box-shadow:0 20px 70px rgba(0,0,0,.38)}
+.ey{color:var(--a);font:800 9px "JetBrains Mono";letter-spacing:.2em}.title{margin:8px 0;font:900 clamp(28px,4vw,48px) Orbitron;background:linear-gradient(90deg,var(--g),var(--a),var(--b),var(--c));-webkit-background-clip:text;color:transparent}.sub{max-width:900px;color:var(--muted);font-size:12px;line-height:1.65}.admin-badge{padding:10px 13px;border-radius:11px;border:1px solid rgba(35,247,163,.18);background:rgba(35,247,163,.04);color:#9fffd4;font:800 8px "JetBrains Mono";white-space:nowrap}
+.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:11px;margin-top:15px}
+.metric{padding:17px;border:1px solid var(--line);border-radius:17px;background:linear-gradient(145deg,rgba(10,18,38,.9),rgba(4,9,20,.96));position:relative;overflow:hidden}
+.metric:after{content:"";position:absolute;inset:auto -25% -65% 25%;height:120px;background:radial-gradient(circle,rgba(25,230,255,.09),transparent 68%)}
+.metric .k{font:800 7px "JetBrains Mono";letter-spacing:.14em;color:#62708e}.metric .v{margin-top:8px;font:900 24px "JetBrains Mono";color:#eef3ff}.metric .hint{margin-top:5px;color:#65728e;font-size:8px}
+.workspace{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:15px;margin-top:15px}
+.panel{padding:20px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,rgba(8,15,31,.94),rgba(3,7,17,.98));box-shadow:0 20px 70px rgba(0,0,0,.3)}
+.panel-head{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:13px}.panel-head h2{margin:0;font:800 14px Orbitron;letter-spacing:.06em}.panel-head span{color:#65728e;font:800 7px "JetBrains Mono";letter-spacing:.12em}
+.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:11px}.search{flex:1;min-width:180px}.input,.select,.search{min-height:40px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:#050b18;color:var(--text);outline:none;font:700 10px "JetBrains Mono"}.input:focus,.select:focus,.search:focus{border-color:rgba(25,230,255,.38);box-shadow:0 0 0 3px rgba(25,230,255,.06)}
+.table-wrap{overflow:auto;border:1px solid rgba(255,255,255,.06);border-radius:14px}.table{width:100%;border-collapse:collapse;min-width:840px}.table th{padding:11px;text-align:left;color:#63718d;font:800 7px "JetBrains Mono";letter-spacing:.12em;border-bottom:1px solid rgba(255,255,255,.07);background:#07101f}.table td{padding:12px 11px;color:#aab5ca;font-size:9px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}.table tr:last-child td{border-bottom:0}.user-name{font-weight:800;color:#eef3ff}.email{color:#8090ad;margin-top:3px}.pill{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:7px;font:800 7px "JetBrains Mono";letter-spacing:.05em;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}.dot{width:6px;height:6px;border-radius:50%}.pill.ok{color:#9fffd4;border-color:rgba(35,247,163,.16);background:rgba(35,247,163,.04)}.pill.bad{color:#ff9baa;border-color:rgba(255,77,109,.18);background:rgba(255,77,109,.045)}.pill.wait{color:#ffd681;border-color:rgba(255,181,46,.18);background:rgba(255,181,46,.045)}.bots{display:flex;gap:5px;flex-wrap:wrap}.bot-chip{padding:4px 6px;border-radius:6px;background:rgba(25,230,255,.045);border:1px solid rgba(25,230,255,.11);color:#9aeefe;font:700 6px "JetBrains Mono"}
+.action-row{display:flex;gap:6px;flex-wrap:wrap}.btn{min-height:34px;padding:0 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:#07101f;color:#dfe7f5;font:800 7px "JetBrains Mono";cursor:pointer}.btn:hover{border-color:rgba(25,230,255,.3)}.btn.green{color:#a9ffdc;border-color:rgba(35,247,163,.18);background:rgba(35,247,163,.04)}.btn.red{color:#ff9baa;border-color:rgba(255,77,109,.18);background:rgba(255,77,109,.045)}.btn.gold{color:#ffe18a;border-color:rgba(246,185,59,.2);background:rgba(246,185,59,.045)}
+.queue{display:grid;gap:10px}.payment-card{padding:14px;border:1px solid rgba(255,255,255,.07);border-radius:15px;background:linear-gradient(145deg,rgba(11,20,41,.86),rgba(4,9,20,.96))}.payment-top{display:flex;justify-content:space-between;gap:10px;align-items:start}.customer{font-weight:800;color:#edf3ff;font-size:10px}.micro{margin-top:4px;color:#667590;font-size:8px}.code{font:900 13px "JetBrains Mono";color:#ffe18a;letter-spacing:.08em}.pay-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:11px}.kv{padding:8px;border:1px solid rgba(255,255,255,.05);border-radius:9px;background:rgba(255,255,255,.018)}.kv .k{font:800 6px "JetBrains Mono";color:#586682}.kv .v{margin-top:4px;color:#dbe4f3;font-size:8px;word-break:break-word}.payment-card.pending{box-shadow:0 0 35px rgba(255,181,46,.04);border-color:rgba(255,181,46,.12)}.payment-card.approved{border-color:rgba(35,247,163,.12)}.payment-card.rejected{border-color:rgba(255,77,109,.12)}
+.activity{max-height:520px;overflow:auto;display:grid;gap:7px}.event{padding:10px;border-left:2px solid rgba(25,230,255,.28);background:rgba(255,255,255,.018);border-radius:8px}.event-top{display:flex;justify-content:space-between;gap:10px;color:#aeb8cb;font:800 7px "JetBrains Mono"}.event-name{color:var(--a)}.event-meta{margin-top:4px;color:#667590;font-size:7px;line-height:1.5;word-break:break-word}
+.toast{position:fixed;right:20px;bottom:20px;z-index:20;max-width:420px;padding:13px 15px;border-radius:12px;border:1px solid rgba(25,230,255,.22);background:rgba(3,8,18,.96);color:#edf3ff;font:800 9px "JetBrains Mono";box-shadow:0 15px 45px rgba(0,0,0,.4);display:none}.toast.show{display:block}.toast.ok{border-color:rgba(35,247,163,.22);box-shadow:0 0 30px rgba(35,247,163,.07)}.toast.err{border-color:rgba(255,77,109,.22);box-shadow:0 0 30px rgba(255,77,109,.06)}
+@media(max-width:1200px){.metrics{grid-template-columns:repeat(3,1fr)}.workspace{grid-template-columns:1fr}.pay-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.admin-shell{width:calc(100% - 16px);padding-top:16px}.topbar{align-items:start;flex-direction:column}.metrics{grid-template-columns:repeat(2,1fr)}.pay-grid{grid-template-columns:1fr}.panel{padding:14px}}
+@media(max-width:480px){.metrics{grid-template-columns:1fr}.title{font-size:25px}}
+</style>
+</head>
+<body>
+<div data-kingbot-navigation></div>
+<div id="lock" class="admin-shell lock-screen">
+  <section class="lock-card">
+    <div class="lock-icon">🛡️</div>
+    <h1>ADMIN SECURITY GATE</h1>
+    <p id="lockMsg">Verifying administrator credentials and secure platform access…</p>
+  </section>
+</div>
+
+<main id="app" class="admin-shell" hidden>
+  <section class="topbar">
+    <div>
+      <div class="ey">KINGBOT FINTECH / ADMIN OPERATIONS OS</div>
+      <h1 class="title">COMMAND CENTER</h1>
+      <p class="sub">Internal operations workspace for platform activity, customer access, subscriptions, M-Pesa payment verification, bot entitlements, and audit intelligence.</p>
+    </div>
+    <div id="adminBadge" class="admin-badge">ADMIN VERIFIED</div>
+  </section>
+
+  <section id="metrics" class="metrics"></section>
+
+  <section class="workspace">
+    <section class="panel">
+      <div class="panel-head"><div><span>01 / USER REGISTRY</span><h2>USERS & ACCESS CONTROL</h2></div><span id="userCount">—</span></div>
+      <div class="toolbar">
+        <input id="userSearch" class="search" placeholder="Search name, email or phone…">
+        <select id="userFilter" class="select"><option value="all">ALL USERS</option><option value="active">ACTIVE</option><option value="blocked">BLOCKED</option><option value="subscribed">SUBSCRIBED</option><option value="waiting">WAITING PAYMENT</option></select>
+      </div>
+      <div class="table-wrap">
+        <table class="table"><thead><tr><th>USER</th><th>ACCOUNT</th><th>SUBSCRIPTION</th><th>BOT ACCESS</th><th>PAYMENT</th><th>CONTROL</th></tr></thead><tbody id="usersBody"></tbody></table>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="panel-head"><div><span>02 / PAYMENT OPS</span><h2>M-PESA VERIFICATION QUEUE</h2></div><span id="paymentCount">—</span></div>
+      <div id="payments" class="queue"></div>
+    </aside>
+  </section>
+
+  <section class="panel" style="margin-top:15px">
+    <div class="panel-head"><div><span>03 / SYSTEM INTELLIGENCE</span><h2>ACTIVITY & AUDIT STREAM</h2></div><span>LAST 250 EVENTS</span></div>
+    <div id="activity" class="activity"></div>
+  </section>
+</main>
+<div id="toast" class="toast"></div>
+
+<script src="system/session.js"></script>
+<script>
+(function(){
+"use strict";
+const lock=document.getElementById("lock"),app=document.getElementById("app"),lockMsg=document.getElementById("lockMsg");
+const metricsEl=document.getElementById("metrics"),usersBody=document.getElementById("usersBody"),paymentsEl=document.getElementById("payments"),activityEl=document.getElementById("activity");
+const userSearch=document.getElementById("userSearch"),userFilter=document.getElementById("userFilter"),toast=document.getElementById("toast");
+let users=[],payments=[],activity=[];
+
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
+function money(v){return Number(v||0).toLocaleString("en-US",{maximumFractionDigits:2})}
+function toastMsg(msg,kind){toast.textContent=msg;toast.className="toast show "+(kind||"");setTimeout(()=>toast.className="toast",3500)}
+async function api(path,options={}){return window.KINGBOT_API.request(path,options)}
+function paymentPill(status){
+ const s=String(status||"").toLowerCase();
+ if(s==="approved")return '<span class="pill ok"><i class="dot" style="background:#23f7a3"></i>APPROVED</span>';
+ if(s==="rejected")return '<span class="pill bad"><i class="dot" style="background:#ff4d6d"></i>DENIED</span>';
+ return '<span class="pill wait"><i class="dot" style="background:#ffb52e"></i>WAITING</span>';
+}
+function botList(ent){
+ return Array.isArray(ent)?ent.filter(x=>x.active!==false).map(x=>'<span class="bot-chip">'+esc(String(x.botId||"").toUpperCase())+'</span>').join(""):'';
+}
+function renderMetrics(m){
+ const items=[
+  ["TOTAL USERS",m.totalUsers,"registered accounts"],
+  ["VERIFIED",m.verifiedUsers,"email verified"],
+  ["ACTIVE SUBS",m.activeSubscriptions,"currently entitled"],
+  ["PENDING M-PESA",m.pendingPayments,"awaiting review"],
+  ["RUNNING BOTS",m.runningBots,"live runtimes"],
+  ["APPROVED KES",money(m.approvedRevenueKes),"approved payment volume"]
+ ];
+ metricsEl.innerHTML=items.map(x=>'<article class="metric"><div class="k">'+x[0]+'</div><div class="v">'+esc(x[1])+'</div><div class="hint">'+x[2]+'</div></article>').join("");
+}
+function renderUsers(){
+ const q=userSearch.value.trim().toLowerCase(),f=userFilter.value;
+ const rows=users.filter(u=>{
+  const text=[u.first_name,u.last_name,u.email,u.phone].join(" ").toLowerCase();
+  const active=String(u.subscription_status)==="active"&&u.expires_at&&new Date(u.expires_at)>new Date();
+  const waiting=u.latest_payment_status==="pending";
+  return (!q||text.includes(q))&&(f==="all"||(f==="active"&&!u.admin_blocked)||(f==="blocked"&&u.admin_blocked)||(f==="subscribed"&&active)||(f==="waiting"&&waiting));
+ });
+ document.getElementById("userCount").textContent=rows.length+" / "+users.length;
+ usersBody.innerHTML=rows.length?rows.map(u=>{
+  const active=String(u.subscription_status)==="active"&&u.expires_at&&new Date(u.expires_at)>new Date();
+  const account=u.admin_blocked?'<span class="pill bad">BLOCKED</span>':'<span class="pill ok">ENABLED</span>';
+  const verified=u.email_verified?'<span class="pill ok">VERIFIED</span>':'<span class="pill wait">UNVERIFIED</span>';
+  const sub=active?'<div class="user-name">'+esc(String(u.plan_id||"").toUpperCase())+'</div><div class="email">expires '+esc(new Date(u.expires_at).toLocaleDateString())+'</div>':'<span class="pill bad">NO ACTIVE SUB</span>';
+  const pay=paymentPill(u.latest_payment_status)+(u.latest_mpesa_code?'<div class="email">'+esc(u.latest_mpesa_code)+'</div>':"");
+  const controls='<div class="action-row"><button class="btn '+(u.admin_blocked?"green":"red")+'" data-user="'+esc(u.id)+'" data-action="'+(u.admin_blocked?"enable":"disable")+'">'+(u.admin_blocked?"ENABLE":"DISABLE")+'</button>'+(active?'<button class="btn gold" data-user="'+esc(u.id)+'" data-action="grant">+ BOT</button><button class="btn red" data-user="'+esc(u.id)+'" data-action="revoke">− BOT</button>':"")+'</div>';
+  return '<tr><td><div class="user-name">'+esc((u.first_name||"")+" "+(u.last_name||""))+'</div><div class="email">'+esc(u.email)+'</div></td><td>'+account+'<div style="margin-top:5px">'+verified+'</div></td><td>'+sub+'</td><td><div class="bots">'+botList(u.entitlements)+'</div></td><td>'+pay+'</td><td>'+controls+'</td></tr>';
+ }).join(""):'<tr><td colspan="6"><div class="email">No matching users.</div></td></tr>';
+}
+function renderPayments(){
+ const pending=payments.filter(p=>p.status==="pending");
+ document.getElementById("paymentCount").textContent=pending.length+" pending / "+payments.length+" total";
+ paymentsEl.innerHTML=payments.length?payments.slice(0,80).map(p=>{
+  const st=String(p.status||"pending").toLowerCase();
+  const actions=st==="pending"?'<div class="action-row" style="margin-top:11px"><button class="btn green" data-pay="'+esc(p.id)+'" data-pay-action="approve">✓ APPROVE & GRANT</button><button class="btn red" data-pay="'+esc(p.id)+'" data-pay-action="reject">× DENY PAYMENT</button></div>':'<div class="micro" style="margin-top:9px">Reviewed by '+esc(p.reviewed_by||"admin")+'</div>';
+  return '<article class="payment-card '+st+'"><div class="payment-top"><div><div class="customer">'+esc((p.first_name||"")+" "+(p.last_name||""))+'</div><div class="micro">'+esc(p.email||"")+'</div></div><div>'+paymentPill(st)+'</div></div><div style="margin-top:10px" class="code">'+esc(p.mpesa_code)+'</div><div class="pay-grid"><div class="kv"><div class="k">PLAN</div><div class="v">'+esc(String(p.plan_id||"").toUpperCase())+'</div></div><div class="kv"><div class="k">KES</div><div class="v">'+esc(money(p.amount_kes))+'</div></div><div class="kv"><div class="k">BOT</div><div class="v">'+esc(String(p.selected_bot_id||"PLAN DEFAULT").toUpperCase())+'</div></div><div class="kv"><div class="k">SUBMITTED</div><div class="v">'+esc(new Date(p.submitted_at).toLocaleString())+'</div></div></div>'+actions+'</article>';
+ }).join(""):'<div class="email">No payment submissions.</div>';
+}
+function renderActivity(){
+ activityEl.innerHTML=activity.length?activity.map(e=>{
+  let meta="";
+  try{meta=JSON.stringify(e.metadata||{});}catch{}
+  return '<article class="event"><div class="event-top"><span class="event-name">'+esc(e.event_type)+'</span><span>'+esc(new Date(e.created_at).toLocaleString())+'</span></div><div class="event-meta">'+esc(e.email||"system")+' · '+esc(meta)+'</div></article>';
+ }).join(""):'<div class="email">No activity recorded.</div>';
+}
+async function loadAll(){
+ try{
+  const [o,u,p,a]=await Promise.all([api("/api/subscription/admin/overview"),api("/api/subscription/admin/users"),api("/api/subscription/admin/payments"),api("/api/subscription/admin/activity")]);
+  const od=await o.json().catch(()=>({})); if(!o.ok) throw new Error(od.error||"Administrator access required.");
+  const ud=await u.json().catch(()=>({})),pd=await p.json().catch(()=>({})),ad=await a.json().catch(()=>({}));
+  if(!u.ok||!p.ok||!a.ok) throw new Error(ud.error||pd.error||ad.error||"Admin data unavailable.");
+  users=Array.isArray(ud.users)?ud.users:[]; payments=Array.isArray(pd.payments)?pd.payments:[]; activity=Array.isArray(ad.activity)?ad.activity:[];
+  renderMetrics(od.metrics||{});renderUsers();renderPayments();renderActivity();
+  document.getElementById("adminBadge").textContent="ADMIN VERIFIED · "+(od.adminEmail||"");
+ }catch(e){
+  lockMsg.textContent=e.message||"Administrator access denied.";
+  setTimeout(()=>{location.href="signin.html"},1800);
+  throw e;
+ }
+}
+async function mutate(url,body,msg){
+ try{
+  const r=await api(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+  const d=await r.json().catch(()=>({})); if(!r.ok||!d.ok)throw new Error(d.error||"Operation failed.");
+  toastMsg(msg,"ok"); await loadAll();
+ }catch(e){toastMsg(e.message||"Operation failed.","err")}
+}
+
+usersBody.addEventListener("click",async e=>{
+ const b=e.target.closest("button");if(!b)return;
+ const id=b.dataset.user,action=b.dataset.action;
+ if(action==="disable")return mutate("/api/subscription/admin/users/"+encodeURIComponent(id)+"/status",{blocked:true},"User access disabled.");
+ if(action==="enable")return mutate("/api/subscription/admin/users/"+encodeURIComponent(id)+"/status",{blocked:false},"User access restored.");
+ if(action==="grant"){
+  const bot=prompt("Bot ID to grant: strategic, flipper, breakout, smc-pro, ladder-flip");if(!bot)return;
+  return mutate("/api/subscription/admin/users/"+encodeURIComponent(id)+"/grant-bot",{botId:bot},"Bot entitlement granted.");
+ }
+ if(action==="revoke"){
+  const bot=prompt("Bot ID to revoke: strategic, flipper, breakout, smc-pro, ladder-flip");if(!bot)return;
+  return mutate("/api/subscription/admin/users/"+encodeURIComponent(id)+"/revoke-bot",{botId:bot},"Bot entitlement revoked.");
+ }
 });
-load();setInterval(load,30000);
+paymentsEl.addEventListener("click",async e=>{
+ const b=e.target.closest("button");if(!b)return;
+ const id=b.dataset.pay,action=b.dataset.payAction;
+ const note=prompt(action==="approve"?"Optional approval note:":"Reason for denial:"); if(action==="reject"&&!note)return;
+ if(!confirm(action==="approve"?"Approve this M-Pesa payment and grant the plan entitlements?":"Deny this payment submission?"))return;
+ await mutate("/api/subscription/admin/payments/"+encodeURIComponent(id)+"/"+action,{note:note||""},action==="approve"?"Payment approved and access granted.":"Payment denied.");
+});
+userSearch.addEventListener("input",renderUsers);userFilter.addEventListener("change",renderUsers);
+(async()=>{
+ try{
+  const gate=await api("/api/subscription/admin/overview"); const gd=await gate.json().catch(()=>({}));
+  if(!gate.ok||!gd.ok)throw new Error(gd.error||"Administrator access required.");
+  lock.hidden=true;app.hidden=false;document.getElementById("adminBadge").textContent="ADMIN VERIFIED · "+(gd.adminEmail||"");
+  await loadAll(); setInterval(()=>loadAll().catch(()=>{}),30000);
+ }catch(e){
+  lockMsg.textContent=e.message||"Administrator access denied.";
+  setTimeout(()=>{location.href="signin.html"},1800);
+ }
 })();
-</script></body></html>
+})();
+</script>
+</body>
+</html>
