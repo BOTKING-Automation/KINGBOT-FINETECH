@@ -5,15 +5,24 @@ import rateLimit from "express-rate-limit";
 import { GoogleGenAI } from "@google/genai";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import cookieParser from "cookie-parser";
+import pg from "pg";
+import { createAuthRouter, ensureAuthSchema } from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT || 10000);
 const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 const API_KEY = process.env.GEMINI_API_KEY || "";
+const DATABASE_URL = process.env.DATABASE_URL || "";
+const pool = DATABASE_URL ? new pg.Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false } }) : null;
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "16kb" }));
+app.use(cookieParser());
+
+const authLimiter = rateLimit({ windowMs: 15*60*1000, limit: 12, standardHeaders: "draft-8", legacyHeaders: false });
+app.use("/api/auth", createAuthRouter({ pool, sessionTtlHours: Number(process.env.SESSION_TTL_HOURS || 24), limiter: authLimiter }));
 
 const allowedOrigin = process.env.FRONTEND_ORIGIN?.trim();
 app.use(cors({
@@ -75,8 +84,8 @@ app.get("/health", (_req, res) => {
   res.json({
     ok: true,
     service: "KINGBOT Intelligence",
-    aiConfigured: Boolean(ai),
-    model: MODEL
+    aiReady: Boolean(ai),
+    accountServiceReady: Boolean(pool)
   });
 });
 
@@ -150,6 +159,11 @@ app.use((_req, res) => {
   });
 });
 
+ensureAuthSchema(pool).then(() => {
 app.listen(PORT, () => {
   console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
+});
+}).catch((error) => {
+  console.error("[KINGBOT] Startup initialization failed:", error?.message || error);
+  process.exit(1);
 });
