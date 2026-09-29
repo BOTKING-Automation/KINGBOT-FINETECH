@@ -10,7 +10,7 @@ import pg from "pg";
 import { createAuthRouter, ensureAuthSchema } from "./auth.js";
 import { createSubscriptionRouter, ensureSubscriptionSchema } from "./subscriptions.js";
 import { createBotEngineRouter, ensureBotEngineSchema } from "./bot-engines.js";
-import { createBroker } from "./broker-adapter.js";
+import { UserBrokerManager } from "./user-broker-manager.js";
 import { requireUser } from "./subscriptions.js";
 import { createBotRuntimeRouter, ensureBotRuntimeSchema } from "./bot-runtime.js";
 
@@ -21,7 +21,7 @@ const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 const API_KEY = process.env.GEMINI_API_KEY || "";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const pool = DATABASE_URL ? new pg.Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false } }) : null;
-const broker = createBroker();
+const broker = new UserBrokerManager({pool});
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "16kb" }));
@@ -72,19 +72,29 @@ app.get("/api/analytics", async (req,res)=>{
   });
 });
 
+app.post("/api/broker/account", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  const accountId=String(req.body?.accountId||"").trim();
+  const executionMode=String(req.body?.executionMode||"PAPER").toUpperCase();
+  if(!accountId)return res.status(400).json({ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"});
+  if(!/^[A-Za-z0-9._:-]{3,100}$/.test(accountId))return res.status(400).json({ok:false,error:"INVALID_BROKER_ACCOUNT_ID"});
+  try{res.status(201).json(await broker.saveMapping({userId:user.id,provider:"metaapi",accountId,executionMode}));}
+  catch(error){res.status(500).json({ok:false,error:"Broker account mapping failed.",reason:error?.message||"BROKER_ACCOUNT_MAPPING_FAILED"});}
+});
+
 app.get("/api/connection", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
-  res.json({ok:true,connected:Boolean(broker.connected),broker:broker.id,executionMode:broker.executionMode,accountConfigured:broker.id!=="noop"});
+  const mapping=await broker.getMapping(user.id); res.json({ok:true,connected:await broker.isConnected(user.id),broker:mapping?.provider||"metaapi",executionMode:mapping?.execution_mode||"NOT_CONNECTED",accountConfigured:Boolean(mapping)});
 });
 app.post("/api/broker/connect", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   const mode=String(req.body?.executionMode||"PAPER").toUpperCase();
-  try{const result=await broker.connect({executionMode:mode,userId:user.id}); if(!result.connected)return res.status(503).json({ok:false,...result}); res.json({ok:true,...result});}
+  try{const result=await broker.connect(user.id,mode); if(!result.connected)return res.status(503).json({ok:false,...result}); res.json({ok:true,...result});}
   catch(error){console.error("[KINGBOT BROKER] connect failed:",error?.message||error);res.status(502).json({ok:false,error:"Broker connection failed.",reason:error?.message||"BROKER_CONNECTION_FAILED"});}
 });
 app.post("/api/broker/disconnect", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
-  try{res.json({ok:true,...await broker.disconnect()});}catch(error){res.status(502).json({ok:false,error:"Broker disconnect failed."});}
+  try{res.json({ok:true,...await broker.disconnect(user.id)});}catch(error){res.status(502).json({ok:false,error:"Broker disconnect failed."});}
 });
 app.get("/api/account", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
@@ -234,7 +244,7 @@ app.use((_req, res) => {
   });
 });
 
-ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => {
+ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => {
 app.listen(PORT, () => {
   console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
 });
