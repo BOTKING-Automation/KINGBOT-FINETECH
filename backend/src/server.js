@@ -84,7 +84,7 @@ app.post("/api/broker/account", async (req,res)=>{
 
 app.get("/api/connection", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
-  const mapping=await broker.getMapping(user.id); res.json({ok:true,connected:await broker.isConnected(user.id),broker:mapping?.provider||"metaapi",executionMode:mapping?.execution_mode||"NOT_CONNECTED",accountConfigured:Boolean(mapping)});
+  const status=await broker.getStatus(user.id); res.json({ok:true,...status});
 });
 app.post("/api/broker/connect", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
