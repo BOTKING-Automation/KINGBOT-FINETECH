@@ -1,4 +1,4 @@
-/* KINGBOT FINTECH — deterministic 20-second startup router */
+/* KINGBOT FINTECH — deterministic 10-second startup router */
 (function(window,document){
 "use strict";
 if(document.documentElement.dataset.kingbotBootLoaded==="1")return;
@@ -42,19 +42,25 @@ function start(){
     return {authenticated:false,user:null};
   };
 
-  const routeAfterBoot=async()=>{
-    let session=localAuth();
-    if(!session.authenticated&&window.KINGBOT_SESSION?.check){
-      try{
-        const checked=await Promise.race([
-          window.KINGBOT_SESSION.check({force:true}),
-          new Promise(resolve=>setTimeout(()=>resolve(null),1500))
-        ]);
-        if(checked)session=checked;
-      }catch(error){console.warn("[KINGBOT BOOT] Session preflight failed:",error?.message||error);}
-    }
+  let preflightResult=localAuth();
+  let preflightReady=!preflightResult.authenticated;
+
+  if(window.KINGBOT_SESSION?.check){
+    preflightReady=false;
+    window.KINGBOT_SESSION.check({force:true}).then(result=>{
+      if(result)preflightResult=result;
+      preflightReady=true;
+    }).catch(error=>{
+      console.warn("[KINGBOT BOOT] Session preflight failed:",error?.message||error);
+      preflightReady=true;
+    });
+  }
+
+  const routeAfterBoot=()=>{
+    const session=preflightReady ? preflightResult : localAuth();
+
     if(!session?.authenticated){
-      window.location.assign("access.html");
+      window.location.assign("access.html#signin");
       return;
     }
     if(!session?.user?.verified){
