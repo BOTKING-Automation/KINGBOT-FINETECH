@@ -454,15 +454,31 @@ PURPOSE
       */
 
       const existing =
-        document.querySelector(
-          "[data-kingbot-navigation]"
-        );
+  document.querySelector(
+    "[data-kingbot-navigation]"
+  );
 
-      if (!existing) {
-        return;
-      }
+if (!existing) {
+  return;
+}
 
-      existing.innerHTML = `
+/*
+ Remove old page navigation once the
+ universal navigation mount exists.
+ This prevents duplicate navigation bars.
+*/
+
+document
+  .querySelectorAll("body > nav")
+  .forEach(nav => {
+
+    if (!nav.contains(existing)) {
+      nav.remove();
+    }
+
+  });
+
+existing.innerHTML = `
 
         <div class="kb-nav-shell">
 
