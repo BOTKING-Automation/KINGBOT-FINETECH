@@ -59,7 +59,7 @@ app.get("/api/analytics", async (req,res)=>{
   const [runtime,risk,trades]=await Promise.all([
     pool.query("SELECT bot_id,state,last_signal,last_run_at,last_error FROM kingbot_bot_runtime WHERE user_id=$1 ORDER BY bot_id",[user.id]),
     pool.query("SELECT bot_id,execution_mode,kill_switch,max_risk_per_trade_pct,daily_drawdown_pct,total_drawdown_pct FROM kingbot_bot_risk_settings WHERE user_id=$1 ORDER BY bot_id",[user.id]),
-    (async()=>{try{return await broker.getTrades({startTime:req.query.startTime,endTime:req.query.endTime});}catch{return {connected:false,data:{orders:[],deals:[]}};}})()
+    (async()=>{try{return await broker.getTrades({startTime:req.query.startTime,endTime:req.query.endTime,userId:user.id});}catch{return {connected:false,data:{orders:[],deals:[]}};}})()
   ]);
   const brokerConnected = Boolean(trades?.connected);
   res.json({
