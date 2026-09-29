@@ -84,7 +84,7 @@ export function createBotRuntimeRouter({pool,broker}){
         const volume=Number(req.body?.volume);
         if(!Number.isFinite(volume)||volume<=0)return res.status(400).json({ok:false,error:"ORDER_VOLUME_REQUIRED",message:"Supply a broker-valid order volume; no order was submitted.",analysis,risk});
         const clientId="kb_"+crypto.randomUUID();
-        order=await broker.placeOrder({side,symbol:analysis.market.symbol,volume,stopLoss:req.body?.stopLoss,takeProfit:req.body?.takeProfit,comment:"KINGBOT",clientId});
+        order=await broker.placeOrder({side,symbol:analysis.market.symbol,volume,stopLoss:req.body?.stopLoss,takeProfit:req.body?.takeProfit,comment:"KINGBOT",clientId,userId:user.id});
         action="ORDER_SUBMITTED";
     }else if(signal!=="NO_SIGNAL"&&!risk.allowed){action="RISK_BLOCKED";}
     await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[user.id,b.id,JSON.stringify({signal,score:analysis.score,action})]);
