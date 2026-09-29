@@ -1,4 +1,7 @@
-/* KINGBOT FINTECH — deterministic 10-second startup router */
+/* KINGBOT FINTECH — deterministic startup loader
+   Auth routing is owned by Firebase session/auth-gate.
+   This loader must never make an independent login decision.
+*/
 (function(window,document){
 "use strict";
 if(document.documentElement.dataset.kingbotBootLoaded==="1")return;
@@ -21,7 +24,9 @@ function start(){
   document.documentElement.classList.add("kb-boot-lock");
   const status=el.querySelector("#kb-boot-status")||el.querySelector(".kb-boot-status");
   let n=0;
-  const ticker=setInterval(()=>{if(status){n=(n+1)%states.length;status.textContent=states[n]}},900);
+  const ticker=setInterval(()=>{
+    if(status){n=(n+1)%states.length;status.textContent=states[n];}
+  },900);
 
   const remove=()=>{
     clearInterval(ticker);
@@ -29,49 +34,16 @@ function start(){
     el.style.transition="opacity .45s ease";
     el.style.opacity="0";
     setTimeout(()=>{
-      el.remove();
+      el?.remove();
       document.documentElement.classList.remove("kb-boot-lock");
     },460);
   };
 
-  const localAuth=()=>{
-    try{
-      const user=window.KINGBOT_FIREBASE?.auth?.currentUser||null;
-      if(user)return {authenticated:true,user:{verified:Boolean(user.emailVerified),email:user.email||""}};
-    }catch(error){console.warn("[KINGBOT BOOT] Local auth read failed:",error?.message||error);}
-    return {authenticated:false,user:null};
-  };
-
-  let preflightResult=localAuth();
-  let preflightReady=!preflightResult.authenticated;
-
-  if(window.KINGBOT_SESSION?.check){
-    preflightReady=false;
-    window.KINGBOT_SESSION.check({force:true}).then(result=>{
-      if(result)preflightResult=result;
-      preflightReady=true;
-    }).catch(error=>{
-      console.warn("[KINGBOT BOOT] Session preflight failed:",error?.message||error);
-      preflightReady=true;
-    });
-  }
-
-  const routeAfterBoot=()=>{
-    const session=preflightReady ? preflightResult : localAuth();
-
-    if(!session?.authenticated){
-      window.location.assign("access.html#signin");
-      return;
-    }
-    if(!session?.user?.verified){
-      window.location.assign("verify.html");
-      return;
-    }
-    remove();
-  };
-
-  setTimeout(routeAfterBoot,10000);
+  // IMPORTANT: no auth lookup and no redirect here.
+  // Firebase + session.js + auth-gate.js are the single auth authority.
+  setTimeout(remove,10000);
 }
 
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
-})(window);
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});
+else start();
+})(window,document);
