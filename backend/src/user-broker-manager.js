@@ -1,15 +1,39 @@
+import crypto from "node:crypto";
 import MetaApi from "metaapi.cloud-sdk";
+
+const ALGORITHM="aes-256-gcm";
+
+function masterKey(){
+  const raw=String(process.env.BROKER_CREDENTIALS_KEY||"").trim();
+  if(!raw) throw new Error("BROKER_CREDENTIALS_KEY_NOT_CONFIGURED");
+  const key=Buffer.from(raw,"base64");
+  if(key.length!==32) throw new Error("BROKER_CREDENTIALS_KEY_INVALID");
+  return key;
+}
+function encryptSecret(value){
+  const iv=crypto.randomBytes(12);
+  const cipher=crypto.createCipheriv(ALGORITHM,masterKey(),iv);
+  const ciphertext=Buffer.concat([cipher.update(String(value),"utf8"),cipher.final()]);
+  return {ciphertext:ciphertext.toString("base64"),iv:iv.toString("base64"),tag:cipher.getAuthTag().toString("base64")};
+}
+function decryptSecret(row){
+  const decipher=crypto.createDecipheriv(ALGORITHM,masterKey(),Buffer.from(row.credential_iv,"base64"));
+  decipher.setAuthTag(Buffer.from(row.credential_tag,"base64"));
+  return Buffer.concat([decipher.update(Buffer.from(row.credential_ciphertext,"base64")),decipher.final()]).toString("utf8");
+}
 
 export class UserBrokerManager {
   constructor({pool}={}) {
     this.pool=pool;
-    this.token=String(process.env.METAAPI_TOKEN||"").trim();
     this.connections=new Map();
   }
 
   async ensureSchema(){
     if(!this.pool)return;
-    await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_broker_accounts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'PAPER' CHECK(execution_mode IN ('PAPER','LIVE')),enabled BOOLEAN NOT NULL DEFAULT TRUE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,provider,account_id))");
+    await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_broker_accounts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,credential_ciphertext TEXT NOT NULL,credential_iv TEXT NOT NULL,credential_tag TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'PAPER' CHECK(execution_mode IN ('PAPER','LIVE')),enabled BOOLEAN NOT NULL DEFAULT TRUE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,provider,account_id))");
+    await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS credential_ciphertext TEXT");
+    await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS credential_iv TEXT");
+    await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS credential_tag TEXT");
   }
 
   async isConnected(userId){
@@ -24,38 +48,49 @@ export class UserBrokerManager {
 
   async getMapping(userId){
     if(!this.pool||!userId)return null;
-    const q=await this.pool.query("SELECT id,user_id,provider,account_id,execution_mode,enabled FROM kingbot_broker_accounts WHERE user_id=$1 AND enabled=TRUE ORDER BY updated_at DESC LIMIT 1",[userId]);
+    const q=await this.pool.query("SELECT id,user_id,provider,account_id,execution_mode,enabled,credential_ciphertext,credential_iv,credential_tag FROM kingbot_broker_accounts WHERE user_id=$1 AND enabled=TRUE AND credential_ciphertext IS NOT NULL AND credential_iv IS NOT NULL AND credential_tag IS NOT NULL ORDER BY updated_at DESC LIMIT 1",[userId]);
     return q.rowCount?q.rows[0]:null;
   }
 
-  async saveMapping({userId,provider="metaapi",accountId,executionMode="PAPER"}={}){
+  async saveMapping({userId,provider="metaapi",accountId,accountToken,executionMode="PAPER"}={}){
     if(!this.pool||!userId)return {ok:false,error:"USER_CONTEXT_REQUIRED"};
     const mode=String(executionMode).toUpperCase();
     if(!["PAPER","LIVE"].includes(mode))return {ok:false,error:"INVALID_EXECUTION_MODE"};
     const id=String(accountId||"").trim();
+    const token=String(accountToken||"").trim();
     if(!id)return {ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"};
-    const q=await this.pool.query("INSERT INTO kingbot_broker_accounts(user_id,provider,account_id,execution_mode,enabled,updated_at) VALUES($1,$2,$3,$4,TRUE,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET execution_mode=EXCLUDED.execution_mode,enabled=TRUE,updated_at=NOW() RETURNING id,user_id,provider,account_id,execution_mode,enabled",[userId,String(provider).toLowerCase(),id,mode]);
+    if(!token)return {ok:false,error:"BROKER_ACCOUNT_TOKEN_REQUIRED"};
+    if(token.length>4096)return {ok:false,error:"BROKER_ACCOUNT_TOKEN_TOO_LONG"};
+    const encrypted=encryptSecret(token);
+    const q=await this.pool.query("INSERT INTO kingbot_broker_accounts(user_id,provider,account_id,credential_ciphertext,credential_iv,credential_tag,execution_mode,enabled,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,TRUE,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET credential_ciphertext=EXCLUDED.credential_ciphertext,credential_iv=EXCLUDED.credential_iv,credential_tag=EXCLUDED.credential_tag,execution_mode=EXCLUDED.execution_mode,enabled=TRUE,updated_at=NOW() RETURNING id,user_id,provider,account_id,execution_mode,enabled",[userId,String(provider).toLowerCase(),id,encrypted.ciphertext,encrypted.iv,encrypted.tag,mode]);
+    await this.disconnect(userId);
     return {ok:true,account:q.rows[0]};
   }
 
   async connect(userId,executionMode="PAPER"){
     if(!userId)return {connected:false,mode:"NOT_CONNECTED",reason:"USER_CONTEXT_REQUIRED"};
-    if(!this.token)return {connected:false,mode:"NOT_CONNECTED",reason:"METAAPI_NOT_CONFIGURED"};
     const mapping=await this.getMapping(userId);
-    if(!mapping)return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_ACCOUNT_NOT_MAPPED"};
+    if(!mapping)return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_ACCOUNT_NOT_CONFIGURED"};
     const mode=String(executionMode||mapping.execution_mode).toUpperCase();
     if(!["PAPER","LIVE"].includes(mode))return {connected:false,mode:"NOT_CONNECTED",reason:"INVALID_EXECUTION_MODE"};
+    let accountToken;
+    try{accountToken=decryptSecret(mapping);}
+    catch(error){return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_CREDENTIAL_DECRYPTION_FAILED"};}
     const key=userId+":"+mapping.provider+":"+mapping.account_id;
     let entry=this.connections.get(key);
     if(!entry){
-      const api=new MetaApi(this.token);
-      const account=await api.metatraderAccountApi.getAccount(mapping.account_id);
-      await account.waitConnected();
-      const connection=account.getRPCConnection();
-      await connection.connect();
-      await connection.waitSynchronized();
-      entry={api,account,connection,accountId:mapping.account_id,executionMode:mode};
-      this.connections.set(key,entry);
+      try{
+        const api=new MetaApi(accountToken);
+        const account=await api.metatraderAccountApi.getAccount(mapping.account_id);
+        await account.waitConnected();
+        const connection=account.getRPCConnection();
+        await connection.connect();
+        await connection.waitSynchronized();
+        entry={api,account,connection,accountId:mapping.account_id,executionMode:mode};
+        this.connections.set(key,entry);
+      }catch(error){
+        return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_CONNECTION_FAILED"};
+      }
     }
     entry.executionMode=mode;
     return {connected:true,mode,broker:mapping.provider,accountId:mapping.account_id};
@@ -72,7 +107,7 @@ export class UserBrokerManager {
 
   async connectionFor(userId){
     const mapping=await this.getMapping(userId);
-    if(!mapping)throw new Error("BROKER_ACCOUNT_NOT_MAPPED");
+    if(!mapping)throw new Error("BROKER_ACCOUNT_NOT_CONFIGURED");
     const key=userId+":"+mapping.provider+":"+mapping.account_id;
     const entry=this.connections.get(key);
     if(!entry)throw new Error("BROKER_NOT_CONNECTED");
