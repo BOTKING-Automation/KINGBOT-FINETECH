@@ -38,9 +38,9 @@ export async function resolveFirebaseUser(pool,req){
  if(!pool)return null;
  const fb=await firebaseUser(req);
  if(!fb||fb.email_verified!==true)return null;
- const q=await pool.query("SELECT id,email,first_name,last_name,email_verified,phone_verified FROM kingbot_users WHERE firebase_uid=$1 LIMIT 1",[fb.uid]);
+ const q=await pool.query("SELECT id,email,first_name,last_name,email_verified,phone_verified,admin_blocked FROM kingbot_users WHERE firebase_uid=$1 LIMIT 1",[fb.uid]);
  if(q.rowCount)return q.rows[0];
- const byEmail=await pool.query("SELECT id,email,first_name,last_name,email_verified,phone_verified FROM kingbot_users WHERE email=$1 LIMIT 1",[String(fb.email||"").toLowerCase()]);
+ const byEmail=await pool.query("SELECT id,email,first_name,last_name,email_verified,phone_verified,admin_blocked FROM kingbot_users WHERE email=$1 LIMIT 1",[String(fb.email||"").toLowerCase()]);
  if(byEmail.rowCount){
   await pool.query("UPDATE kingbot_users SET firebase_uid=$1,email_verified=TRUE WHERE id=$2",[fb.uid,byEmail.rows[0].id]);
   return {...byEmail.rows[0],email_verified:true};
