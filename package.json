@@ -1,8 +1,5 @@
 {
   "name": "kingbot-finetech-frontend",
   "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "build": "node -e \"console.log('KINGBOT FINTECH static frontend: no build step required')\""
-  }
+  "private": true
 }
