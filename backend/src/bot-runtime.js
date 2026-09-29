@@ -49,7 +49,7 @@ export function createBotRuntimeRouter({pool,broker}){
     const s=await settings(pool,user.id,b.id);
     if(s.killSwitch)return res.status(409).json({ok:false,error:"KILL_SWITCH_ACTIVE"});
     if(!["PAPER","LIVE"].includes(s.executionMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
-    if(!broker.connected)return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before starting PAPER or LIVE execution. No order was submitted."});
+    if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before starting PAPER or LIVE execution. No order was submitted."});
     await pool.query("INSERT INTO kingbot_bot_runtime(user_id,bot_id,state,last_error,updated_at) VALUES($1,$2,'RUNNING',NULL,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET state='RUNNING',last_error=NULL,updated_at=NOW()",[user.id,b.id]);
     await audit(pool,user.id,"BOT_RUNTIME_STARTED",{botId:b.id,executionMode:s.executionMode});
     res.json({ok:true,botId:b.id,state:"RUNNING",executionMode:s.executionMode});
@@ -71,7 +71,7 @@ export function createBotRuntimeRouter({pool,broker}){
     const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id);
     if(!r||r.state!=="RUNNING")return res.status(409).json({ok:false,error:"BOT_NOT_RUNNING"});
     if(s.killSwitch)return res.status(409).json({ok:false,error:"KILL_SWITCH_ACTIVE"});
-    if(!broker.connected)return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Verified broker connection is required before market validation. No order was submitted."});
+    if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Verified broker connection is required before market validation. No order was submitted."});
     const requestedSymbol=String(req.body?.symbol||"").trim().toUpperCase();
     if(!requestedSymbol)return res.status(400).json({ok:false,error:"SYMBOL_REQUIRED",message:"A broker symbol is required."});
     let quote;
