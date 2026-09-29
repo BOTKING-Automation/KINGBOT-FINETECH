@@ -138,7 +138,13 @@ async function buildIntelligenceContext(user, requestedSymbol=null){
   };
 
   try{
-    context.broker=await broker.getStatus(user.id);
+    const brokerStatus=await broker.getStatus(user.id);
+    context.broker={
+      configured:Boolean(brokerStatus.configured),
+      connected:Boolean(brokerStatus.connected),
+      broker:brokerStatus.broker||null,
+      executionMode:brokerStatus.executionMode||"NOT_CONNECTED"
+    };
   }catch(error){
     context.broker={configured:false,connected:false,broker:null,executionMode:"NOT_CONNECTED",reason:"BROKER_STATUS_UNAVAILABLE"};
   }
@@ -292,6 +298,17 @@ app.get("/health", (_req,res) => res.json({ok:true,service:"KINGBOT Intelligence
 app.post("/api/ai/query", aiLimiter, async (req, res) => {
   const aiUser = await requireUser(pool, req, res);
   if (!aiUser) return;
+
+  const aiAccess = await pool.query(
+    "SELECT plan_id FROM kingbot_subscriptions WHERE user_id=$1 AND status='active' AND (expires_at IS NULL OR expires_at>NOW()) AND plan_id IN ('pro','institutional') ORDER BY expires_at DESC NULLS LAST LIMIT 1",
+    [aiUser.id]
+  );
+  if (!aiAccess.rowCount) {
+    return res.status(403).json({
+      ok:false,
+      error:"KINGBOT Intelligence requires an active Pro Trader Bot or Institutional OS subscription."
+    });
+  }
   const message = typeof req.body?.message === "string"
     ? req.body.message.trim()
     : "";
