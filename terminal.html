@@ -1402,10 +1402,28 @@
           </div>
 
           <p>
-            Connect the KINGBOT backend to a supported broker layer before
-            account balances, positions, bot execution and trade history
-            become available.
-          </p>
+             Connect your own MetaApi-linked MT4/MT5 account. Your broker credential
+             is sent over HTTPS and stored encrypted on the KINGBOT backend. It is
+             never displayed back to the browser.
+           </p>
+
+           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
+             <label style="display:block;">
+               <span class="state-label">METAAPI ACCOUNT ID</span>
+               <input id="metaApiAccountId" type="text" autocomplete="off" placeholder="Your MetaApi account ID"
+                 style="width:100%;margin-top:6px;padding:11px;border-radius:10px;border:1px solid rgba(25,230,255,.25);background:rgba(4,12,28,.7);color:#fff;">
+             </label>
+             <label style="display:block;">
+               <span class="state-label">ACCOUNT ACCESS TOKEN</span>
+               <input id="metaApiAccountToken" type="password" autocomplete="new-password" placeholder="Your account access token"
+                 style="width:100%;margin-top:6px;padding:11px;border-radius:10px;border:1px solid rgba(155,92,255,.25);background:rgba(4,12,28,.7);color:#fff;">
+             </label>
+           </div>
+
+           <div style="margin-top:8px;font-size:12px;opacity:.72;">
+             Use a MetaApi <strong>account access token</strong> for this specific trading account.
+             Do not paste your platform-wide MetaApi API token here.
+           </div>
 
           <div style="margin-top:14px;display:flex;gap:8px;">
             <button class="btn" id="connectBroker">
@@ -2771,7 +2789,11 @@ $("connectBroker").addEventListener(
         "/api/broker/connect",
         {
           method: "POST",
-          body: JSON.stringify({})
+          body: JSON.stringify({
+            accountId: document.getElementById("metaApiAccountId")?.value.trim(),
+            accountToken: document.getElementById("metaApiAccountToken")?.value.trim(),
+            executionMode: "PAPER"
+          })
         }
       );
 
