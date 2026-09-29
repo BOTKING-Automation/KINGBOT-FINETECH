@@ -462,7 +462,7 @@
           el.classList.remove("kb-guest-only");
         }else{
           el.textContent=el.dataset.guestText||"ENTER KINGBOT →";
-          el.setAttribute("href","signin.html");
+          el.setAttribute("href","access-stable.html#signin");
         }
       });
 
