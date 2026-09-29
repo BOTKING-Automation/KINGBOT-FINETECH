@@ -130,6 +130,17 @@ export class UserBrokerManager {
     return {connected:true,data:await connection.getSymbolSpecification(String(symbol).trim().toUpperCase())};
   }
 
+  async getHistoricalCandles(symbol,timeframe,userId,limit=100){
+    const connection=await this.connectionFor(userId);
+    const count=Math.max(10,Math.min(1000,Number(limit)||100));
+    const end=new Date();
+    const hours={1m:1,5m:5,15m:15,30m:30,1h:100,4h:400,1d:2400};
+    const minutes={1m:1,2m:2,3m:3,4m:4,5m:5,6m:6,10m:10,12m:12,15m:15,20m:20,30m:30,1h:60,2h:120,3h:180,4h:240,6h:360,8h:480,12h:720,1d:1440,1w:10080,1mn:43200};
+    const mins=minutes[String(timeframe)]||1;
+    const start=new Date(end.getTime()-count*mins*60000);
+    return {connected:true,data:await connection.getHistoricalCandles(String(symbol).trim().toUpperCase(),String(timeframe),start,end,count)};
+  }
+
   async getQuote(symbol,userId){
     const connection=await this.connectionFor(userId);
     return {connected:true,data:await connection.getSymbolPrice(String(symbol).trim().toUpperCase())};
