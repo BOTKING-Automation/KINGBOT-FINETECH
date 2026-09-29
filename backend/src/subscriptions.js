@@ -16,7 +16,7 @@ async function currentUser(pool, req) {
   const q = await pool.query("SELECT u.id,u.email,u.first_name,u.last_name,u.email_verified FROM kingbot_sessions s JOIN kingbot_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()",[hashToken(req.cookies.kingbot_session)]);
   return q.rowCount ? q.rows[0] : null;
 }
-async function requireUser(pool, req, res) {
+export async function requireUser(pool, req, res) {
   const u = await currentUser(pool,req);
   if (!u) { res.status(401).json({ok:false,error:"Authentication required."}); return null; }
   if (!u.email_verified) { res.status(403).json({ok:false,error:"Email verification is required."}); return null; }
