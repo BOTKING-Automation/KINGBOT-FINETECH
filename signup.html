@@ -712,7 +712,7 @@
       const data = await response.json().catch(() => ({}));
 
       if(!response.ok){
-        throw new Error(data.message || "Account creation failed.");
+        throw new Error(data.error || data.message || "Account creation failed.");
       }
 
       sessionStorage.setItem("signup_email", payload.email);
