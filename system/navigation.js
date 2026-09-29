@@ -41,7 +41,29 @@
         top:14px;
         right:14px;
         z-index:2147483000;
+        display:flex;
+        align-items:center;
+        gap:8px;
         font-family:Space Grotesk,Inter,system-ui,sans-serif;
+      }
+
+      #kb-compact-nav .kb-fintech-logo{
+        width:42px;
+        height:42px;
+        display:block;
+        object-fit:contain;
+        border-radius:11px;
+        padding:4px;
+        background:rgba(4,9,22,.82);
+        border:1px solid rgba(255,255,255,.10);
+        box-shadow:0 0 22px rgba(25,230,255,.08),0 0 16px rgba(246,185,59,.05);
+        transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
+      }
+
+      #kb-compact-nav .kb-fintech-logo:hover{
+        transform:translateY(-1px);
+        border-color:rgba(25,230,255,.25);
+        box-shadow:0 0 28px rgba(25,230,255,.13),0 0 18px rgba(246,185,59,.07);
       }
 
       #kb-compact-nav .kb-nav-trigger{
@@ -131,9 +153,9 @@
         position:absolute;
         top:58px;
         right:0;
-        width:min(350px,calc(100vw - 28px));
-        padding:10px;
-        border-radius:18px;
+        width:min(310px,calc(100vw - 28px));
+        padding:8px;
+        border-radius:15px;
         border:1px solid rgba(255,255,255,.10);
         background:
           radial-gradient(circle at 10% 0%,rgba(25,230,255,.08),transparent 34%),
@@ -151,7 +173,7 @@
         content:"";
         position:absolute;
         inset:-1px;
-        border-radius:19px;
+        border-radius:16px;
         padding:1px;
         background:linear-gradient(
           120deg,
@@ -217,11 +239,11 @@
       }
 
       .kb-menu-grid a{
-        min-height:43px;
+        min-height:38px;
         display:flex;
         align-items:center;
         gap:8px;
-        padding:8px 9px;
+        padding:7px 8px;
         border-radius:10px;
         color:#8e9ab8;
         text-decoration:none;
@@ -246,7 +268,7 @@
         border-radius:7px;
         background:rgba(255,255,255,.04);
         color:#19e6ff;
-        font-size:12px;
+        font-size:11px;
       }
 
       .kb-menu-grid a.kb-active .kb-menu-icon{
@@ -254,14 +276,14 @@
       }
 
       .kb-menu-name{
-        font:800 8px/1.1 Orbitron,sans-serif;
+        font:800 7.5px/1.1 Orbitron,sans-serif;
       }
 
       .kb-menu-sub{
         display:block;
         margin-top:3px;
         color:#586681;
-        font:600 6px/1.15 JetBrains Mono,monospace;
+        font:600 5.8px/1.15 JetBrains Mono,monospace;
       }
 
       .kb-menu-account{
@@ -304,7 +326,8 @@
       }
 
       @media(max-width:560px){
-        #kb-compact-nav{top:10px;right:10px}
+        #kb-compact-nav{top:10px;right:10px;gap:6px}
+        #kb-compact-nav .kb-fintech-logo{width:38px;height:38px;border-radius:10px}
         #kb-compact-nav .kb-nav-trigger{width:44px;height:44px}
         #kb-compact-nav .kb-menu{
           top:53px;
@@ -344,6 +367,7 @@
     const root=document.createElement("div");
     root.id="kb-compact-nav";
     root.innerHTML=
+      '<img class="kb-fintech-logo" src="assets/images/kingbot-fintech-logo.png" alt="KINGBOT FINTECH logo" title="KINGBOT FINTECH">'+
       '<button class="kb-nav-trigger" type="button" aria-label="Open KINGBOT navigation" aria-expanded="false">'+
         '<span class="kb-bars" aria-hidden="true"><i></i><i></i><i></i></span>'+
       '</button>'+
