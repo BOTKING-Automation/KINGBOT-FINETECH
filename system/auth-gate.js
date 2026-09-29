@@ -124,8 +124,9 @@ IMPORTANT:
         this.getReturnUrl();
 
       return (
-        "signin.html?return=" +
-        encodeURIComponent(returnUrl)
+        "access-stable.html?return=" +
+        encodeURIComponent(returnUrl) +
+        "#signin"
       );
 
     },
