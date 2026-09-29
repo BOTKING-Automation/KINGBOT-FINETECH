@@ -4,6 +4,7 @@
  SMTP credentials, or Resend calls are handled by KINGBOT frontend code.
 */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 import {
   getAuth,
   setPersistence,
@@ -29,6 +30,37 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
+
+async function saveUserProfile(user, extra={}) {
+  if (!user) throw new Error("Cannot save a missing Firebase user.");
+  const ref = doc(db, "users", user.uid);
+  const existing = await getDoc(ref);
+  const now = serverTimestamp();
+  const profile = {
+    uid: user.uid,
+    email: user.email || "",
+    emailVerified: user.emailVerified === true,
+    displayName: extra.displayName || user.displayName || "",
+    firstName: extra.firstName || "",
+    lastName: extra.lastName || "",
+    phone: extra.phone || "",
+    lastLoginAt: now,
+    updatedAt: now
+  };
+  if (!existing.exists()) {
+    profile.createdAt = now;
+    profile.botRunning = false;
+    profile.lastTradeTime = 0;
+    profile.trades = [];
+    profile.totalTrades = 0;
+    profile.wins = 0;
+    profile.losses = 0;
+    profile.balance = 0;
+  }
+  await setDoc(ref, profile, { merge: true });
+  return (await getDoc(ref)).data();
+}
 
 const API_BASE = window.KINGBOT_API?.baseUrl || "https://kingbot-fintech-api-etfv.onrender.com/api";
 
@@ -53,7 +85,7 @@ async function backendSync(extra={}){
 }
 
 window.KINGBOT_FIREBASE={
-  app,auth,API_BASE,persist,
+  app,auth,db,API_BASE,persist,
   createAccount:async({email,password,firstName,lastName,phone,remember=true})=>{
     await persist(remember);
     let credential;
@@ -79,6 +111,12 @@ window.KINGBOT_FIREBASE={
     let backendSynced=false;
     let syncError=null;
     try{
+      await saveUserProfile(user,{firstName,lastName,phone,displayName});
+    }catch(error){
+      console.error("[KINGBOT AUTH] Firestore profile save failed:",error?.message||error);
+      throw new Error("Account was created, but the user profile could not be saved. Check Firebase Firestore rules.");
+    }
+    try{
       await backendSync({firstName,lastName,phone,displayName});
       backendSynced=true;
     }catch(error){
@@ -94,6 +132,12 @@ window.KINGBOT_FIREBASE={
     if(!credential.user.emailVerified) return {user:credential.user,verified:false,backendSynced:false,syncError:null};
     let backendSynced=false;
     let syncError=null;
+    try{
+      await saveUserProfile(credential.user);
+    }catch(error){
+      console.error("[KINGBOT AUTH] Firestore profile save failed after sign-in:",error?.message||error);
+      throw new Error("Sign-in succeeded, but your user profile could not be saved. Check Firebase Firestore rules.");
+    }
     try{
       await backendSync();
       backendSynced=true;
