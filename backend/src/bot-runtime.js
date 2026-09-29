@@ -98,18 +98,29 @@ export function createBotRuntimeRouter({pool,broker}){
     if(!Number.isFinite(equity)||!Number.isFinite(balance)||equity<=0)return res.status(503).json({ok:false,error:"INVALID_ACCOUNT_TELEMETRY",message:"Broker account telemetry is incomplete. No order was submitted."});
     const symbolPositions=positionData.filter(p=>String(p.symbol||"").toUpperCase()===requestedSymbol);
     const spread=ask-bid;
+    const riskState=await pool.query("SELECT baseline_date,day_start_equity,peak_equity FROM kingbot_risk_state WHERE user_id=$1 AND bot_id=$2",[user.id,b.id]);
+    const today=new Date().toISOString().slice(0,10);
+    let dayStartEquity=equity;
+    let peakEquity=equity;
+    if(riskState.rowCount){
+      const state=riskState.rows[0];
+      dayStartEquity=state.baseline_date===today?Number(state.day_start_equity):equity;
+      peakEquity=Math.max(Number(state.peak_equity)||equity,equity);
+    }
+    await pool.query("INSERT INTO kingbot_risk_state(user_id,bot_id,baseline_date,day_start_equity,peak_equity,updated_at) VALUES($1,$2,$3,$4,$5,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET baseline_date=EXCLUDED.baseline_date,day_start_equity=EXCLUDED.day_start_equity,peak_equity=EXCLUDED.peak_equity,updated_at=NOW()",[user.id,b.id,today,dayStartEquity,peakEquity]);
     const requestedRiskPct=Number(req.body?.requestedRiskPct??s.maxRiskPerTradePct);
     const risk=authorizeOrder({
       limits:s,
       executionMode:s.executionMode,
       killSwitch:s.killSwitch,
       equity,
-      dayStartEquity:equity,
-      peakEquity:equity,
+      dayStartEquity,
+      peakEquity,
       openPositions:positionData.length,
       requestedRiskPct,
       spread,
-      atr:Number(req.body?.atr)
+      atr:Number(req.body?.atr),
+      dataAgeMs:0
     });
     const signal=analysis.signal;
     let action="NO_ACTION",order=null;
