@@ -64,7 +64,7 @@ function start(){
     remove();
   };
 
-  setTimeout(routeAfterBoot,20000);
+  setTimeout(routeAfterBoot,10000);
 }
 
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
