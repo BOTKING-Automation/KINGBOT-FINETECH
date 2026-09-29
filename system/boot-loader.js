@@ -72,12 +72,33 @@ html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
  const states=["NEURAL CORE INITIALIZING","MARKET MATRIX LINKING","BOT BRAIN SYNCHRONIZING","RISK ENGINE ONLINE","AUTH GATE READY"];
  let n=0;const status=el.querySelector("#kb-boot-status"),ticker=setInterval(()=>{n=(n+1)%states.length;status.textContent=states[n]},900);
  const remove=()=>{clearInterval(ticker);el.style.transition="opacity .45s ease";el.style.opacity="0";setTimeout(()=>{el.remove();document.documentElement.classList.remove("kb-boot-lock")},460)};
- const ready=window.KINGBOT_SESSION?.check?window.KINGBOT_SESSION.check({force:true}):Promise.resolve({authenticated:false});
+ const ready=(async()=>{
+  try{
+    if(!window.KINGBOT_SESSION){
+      await import(new URL("./session.js",window.location.href).href);
+    }
+    if(window.KINGBOT_SESSION?.check){
+      return await window.KINGBOT_SESSION.check({force:true});
+    }
+  }catch(error){
+    console.warn("[KINGBOT BOOT] Session preflight failed:",error?.message||error);
+  }
+  return {authenticated:false,user:null};
+ })();
  Promise.all([new Promise(r=>setTimeout(r,20000)),ready]).then(([,session])=>{
-  if(!session?.authenticated)window.location.replace("access.html");
-  else if(!session?.user?.verified)window.location.replace("verify.html");
-  else remove();
- }).catch(()=>window.location.replace("access.html"));
+  if(!session?.authenticated){
+    window.location.replace("access.html");
+    return;
+  }
+  if(!session?.user?.verified){
+    window.location.replace("verify.html");
+    return;
+  }
+  remove();
+ }).catch(error=>{
+  console.warn("[KINGBOT BOOT] Routing fallback:",error?.message||error);
+  window.location.replace("access.html");
+ });
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",inject,{once:true});else inject();
 })(window);
