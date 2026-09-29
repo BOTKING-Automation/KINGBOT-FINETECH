@@ -452,6 +452,7 @@ async function check(){
     sessionStorage.setItem("auth_sync_pending","1");
    }
    sessionStorage.removeItem("verification_email");sessionStorage.removeItem("signup_email");
+   try{sessionStorage.setItem("KINGBOT_AUTH_HANDOFF","1");}catch{}
    show("Email verified successfully. Opening KINGBOT...","success");
    const rawReturn=new URLSearchParams(location.search).get("return")||"index.html";
    let destination="index.html";
@@ -473,7 +474,16 @@ resendButton.addEventListener("click",async()=>{
  catch(e){show(e.message||"Unable to send verification email.","error");}
  finally{setTimeout(()=>resendButton.disabled=false,30000);}
 });
-(async()=>{const u=window.KINGBOT_FIREBASE.auth.currentUser;if(u){emailDisplay.textContent=u.email||"";emailDisplay.style.display="block";}await check();})();
+(function(){
+  const u=window.KINGBOT_FIREBASE.auth.currentUser;
+  if(u){
+    emailDisplay.textContent=u.email||"";
+    emailDisplay.style.display="block";
+  }else{
+    show("Sign in first, then verify the email sent to your account.","info");
+  }
+  // Do not auto-check or auto-redirect. The user must press CHECK VERIFICATION.
+})();
 </script>
 
 </body>
