@@ -677,12 +677,11 @@ form.addEventListener("submit",async e=>{
   setTimeout(()=>window.location.href="verify.html",900);
  }catch(error){
   const code=String(error?.code||"");
-  const messages={"auth/email-already-in-use":"An account with this email already exists.","auth/invalid-email":"Enter a valid email address.","auth/weak-password":"Choose a stronger password.","auth/network-request-failed":"Network error. Check your connection."};
+  const messages={"auth/email-already-in-use":"An account with this email already exists.","auth/invalid-email":"Enter a valid email address.","auth/weak-password":"Choose a stronger password.","auth/network-request-failed":"Network error. Check your connection.","auth/configuration-not-found":"Firebase Authentication is not enabled/configured for this project yet. Open Firebase Console → Authentication → Get started, then enable Email/Password and try again."};
   showMessage(messages[code]||error.message||"Account creation failed.","error");
   button.disabled=false;button.textContent="CREATE SECURE ACCOUNT";
  }
 });
-</script>
 </script>
 
 </body>
