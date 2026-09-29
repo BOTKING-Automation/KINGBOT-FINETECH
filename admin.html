@@ -168,7 +168,7 @@ async function loadAll(){
   document.getElementById("adminBadge").textContent="ADMIN VERIFIED · "+(od.adminEmail||"");
  }catch(e){
   lockMsg.textContent=e.message||"Administrator access denied.";
-  setTimeout(()=>{location.href="signin.html"},1800);
+  setTimeout(()=>{location.href="access-stable.html#signin"},1800);
   throw e;
  }
 }
@@ -210,7 +210,7 @@ userSearch.addEventListener("input",renderUsers);userFilter.addEventListener("ch
   await loadAll(); setInterval(()=>loadAll().catch(()=>{}),30000);
  }catch(e){
   lockMsg.textContent=e.message||"Administrator access denied.";
-  setTimeout(()=>{location.href="signin.html"},1800);
+  setTimeout(()=>{location.href="access-stable.html#signin"},1800);
  }
 })();
 })();
