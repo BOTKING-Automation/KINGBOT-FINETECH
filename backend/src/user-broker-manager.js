@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import MetaApi from "metaapi.cloud-sdk";
+import MetaApi from "metaapi.cloud-sdk/esm-node";
 
 const ALGORITHM="aes-256-gcm";
 
