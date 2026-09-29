@@ -50,6 +50,9 @@ export function createBotRuntimeRouter({pool,broker}){
     if(s.killSwitch)return res.status(409).json({ok:false,error:"KILL_SWITCH_ACTIVE"});
     if(!["PAPER","LIVE"].includes(s.executionMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
     if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before starting PAPER or LIVE execution. No order was submitted."});
+    await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS symbol TEXT, ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '1m'");
+    const configured=await pool.query("SELECT symbol,timeframe FROM kingbot_bot_runtime WHERE user_id=$1 AND bot_id=$2",[user.id,b.id]);
+    if(!configured.rowCount||!configured.rows[0].symbol)return res.status(400).json({ok:false,error:"BOT_SYMBOL_NOT_CONFIGURED",message:"Configure the broker symbol before starting autonomous execution. No order was submitted."});
     await pool.query("INSERT INTO kingbot_bot_runtime(user_id,bot_id,state,last_error,updated_at) VALUES($1,$2,'RUNNING',NULL,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET state='RUNNING',last_error=NULL,updated_at=NOW()",[user.id,b.id]);
     await audit(pool,user.id,"BOT_RUNTIME_STARTED",{botId:b.id,executionMode:s.executionMode});
     res.json({ok:true,botId:b.id,state:"RUNNING",executionMode:s.executionMode});
