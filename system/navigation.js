@@ -21,8 +21,8 @@
 
   const guestAccountLinks = [
     ["subscription.html","Subscription"],
-    ["access.html#signin","Sign in"],
-    ["access.html#signup","Create account"]
+    ["access-stable.html#signin","Sign in"],
+    ["access-stable.html#signup","Create account"]
   ];
 
   const authenticatedAccountLinks = [
@@ -423,7 +423,7 @@
       if(logout){
         await logout({redirect:true});
       }else{
-        window.location.replace("access.html");
+        window.location.replace("access-stable.html");
       }
     });
 
@@ -444,7 +444,7 @@
           close();
           const logout=window.KINGBOT_SESSION?.logout;
           if(logout) await logout({redirect:true});
-          else window.location.replace("access.html");
+          else window.location.replace("access-stable.html");
         });
       }
 
