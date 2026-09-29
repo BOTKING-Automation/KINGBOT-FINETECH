@@ -406,7 +406,7 @@ Expected session response:
 
       }
 
-      window.location.replace("../index.html");
+      window.location.replace("index.html");
 
     },
 
@@ -467,7 +467,7 @@ Expected session response:
         if (redirect) {
 
           window.location.replace(
-            "../signin.html"
+            "signin.html"
           );
 
         }

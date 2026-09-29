@@ -32,8 +32,6 @@ IMPORTANT:
 
     config: {
       protectedPages: [
-        "index.html",
-        "markets.html",
         "terminal.html",
         "analytics.html",
         "ai.html",
@@ -125,7 +123,7 @@ IMPORTANT:
         this.getReturnUrl();
 
       return (
-        "../signin.html?return=" +
+        "signin.html?return=" +
         encodeURIComponent(returnUrl)
       );
 
@@ -137,7 +135,7 @@ IMPORTANT:
         this.getReturnUrl();
 
       return (
-        "../verify.html?return=" +
+        "verify.html?return=" +
         encodeURIComponent(returnUrl)
       );
 
@@ -439,7 +437,7 @@ IMPORTANT:
       }
 
       window.location.replace(
-        "../index.html"
+        "index.html"
       );
 
     },
@@ -907,7 +905,7 @@ IMPORTANT:
       }
 
       window.location.replace(
-        "../signin.html"
+        "signin.html"
       );
 
     }
