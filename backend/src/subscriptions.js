@@ -139,6 +139,107 @@ export function createSubscriptionRouter({pool}) {
     const q=await pool.query("SELECT e.user_id,u.email,e.bot_id,e.active,e.granted_at,s.plan_id,s.status,s.expires_at FROM kingbot_bot_entitlements e JOIN kingbot_users u ON u.id=e.user_id LEFT JOIN kingbot_subscriptions s ON s.id=e.subscription_id ORDER BY e.granted_at DESC LIMIT 300");
     res.json({ok:true,entitlements:q.rows});
   });
+  router.get("/admin/overview",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    try{
+      await expireStaleSubscriptions(pool);
+      const [users,verified,active,pending,approved,rejected,running,revenue]=await Promise.all([
+        pool.query("SELECT COUNT(*)::int AS count FROM kingbot_users"),
+        pool.query("SELECT COUNT(*)::int AS count FROM kingbot_users WHERE email_verified=TRUE"),
+        pool.query("SELECT COUNT(*)::int AS count FROM kingbot_subscriptions WHERE status='active' AND expires_at>NOW()"),
+        pool.query("SELECT COUNT(*)::int AS count FROM kingbot_payments WHERE status='pending'"),
+        pool.query("SELECT COUNT(*)::int AS count FROM kingbot_payments WHERE status='approved'"),
+        pool.query("SELECT COUNT(*)::int AS count FROM kingbot_payments WHERE status='rejected'"),
+        pool.query("SELECT COUNT(*)::int AS count FROM kingbot_bot_runtime WHERE state='RUNNING'"),
+        pool.query("SELECT COALESCE(SUM(amount_kes),0)::numeric(14,2) AS total FROM kingbot_payments WHERE status='approved'")
+      ]);
+      res.json({ok:true,adminEmail:a.email,metrics:{
+        totalUsers:users.rows[0].count,verifiedUsers:verified.rows[0].count,activeSubscriptions:active.rows[0].count,
+        pendingPayments:pending.rows[0].count,approvedPayments:approved.rows[0].count,rejectedPayments:rejected.rows[0].count,
+        runningBots:running.rows[0].count,approvedRevenueKes:Number(revenue.rows[0].total)
+      }});
+    }catch(error){console.error("[KINGBOT ADMIN OVERVIEW]",error?.message||error);res.status(500).json({ok:false,error:"Admin overview unavailable."});}
+  });
+
+  router.get("/admin/users",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    try{
+      await expireStaleSubscriptions(pool);
+      const q=await pool.query(`
+        SELECT u.id,u.first_name,u.last_name,u.email,u.phone,u.email_verified,u.phone_verified,u.admin_blocked,u.created_at,
+               s.plan_id,s.status AS subscription_status,s.started_at,s.expires_at,
+               COALESCE((SELECT json_agg(json_build_object('botId',e.bot_id,'active',e.active) ORDER BY e.bot_id)
+                         FROM kingbot_bot_entitlements e
+                         WHERE e.user_id=u.id AND e.subscription_id=s.id),'[]'::json) AS entitlements,
+               lp.status AS latest_payment_status,lp.plan_id AS latest_payment_plan,lp.amount_kes AS latest_payment_amount,
+               lp.mpesa_code AS latest_mpesa_code,lp.submitted_at AS latest_payment_at,lp.reviewer_note AS latest_payment_note
+        FROM kingbot_users u
+        LEFT JOIN LATERAL (
+          SELECT * FROM kingbot_subscriptions s1
+          WHERE s1.user_id=u.id
+          ORDER BY CASE WHEN s1.status='active' AND s1.expires_at>NOW() THEN 0 ELSE 1 END,s1.started_at DESC
+          LIMIT 1
+        ) s ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT status,plan_id,amount_kes,mpesa_code,submitted_at,reviewer_note
+          FROM kingbot_payments p1 WHERE p1.user_id=u.id
+          ORDER BY submitted_at DESC LIMIT 1
+        ) lp ON TRUE
+        ORDER BY u.created_at DESC
+        LIMIT 500
+      `);
+      res.json({ok:true,users:q.rows});
+    }catch(error){console.error("[KINGBOT ADMIN USERS]",error?.message||error);res.status(500).json({ok:false,error:"User registry unavailable."});}
+  });
+
+  router.post("/admin/users/:id/status",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    const userId=String(req.params.id||""),blocked=Boolean(req.body?.blocked);
+    try{
+      const target=await pool.query("SELECT id,email FROM kingbot_users WHERE id=$1",[userId]);
+      if(!target.rowCount)return res.status(404).json({ok:false,error:"User not found."});
+      if(String(target.rows[0].email).toLowerCase()===String(a.email).toLowerCase() && blocked)return res.status(400).json({ok:false,error:"You cannot disable the currently signed-in administrator account."});
+      const q=await pool.query("UPDATE kingbot_users SET admin_blocked=$2 WHERE id=$1 RETURNING id,email,admin_blocked",[userId,blocked]);
+      if(blocked)await pool.query("UPDATE kingbot_bot_runtime SET state='STOPPED',last_error='ADMIN_ACCOUNT_DISABLED',updated_at=NOW() WHERE user_id=$1 AND state='RUNNING'",[userId]);
+      await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,$2,$3::jsonb)",[userId,blocked?"ADMIN_USER_DISABLED":"ADMIN_USER_ENABLED",JSON.stringify({admin:a.email,targetEmail:q.rows[0].email,blocked})]);
+      res.json({ok:true,user:q.rows[0],message:blocked?"User access disabled.":"User access restored."});
+    }catch(error){console.error("[KINGBOT ADMIN USER STATUS]",error?.message||error);res.status(500).json({ok:false,error:"User access update failed."});}
+  });
+
+  router.post("/admin/users/:id/grant-bot",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    const userId=String(req.params.id||""),bot=normalizeBotId(req.body?.botId);
+    if(!BOT_NAMES[bot])return res.status(400).json({ok:false,error:"Unknown bot engine."});
+    try{
+      const s=await pool.query("SELECT id FROM kingbot_subscriptions WHERE user_id=$1 AND status='active' AND expires_at>NOW() ORDER BY expires_at DESC LIMIT 1",[userId]);
+      if(!s.rowCount)return res.status(409).json({ok:false,error:"User has no active subscription."});
+      await pool.query("INSERT INTO kingbot_bot_entitlements(user_id,bot_id,subscription_id,active) VALUES($1,$2,$3,TRUE) ON CONFLICT(user_id,bot_id,subscription_id) DO UPDATE SET active=TRUE",[userId,bot,s.rows[0].id]);
+      await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'ADMIN_BOT_GRANTED',$2::jsonb)",[userId,JSON.stringify({admin:a.email,botId:bot,subscriptionId:s.rows[0].id})]);
+      res.json({ok:true,botId:bot,botName:BOT_NAMES[bot]});
+    }catch(error){console.error("[KINGBOT ADMIN GRANT BOT]",error?.message||error);res.status(500).json({ok:false,error:"Bot grant failed."});}
+  });
+
+  router.post("/admin/users/:id/revoke-bot",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    const userId=String(req.params.id||""),bot=normalizeBotId(req.body?.botId);
+    if(!BOT_NAMES[bot])return res.status(400).json({ok:false,error:"Unknown bot engine."});
+    try{
+      const q=await pool.query("UPDATE kingbot_bot_entitlements e SET active=FALSE FROM kingbot_subscriptions s WHERE e.subscription_id=s.id AND e.user_id=$1 AND e.bot_id=$2 AND s.status='active' RETURNING e.bot_id",[userId,bot]);
+      if(!q.rowCount)return res.status(404).json({ok:false,error:"Active bot entitlement not found."});
+      await pool.query("UPDATE kingbot_bot_runtime SET state='STOPPED',last_error='ADMIN_BOT_ACCESS_REVOKED',updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,bot]);
+      await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'ADMIN_BOT_REVOKED',$2::jsonb)",[userId,JSON.stringify({admin:a.email,botId:bot})]);
+      res.json({ok:true,botId:bot,botName:BOT_NAMES[bot]});
+    }catch(error){console.error("[KINGBOT ADMIN REVOKE BOT]",error?.message||error);res.status(500).json({ok:false,error:"Bot revoke failed."});}
+  });
+
+  router.get("/admin/activity",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    try{
+      const q=await pool.query(`SELECT l.id,l.event_type,l.metadata,l.created_at,u.email FROM kingbot_audit_log l LEFT JOIN kingbot_users u ON u.id=l.user_id ORDER BY l.created_at DESC LIMIT 250`);
+      res.json({ok:true,activity:q.rows});
+    }catch(error){console.error("[KINGBOT ADMIN ACTIVITY]",error?.message||error);res.status(500).json({ok:false,error:"Activity stream unavailable."});}
+  });
+
 
   return router;
 }
