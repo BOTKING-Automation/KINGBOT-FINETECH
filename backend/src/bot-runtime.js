@@ -126,17 +126,24 @@ export function createBotRuntimeRouter({pool,broker}){
     let action="NO_ACTION",order=null;
     if(signal!=="NO_SIGNAL"&&risk.allowed){
         const side=signal==="LONG_CANDIDATE"?"BUY":"SELL";
-        const volume=Number(req.body?.volume);
-        if(!Number.isFinite(volume)||volume<=0)return res.status(400).json({ok:false,error:"ORDER_VOLUME_REQUIRED",message:"Supply a broker-valid order volume; no order was submitted.",analysis,risk});
         let specification;
         try{ specification=(await broker.getSymbolSpecification(requestedSymbol,user.id)).data||{}; }
         catch(error){ return res.status(503).json({ok:false,error:"SYMBOL_SPECIFICATION_UNAVAILABLE",reason:error?.message||"BROKER_SPECIFICATION_FAILED",message:"Broker symbol constraints could not be verified. No order was submitted.",analysis,risk}); }
-        const minVolume=Number(specification.minVolume),maxVolume=Number(specification.maxVolume),volumeStep=Number(specification.volumeStep),point=Number(specification.point),stopsLevel=Number(specification.stopsLevel);
+        const minVolume=Number(specification.minVolume),maxVolume=Number(specification.maxVolume),volumeStep=Number(specification.volumeStep),point=Number(specification.point),stopsLevel=Number(specification.stopsLevel),tickSize=Number(specification.tickSize),tickValue=Number(specification.tickValue);
         if(!Number.isFinite(minVolume)||!Number.isFinite(maxVolume)||!Number.isFinite(volumeStep)||minVolume<=0||maxVolume<minVolume||volumeStep<=0)return res.status(503).json({ok:false,error:"INVALID_SYMBOL_SPECIFICATION",message:"Broker returned incomplete symbol constraints. No order was submitted.",analysis,risk});
-        const stepAligned=Math.abs((volume-minVolume)/volumeStep-Math.round((volume-minVolume)/volumeStep))<1e-9;
-        if(volume<minVolume||volume>maxVolume||!stepAligned)return res.status(400).json({ok:false,error:"INVALID_ORDER_VOLUME_STEP",message:"Order volume violates the broker's minimum, maximum, or volume-step constraints. No order was submitted.",minVolume,maxVolume,volumeStep,analysis,risk});
         const stopLoss=req.body?.stopLoss==null?null:Number(req.body.stopLoss);
         const takeProfit=req.body?.takeProfit==null?null:Number(req.body.takeProfit);
+        if(stopLoss==null)return res.status(400).json({ok:false,error:"STOP_LOSS_REQUIRED_FOR_AUTO_SIZING",message:"A stop loss is required so the server can calculate risk-based position size. No order was submitted.",analysis,risk});
+        if(!Number.isFinite(tickSize)||tickSize<=0||!Number.isFinite(tickValue)||tickValue<=0)return res.status(503).json({ok:false,error:"RISK_SIZING_DATA_UNAVAILABLE",message:"Broker did not provide verified monetary tick data required for automatic risk sizing. No order was submitted.",analysis,risk});
+        const riskAmount=equity*(requestedRiskPct/100);
+        const entryPrice=side==="BUY"?ask:bid;
+        const stopDistance=Math.abs(entryPrice-stopLoss);
+        const rawVolume=riskAmount/((stopDistance/tickSize)*tickValue);
+        const steppedVolume=Math.floor(rawVolume/volumeStep)*volumeStep;
+        const volume=Number(steppedVolume.toFixed(12));
+        if(!Number.isFinite(volume)||volume<minVolume||volume>maxVolume)return res.status(400).json({ok:false,error:"RISK_SIZED_VOLUME_OUT_OF_RANGE",message:"Calculated risk-based volume is outside broker limits. No order was submitted.",calculatedVolume:volume,minVolume,maxVolume,volumeStep,analysis,risk});
+        const stepAligned=Math.abs((volume-minVolume)/volumeStep-Math.round((volume-minVolume)/volumeStep))<1e-9;
+        if(!stepAligned)return res.status(400).json({ok:false,error:"INVALID_CALCULATED_VOLUME_STEP",message:"Calculated volume does not satisfy the broker volume step. No order was submitted.",calculatedVolume:volume,volumeStep,analysis,risk});
         if(!Number.isFinite(point)||point<=0||!Number.isFinite(stopsLevel)||stopsLevel<0)return res.status(503).json({ok:false,error:"INVALID_STOP_CONSTRAINTS",message:"Broker stop-distance constraints could not be verified. No order was submitted.",analysis,risk});
         const minDistance=stopsLevel*point;
         if(stopLoss!=null){
