@@ -115,6 +115,7 @@ $("signInForm").addEventListener("submit",async e=>{
  try{
   const result=await window.KINGBOT_FIREBASE.signIn({email:$("loginEmail").value.trim(),password:$("loginPassword").value,remember:$("remember").checked});
   if(!result.verified){sessionStorage.setItem("verification_email",$("loginEmail").value.trim());location.replace("verify.html");return;}
+  try{sessionStorage.setItem("KINGBOT_AUTH_HANDOFF","1");}catch(e){}
   showMessage("Authentication verified. Opening KINGBOT command center…","success");
   setTimeout(goHome,500);
  }catch(error){showMessage(error?.message||"Sign-in failed. Check your credentials and try again.","error");$("loginBtn").disabled=false;$("loginBtn").textContent="SECURE SIGN IN →";}
