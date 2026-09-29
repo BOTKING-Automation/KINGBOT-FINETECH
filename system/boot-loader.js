@@ -74,7 +74,9 @@ html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
  const remove=()=>{clearInterval(ticker);el.style.transition="opacity .45s ease";el.style.opacity="0";setTimeout(()=>{el.remove();document.documentElement.classList.remove("kb-boot-lock")},460)};
  const ready=window.KINGBOT_SESSION?.check?window.KINGBOT_SESSION.check({force:true}):Promise.resolve({authenticated:false});
  Promise.all([new Promise(r=>setTimeout(r,5000)),ready]).then(([,session])=>{
-  if(!session?.authenticated)window.location.replace("access.html");else remove();
+  if(!session?.authenticated)window.location.replace("access.html");
+  else if(!session?.user?.verified)window.location.replace("verify.html");
+  else remove();
  }).catch(()=>window.location.replace("access.html"));
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",inject,{once:true});else inject();
