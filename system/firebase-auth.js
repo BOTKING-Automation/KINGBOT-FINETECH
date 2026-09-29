@@ -60,17 +60,34 @@ window.KINGBOT_FIREBASE={
     const user=credential.user;
     const displayName=[firstName,lastName].filter(Boolean).join(" ").trim();
     await sendEmailVerification(user);
-    await backendSync({firstName,lastName,phone,displayName});
-    return user;
+    let backendSynced=false;
+    let syncError=null;
+    try{
+      await backendSync({firstName,lastName,phone,displayName});
+      backendSynced=true;
+    }catch(error){
+      syncError=error;
+      console.warn("[KINGBOT AUTH] Backend sync deferred after signup:",error?.message||error);
+    }
+    return {user,backendSynced,syncError};
   },
   signIn:async({email,password,remember=true})=>{
     await persist(remember);
     const credential=await signInWithEmailAndPassword(auth,email,password);
     await reload(credential.user);
-    if(!credential.user.emailVerified) return {user:credential.user,verified:false};
-    await backendSync();
-    return {user:credential.user,verified:true};
+    if(!credential.user.emailVerified) return {user:credential.user,verified:false,backendSynced:false,syncError:null};
+    let backendSynced=false;
+    let syncError=null;
+    try{
+      await backendSync();
+      backendSynced=true;
+    }catch(error){
+      syncError=error;
+      console.warn("[KINGBOT AUTH] Backend sync deferred after sign-in:",error?.message||error);
+    }
+    return {user:credential.user,verified:true,backendSynced,syncError};
   },
+  syncAccount:async extra=>backendSync(extra),
   resendVerification:async()=>{
     if(!auth.currentUser) throw new Error("Please sign in first.");
     await sendEmailVerification(auth.currentUser);
