@@ -13,7 +13,6 @@
     ["analytics.html","Analytics","▦","Performance intelligence"],
     ["ai.html","AI Intelligence","✦","AI intelligence layer"],
     ["academy.html","Academy","◇","Education & research"],
-    ["pricing.html","Plans","◫","Platform access"],
     ["about.html","About","◎","KINGBOT FINTECH"],
     ["contact.html","Contact","✉","Support & contact"],
     ["settings.html","Settings","⚙","Account controls"],
