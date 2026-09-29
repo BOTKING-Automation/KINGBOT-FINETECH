@@ -59,7 +59,7 @@ html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
 @media(max-width:640px){.kb-boot-stage{height:300px}.kb-boot-brain{width:300px;height:225px}.kb-market-plane{width:335px}.kb-boot-brand{font-size:15px}.kb-boot-sub{font-size:6px}.kb-candle{width:15px}}
 @media(prefers-reduced-motion:reduce){#kb-boot-loader *{animation-duration:.01ms!important;animation-iteration-count:1!important}}
 </style>
-<script src="system/boot-loader.js?v=23"></script>
+<script src="system/boot-loader.js?v=24"></script>
   
 <style>
 
@@ -2064,6 +2064,21 @@ footer{
 <div class="kb-boot-foot">GIBSONFX TECH · KINGBOT FINTECH · 10.00 SEC STARTUP SEQUENCE</div>
 </div>
 </div>
+<script id="kb-boot-handoff">
+(function(){
+  "use strict";
+  if(window.__KINGBOT_BOOT_HANDOFF__) return;
+  window.__KINGBOT_BOOT_HANDOFF__ = true;
+  var target = "access.html#signin";
+  window.setTimeout(function(){
+    try{
+      window.location.replace(target);
+    }catch(e){
+      window.location.href = target;
+    }
+  }, 10000);
+})();
+</script>
 
 <div data-kingbot-navigation></div> 
 
