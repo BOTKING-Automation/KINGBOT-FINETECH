@@ -6,7 +6,7 @@
 */
 (function(window){
 "use strict";
-const API_BASE="https://kingbot-fintech-api.onrender.com/api";
+const API_BASE="https://kingbot-fintech-api-etfv.onrender.com/api";
 const state={checked:false,checking:false,authenticated:false,user:null,error:null,checkedAt:0};
 const session={
  config:{sessionEndpoint:API_BASE+"/auth/session",logoutEndpoint:API_BASE+"/auth/logout",cacheDuration:15000},
