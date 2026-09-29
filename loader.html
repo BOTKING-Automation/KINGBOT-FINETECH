@@ -19,6 +19,13 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
 .halo:before,.halo:after{content:"";position:absolute;border-radius:50%;inset:24px;border:1px dashed rgba(155,92,255,.3);animation:spinReverse 8s linear infinite}
 .halo:after{inset:55px;border-style:solid;border-color:rgba(246,185,59,.22);animation-duration:11s}
 .brain{position:relative;width:min(370px,82vw);height:280px;transform-style:preserve-3d;animation:float 2.4s ease-in-out infinite}
+.brain-image-wrap{position:relative;width:100%;height:100%;display:grid;place-items:center;transform-style:preserve-3d}
+.brain-image{width:100%;height:100%;object-fit:contain;display:block;mix-blend-mode:screen;filter:drop-shadow(0 0 16px rgba(25,230,255,.55)) drop-shadow(0 0 42px rgba(25,230,255,.22)) hue-rotate(0deg) saturate(1.25) brightness(1.08);animation:brainColor 7s linear infinite,brainDepth 3.5s ease-in-out infinite}
+.brain-energy{position:absolute;inset:8% 7%;border-radius:48%;pointer-events:none;background:conic-gradient(from 120deg,rgba(25,230,255,.15),rgba(155,92,255,.2),rgba(255,79,216,.18),rgba(246,185,59,.17),rgba(35,247,163,.16),rgba(25,230,255,.15));mix-blend-mode:screen;filter:blur(24px);opacity:.75;animation:energyShift 5s linear infinite}
+@keyframes brainColor{0%,100%{filter:drop-shadow(0 0 16px rgba(25,230,255,.6)) drop-shadow(0 0 42px rgba(25,230,255,.24)) hue-rotate(0deg) saturate(1.3) brightness(1.1)}20%{filter:drop-shadow(0 0 18px rgba(155,92,255,.62)) drop-shadow(0 0 44px rgba(155,92,255,.24)) hue-rotate(55deg) saturate(1.4) brightness(1.12)}40%{filter:drop-shadow(0 0 18px rgba(255,79,216,.65)) drop-shadow(0 0 46px rgba(255,79,216,.25)) hue-rotate(115deg) saturate(1.45) brightness(1.12)}60%{filter:drop-shadow(0 0 18px rgba(246,185,59,.65)) drop-shadow(0 0 46px rgba(246,185,59,.25)) hue-rotate(190deg) saturate(1.5) brightness(1.15)}80%{filter:drop-shadow(0 0 18px rgba(35,247,163,.65)) drop-shadow(0 0 46px rgba(35,247,163,.25)) hue-rotate(260deg) saturate(1.45) brightness(1.12)}}
+@keyframes brainDepth{50%{transform:translateY(-6px) rotateY(-3deg) rotateX(2deg) scale(1.015)}}
+@keyframes energyShift{to{transform:rotate(360deg) scale(1.06);filter:blur(28px);opacity:.95}}
+
 .brain svg{width:100%;height:100%;overflow:visible}
 .rim{fill:none;stroke:url(#stroke);stroke-width:1.2;opacity:.58;transform:translateZ(-20px) scale(.94)}
 .body{fill:url(#fill);fill-opacity:.12;stroke:url(#stroke);stroke-width:2.8;filter:url(#glow)}
@@ -55,25 +62,15 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
 <div class="stage">
 <div class="halo"></div>
 <div class="brain">
-<svg viewBox="0 0 360 270" aria-label="KINGBOT high-tech neural brain">
-<defs>
-<linearGradient id="fill" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#19e6ff"/><stop offset="30%" stop-color="#5e7cff"/><stop offset="55%" stop-color="#ff4fd8"/><stop offset="76%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
-<linearGradient id="stroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#19e6ff"/><stop offset="24%" stop-color="#9b5cff"/><stop offset="50%" stop-color="#ff4fd8"/><stop offset="74%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
-<linearGradient id="circuit" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#23f7a3"/><stop offset="25%" stop-color="#19e6ff"/><stop offset="50%" stop-color="#9b5cff"/><stop offset="72%" stop-color="#ff4fd8"/><stop offset="100%" stop-color="#ffd977"/></linearGradient>
-<linearGradient id="line" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#19e6ff"/><stop offset="35%" stop-color="#9b5cff"/><stop offset="58%" stop-color="#ff4fd8"/><stop offset="78%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
-<filter id="glow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-</defs>
-<path class="rim" d="M180 26c-28-28-76-18-89 17-37-8-67 17-63 54-23 18-20 55 7 70-9 39 23 65 56 57 15 35 67 37 89 6 22 31 74 29 89-6 33 8 65-18 56-57 27-15 30-52 7-70 4-37-26-62-63-54-13-35-61-45-89-17Z"/>
-<path class="body" d="M180 32c-25-24-67-16-78 18-33-8-59 15-56 47-21 16-17 45 7 58-8 33 19 54 47 48 13 30 58 33 80 4 22 29 67 26 80-4 28 6 55-15 47-48 24-13 28-42 7-58 3-32-23-55-56-47-11-34-53-42-78-18Z"/>
-<path class="circuit" d="M180 47V76h-31v26h-27v32h-24M180 47v29h31v27h27v31h24M149 102h-19V78h-22M211 103h19V79h22M98 134H74v-22H58M262 134h24v-22h16M129 134h25v22h26v37M231 134h-25v22h-26v37M128 78v-20h-18M232 78v-20h18M105 169h-22v18H67M255 169h22v18h16"/>
-<path class="circuit s2" d="M180 78v24M154 102v32M206 102v32M155 156h25M205 156h-25M180 190v27M130 134h-30M230 134h30"/>
-<path class="circuit s3" d="M111 58l17 17M249 58l-17 17M74 113l24 21M286 113l-24 21M84 187l21-18M276 187l-21-18"/>
-<rect class="chip" x="161" y="108" width="38" height="32" rx="5"/>
-<path class="chipline" d="M166 115h28M166 122h28M166 129h28M166 136h28M172 108v-7M181 108v-8M190 108v-7M172 140v7M181 140v8M190 140v-7"/>
-<circle class="node" cx="180" cy="47" r="3"/><circle class="node" cx="149" cy="102" r="3"/><circle class="node" cx="211" cy="102" r="3"/><circle class="node" cx="98" cy="134" r="3"/><circle class="node" cx="262" cy="134" r="3"/><circle class="node" cx="118" cy="193" r="3"/><circle class="node" cx="242" cy="193" r="3"/>
-<path class="scan" d="M68 220 Q180 188 292 220"/>
-</svg>
-<div class="pulse"></div>
+  <div class="brain-image-wrap">
+    <img
+      class="brain-image"
+      src="assets/images/kingbot_v8_logo.png"
+      alt="KINGBOT high-tech artificial intelligence brain"
+    >
+    <div class="brain-energy"></div>
+  </div>
+  <div class="pulse"></div><div class="pulse"></div>
 <div class="market">
 <div class="grid"></div>
 <svg class="line" viewBox="0 0 410 112" preserveAspectRatio="none" aria-hidden="true"><polyline points="5,94 34,90 62,84 88,86 111,75 137,79 163,66 188,68 213,53 238,58 263,43 288,47 314,32 341,35 368,18 405,8"/></svg>
