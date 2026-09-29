@@ -84,14 +84,40 @@ export function createBotRuntimeRouter({pool,broker}){
     const market={...req.body?.market,symbol:requestedSymbol,bid,ask,price:Number(req.body?.price)||ask};
     const analysis=evaluateBot(b.id,market);
     if(!analysis.ok)return res.status(400).json(analysis);
-    const riskContext=req.body?.riskContext||{};
-    const risk=authorizeOrder({...riskContext,limits:s,executionMode:s.executionMode,killSwitch:s.killSwitch,requestedRiskPct:Number(req.body?.requestedRiskPct??s.maxRiskPerTradePct)});
+    let account;
+    let positions;
+    try {
+      [account,positions]=await Promise.all([broker.getAccount(user.id),broker.getPositions(user.id)]);
+    } catch(error) {
+      return res.status(503).json({ok:false,error:"ACCOUNT_RISK_DATA_UNAVAILABLE",reason:error?.message||"BROKER_TELEMETRY_FAILED",message:"Authoritative account and position data could not be verified. No order was submitted."});
+    }
+    const accountData=account?.data||{};
+    const positionData=Array.isArray(positions?.data)?positions.data:[];
+    const equity=Number(accountData.equity);
+    const balance=Number(accountData.balance);
+    if(!Number.isFinite(equity)||!Number.isFinite(balance)||equity<=0)return res.status(503).json({ok:false,error:"INVALID_ACCOUNT_TELEMETRY",message:"Broker account telemetry is incomplete. No order was submitted."});
+    const symbolPositions=positionData.filter(p=>String(p.symbol||"").toUpperCase()===requestedSymbol);
+    const spread=ask-bid;
+    const requestedRiskPct=Number(req.body?.requestedRiskPct??s.maxRiskPerTradePct);
+    const risk=authorizeOrder({
+      limits:s,
+      executionMode:s.executionMode,
+      killSwitch:s.killSwitch,
+      equity,
+      dayStartEquity:equity,
+      peakEquity:equity,
+      openPositions:positionData.length,
+      requestedRiskPct,
+      spread,
+      atr:Number(req.body?.atr)
+    });
     const signal=analysis.signal;
     let action="NO_ACTION",order=null;
     if(signal!=="NO_SIGNAL"&&risk.allowed){
         const side=signal==="LONG_CANDIDATE"?"BUY":"SELL";
         const volume=Number(req.body?.volume);
         if(!Number.isFinite(volume)||volume<=0)return res.status(400).json({ok:false,error:"ORDER_VOLUME_REQUIRED",message:"Supply a broker-valid order volume; no order was submitted.",analysis,risk});
+        if(symbolPositions.length>=s.maxPositions)return res.status(409).json({ok:false,error:"MAX_SYMBOL_POSITIONS",message:"Maximum positions for this symbol are already open. No order was submitted.",analysis,risk});
         const clientId="kb_"+crypto.randomUUID();
         order=await broker.placeOrder({side,symbol:analysis.market.symbol,volume,stopLoss:req.body?.stopLoss,takeProfit:req.body?.takeProfit,comment:"KINGBOT",clientId,userId:user.id});
         action="ORDER_SUBMITTED";
