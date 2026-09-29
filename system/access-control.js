@@ -87,7 +87,8 @@ No fake trading permissions.
 
       error: null,
 
-      checkedAt: 0
+      checkedAt: 0,
+      expiryTimer: null
 
     },
 
@@ -240,7 +241,13 @@ No fake trading permissions.
         };
 
         this.state.subscription =
-          data.subscription ? {...data.subscription,active:true} : null;
+          data.subscription ? {
+            ...data.subscription,
+            active:true,
+            plan:data.subscription.plan_id
+          } : null;
+
+        this.scheduleExpiryRefresh();
 
         this.state.loaded = true;
         this.state.checkedAt = Date.now();
@@ -492,8 +499,36 @@ No fake trading permissions.
 
       return (
         this.state.subscription.plan ||
+        this.state.subscription.plan_id ||
         null
       );
+
+    },
+
+    scheduleExpiryRefresh() {
+
+      if (this.state.expiryTimer) {
+        clearTimeout(this.state.expiryTimer);
+        this.state.expiryTimer = null;
+      }
+
+      const expiresAt = this.state.subscription?.expires_at;
+      if (!expiresAt) return;
+
+      const delay = Math.max(
+        1000,
+        new Date(expiresAt).getTime() - Date.now() + 1500
+      );
+
+      this.state.expiryTimer = setTimeout(async () => {
+        this.state.expiryTimer = null;
+        await this.refresh();
+        window.dispatchEvent(
+          new CustomEvent("kingbot:subscription-expired", {
+            detail: this.getState()
+          })
+        );
+      }, Math.min(delay, 2147483647));
 
     },
 
@@ -958,6 +993,11 @@ No fake trading permissions.
       this.state.subscription = null;
 
       this.state.permissions = {};
+
+      if (this.state.expiryTimer) {
+        clearTimeout(this.state.expiryTimer);
+        this.state.expiryTimer = null;
+      }
 
       return this.initialize();
 
