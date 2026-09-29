@@ -3,150 +3,212 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#030711">
-<meta name="description" content="KINGBOT FINTECH secure account access gateway.">
+<meta name="theme-color" content="#02040a">
+<meta name="description" content="KINGBOT FINTECH secure account access.">
+<meta http-equiv="Cache-Control" content="no-store">
 <title>KINGBOT FINTECH — Secure Access</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#02050d;--panel:#071022;--panel2:#0a1530;--gold:#f6b93b;--cyan:#19e6ff;--violet:#9b5cff;--pink:#ff4fd8;--green:#23f7a3;--red:#ff5c7a;--muted:#8d9aba;--line:rgba(255,255,255,.09)}
+:root{--bg:#02040a;--panel:#071022;--panel2:#0a1530;--cyan:#19e6ff;--violet:#9b5cff;--pink:#ff4fd8;--gold:#f6b93b;--green:#23f7a3;--red:#ff5c7a;--text:#eef3ff;--muted:#8390aa;--line:rgba(255,255,255,.10)}
 *{box-sizing:border-box;margin:0;padding:0}
-body{min-height:100vh;color:#eef3ff;font-family:Inter,sans-serif;background:radial-gradient(circle at 8% 12%,rgba(25,230,255,.13),transparent 27%),radial-gradient(circle at 92% 18%,rgba(255,79,216,.10),transparent 25%),radial-gradient(circle at 55% 90%,rgba(246,185,59,.09),transparent 30%),linear-gradient(145deg,#02050d,#050b18 48%,#02040a);overflow-x:hidden}
-body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.23;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:46px 46px}
-.page{min-height:100vh;display:grid;place-items:center;padding:32px 18px}
-.gateway{width:min(1120px,100%);display:grid;grid-template-columns:1fr 1fr;border:1px solid rgba(255,255,255,.10);border-radius:30px;overflow:hidden;background:rgba(5,10,23,.92);box-shadow:0 45px 120px rgba(0,0,0,.60),0 0 70px rgba(25,230,255,.05);position:relative}
-.gateway:before{content:"";position:absolute;inset:0;border-radius:30px;padding:1px;background:linear-gradient(120deg,rgba(25,230,255,.55),rgba(155,92,255,.28),rgba(255,79,216,.30),rgba(246,185,59,.55),rgba(35,247,163,.25));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
-.visual{padding:58px;display:flex;flex-direction:column;justify-content:center;background:radial-gradient(circle at 50% 28%,rgba(25,230,255,.10),transparent 30%),linear-gradient(150deg,rgba(12,23,52,.88),rgba(4,9,21,.96))}
-.brand{display:flex;align-items:center;gap:13px;margin-bottom:36px}
-.brand-logo{width:54px;height:54px;border-radius:15px;display:grid;place-items:center;overflow:hidden;border:1px solid rgba(246,185,59,.25);box-shadow:0 0 35px rgba(246,185,59,.12);background:rgba(255,255,255,.03)}
-.brand-logo img{width:100%;height:100%;object-fit:contain}.fallback{font:900 22px Orbitron;color:var(--gold)}
-.brand strong{font:900 15px Orbitron;letter-spacing:.08em}.brand small{display:block;color:#687694;font:700 7px JetBrains Mono;letter-spacing:.22em;margin-top:4px}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;color:var(--gold);font:800 8px JetBrains Mono;letter-spacing:.20em;padding:8px 10px;border:1px solid rgba(246,185,59,.17);border-radius:7px;background:rgba(246,185,59,.04);width:max-content}
-.eyebrow:before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}
-h1{font:900 clamp(30px,4vw,52px)/1.04 Orbitron;letter-spacing:-.03em;margin-top:22px}.gold{background:linear-gradient(120deg,var(--gold),#fff1bd,var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
-.description{max-width:530px;color:var(--muted);font-size:14px;line-height:1.8;margin:22px 0 28px}
-.signal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.signal{padding:14px;border:1px solid rgba(255,255,255,.06);border-radius:13px;background:rgba(255,255,255,.02)}.signal b{display:block;font:800 8px Orbitron;letter-spacing:.08em}.signal span{display:block;color:#677490;font:600 8px JetBrains Mono;margin-top:7px}
-.auth{padding:58px;background:rgba(2,6,15,.62);display:flex;align-items:center}.card{width:100%}
-.tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:5px;border:1px solid rgba(255,255,255,.08);border-radius:13px;background:rgba(255,255,255,.025);margin:20px 0 22px}
-.tab{padding:12px;border:0;border-radius:9px;background:transparent;color:#73809e;font:800 9px Orbitron;letter-spacing:.08em;cursor:pointer}.tab.active{color:#030711;background:linear-gradient(100deg,var(--gold),#ffe49a,var(--cyan));box-shadow:0 0 24px rgba(25,230,255,.12)}
-form{display:none}.form-active{display:block}.fields{display:grid;grid-template-columns:1fr 1fr;gap:13px}.full{grid-column:1/-1}.field{display:flex;flex-direction:column;gap:7px}.label{color:#cbd4e5;font-size:11px;font-weight:700}
-input,select{width:100%;padding:14px 14px;color:white;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.10);border-radius:12px;outline:none;font:500 13px Inter}input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 24px rgba(25,230,255,.09)}select{background:#0a1020}
-.phone{display:grid;grid-template-columns:104px 1fr;gap:8px}
-.checkline{display:flex;gap:9px;align-items:flex-start;color:#7f8ba8;font-size:10px;line-height:1.55;margin:16px 0}.checkline input{width:auto;margin-top:2px}
-.action{width:100%;padding:15px;border:0;border-radius:13px;background:linear-gradient(100deg,var(--gold),#ffe18b,var(--cyan));color:#05070d;font-weight:900;cursor:pointer;box-shadow:0 0 35px rgba(246,185,59,.13);transition:.2s}.action:hover{transform:translateY(-1px);box-shadow:0 0 45px rgba(25,230,255,.17)}.action:disabled{opacity:.6;cursor:not-allowed;transform:none}
-.helper{color:#687694;font-size:10px;line-height:1.6;margin-top:14px}.helper a{color:var(--cyan);font-weight:700;text-decoration:none}
-.message{display:none;margin-top:14px;padding:12px;border-radius:11px;font-size:11px;line-height:1.55}.message.show{display:block}.error{color:#ffc0cb;background:rgba(255,92,122,.08);border:1px solid rgba(255,92,122,.18)}.success{color:#b3ffe2;background:rgba(35,247,163,.07);border:1px solid rgba(35,247,163,.17)}
-.secure{display:flex;gap:15px;justify-content:center;color:#58657f;font:700 7px JetBrains Mono;letter-spacing:.08em;margin-top:22px}
-.boot-note{margin-top:22px;padding:12px;border-left:2px solid var(--cyan);color:#6f7d99;font:600 8px/1.55 JetBrains Mono;background:rgba(25,230,255,.03)}
-@media(max-width:900px){.gateway{grid-template-columns:1fr}.visual{padding:38px 28px}.auth{padding:32px 28px}}
-@media(max-width:560px){.page{padding:15px}.gateway{border-radius:22px}.visual,.auth{padding:27px 20px}.fields{grid-template-columns:1fr}.full{grid-column:auto}.signal-grid{grid-template-columns:1fr}.phone{grid-template-columns:92px 1fr}h1{font-size:28px}}
+html{background:var(--bg)}
+body{min-height:100vh;background:linear-gradient(145deg,#02040a,#071022 52%,#02040a);color:var(--text);font-family:Arial,Helvetica,sans-serif;overflow:auto}
+.page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.gateway{width:min(1040px,100%);display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:24px;overflow:hidden;background:#050b18;box-shadow:0 28px 90px rgba(0,0,0,.55)}
+.visual,.auth{min-width:0}
+.visual{padding:44px;background:#071126}
+.auth{padding:44px;background:#030812}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:26px}
+.brand-logo{width:50px;height:50px;border:1px solid rgba(246,185,59,.28);border-radius:13px;background:#050a15;display:grid;place-items:center;overflow:hidden}
+.brand-logo img{width:100%;height:100%;object-fit:contain}
+.brand-name{font-size:14px;font-weight:900;letter-spacing:2px}.brand-sub{margin-top:4px;color:#65728b;font-size:7px;font-weight:700;letter-spacing:1.8px}
+.badge{display:inline-block;padding:8px 10px;border-radius:8px;border:1px solid rgba(25,230,255,.18);color:var(--cyan);font-size:8px;font-weight:800;letter-spacing:1.7px}
+h1{margin-top:20px;font-size:31px;line-height:1.1;letter-spacing:-.4px}.accent{color:var(--gold)}
+.description{margin:17px 0 25px;color:var(--muted);font-size:12px;line-height:1.75}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.info{padding:13px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:#09142a}.info b{display:block;font-size:8px;letter-spacing:1px}.info span{display:block;margin-top:6px;color:#72809b;font-size:8px;line-height:1.45}
+.note{margin-top:18px;padding:12px;border-left:2px solid var(--cyan);background:#071321;color:#71809c;font-size:8px;line-height:1.6;letter-spacing:.4px}
+.card-title{font-size:9px;font-weight:900;letter-spacing:2px;color:var(--gold)}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:17px 0 20px;padding:5px;border:1px solid rgba(255,255,255,.08);border-radius:11px;background:#070d1a}
+.tab{height:42px;border:0;border-radius:8px;background:transparent;color:#71809b;font-size:9px;font-weight:900;letter-spacing:1px;cursor:pointer}.tab.active{background:var(--gold);color:#080b10}
+form{display:none}.form-active{display:block}
+.field{margin-top:13px}.field label{display:block;margin-bottom:7px;color:#cbd4e5;font-size:10px;font-weight:700}
+input,select{width:100%;height:46px;padding:0 12px;border:1px solid rgba(255,255,255,.11);border-radius:10px;background:#040914;color:#fff;outline:none;font-size:12px}
+input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(25,230,255,.07)}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px}.full{grid-column:1/-1}
+.phone{display:grid;grid-template-columns:100px 1fr;gap:7px}
+.checkline{display:flex;align-items:flex-start;gap:8px;margin:14px 0;color:#7f8ba4;font-size:9px;line-height:1.5}.checkline input{width:15px;height:15px;margin:0}
+.action{width:100%;height:48px;border:0;border-radius:10px;background:linear-gradient(90deg,var(--gold),#ffe29a,var(--cyan));color:#05070d;font-size:11px;font-weight:900;cursor:pointer}.action:disabled{opacity:.55;cursor:not-allowed}
+.helper{margin-top:12px;color:#71809b;font-size:9px}.helper a,.bottom a{color:var(--cyan);text-decoration:none;font-weight:800}
+.message{display:none;margin-top:12px;padding:11px;border-radius:10px;font-size:10px;line-height:1.5}.message.show{display:block}.message.error{color:#ffc1ca;background:rgba(255,92,122,.08);border:1px solid rgba(255,92,122,.18)}.message.success{color:#b8ffe1;background:rgba(35,247,163,.07);border:1px solid rgba(35,247,163,.16)}
+.bottom{text-align:center;margin-top:18px;color:#71809b;font-size:9px}.secure{text-align:center;margin-top:17px;color:#536078;font-size:7px;letter-spacing:1.3px}
+@media(max-width:860px){.gateway{grid-template-columns:1fr}.visual{padding:31px 25px}.auth{padding:31px 25px}}
+@media(max-width:520px){.page{padding:10px}.visual,.auth{padding:25px 18px}.info-grid,.fields{grid-template-columns:1fr}.full{grid-column:auto}.phone{grid-template-columns:88px 1fr}h1{font-size:27px}}
 </style>
 </head>
 <body>
 <main class="page">
-  <section class="gateway auth-shell">
-    <div class="visual">
-      <div class="brand">
-        <div class="brand-logo"><img src="assets/images/kingbot-fintech-logo.png" alt="KINGBOT FINTECH" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="fallback" style="display:none">K</span></div>
-        <div><strong>KINGBOT FINTECH</strong><small>GIBSONFX TECH · SECURE ACCESS</small></div>
-      </div>
-      <div class="eyebrow">NEURAL AUTHENTICATION GATEWAY</div>
-      <h1>Enter the <span class="gold">KINGBOT command center.</span></h1>
-      <p class="description">Authenticate your account or create a new secure profile. Verified sessions return directly to the KINGBOT landing environment and unlock the platform navigation according to your account access.</p>
-      <div class="signal-grid">
-        <div class="signal"><b style="color:var(--cyan)">IDENTITY</b><span>Firebase verified session</span></div>
-        <div class="signal"><b style="color:var(--pink)">SECURITY</b><span>Protected account state</span></div>
-        <div class="signal"><b style="color:var(--violet)">AUTOMATION</b><span>Bot access follows entitlements</span></div>
-        <div class="signal"><b style="color:var(--gold)">CONTROL</b><span>Realtime platform navigation</span></div>
-      </div>
-      <div class="boot-note">SYSTEM FLOW · STARTUP NEURAL LOAD → AUTHENTICATE → VERIFIED SESSION → KINGBOT LANDING</div>
-    </div>
-    <div class="auth">
-      <div class="card">
-        <div class="eyebrow">ACCOUNT ACCESS</div>
-        <div class="tabs">
-          <button class="tab active" id="signInTab" type="button">SIGN IN</button>
-          <button class="tab" id="signUpTab" type="button">CREATE ACCOUNT</button>
-        </div>
+<section class="gateway">
+<div class="visual">
+<div class="brand">
+<div class="brand-logo"><img src="assets/images/kingbot-fintech-logo.png" alt="KINGBOT FINTECH" onerror="this.style.display='none'"></div>
+<div><div class="brand-name">KINGBOT FINTECH</div><div class="brand-sub">GIBSONFX TECH · SECURE ACCESS</div></div>
+</div>
+<div class="badge">NEURAL AUTHENTICATION GATEWAY</div>
+<h1>Enter the <span class="accent">KINGBOT command center.</span></h1>
+<p class="description">Sign in to your verified account or create a new account. This access page does not redirect or reload while you enter your details.</p>
+<div class="info-grid">
+<div class="info"><b style="color:var(--cyan)">IDENTITY</b><span>Firebase account authentication</span></div>
+<div class="info"><b style="color:var(--pink)">SECURITY</b><span>Email verification required</span></div>
+<div class="info"><b style="color:var(--violet)">AUTOMATION</b><span>Platform access after login</span></div>
+<div class="info"><b style="color:var(--gold)">SESSION</b><span>Protected verified session</span></div>
+</div>
+<div class="note">FLOW · STARTUP → SIGN IN / CREATE ACCOUNT → EMAIL VERIFICATION → KINGBOT PLATFORM</div>
+</div>
 
-        <form id="signInForm" class="form-active">
-          <div class="field"><label class="label">EMAIL</label><input id="loginEmail" type="email" autocomplete="email" required></div>
-          <div class="field" style="margin-top:13px"><label class="label">PASSWORD</label><input id="loginPassword" type="password" autocomplete="current-password" required></div>
-          <div class="checkline"><input id="remember" type="checkbox"><label for="remember">Remember this session on this device.</label></div>
-          <button class="action" id="loginBtn" type="submit">SECURE SIGN IN →</button>
-          <div class="helper">Forgot your password? <a href="forgot-password.html">Reset it here.</a></div>
-        </form>
+<div class="auth">
+<div class="card-title">ACCOUNT ACCESS</div>
+<div class="tabs">
+<button id="signInTab" class="tab active" type="button">SIGN IN</button>
+<button id="signUpTab" class="tab" type="button">CREATE ACCOUNT</button>
+</div>
 
-        <form id="signUpForm">
-          <div class="fields">
-            <div class="field"><label class="label">FIRST NAME</label><input id="firstName" type="text" required autocomplete="given-name"></div>
-            <div class="field"><label class="label">LAST NAME</label><input id="lastName" type="text" required autocomplete="family-name"></div>
-            <div class="field full"><label class="label">EMAIL ADDRESS</label><input id="signupEmail" type="email" required autocomplete="email"></div>
-            <div class="field full">
-              <label class="label">PHONE NUMBER</label>
-              <div class="phone"><select id="countryCode"><option value="+254">KE +254</option><option value="+255">TZ +255</option><option value="+256">UG +256</option><option value="+250">RW +250</option><option value="+27">ZA +27</option><option value="+1">US +1</option><option value="+44">GB +44</option><option value="+91">IN +91</option><option value="+971">AE +971</option></select><input id="phone" type="tel" required autocomplete="tel" placeholder="712345678"></div>
-            </div>
-            <div class="field"><label class="label">PASSWORD</label><input id="signupPassword" type="password" minlength="8" required autocomplete="new-password"></div>
-            <div class="field"><label class="label">CONFIRM PASSWORD</label><input id="confirmPassword" type="password" minlength="8" required autocomplete="new-password"></div>
-          </div>
-          <div class="checkline"><input id="terms" type="checkbox" required><label for="terms">I agree to the KINGBOT Terms, Privacy Policy and Risk Disclosure.</label></div>
-          <button class="action" id="signupBtn" type="submit">CREATE SECURE ACCOUNT →</button>
-        </form>
+<form id="signInForm" class="form-active" novalidate>
+<div class="field"><label for="loginEmail">EMAIL ADDRESS</label><input id="loginEmail" type="email" inputmode="email" autocomplete="email" required></div>
+<div class="field"><label for="loginPassword">PASSWORD</label><input id="loginPassword" type="password" autocomplete="current-password" required></div>
+<div class="checkline"><input id="remember" type="checkbox" checked><label for="remember">Remember this session on this device.</label></div>
+<button id="loginBtn" class="action" type="submit">SECURE SIGN IN</button>
+<div class="helper">Forgot your password? <a href="forgot-password.html">Reset it here.</a></div>
+</form>
 
-        <div id="message" class="message"></div>
-        <div class="secure"><span>SECURE</span><span>VERIFIED ACCESS</span><span>RISK CONTROL</span></div>
-      </div>
-    </div>
-  </section>
+<form id="signUpForm" novalidate>
+<div class="fields">
+<div class="field"><label for="firstName">FIRST NAME</label><input id="firstName" type="text" autocomplete="given-name" required></div>
+<div class="field"><label for="lastName">LAST NAME</label><input id="lastName" type="text" autocomplete="family-name" required></div>
+<div class="field full"><label for="signupEmail">EMAIL ADDRESS</label><input id="signupEmail" type="email" autocomplete="email" required></div>
+<div class="field full"><label for="phone">PHONE NUMBER</label><div class="phone"><select id="countryCode"><option value="+254">KE +254</option><option value="+255">TZ +255</option><option value="+256">UG +256</option><option value="+250">RW +250</option><option value="+27">ZA +27</option><option value="+1">US +1</option><option value="+44">GB +44</option><option value="+91">IN +91</option><option value="+971">AE +971</option></select><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="712345678" required></div></div>
+<div class="field"><label for="signupPassword">PASSWORD</label><input id="signupPassword" type="password" minlength="8" autocomplete="new-password" required></div>
+<div class="field"><label for="confirmPassword">CONFIRM PASSWORD</label><input id="confirmPassword" type="password" minlength="8" autocomplete="new-password" required></div>
+</div>
+<div class="checkline"><input id="terms" type="checkbox" required><label for="terms">I agree to the KINGBOT Terms, Privacy Policy and Risk Disclosure.</label></div>
+<button id="signupBtn" class="action" type="submit">CREATE SECURE ACCOUNT</button>
+</form>
+
+<div id="message" class="message" role="status" aria-live="polite"></div>
+<div class="bottom">Need an account? <a id="switchText" href="#signup">Create one here</a></div>
+<div class="secure">FIREBASE AUTH · EMAIL VERIFIED · SECURE SESSION</div>
+</div>
+</section>
 </main>
 
-<script type="module">
-import "./system/firebase-auth.js";
-const $=id=>document.getElementById(id);
-const signInTab=$("signInTab"),signUpTab=$("signUpTab"),signInForm=$("signInForm"),signUpForm=$("signUpForm"),message=$("message");
-function showMessage(text,type){message.textContent=text;message.className="message show "+type;}
-function switchMode(mode){const up=mode==="signup";signInTab.classList.toggle("active",!up);signUpTab.classList.toggle("active",up);signInForm.classList.toggle("form-active",!up);signUpForm.classList.toggle("form-active",up);message.className="message";}
-signInTab.addEventListener("click",()=>switchMode("signin"));signUpTab.addEventListener("click",()=>switchMode("signup"));
-switchMode(location.hash.toLowerCase().includes("signup")?"signup":"signin");
-async function goHome(){try{if(window.KINGBOT_SESSION?.redirectAfterLogin){window.KINGBOT_SESSION.redirectAfterLogin();return;}}catch{}location.replace("index.html");}
-$("signInForm").addEventListener("submit",async e=>{
- e.preventDefault();$("loginBtn").disabled=true;$("loginBtn").textContent="AUTHENTICATING...";
- try{
-  const result=await window.KINGBOT_FIREBASE.signIn({email:$("loginEmail").value.trim(),password:$("loginPassword").value,remember:$("remember").checked});
-  if(!result.verified){sessionStorage.setItem("verification_email",$("loginEmail").value.trim());location.replace("verify.html");return;}
-  try{sessionStorage.setItem("KINGBOT_AUTH_HANDOFF","1");}catch(e){}
-  showMessage("Authentication verified. Opening KINGBOT command center…","success");
-  setTimeout(goHome,500);
- }catch(error){showMessage(error?.message||"Sign-in failed. Check your credentials and try again.","error");$("loginBtn").disabled=false;$("loginBtn").textContent="SECURE SIGN IN →";}
-});
-$("signUpForm").addEventListener("submit",async e=>{
- e.preventDefault();
- const password=$("signupPassword").value,confirm=$("confirmPassword").value;
- if(password!==confirm){showMessage("Passwords do not match.","error");return;}
- if(password.length<8){showMessage("Password must contain at least 8 characters.","error");return;}
- $("signupBtn").disabled=true;$("signupBtn").textContent="CREATING ACCOUNT...";
- const payload={firstName:$("firstName").value.trim(),lastName:$("lastName").value.trim(),email:$("signupEmail").value.trim(),phone:$("countryCode").value+$("phone").value.trim(),password};
- try{
-  const result=await window.KINGBOT_FIREBASE.createAccount(payload);
-  sessionStorage.setItem("signup_email",payload.email);sessionStorage.setItem("signup_phone",payload.phone);
-  showMessage(result.existing&&!result.verified?"Account exists but is not verified. A fresh verification email was sent.":"Account created. A verification email has been sent. Open it to verify your account.","success");
-  setTimeout(()=>location.replace("verify.html"),700);
- }catch(error){
-  const code=String(error?.code||"");
-  const messages={"auth/email-already-in-use":"An account with this email already exists.","auth/invalid-email":"Enter a valid email address.","auth/weak-password":"Choose a stronger password.","auth/network-request-failed":"Network error. Check your connection."};
-  showMessage(messages[code]||error?.message||"Account creation failed.","error");$("signupBtn").disabled=false;$("signupBtn").textContent="CREATE SECURE ACCOUNT →";
- }
-});
-(async()=>{
- try{
-  if(!window.KINGBOT_SESSION){await import("./system/session.js");}
-  const session=window.KINGBOT_SESSION;
-  if(session){
-   const state=await session.check({force:true});
-   if(state.authenticated){if(state.user?.verified)goHome();else if(location.pathname.toLowerCase().endsWith("access.html"))location.replace("verify.html");}
+<script>
+(function(){
+  "use strict";
+  const $=id=>document.getElementById(id);
+  const signInTab=$("signInTab"),signUpTab=$("signUpTab"),signInForm=$("signInForm"),signUpForm=$("signUpForm"),message=$("message"),switchText=$("switchText");
+
+  function showMessage(text,type){message.textContent=text;message.className="message show "+type}
+  function switchMode(mode){
+    const up=mode==="signup";
+    signInTab.classList.toggle("active",!up);
+    signUpTab.classList.toggle("active",up);
+    signInForm.classList.toggle("form-active",!up);
+    signUpForm.classList.toggle("form-active",up);
+    switchText.textContent=up?"Sign in here":"Create one here";
+    switchText.setAttribute("href",up?"#signin":"#signup");
+    message.className="message";
   }
- }catch{}
+
+  switchMode((location.hash||"").toLowerCase().includes("signup")?"signup":"signin");
+  signInTab.addEventListener("click",()=>{history.replaceState(null,"","#signin");switchMode("signin")});
+  signUpTab.addEventListener("click",()=>{history.replaceState(null,"","#signup");switchMode("signup")});
+  switchText.addEventListener("click",e=>{e.preventDefault();const up=location.hash.toLowerCase().includes("signin");history.replaceState(null,"",up?"#signup":"#signin");switchMode(up?"signup":"signin")});
+
+  async function firebase(){
+    if(!window.KINGBOT_FIREBASE){
+      await import("./system/firebase-auth.js");
+    }
+    if(!window.KINGBOT_FIREBASE) throw new Error("Authentication service did not load. Please refresh once and try again.");
+    return window.KINGBOT_FIREBASE;
+  }
+
+  function destination(){
+    const p=new URLSearchParams(location.search),ret=p.get("return");
+    if(!ret)return "index.html";
+    try{
+      const u=new URL(ret,location.href);
+      if(u.origin!==location.origin)return "index.html";
+      const lower=u.pathname.toLowerCase();
+      if(/\/(signin|signup|access|verify)\.html$/.test(lower))return "index.html";
+      return u.pathname+u.search+u.hash;
+    }catch{return "index.html"}
+  }
+
+  signInForm.addEventListener("submit",async e=>{
+    e.preventDefault();
+    const email=$("loginEmail").value.trim(),password=$("loginPassword").value;
+    if(!email||!password){showMessage("Enter your email and password.","error");return}
+    $("loginBtn").disabled=true;$("loginBtn").textContent="AUTHENTICATING…";
+    try{
+      const fb=await firebase();
+      const result=await fb.signIn({email,password,remember:$("remember").checked});
+      if(!result.verified){
+        try{sessionStorage.setItem("verification_email",email)}catch{}
+        location.replace("verify.html?return="+encodeURIComponent(destination()));
+        return;
+      }
+      try{sessionStorage.setItem("KINGBOT_AUTH_HANDOFF","1")}catch{}
+      showMessage("Authentication verified. Opening KINGBOT…","success");
+      setTimeout(()=>location.replace(destination()),250);
+    }catch(error){
+      const code=String(error&&error.code||"");
+      const map={
+        "auth/invalid-credential":"Email or password is incorrect.",
+        "auth/wrong-password":"Email or password is incorrect.",
+        "auth/user-not-found":"No KINGBOT account was found for this email.",
+        "auth/invalid-email":"Enter a valid email address.",
+        "auth/too-many-requests":"Too many attempts. Please wait and try again.",
+        "auth/network-request-failed":"Network error. Check your connection."
+      };
+      showMessage(map[code]||(error&&error.message)||"Sign-in failed. Check your details and try again.","error");
+      $("loginBtn").disabled=false;$("loginBtn").textContent="SECURE SIGN IN";
+    }
+  });
+
+  signUpForm.addEventListener("submit",async e=>{
+    e.preventDefault();
+    const password=$("signupPassword").value,confirm=$("confirmPassword").value;
+    if(!$("terms").checked){showMessage("Accept the Terms, Privacy Policy and Risk Disclosure.","error");return}
+    if(password.length<8){showMessage("Password must contain at least 8 characters.","error");return}
+    if(password!==confirm){showMessage("Passwords do not match.","error");return}
+    const payload={
+      firstName:$("firstName").value.trim(),
+      lastName:$("lastName").value.trim(),
+      email:$("signupEmail").value.trim(),
+      phone:$("countryCode").value+$("phone").value.trim(),
+      password
+    };
+    if(!payload.firstName||!payload.lastName||!payload.email||!payload.phone){showMessage("Complete all account details.","error");return}
+    $("signupBtn").disabled=true;$("signupBtn").textContent="CREATING ACCOUNT…";
+    try{
+      const fb=await firebase();
+      const result=await fb.createAccount(payload);
+      try{
+        sessionStorage.setItem("signup_email",payload.email);
+        sessionStorage.setItem("signup_phone",payload.phone);
+      }catch{}
+      showMessage(result.existing&&!result.verified?"Account exists but is not verified. A fresh verification email was sent.":"Account created. A verification email has been sent.","success");
+      setTimeout(()=>location.replace("verify.html"),500);
+    }catch(error){
+      const code=String(error&&error.code||"");
+      const map={
+        "auth/email-already-in-use":"An account with this email already exists.",
+        "auth/invalid-email":"Enter a valid email address.",
+        "auth/weak-password":"Choose a stronger password.",
+        "auth/network-request-failed":"Network error. Check your connection."
+      };
+      showMessage(map[code]||(error&&error.message)||"Account creation failed.","error");
+      $("signupBtn").disabled=false;$("signupBtn").textContent="CREATE SECURE ACCOUNT";
+    }
+  });
 })();
 </script>
 </body>
