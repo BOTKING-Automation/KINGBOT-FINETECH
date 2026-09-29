@@ -260,7 +260,7 @@ a{
     Remember session
    </label>
 
-   <a href="forgot-password.html">Forgot password?</a>
+   <a href="reset-password.html">Forgot password?</a>
   </div>
 
   <button id="loginBtn" type="submit">
@@ -339,7 +339,7 @@ form.addEventListener("submit",async e=>{
    return;
   }
 
-     window.location.href="index.html";
+     if(window.KINGBOT_SESSION && typeof window.KINGBOT_SESSION.redirectAfterLogin==="function"){ window.KINGBOT_SESSION.redirectAfterLogin(); } else { window.location.replace("index.html"); }
 
  }catch(error){
 
