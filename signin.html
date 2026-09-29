@@ -328,7 +328,7 @@ form.addEventListener("submit",async e=>{
    * Never trust a frontend flag for authentication.
    */
 
-  if(data.emailVerified===false || data.phoneVerified===false){
+  if(data.emailVerified===false){
 
    sessionStorage.setItem(
     "verification_email",
