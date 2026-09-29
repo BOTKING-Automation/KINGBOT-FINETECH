@@ -35,7 +35,6 @@ const db = getFirestore(app);
 async function saveUserProfile(user, extra={}) {
   if (!user) throw new Error("Cannot save a missing Firebase user.");
   const ref = doc(db, "users", user.uid);
-  const existing = await getDoc(ref);
   const now = serverTimestamp();
   const profile = {
     uid: user.uid,
@@ -46,20 +45,19 @@ async function saveUserProfile(user, extra={}) {
     lastName: extra.lastName || "",
     phone: extra.phone || "",
     lastLoginAt: now,
-    updatedAt: now
+    updatedAt: now,
+    botRunning: false,
+    lastTradeTime: 0,
+    trades: [],
+    totalTrades: 0,
+    wins: 0,
+    losses: 0,
+    balance: 0
   };
-  if (!existing.exists()) {
-    profile.createdAt = now;
-    profile.botRunning = false;
-    profile.lastTradeTime = 0;
-    profile.trades = [];
-    profile.totalTrades = 0;
-    profile.wins = 0;
-    profile.losses = 0;
-    profile.balance = 0;
-  }
+
+  // Write directly. Signup/sign-in must not depend on a prior profile read.
   await setDoc(ref, profile, { merge: true });
-  return (await getDoc(ref)).data();
+  return { ...profile, uid: user.uid, email: user.email || "" };
 }
 
 const API_BASE = window.KINGBOT_API?.baseUrl || "https://kingbot-fintech-api-etfv.onrender.com/api";
