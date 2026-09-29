@@ -61,8 +61,15 @@ export function createSubscriptionRouter({pool}) {
       await expireStaleSubscriptions(pool);
       const s=await pool.query("SELECT id,plan_id,status,started_at,expires_at,approved_at FROM kingbot_subscriptions WHERE user_id=$1 AND status='active' AND expires_at>NOW() ORDER BY expires_at DESC LIMIT 1",[u.id]);
       const e=await pool.query("SELECT e.bot_id FROM kingbot_bot_entitlements e JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 AND e.active=TRUE AND s.status='active' AND s.expires_at>NOW() ORDER BY e.bot_id",[u.id]);
-      const p=await pool.query("SELECT id,plan_id,status,mpesa_code,amount_kes,submitted_at,reviewed_at,reviewer_note FROM kingbot_payments WHERE user_id=$1 ORDER BY submitted_at DESC LIMIT 20",[u.id]);
-      res.json({ok:true,subscription:s.rows[0]||null,entitlements:e.rows.map(x=>({botId:x.bot_id,botName:BOT_NAMES[x.bot_id]||x.bot_id})),payments:p.rows});
+      const p=await pool.query("SELECT id,plan_id,status,mpesa_code,amount_kes,submitted_at,reviewed_at,reviewer_note,selected_bot_id FROM kingbot_payments WHERE user_id=$1 ORDER BY submitted_at DESC LIMIT 20",[u.id]);
+      res.json({
+        ok:true,
+        subscription:s.rows[0]||null,
+        entitlements:e.rows.map(x=>({botId:x.bot_id,botName:BOT_NAMES[x.bot_id]||x.bot_id})),
+        payments:p.rows,
+        latestPayment:p.rows[0]||null,
+        accessState:p.rows[0]?.status==="approved" ? "approved" : p.rows[0]?.status==="rejected" ? "denied" : p.rows[0]?.status==="pending" ? "waiting" : (s.rows[0] ? "approved" : "waiting")
+      });
     } catch(err){console.error("[KINGBOT BILLING]",err?.message||err);res.status(500).json({ok:false,error:"Subscription service unavailable."});}
   });
 
