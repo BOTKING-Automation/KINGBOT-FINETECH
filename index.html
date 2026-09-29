@@ -15,39 +15,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="system/platform.css">
-<style id="kb-entry-guard-style">
-html.kb-entry-check{visibility:hidden}
-html.kb-entry-check body{visibility:hidden}
-</style>
-<script type="module">
-(function(){
-  const root=document.documentElement;
-  root.classList.add("kb-entry-check");
-  let finished=false;
-  const finish=()=>{if(finished)return;finished=true;root.classList.remove("kb-entry-check")};
-  const deny=(path)=>{window.location.replace(path)};
-  const fallback=setTimeout(()=>{if(!finished)deny("access-stable.html#signin")},5000);
-  import("./system/firebase-auth.js").then(async()=>{
-    const fb=window.KINGBOT_FIREBASE;
-    const user=fb?.auth?.currentUser||null;
-    if(!user){clearTimeout(fallback);deny("access-stable.html#signin");return}
-    await fb.refresh();
-    const current=fb.auth.currentUser;
-    if(!current){clearTimeout(fallback);deny("access-stable.html#signin");return}
-    if(!current.emailVerified){
-      clearTimeout(fallback);
-      deny("verify.html");
-      return;
-    }
-    clearTimeout(fallback);
-    finish();
-  }).catch(()=>{
-    clearTimeout(fallback);
-    deny("access-stable.html#signin");
-  });
-})();
-</script>
-
 <style>
 
 :root{
