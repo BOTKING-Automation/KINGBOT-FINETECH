@@ -116,7 +116,9 @@ export function createBotRuntimeRouter({pool,broker}){
     if(!Number.isFinite(equity)||!Number.isFinite(balance)||equity<=0)return res.status(503).json({ok:false,error:"INVALID_ACCOUNT_TELEMETRY",message:"Broker account telemetry is incomplete. No order was submitted."});
     const symbolPositions=positionData.filter(p=>String(p.symbol||"").toUpperCase()===requestedSymbol);
     const spread=ask-bid;
-    const riskState=await pool.query("SELECT baseline_date,day_start_equity,peak_equity FROM kingbot_risk_state WHERE user_id=$1 AND bot_id=$2",[user.id,b.id]);
+    const mapping=await broker.getMapping(user.id);
+    if(!mapping)return res.status(503).json({ok:false,error:"BROKER_ACCOUNT_MAPPING_UNAVAILABLE",message:"The authorized broker account mapping could not be verified. No order was submitted."});
+    const riskState=await pool.query("SELECT baseline_date,day_start_equity,peak_equity FROM kingbot_account_risk_state WHERE user_id=$1 AND provider=$2 AND account_id=$3",[user.id,mapping.provider,mapping.account_id]);
     const today=new Date().toISOString().slice(0,10);
     let dayStartEquity=equity;
     let peakEquity=equity;
@@ -125,7 +127,7 @@ export function createBotRuntimeRouter({pool,broker}){
       dayStartEquity=state.baseline_date===today?Number(state.day_start_equity):equity;
       peakEquity=Math.max(Number(state.peak_equity)||equity,equity);
     }
-    await pool.query("INSERT INTO kingbot_risk_state(user_id,bot_id,baseline_date,day_start_equity,peak_equity,updated_at) VALUES($1,$2,$3,$4,$5,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET baseline_date=EXCLUDED.baseline_date,day_start_equity=EXCLUDED.day_start_equity,peak_equity=EXCLUDED.peak_equity,updated_at=NOW()",[user.id,b.id,today,dayStartEquity,peakEquity]);
+    await pool.query("INSERT INTO kingbot_account_risk_state(user_id,provider,account_id,baseline_date,day_start_equity,peak_equity,updated_at) VALUES($1,$2,$3,$4,$5,$6,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET baseline_date=EXCLUDED.baseline_date,day_start_equity=EXCLUDED.day_start_equity,peak_equity=EXCLUDED.peak_equity,updated_at=NOW()",[user.id,mapping.provider,mapping.account_id,today,dayStartEquity,peakEquity]);
     const requestedRiskPct=s.maxRiskPerTradePct;
     const risk=authorizeOrder({
       limits:s,
@@ -194,6 +196,7 @@ export function createBotRuntimeRouter({pool,broker}){
 export async function ensureBotRuntimeSchema(pool){
   if(!pool)return;
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_risk_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,baseline_date DATE NOT NULL,day_start_equity NUMERIC NOT NULL,peak_equity NUMERIC NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,bot_id))");
+  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_account_risk_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,baseline_date DATE NOT NULL,day_start_equity NUMERIC NOT NULL,peak_equity NUMERIC NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,provider,account_id))");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_execution_journal (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,execution_mode TEXT NOT NULL,symbol TEXT NOT NULL,side TEXT NOT NULL,volume NUMERIC NOT NULL,status TEXT NOT NULL,broker_result JSONB,error_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_runtime (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'STOPPED',last_signal JSONB,last_run_at TIMESTAMPTZ,last_error TEXT,symbol TEXT,timeframe TEXT DEFAULT '1m',updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,bot_id))");
 }
