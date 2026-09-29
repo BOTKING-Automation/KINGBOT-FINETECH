@@ -75,8 +75,6 @@ html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
 .kb-market-plane:after{content:"";position:absolute;left:4%;right:4%;top:12%;bottom:12%;border-top:1px solid rgba(35,247,163,.14);border-bottom:1px solid rgba(25,230,255,.1);transform:translateZ(-2px);box-shadow:0 -22px 0 rgba(155,92,255,.035),0 22px 0 rgba(246,185,59,.03)}
 @keyframes kbCircuitFlow{to{stroke-dashoffset:-56}}@keyframes kbTechNode{to{opacity:.38;filter:url(#kbTechGlow) brightness(1.6)}}@keyframes kbScan{to{stroke-dashoffset:-86}}
 </style>
-<script src="system/boot-loader.js?v=24"></script>
-  
 <style>
 
 :root{
@@ -2087,12 +2085,33 @@ footer{
   "use strict";
   if(window.__KINGBOT_BOOT_HANDOFF__) return;
   window.__KINGBOT_BOOT_HANDOFF__ = true;
-  var target = "access.html#signin";
+
+  /*
+   * The startup screen is only an entry gate for unauthenticated visitors.
+   * A successful sign-in sets the one-use handoff flag below before returning
+   * to index.html, preventing the landing page from bouncing back to login.
+   */
+  var authHandoff = false;
+  try{
+    authHandoff = sessionStorage.getItem("KINGBOT_AUTH_HANDOFF") === "1";
+    if(authHandoff) sessionStorage.removeItem("KINGBOT_AUTH_HANDOFF");
+  }catch(e){}
+
   window.setTimeout(function(){
+    if(authHandoff) return;
+
+    var authenticated = false;
     try{
-      window.location.replace(target);
+      authenticated = Boolean(window.KINGBOT_SESSION?.isAuthenticated?.());
+      if(!authenticated) authenticated = Boolean(window.KINGBOT_FIREBASE?.auth?.currentUser);
+    }catch(e){}
+
+    if(authenticated) return;
+
+    try{
+      window.location.replace("access.html#signin");
     }catch(e){
-      window.location.href = target;
+      window.location.href = "access.html#signin";
     }
   }, 10000);
 })();
