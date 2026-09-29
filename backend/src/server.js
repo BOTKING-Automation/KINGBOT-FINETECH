@@ -88,7 +88,7 @@ app.post("/api/broker/disconnect", async (req,res)=>{
 });
 app.get("/api/account", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
-  try{const x=await broker.getAccount();res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Account telemetry unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
+  try{const x=await broker.getAccount(user.id);res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Account telemetry unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
 });
 app.get("/api/positions", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
