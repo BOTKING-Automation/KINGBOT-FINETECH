@@ -1,6 +1,8 @@
-/* KINGBOT FINTECH — Advanced unified navigation
-   High-performance command menu: compact top-left trigger + right-side nav dashboard.
-   No framework, no canvas, no polling. CSS animations are GPU-friendly and DOM is created once. */
+/* KINGBOT FINTECH — Unified top navigation
+   Single source of truth for site navigation.
+   Desktop: page links stay in the top-right.
+   Mobile: compact glowing command button opens the same links.
+   The old duplicate navigation dashboard/cards have been removed. */
 (function(window, document){
   "use strict";
 
@@ -8,15 +10,15 @@
     ["index.html","Overview","⌂","Core platform"],
     ["markets.html","Markets","◈","Live market intelligence"],
     ["terminal.html","Terminal","⌁","Trading terminal"],
-    ["bots.html","Bot Ecosystem","◉","Automated trading systems"],
+    ["bots.html","Bots","◉","Automated trading systems"],
     ["analytics.html","Analytics","▦","Performance intelligence"],
-    ["ai.html","AI Intelligence","✦","AI trading layer"],
+    ["ai.html","AI","✦","AI intelligence layer"],
     ["academy.html","Academy","◇","Education & research"],
     ["pricing.html","Plans","◫","Platform access"],
     ["about.html","About","◎","KINGBOT FINTECH"],
     ["contact.html","Contact","✉","Support & contact"],
     ["settings.html","Settings","⚙","Account controls"],
-    ["legal.html","Legal Center","▤","Terms & risk disclosure"]
+    ["legal.html","Legal","▤","Terms & risk disclosure"]
   ];
 
   const accountLinks = [
@@ -26,208 +28,543 @@
   ];
 
   function currentPage(){
-    const file=(window.location.pathname.split("/").filter(Boolean).pop()||"index.html").toLowerCase();
-    return file === "" ? "index.html" : file;
+    const file = (window.location.pathname.split("/").filter(Boolean).pop() || "index.html").toLowerCase();
+    return file || "index.html";
   }
 
   function style(){
-    if(document.getElementById("kb-advanced-nav-style")) return;
-    const s=document.createElement("style");
-    s.id="kb-advanced-nav-style";
-    s.textContent=`
-      #kb-nav-trigger{
-        position:fixed;top:18px;left:18px;z-index:2147483000;
-        width:48px;height:48px;border-radius:15px;border:1px solid rgba(255,255,255,.12);
-        background:rgba(5,10,24,.78);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
-        color:#eef2ff;cursor:pointer;display:grid;place-items:center;
-        box-shadow:0 12px 35px rgba(0,0,0,.35),0 0 28px rgba(25,230,255,.08);
-        transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease;
-        isolation:isolate;
-      }
-      #kb-nav-trigger:before{
-        content:"";position:absolute;inset:-2px;border-radius:17px;padding:1px;
-        background:conic-gradient(from 0deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#2ee6a8,#19e6ff);
-        -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-        -webkit-mask-composite:xor;mask-composite:exclude;opacity:.9;
-        animation:kbSpin 4.5s linear infinite;z-index:-1;
-      }
-      #kb-nav-trigger:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 15px 42px rgba(0,0,0,.42),0 0 35px rgba(25,230,255,.2)}
-      #kb-nav-trigger .kb-bars{width:20px;height:16px;position:relative}
-      #kb-nav-trigger .kb-bars i{position:absolute;left:0;width:100%;height:2px;border-radius:2px;background:linear-gradient(90deg,#19e6ff,#9b5cff,#f6b93b);transition:.22s}
-      #kb-nav-trigger .kb-bars i:nth-child(1){top:0}.kb-bars i:nth-child(2){top:7px}.kb-bars i:nth-child(3){top:14px}
-      #kb-nav-trigger[aria-expanded="true"] .kb-bars i:nth-child(1){top:7px;transform:rotate(45deg)}
-      #kb-nav-trigger[aria-expanded="true"] .kb-bars i:nth-child(2){opacity:0;transform:scaleX(.2)}
-      #kb-nav-trigger[aria-expanded="true"] .kb-bars i:nth-child(3){top:7px;transform:rotate(-45deg)}
+    if(document.getElementById("kb-unified-nav-style")) return;
 
-      #kb-nav-overlay{
-        position:fixed;inset:0;z-index:2147482990;display:none;
-        background:rgba(1,4,12,.72);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
-        opacity:0;transition:opacity .22s ease;
+    const s = document.createElement("style");
+    s.id = "kb-unified-nav-style";
+    s.textContent = `
+      #kb-unified-nav{
+        position:fixed;
+        top:12px;
+        left:12px;
+        right:12px;
+        z-index:2147483000;
+        pointer-events:none;
+        font-family:Space Grotesk,Inter,system-ui,sans-serif;
       }
-      #kb-nav-overlay.kb-open{display:block;opacity:1}
 
-      #kb-nav-panel{
-        position:absolute;top:12px;right:12px;bottom:12px;width:min(900px,calc(100vw - 24px));
-        overflow:hidden;border-radius:28px;
-        background:linear-gradient(145deg,rgba(10,18,40,.97),rgba(3,7,17,.985));
+      .kb-nav-bar{
+        width:min(1480px,100%);
+        min-height:62px;
+        margin:0 auto;
+        padding:9px 11px 9px 14px;
+        display:flex;
+        align-items:center;
+        gap:18px;
         border:1px solid rgba(255,255,255,.09);
-        box-shadow:0 35px 120px rgba(0,0,0,.72),0 0 90px rgba(77,141,255,.09);
-        transform:translateX(30px) scale(.985);transition:transform .28s cubic-bezier(.2,.8,.2,1);
-        isolation:isolate;
+        border-radius:18px;
+        background:linear-gradient(120deg,rgba(5,10,24,.9),rgba(8,14,31,.78));
+        backdrop-filter:blur(22px);
+        -webkit-backdrop-filter:blur(22px);
+        box-shadow:0 18px 55px rgba(0,0,0,.42),0 0 35px rgba(25,230,255,.06);
+        pointer-events:auto;
+        position:relative;
+        overflow:visible;
       }
-      #kb-nav-overlay.kb-open #kb-nav-panel{transform:none}
-      #kb-nav-panel:before{
-        content:"";position:absolute;inset:0;padding:1px;border-radius:28px;pointer-events:none;
-        background:conic-gradient(from 35deg,#19e6ff,#4d8dff,#9b5cff,#ff4fd8,#f6b93b,#2ee6a8,#19e6ff);
+
+      .kb-nav-bar::before{
+        content:"";
+        position:absolute;
+        inset:-1px;
+        border-radius:19px;
+        padding:1px;
+        background:linear-gradient(100deg,rgba(25,230,255,.42),rgba(155,92,255,.24),rgba(246,185,59,.36),rgba(25,230,255,.18));
         -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-        -webkit-mask-composite:xor;mask-composite:exclude;opacity:.9;
-        animation:kbSpin 9s linear infinite;
+        -webkit-mask-composite:xor;
+        mask-composite:exclude;
+        pointer-events:none;
       }
-      #kb-nav-panel:after{
-        content:"";position:absolute;inset:0;pointer-events:none;
-        background:radial-gradient(circle at 20% 15%,rgba(25,230,255,.1),transparent 28%),
-                   radial-gradient(circle at 80% 85%,rgba(255,79,216,.08),transparent 30%);
-        z-index:-1;
+
+      .kb-nav-brand{
+        display:flex;
+        align-items:center;
+        gap:10px;
+        flex:none;
+        text-decoration:none;
+        color:#eef2ff;
       }
-      .kb-nv-shell{height:100%;display:grid;grid-template-columns:1fr 280px;position:relative}
-      .kb-nv-main{min-width:0;padding:30px 30px 28px;overflow:auto}
-      .kb-nv-right{position:relative;padding:30px 20px 24px;border-left:1px solid rgba(255,255,255,.07);background:rgba(2,7,18,.42);overflow:auto}
-      .kb-nv-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
-      .kb-nv-kicker{font:700 9px/1 JetBrains Mono,monospace;letter-spacing:.28em;color:#19e6ff;text-transform:uppercase}
-      .kb-nv-title{margin-top:9px;font:800 clamp(22px,3vw,34px)/1.05 Orbitron,sans-serif;letter-spacing:-.03em;color:#eef2ff}
-      .kb-nv-title span{background:linear-gradient(90deg,#f6b93b,#19e6ff,#9b5cff);-webkit-background-clip:text;background-clip:text;color:transparent}
-      .kb-nv-close{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#93a0c9;cursor:pointer;font-size:20px}
-      .kb-nv-close:hover{color:#fff;border-color:rgba(25,230,255,.35)}
-      .kb-nv-status{margin-top:25px;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:13px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);font:600 9px JetBrains Mono,monospace;color:#93a0c9}
-      .kb-nv-live{width:7px;height:7px;border-radius:50%;background:#2ee6a8;box-shadow:0 0 12px #2ee6a8;animation:kbPulse 1.5s ease-in-out infinite}
-      .kb-nv-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin-top:16px}
-      .kb-nv-card{position:relative;min-height:105px;padding:16px;border-radius:16px;background:linear-gradient(145deg,rgba(16,26,58,.75),rgba(5,10,24,.82));border:1px solid rgba(255,255,255,.07);transition:.2s;overflow:hidden}
-      .kb-nv-card:before{content:"";position:absolute;inset:-50%;background:conic-gradient(from 90deg,transparent,#19e6ff22,transparent,#ff4fd822,transparent);animation:kbSpin 7s linear infinite;opacity:0;transition:.2s}
-      .kb-nv-card:hover{transform:translateY(-3px);border-color:rgba(25,230,255,.32);box-shadow:0 15px 35px rgba(0,0,0,.25)}
-      .kb-nv-card:hover:before{opacity:1}
-      .kb-nv-card>*{position:relative}
-      .kb-nv-icon{font-size:19px;margin-bottom:11px;color:#f6b93b}
-      .kb-nv-name{font:800 10px Orbitron,sans-serif;color:#eef2ff;letter-spacing:.03em}
-      .kb-nv-desc{margin-top:5px;font:500 8px/1.45 Space Grotesk,sans-serif;color:#7180a9}
-      .kb-nv-right-title{font:800 10px Orbitron,sans-serif;letter-spacing:.14em;color:#eef2ff}
-      .kb-nv-rail{margin-top:14px;display:grid;gap:6px}
-      .kb-nv-link{display:grid;grid-template-columns:31px 1fr;gap:9px;align-items:center;padding:10px;border-radius:12px;color:#8f9bc0;border:1px solid transparent;transition:.18s}
-      .kb-nv-link:hover,.kb-nv-link.kb-active{color:#fff;background:linear-gradient(90deg,rgba(25,230,255,.09),rgba(155,92,255,.07));border-color:rgba(25,230,255,.16)}
-      .kb-nv-link.kb-active{box-shadow:inset 2px 0 0 #19e6ff,0 0 22px rgba(25,230,255,.05)}
-      .kb-nv-link-icon{width:31px;height:31px;display:grid;place-items:center;border-radius:9px;background:rgba(255,255,255,.035);font-size:14px;color:#19e6ff}
-      .kb-nv-link-text{font:700 9px Space Grotesk,sans-serif}.kb-nv-link-sub{display:block;margin-top:2px;font:500 7px JetBrains Mono,monospace;color:#5f6b8e}
-      .kb-nv-section{margin-top:24px;padding-top:18px;border-top:1px solid rgba(255,255,255,.06)}
-      .kb-nv-section-label{font:700 8px JetBrains Mono,monospace;letter-spacing:.2em;color:#596684;margin-bottom:9px}
-      .kb-nv-mini{display:flex;gap:7px;flex-wrap:wrap}
-      .kb-nv-chip{font:700 7px JetBrains Mono,monospace;color:#93a0c9;padding:7px 9px;border-radius:8px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06)}
-      .kb-nv-footer{position:absolute;bottom:18px;left:20px;right:20px;font:500 7px/1.5 JetBrains Mono,monospace;color:#4f5b7c}
-      @keyframes kbSpin{to{transform:rotate(360deg)}}@keyframes kbPulse{50%{opacity:.35;transform:scale(.75)}}
-      @media(max-width:760px){
-        #kb-nav-trigger{top:12px;left:12px;width:44px;height:44px}
-        #kb-nav-panel{top:7px;right:7px;bottom:7px;width:calc(100vw - 14px);border-radius:22px}
-        .kb-nv-shell{grid-template-columns:1fr}
-        .kb-nv-main{padding:23px 18px 100px}
-        .kb-nv-right{border-left:0;border-top:1px solid rgba(255,255,255,.07);padding:20px 18px 85px}
-        .kb-nv-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-        .kb-nv-footer{position:static;margin-top:18px}
+
+      .kb-nav-brand-mark{
+        width:38px;
+        height:38px;
+        display:grid;
+        place-items:center;
+        border-radius:12px;
+        color:#07101b;
+        font:900 17px Orbitron,sans-serif;
+        background:linear-gradient(135deg,#f6b93b,#19e6ff,#9b5cff);
+        box-shadow:0 0 22px rgba(25,230,255,.22),0 0 28px rgba(246,185,59,.14);
+        position:relative;
+        overflow:hidden;
       }
+
+      .kb-nav-brand-mark::after{
+        content:"";
+        position:absolute;
+        inset:0;
+        background:linear-gradient(120deg,transparent,rgba(255,255,255,.55),transparent);
+        transform:translateX(-120%);
+        animation:kbNavSweep 4.8s linear infinite;
+      }
+
+      @keyframes kbNavSweep{
+        55%,100%{transform:translateX(120%)}
+      }
+
+      .kb-nav-brand-copy strong{
+        display:block;
+        font:900 12px/1 Orbitron,sans-serif;
+        letter-spacing:.13em;
+      }
+
+      .kb-nav-brand-copy span{
+        display:block;
+        margin-top:4px;
+        color:#687695;
+        font:600 7px/1 JetBrains Mono,monospace;
+        letter-spacing:.18em;
+      }
+
+      .kb-nav-actions{
+        margin-left:auto;
+        display:flex;
+        align-items:center;
+        justify-content:flex-end;
+        min-width:0;
+      }
+
+      .kb-nav-links{
+        display:flex;
+        align-items:center;
+        justify-content:flex-end;
+        flex-wrap:wrap;
+        gap:3px;
+      }
+
+      .kb-nav-links a{
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+        padding:8px 9px;
+        border-radius:9px;
+        color:#8d98b5;
+        text-decoration:none;
+        font:700 8px/1 Space Grotesk,sans-serif;
+        letter-spacing:.025em;
+        white-space:nowrap;
+        transition:.2s ease;
+        border:1px solid transparent;
+      }
+
+      .kb-nav-links a .kb-nav-icon{
+        color:#19e6ff;
+        font-size:11px;
+      }
+
+      .kb-nav-links a:hover,
+      .kb-nav-links a.kb-active{
+        color:#ffffff;
+        border-color:rgba(25,230,255,.15);
+        background:linear-gradient(90deg,rgba(25,230,255,.08),rgba(155,92,255,.06));
+        box-shadow:0 0 16px rgba(25,230,255,.05);
+      }
+
+      .kb-nav-right-stack{
+        display:flex;
+        flex-direction:column;
+        align-items:flex-end;
+        gap:5px;
+        min-width:0;
+      }
+
+      .kb-nav-command-line{
+        display:flex;
+        align-items:center;
+        justify-content:flex-end;
+        gap:6px;
+      }
+
+      .kb-nav-status{
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+        color:#61708f;
+        font:700 7px/1 JetBrains Mono,monospace;
+        letter-spacing:.08em;
+        white-space:nowrap;
+      }
+
+      .kb-nav-live{
+        width:5px;
+        height:5px;
+        border-radius:50%;
+        background:#23f7a3;
+        box-shadow:0 0 9px #23f7a3;
+        animation:kbNavPulse 1.6s ease-in-out infinite;
+      }
+
+      @keyframes kbNavPulse{
+        50%{opacity:.3;transform:scale(.72)}
+      }
+
+      .kb-dashboard-portrait{
+        display:flex;
+        align-items:center;
+        gap:7px;
+        padding:4px 7px 4px 4px;
+        border-radius:10px;
+        color:#dfe7ff;
+        text-decoration:none;
+        background:rgba(255,255,255,.028);
+        border:1px solid rgba(246,185,59,.16);
+        box-shadow:0 0 18px rgba(246,185,59,.07);
+        transition:.2s ease;
+      }
+
+      .kb-dashboard-portrait:hover{
+        transform:translateY(-1px);
+        border-color:rgba(25,230,255,.34);
+        box-shadow:0 0 26px rgba(25,230,255,.12),0 0 18px rgba(246,185,59,.08);
+      }
+
+      .kb-dashboard-portrait img{
+        width:32px;
+        height:32px;
+        object-fit:cover;
+        border-radius:8px;
+        display:block;
+        border:1px solid rgba(25,230,255,.22);
+        box-shadow:0 0 12px rgba(25,230,255,.15);
+      }
+
+      .kb-dashboard-portrait .dash-copy strong{
+        display:block;
+        color:#f6c75b;
+        font:900 7px/1 Orbitron,sans-serif;
+        letter-spacing:.1em;
+      }
+
+      .kb-dashboard-portrait .dash-copy span{
+        display:block;
+        margin-top:3px;
+        color:#64708b;
+        font:600 6px/1 JetBrains Mono,monospace;
+        letter-spacing:.05em;
+      }
+
+      #kb-mobile-nav-trigger{
+        display:none;
+        width:43px;
+        height:43px;
+        flex:none;
+        border:1px solid rgba(25,230,255,.22);
+        border-radius:12px;
+        background:rgba(5,10,24,.86);
+        color:#eef2ff;
+        box-shadow:0 0 24px rgba(25,230,255,.09);
+      }
+
+      #kb-mobile-nav-trigger .kb-bars{
+        width:18px;
+        height:14px;
+        margin:auto;
+        position:relative;
+        display:block;
+      }
+
+      #kb-mobile-nav-trigger .kb-bars i{
+        position:absolute;
+        left:0;
+        width:100%;
+        height:2px;
+        border-radius:2px;
+        background:linear-gradient(90deg,#19e6ff,#9b5cff,#f6b93b);
+        transition:.2s ease;
+      }
+
+      #kb-mobile-nav-trigger .kb-bars i:nth-child(1){top:0}
+      #kb-mobile-nav-trigger .kb-bars i:nth-child(2){top:6px}
+      #kb-mobile-nav-trigger .kb-bars i:nth-child(3){top:12px}
+
+      #kb-mobile-nav-trigger[aria-expanded="true"] .kb-bars i:nth-child(1){top:6px;transform:rotate(45deg)}
+      #kb-mobile-nav-trigger[aria-expanded="true"] .kb-bars i:nth-child(2){opacity:0}
+      #kb-mobile-nav-trigger[aria-expanded="true"] .kb-bars i:nth-child(3){top:6px;transform:rotate(-45deg)}
+
+      .kb-mobile-panel{
+        display:none;
+        margin-top:8px;
+        margin-left:auto;
+        width:min(430px,calc(100vw - 24px));
+        max-height:calc(100vh - 90px);
+        overflow:auto;
+        padding:12px;
+        border-radius:17px;
+        border:1px solid rgba(25,230,255,.16);
+        background:linear-gradient(145deg,rgba(6,12,28,.98),rgba(3,7,17,.98));
+        box-shadow:0 25px 90px rgba(0,0,0,.6),0 0 40px rgba(25,230,255,.07);
+      }
+
+      .kb-mobile-panel.kb-open{display:block}
+
+      .kb-mobile-grid{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:6px;
+      }
+
+      .kb-mobile-grid a{
+        min-height:54px;
+        padding:9px;
+        display:flex;
+        flex-direction:column;
+        justify-content:center;
+        gap:3px;
+        border-radius:11px;
+        color:#8e9abb;
+        text-decoration:none;
+        background:rgba(255,255,255,.025);
+        border:1px solid rgba(255,255,255,.05);
+      }
+
+      .kb-mobile-grid a:hover,
+      .kb-mobile-grid a.kb-active{
+        color:#fff;
+        border-color:rgba(25,230,255,.18);
+        background:rgba(25,230,255,.055);
+      }
+
+      .kb-mobile-grid .kb-mobile-name{
+        font:800 8px/1.1 Orbitron,sans-serif;
+      }
+
+      .kb-mobile-grid .kb-mobile-desc{
+        font:500 7px/1.2 JetBrains Mono,monospace;
+        color:#586581;
+      }
+
+      .kb-mobile-account{
+        display:grid;
+        grid-template-columns:repeat(3,1fr);
+        gap:6px;
+        margin-top:9px;
+        padding-top:9px;
+        border-top:1px solid rgba(255,255,255,.06);
+      }
+
+      .kb-mobile-account a{
+        padding:9px 6px;
+        border-radius:9px;
+        text-align:center;
+        color:#8895b5;
+        text-decoration:none;
+        font:700 7px/1.2 Space Grotesk,sans-serif;
+        background:rgba(255,255,255,.025);
+        border:1px solid rgba(255,255,255,.05);
+      }
+
+      .kb-mobile-dashboard{
+        display:flex;
+        align-items:center;
+        gap:9px;
+        margin-top:9px;
+        padding:8px;
+        border-radius:12px;
+        background:linear-gradient(90deg,rgba(246,185,59,.07),rgba(25,230,255,.05));
+        border:1px solid rgba(246,185,59,.14);
+      }
+
+      .kb-mobile-dashboard img{
+        width:42px;
+        height:42px;
+        border-radius:10px;
+        object-fit:cover;
+        border:1px solid rgba(25,230,255,.2);
+      }
+
+      .kb-mobile-dashboard strong{
+        display:block;
+        font:800 8px Orbitron,sans-serif;
+        color:#f6c75b;
+        letter-spacing:.08em;
+      }
+
+      .kb-mobile-dashboard span{
+        display:block;
+        margin-top:3px;
+        color:#63718c;
+        font:600 7px JetBrains Mono,monospace;
+      }
+
+      .kb-mobile-meta{
+        margin-top:9px;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        color:#56627d;
+        font:600 7px JetBrains Mono,monospace;
+      }
+
+      @media(max-width:1120px){
+        .kb-nav-links a{
+          padding:7px 7px;
+          font-size:7.5px;
+        }
+        .kb-nav-brand-copy span{display:none}
+      }
+
+      @media(max-width:900px){
+        #kb-unified-nav{
+          top:8px;
+          left:8px;
+          right:8px;
+        }
+        .kb-nav-bar{
+          min-height:56px;
+          padding:7px 8px 7px 9px;
+          border-radius:15px;
+        }
+        .kb-nav-brand-mark{
+          width:35px;
+          height:35px;
+          border-radius:10px;
+        }
+        .kb-nav-brand-copy strong{font-size:10px}
+        .kb-nav-right-stack{
+          display:none;
+        }
+        #kb-mobile-nav-trigger{
+          display:grid;
+          place-items:center;
+          margin-left:auto;
+        }
+        .kb-nav-actions{
+          margin-left:auto;
+        }
+        .kb-mobile-panel{
+          position:relative;
+        }
+      }
+
+      @media(max-width:520px){
+        .kb-nav-brand-copy strong{font-size:9px}
+        .kb-nav-bar{gap:8px}
+        .kb-mobile-panel{width:calc(100vw - 16px)}
+        .kb-mobile-grid{grid-template-columns:1fr 1fr}
+        .kb-mobile-account{grid-template-columns:1fr}
+      }
+
       @media(prefers-reduced-motion:reduce){
-        #kb-nav-trigger:before,#kb-nav-panel:before,.kb-nv-card:before,.kb-nv-live{animation:none}
-        #kb-nav-overlay,#kb-nav-panel{transition:none}
+        .kb-nav-brand-mark::after,
+        .kb-nav-live{animation:none}
       }
     `;
     document.head.appendChild(s);
   }
 
   function build(){
-    if(document.getElementById("kb-nav-trigger")) return;
+    if(document.getElementById("kb-unified-nav")) return;
+
+    // Auth/verification screens have their own focused layout.
+    if(document.querySelector(".verify-shell,.auth-shell,.auth-card")) return;
 
     style();
 
-    const trigger=document.createElement("button");
-    trigger.id="kb-nav-trigger";
-    trigger.type="button";
-    trigger.setAttribute("aria-label","Open KINGBOT navigation");
-    trigger.setAttribute("aria-expanded","false");
-    trigger.innerHTML='<span class="kb-bars" aria-hidden="true"><i></i><i></i><i></i></span>';
+    const page = currentPage();
 
-    const overlay=document.createElement("div");
-    overlay.id="kb-nav-overlay";
-    overlay.setAttribute("aria-hidden","true");
-
-    const panel=document.createElement("aside");
-    panel.id="kb-nav-panel";
-    panel.setAttribute("aria-label","KINGBOT FINTECH navigation dashboard");
-
-    const page=currentPage();
-    const pageLinks=links.map(([href,name,icon,desc])=>{
-      const active=href.toLowerCase()===page;
-      return '<a class="kb-nv-card" href="'+href+'"'+(active?' aria-current="page"':'')+'>'+
-        '<div class="kb-nv-icon">'+icon+'</div><div class="kb-nv-name">'+name+'</div><div class="kb-nv-desc">'+desc+'</div></a>';
+    const desktopLinks = links.map(([href,name,icon])=>{
+      const active = href.toLowerCase() === page;
+      return '<a href="'+href+'"'+(active?' class="kb-active" aria-current="page"':'')+'>'+
+        '<span class="kb-nav-icon">'+icon+'</span><span>'+name+'</span></a>';
     }).join("");
 
-    const rail=links.map(([href,name,icon,desc])=>{
-      const active=href.toLowerCase()===page;
-      return '<a class="kb-nv-link'+(active?' kb-active':'')+'" href="'+href+'"'+(active?' aria-current="page"':'')+'>'+
-        '<span class="kb-nv-link-icon">'+icon+'</span><span class="kb-nv-link-text">'+name+'<span class="kb-nv-link-sub">'+desc+'</span></span></a>';
+    const mobileLinks = links.map(([href,name,icon,desc])=>{
+      const active = href.toLowerCase() === page;
+      return '<a href="'+href+'"'+(active?' class="kb-active" aria-current="page"':'')+'>'+
+        '<span class="kb-mobile-name">'+icon+' '+name+'</span>'+
+        '<span class="kb-mobile-desc">'+desc+'</span></a>';
     }).join("");
 
-    const account=accountLinks.map(([href,name])=>'<a class="kb-nv-link" href="'+href+'"><span class="kb-nv-link-icon">↗</span><span class="kb-nv-link-text">'+name+'</span></a>').join("");
+    const account = accountLinks.map(([href,name]) =>
+      '<a href="'+href+'">'+name+'</a>'
+    ).join("");
 
-    panel.innerHTML=
-      '<div class="kb-nv-shell">'+
-        '<section class="kb-nv-main">'+
-          '<div class="kb-nv-head"><div><div class="kb-nv-kicker">KINGBOT // CONTROL SYSTEM</div><div class="kb-nv-title">FINTECH <span>COMMAND</span></div></div><button class="kb-nv-close" type="button" aria-label="Close navigation">×</button></div>'+
-          '<div class="kb-nv-status"><span class="kb-nv-live"></span><span>SYSTEM ONLINE</span><span style="margin-left:auto">UNIFIED OS</span></div>'+
-          '<div class="kb-nv-grid">'+pageLinks+'</div>'+
-        '</section>'+
-        '<nav class="kb-nv-right">'+
-          '<div class="kb-nv-right-title">NAVIGATION</div>'+
-          '<div class="kb-nv-rail">'+rail+'</div>'+
-          '<div class="kb-nv-section"><div class="kb-nv-section-label">ACCOUNT</div><div class="kb-nv-rail">'+account+'</div></div>'+
-          '<div class="kb-nv-section"><div class="kb-nv-section-label">AUTOMATION</div><div class="kb-nv-mini"><span class="kb-nv-chip">AUTO-TRADING</span><span class="kb-nv-chip">AI LAYER</span><span class="kb-nv-chip">RISK ENGINE</span><span class="kb-nv-chip">LIVE DATA</span></div></div>'+
-          '<div class="kb-nv-footer">ONE PLATFORM · ONE CONTROL SURFACE<br>CONSISTENCY · RESILIENCE · INNOVATION</div>'+
-        '</nav>'+
+    const shell = document.createElement("div");
+    shell.id = "kb-unified-nav";
+    shell.innerHTML =
+      '<div class="kb-nav-bar">'+
+        '<a class="kb-nav-brand" href="index.html" aria-label="KINGBOT FINTECH home">'+
+          '<span class="kb-nav-brand-mark">K</span>'+
+          '<span class="kb-nav-brand-copy"><strong>KINGBOT FINTECH</strong><span>INTELLIGENT TRADING INFRASTRUCTURE</span></span>'+
+        '</a>'+
+        '<div class="kb-nav-actions">'+
+          '<div class="kb-nav-right-stack">'+
+            '<div class="kb-nav-links" aria-label="Primary navigation">'+desktopLinks+'</div>'+
+            '<div class="kb-nav-command-line">'+
+              '<span class="kb-nav-status"><span class="kb-nav-live"></span>SYSTEM ONLINE</span>'+
+              '<a class="kb-dashboard-portrait" href="index.html" aria-label="Open KINGBOT Dashboard">'+
+                '<img src="assets/images/hero-bot.png" alt="KINGBOT dashboard portrait">'+
+                '<span class="dash-copy"><strong>DASHBOARD</strong><span>COMMAND OVERVIEW</span></span>'+
+              '</a>'+
+            '</div>'+
+          '</div>'+
+          '<button id="kb-mobile-nav-trigger" type="button" aria-label="Open KINGBOT navigation" aria-expanded="false"><span class="kb-bars" aria-hidden="true"><i></i><i></i><i></i></span></button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="kb-mobile-panel" aria-label="KINGBOT mobile navigation">'+
+        '<div class="kb-mobile-grid">'+mobileLinks+'</div>'+
+        '<div class="kb-mobile-account">'+account+'</div>'+
+        '<a class="kb-mobile-dashboard" href="index.html">'+
+          '<img src="assets/images/hero-bot.png" alt="KINGBOT dashboard portrait">'+
+          '<span><strong>GLOWING DASHBOARD</strong><span>COMMAND OVERVIEW · KINGBOT FINTECH</span></span>'+
+        '</a>'+
+        '<div class="kb-mobile-meta"><span>ONE NAVIGATION SURFACE</span><span>CONSISTENCY · RESILIENCE · INNOVATION</span></div>'+
       '</div>';
 
-    overlay.appendChild(panel);
-    document.body.appendChild(trigger);
-    document.body.appendChild(overlay);
+    document.body.appendChild(shell);
 
-    function open(){
-      overlay.classList.add("kb-open");
-      overlay.setAttribute("aria-hidden","false");
-      trigger.setAttribute("aria-expanded","true");
-      document.body.style.overflow="hidden";
-      const close=panel.querySelector(".kb-nv-close");
-      if(close) close.focus();
-    }
-    function close(){
-      overlay.classList.remove("kb-open");
-      overlay.setAttribute("aria-hidden","true");
-      trigger.setAttribute("aria-expanded","false");
-      document.body.style.overflow="";
-      trigger.focus();
-    }
+    const trigger = shell.querySelector("#kb-mobile-nav-trigger");
+    const panel = shell.querySelector(".kb-mobile-panel");
 
-    trigger.addEventListener("click",()=>overlay.classList.contains("kb-open")?close():open());
-    panel.querySelector(".kb-nv-close").addEventListener("click",close);
-    overlay.addEventListener("click",e=>{if(e.target===overlay) close()});
-    document.addEventListener("keydown",e=>{if(e.key==="Escape"&&overlay.classList.contains("kb-open")) close()},{passive:true});
-    panel.querySelectorAll("a").forEach(a=>a.addEventListener("click",()=>close()));
+    const close = () => {
+      panel?.classList.remove("kb-open");
+      trigger?.setAttribute("aria-expanded","false");
+    };
 
-    window.KINGBOT_NAV={
+    const open = () => {
+      panel?.classList.add("kb-open");
+      trigger?.setAttribute("aria-expanded","true");
+    };
+
+    trigger?.addEventListener("click", () => {
+      if(panel?.classList.contains("kb-open")) close();
+      else open();
+    });
+
+    shell.querySelectorAll("a").forEach(a => a.addEventListener("click", close));
+    document.addEventListener("keydown", event => {
+      if(event.key === "Escape") close();
+    });
+
+    window.KINGBOT_NAV = {
       config:{links,account:accountLinks},
-      state:{initialized:true,user:null,open:false},
+      state:{initialized:true,open:false},
       initialize:()=>Promise.resolve(),
       current:currentPage,
       active:href=>String(href).toLowerCase()===currentPage(),
-      refreshUser:()=>Promise.resolve(),
-      open,close
+      open,
+      close
     };
   }
 
-  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",build,{once:true});
-  else build();
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",build,{once:true});
+  } else {
+    build();
+  }
 
 })(window,document);
