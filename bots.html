@@ -39,7 +39,7 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 <h2 id="botTitle">Select a bot</h2>
 <p class="desc" id="botDesc">Choose an entitled bot to configure its independent risk profile.</p>
 <div class="risk-grid">
-<div class="field"><label>Execution mode <em>ENGINE</em></label><select id="executionMode"><option value="SIMULATION">SIMULATION</option><option value="PAPER">PAPER</option><option value="LIVE">LIVE</option></select></div>
+<div class="field"><label>Execution mode <em>ENGINE</em></label><select id="executionMode"><option value="PAPER">PAPER</option><option value="LIVE">LIVE</option></select></div>
 <div class="field"><label>Max risk / trade <em>%</em></label><input id="maxRisk" type="number" min=".1" max="5" step=".05"></div>
 <div class="field"><label>Daily drawdown limit <em>%</em></label><input id="dailyDd" type="number" min=".5" max="20" step=".1"></div>
 <div class="field"><label>Total drawdown limit <em>%</em></label><input id="totalDd" type="number" min="1" max="30" step=".1"></div>
@@ -81,7 +81,7 @@ function renderBots(){
  document.querySelectorAll(".bot").forEach(x=>x.addEventListener("click",()=>selectBot(x.dataset.id)));
 }
 function putSettings(s,mode,kill){
- fields.executionMode.value=mode||"SIMULATION";fields.maxRisk.value=s.maxRiskPerTradePct;fields.dailyDd.value=s.dailyDrawdownPct;fields.totalDd.value=s.totalDrawdownPct;fields.maxPositions.value=s.maxPositions;fields.spreadRatio.value=s.maxSpreadAtrRatio;fields.staleMs.value=s.staleDataMs;fields.lossStreak.value=s.maxConsecutiveLosses;fields.autoPause.checked=Boolean(s.autoPauseOnLossStreak);fields.killSwitch.checked=Boolean(kill);
+ fields.executionMode.value=mode||"PAPER";fields.maxRisk.value=s.maxRiskPerTradePct;fields.dailyDd.value=s.dailyDrawdownPct;fields.totalDd.value=s.totalDrawdownPct;fields.maxPositions.value=s.maxPositions;fields.spreadRatio.value=s.maxSpreadAtrRatio;fields.staleMs.value=s.staleDataMs;fields.lossStreak.value=s.maxConsecutiveLosses;fields.autoPause.checked=Boolean(s.autoPauseOnLossStreak);fields.killSwitch.checked=Boolean(kill);
  $("mRisk").textContent=s.maxRiskPerTradePct+"%";$("mDaily").textContent=s.dailyDrawdownPct+"%";$("mTotal").textContent=s.totalDrawdownPct+"%";$("mPositions").textContent=s.maxPositions;
  $("mMode").textContent=mode||"SIMULATION";$("mRuntime").textContent=selected?.runtime||"STOPPED";
  $("riskPill").textContent=fields.killSwitch.checked?"KILL SWITCH":"CONFIGURED";$("enginePill").textContent=selected?.entitled?"ENTITLED":"LOCKED";
