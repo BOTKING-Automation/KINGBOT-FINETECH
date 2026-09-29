@@ -75,10 +75,12 @@ app.get("/api/analytics", async (req,res)=>{
 app.post("/api/broker/account", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   const accountId=String(req.body?.accountId||"").trim();
+  const accountToken=String(req.body?.accountToken||"").trim();
   const executionMode=String(req.body?.executionMode||"PAPER").toUpperCase();
   if(!accountId)return res.status(400).json({ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"});
+  if(!accountToken)return res.status(400).json({ok:false,error:"BROKER_ACCOUNT_TOKEN_REQUIRED"});
   if(!/^[A-Za-z0-9._:-]{3,100}$/.test(accountId))return res.status(400).json({ok:false,error:"INVALID_BROKER_ACCOUNT_ID"});
-  try{res.status(201).json(await broker.saveMapping({userId:user.id,provider:"metaapi",accountId,executionMode}));}
+  try{res.status(201).json(await broker.saveMapping({userId:user.id,provider:"metaapi",accountId,accountToken,executionMode}));}
   catch(error){res.status(500).json({ok:false,error:"Broker account mapping failed.",reason:error?.message||"BROKER_ACCOUNT_MAPPING_FAILED"});}
 });
 
