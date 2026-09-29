@@ -94,30 +94,22 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
 <div class="foot">GIBSONFX TECH · KINGBOT FINTECH · 10.00 SEC STARTUP SEQUENCE</div>
 </div></div>
 
-<script type="module">
-import "./system/firebase-auth.js";
-const states=["NEURAL CORE INITIALIZING","MARKET MATRIX LINKING","BOT BRAIN SYNCHRONIZING","RISK ENGINE ONLINE","AUTH GATE READY"];
-const status=document.getElementById("status");
-let i=0;
-setInterval(()=>{i=(i+1)%states.length;status.textContent=states[i]},900);
+<script>
+(function(){
+  "use strict";
+  var states=["NEURAL CORE INITIALIZING","MARKET MATRIX LINKING","BOT BRAIN SYNCHRONIZING","RISK ENGINE ONLINE","AUTH GATE READY"];
+  var status=document.getElementById("status");
+  var i=0;
+  var ticker=window.setInterval(function(){
+    i=(i+1)%states.length;
+    if(status) status.textContent=states[i];
+  },900);
 
-setTimeout(async()=>{
-  let user=null;
-  try{
-    user=window.KINGBOT_FIREBASE?.auth?.currentUser||null;
-    if(!user && window.KINGBOT_SESSION?.check){
-      const checked=await window.KINGBOT_SESSION.check({force:true});
-      if(checked?.authenticated) user={emailVerified:Boolean(checked.user?.verified)};
-    }
-  }catch(e){console.warn("[KINGBOT LOADER]",e);}
-  if(user?.emailVerified){
-    window.location.replace("index.html");
-  }else if(user){
-    window.location.replace("verify.html");
-  }else{
+  window.setTimeout(function(){
+    window.clearInterval(ticker);
     window.location.replace("access.html#signin");
-  }
-},10000);
+  },10000);
+})();
 </script>
 </body>
 </html>
