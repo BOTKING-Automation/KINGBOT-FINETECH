@@ -2073,7 +2073,7 @@ footer{
 </div>
 </div>
 </div>
-</div>/div>
+</div>
 <div class="kb-boot-readout"><span>AI CORE <b>ACTIVE</b></span><span>CYBER NEURAL CORE <b>ONLINE</b></span><span>MARKET ENGINE <b>LINKING</b></span></div>
 <div class="kb-boot-status" id="kb-boot-status">NEURAL CORE INITIALIZING</div>
 <div class="kb-boot-progress"><i></i></div>
@@ -2097,16 +2097,33 @@ footer{
     if(authHandoff) sessionStorage.removeItem("KINGBOT_AUTH_HANDOFF");
   }catch(e){}
 
-  window.setTimeout(function(){
-    if(authHandoff) return;
+  function finishAuthenticated(){
+    var loader = document.getElementById("kb-boot-loader");
+    if(!loader) return;
+    loader.style.transition = "opacity .35s ease";
+    loader.style.opacity = "0";
+    window.setTimeout(function(){
+      loader.remove();
+      document.documentElement.classList.remove("kb-boot-lock");
+    }, 380);
+  }
 
+  if(authHandoff){
+    finishAuthenticated();
+    return;
+  }
+
+  window.setTimeout(function(){
     var authenticated = false;
     try{
       authenticated = Boolean(window.KINGBOT_SESSION?.isAuthenticated?.());
       if(!authenticated) authenticated = Boolean(window.KINGBOT_FIREBASE?.auth?.currentUser);
     }catch(e){}
 
-    if(authenticated) return;
+    if(authenticated){
+      finishAuthenticated();
+      return;
+    }
 
     try{
       window.location.replace("access.html#signin");
