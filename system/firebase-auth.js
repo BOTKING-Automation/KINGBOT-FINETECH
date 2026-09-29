@@ -30,7 +30,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-const API_BASE = "https://kingbot-fintech-api.onrender.com/api";
+const API_BASE = "https://kingbot-fintech-api-etfv.onrender.com/api";
 
 async function persist(remember=true){
   await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
