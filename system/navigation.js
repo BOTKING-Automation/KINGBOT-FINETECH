@@ -19,10 +19,16 @@
     ["legal.html","Legal Center","▤","Terms & risk disclosure"]
   ];
 
-  const accountLinks = [
+  const guestAccountLinks = [
     ["subscription.html","Subscription"],
     ["signin.html","Sign in"],
     ["signup.html","Create account"]
+  ];
+
+  const authenticatedAccountLinks = [
+    ["index.html","Dashboard"],
+    ["subscription.html","Subscription"],
+    ["#","Logout","logout"]
   ];
 
   function currentPage(){
@@ -365,7 +371,16 @@
       '</a>';
     }).join("");
 
-    const account=accountLinks.map(([href,name])=>'<a href="'+href+'">'+name+'</a>').join("");
+    const accountLinks = window.KINGBOT_SESSION?.isAuthenticated?.()
+      ? authenticatedAccountLinks
+      : guestAccountLinks;
+
+    const account=accountLinks.map(([href,name,action])=>{
+      if(action==="logout"){
+        return '<a href="#" data-kb-logout>'+name+'</a>';
+      }
+      return '<a href="'+href+'">'+name+'</a>';
+    }).join("");
 
     const root=document.createElement("div");
     root.id="kb-compact-nav";
@@ -401,21 +416,73 @@
 
     trigger.addEventListener("click",()=>menu.classList.contains("kb-open")?close():open());
     root.querySelectorAll("a").forEach(a=>a.addEventListener("click",close));
-    document.addEventListener("click",event=>{
-      if(!root.contains(event.target)) close();
-    });
-    document.addEventListener("keydown",event=>{
-      if(event.key==="Escape") close();
+    root.querySelector("[data-kb-logout]")?.addEventListener("click",async event=>{
+      event.preventDefault();
+      close();
+      const logout=window.KINGBOT_SESSION?.logout;
+      if(logout){
+        await logout({redirect:true});
+      }else{
+        window.location.replace("access.html");
+      }
     });
 
+    function syncAuthUI(detail){
+      const authenticated = detail?.authenticated === true ||
+        window.KINGBOT_SESSION?.isAuthenticated?.() === true;
+
+      const accountNode=root.querySelector(".kb-menu-account");
+      if(accountNode){
+        const activeLinks=authenticated ? authenticatedAccountLinks : guestAccountLinks;
+        accountNode.innerHTML=activeLinks.map(([href,name,action])=>{
+          if(action==="logout") return '<a href="#" data-kb-logout>'+name+'</a>';
+          return '<a href="'+href+'">'+name+'</a>';
+        }).join("");
+        accountNode.querySelectorAll("a").forEach(a=>a.addEventListener("click",close));
+        accountNode.querySelector("[data-kb-logout]")?.addEventListener("click",async event=>{
+          event.preventDefault();
+          close();
+          const logout=window.KINGBOT_SESSION?.logout;
+          if(logout) await logout({redirect:true});
+          else window.location.replace("access.html");
+        });
+      }
+
+      const state=root.querySelector(".kb-menu-state");
+      if(state){
+        state.innerHTML=authenticated
+          ? '<span class="kb-menu-dot"></span>AUTHENTICATED'
+          : '<span class="kb-menu-dot"></span>SYSTEM ONLINE';
+      }
+
+      document.querySelectorAll("[data-kb-auth-cta]").forEach(el=>{
+        if(authenticated){
+          el.textContent="DASHBOARD →";
+          el.setAttribute("href","index.html");
+          el.classList.remove("kb-guest-only");
+        }else{
+          el.textContent=el.dataset.guestText||"ENTER KINGBOT →";
+          el.setAttribute("href","signin.html");
+        }
+      });
+
+      document.querySelectorAll("[data-kb-guest-only]").forEach(el=>{
+        el.hidden=authenticated;
+      });
+    }
+
     window.KINGBOT_NAV={
-      config:{links,account:accountLinks},
+      config:{links,guestAccount:guestAccountLinks,authenticatedAccount:authenticatedAccountLinks},
       state:{initialized:true,open:false},
       initialize:()=>Promise.resolve(),
       current:currentPage,
       active:href=>String(href).toLowerCase()===currentPage(),
-      open,close
+      open,close,
+      syncAuthUI
     };
+
+    syncAuthUI();
+    window.addEventListener("kingbot:session-change",event=>syncAuthUI(event.detail||{}));
   }
 
   if(document.readyState==="loading"){
