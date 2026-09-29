@@ -4,60 +4,162 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#030711">
-<meta name="description" content="KINGBOT FINTECH secure sign-in gateway.">
+<meta name="description" content="KINGBOT FINTECH secure sign-in.">
 <title>KINGBOT FINTECH — Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#02040a;--cyan:#19e6ff;--violet:#9b5cff;--gold:#f6b93b;--text:#eef3ff;--muted:#71809e}
+:root{--bg:#02040a;--panel:#071022;--cyan:#19e6ff;--violet:#9b5cff;--pink:#ff4fd8;--gold:#f6b93b;--green:#23f7a3;--red:#ff5c7a;--text:#eef3ff;--muted:#8390aa}
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% 40%,#08152b 0,#02040a 56%,#010208 100%);color:var(--text);font-family:Inter,system-ui,sans-serif}
-body{min-height:100vh;display:grid;place-items:center;padding:24px;overflow:hidden}
-.card{width:min(440px,100%);padding:36px 28px;text-align:center;border:1px solid rgba(25,230,255,.16);border-radius:24px;background:rgba(5,10,23,.88);box-shadow:0 30px 90px rgba(0,0,0,.55),0 0 55px rgba(25,230,255,.06)}
-.logo{font:900 24px Orbitron,Inter,sans-serif;letter-spacing:.16em;background:linear-gradient(90deg,var(--cyan),var(--violet),var(--gold),var(--cyan));background-size:300% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:flow 3s linear infinite}
-.core{width:76px;height:76px;margin:24px auto 20px;border-radius:50%;border:1px solid rgba(25,230,255,.3);display:grid;place-items:center;position:relative;box-shadow:0 0 35px rgba(25,230,255,.1)}
-.core:before{content:"";position:absolute;inset:10px;border-radius:50%;border:1px dashed rgba(155,92,255,.35);animation:spin 4s linear infinite}
-.core:after{content:"";width:16px;height:16px;border-radius:50%;background:var(--cyan);box-shadow:0 0 16px var(--cyan),0 0 34px rgba(246,185,59,.35);animation:pulse 1.5s ease-in-out infinite}
-h1{margin:0;font:800 16px Orbitron,Inter,sans-serif;letter-spacing:.08em}
-p{margin:10px 0 0;color:var(--muted);font-size:11px;line-height:1.6}
-a{display:inline-block;margin-top:20px;color:var(--cyan);text-decoration:none;font-weight:800;font-size:11px}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes pulse{50%{transform:scale(1.35);opacity:.55}}
-@keyframes flow{to{background-position:300% center}}
-@media(prefers-reduced-motion:reduce){.core:before,.core:after,.logo{animation:none}}
+html,body{margin:0;min-height:100%;background:radial-gradient(circle at 10% 10%,rgba(25,230,255,.12),transparent 28%),radial-gradient(circle at 90% 20%,rgba(155,92,255,.10),transparent 25%),linear-gradient(145deg,#02040a,#071022 55%,#02040a);color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{min-height:100vh;display:grid;place-items:center;padding:20px;overflow:auto}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:44px 44px}
+.shell{position:relative;z-index:2;width:min(460px,100%)}
+.card{padding:34px 28px;border:1px solid rgba(255,255,255,.10);border-radius:26px;background:rgba(5,10,23,.94);box-shadow:0 35px 110px rgba(0,0,0,.58),0 0 70px rgba(25,230,255,.05)}
+.brand{text-align:center;font:900 21px Orbitron,sans-serif;letter-spacing:.15em;background:linear-gradient(90deg,var(--cyan),var(--violet),var(--pink),var(--gold),var(--green),var(--cyan));background-size:500% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradient 4s linear infinite}
+.sub{text-align:center;margin-top:7px;color:#62708a;font:700 7px "JetBrains Mono",monospace;letter-spacing:.18em}
+.core{width:82px;height:82px;margin:25px auto 22px;border-radius:50%;border:1px solid rgba(25,230,255,.28);display:grid;place-items:center;position:relative;box-shadow:0 0 42px rgba(25,230,255,.09),inset 0 0 28px rgba(155,92,255,.07)}
+.core:before{content:"";position:absolute;inset:9px;border-radius:50%;border:1px dashed rgba(155,92,255,.38);animation:spin 5s linear infinite}
+.core:after{content:"";width:18px;height:18px;border-radius:50%;background:var(--cyan);box-shadow:0 0 18px var(--cyan),0 0 42px rgba(255,79,216,.35);animation:pulse 1.4s ease-in-out infinite}
+h1{margin:0;text-align:center;font:900 18px Orbitron,sans-serif;letter-spacing:.08em}
+.intro{margin:10px 0 25px;text-align:center;color:var(--muted);font-size:11px;line-height:1.65}
+.form{display:block}
+.field{display:flex;flex-direction:column;gap:7px;margin-top:14px}
+label{color:#cbd4e5;font-size:11px;font-weight:700}
+input{width:100%;padding:14px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.035);color:#fff;outline:none;font:500 13px Inter,sans-serif;transition:.2s}
+input:focus{border-color:rgba(25,230,255,.72);box-shadow:0 0 25px rgba(25,230,255,.10)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:15px 0 20px}
+.remember{display:flex;align-items:center;gap:8px;color:#7f8ba4;font-size:10px}
+.remember input{width:auto;padding:0;margin:0}
+.link{color:var(--cyan);text-decoration:none;font-size:10px;font-weight:700}
+.action{width:100%;padding:15px;border:0;border-radius:13px;background:linear-gradient(100deg,var(--gold),#ffe18b,var(--cyan));color:#05070d;font-weight:900;cursor:pointer;box-shadow:0 0 30px rgba(246,185,59,.12)}
+.action:disabled{opacity:.55;cursor:not-allowed}
+.message{display:none;margin-top:14px;padding:12px 13px;border-radius:11px;font-size:11px;line-height:1.55}
+.message.show{display:block}
+.message.error{color:#ffc0cb;background:rgba(255,92,122,.08);border:1px solid rgba(255,92,122,.18)}
+.message.success{color:#b3ffe2;background:rgba(35,247,163,.07);border:1px solid rgba(35,247,163,.17)}
+.bottom{text-align:center;margin-top:20px;color:#687694;font-size:10px}
+.bottom a{color:var(--cyan);font-weight:800;text-decoration:none}
+.security{display:flex;justify-content:center;gap:15px;margin-top:20px;color:#56627a;font:700 7px "JetBrains Mono",monospace;letter-spacing:.08em}
+@keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{50%{transform:scale(1.35);opacity:.55}}@keyframes gradient{to{background-position:500% center}}
+@media(prefers-reduced-motion:reduce){.core:before,.core:after,.brand{animation:none}}
+@media(max-width:520px){.card{padding:28px 20px;border-radius:22px}.brand{font-size:18px}}
 </style>
 </head>
 <body>
-<main class="card" aria-live="polite">
-  <div class="logo">KINGBOT FINTECH</div>
-  <div class="core" aria-hidden="true"></div>
-  <h1>OPENING SECURE SIGN-IN</h1>
-  <p id="message">Preparing the KINGBOT authentication gateway…</p>
-  <a id="continue" href="access.html#signin">Continue to sign in</a>
+<main class="shell">
+  <section class="card">
+    <div class="brand">KINGBOT FINTECH</div>
+    <div class="sub">GIBSONFX TECH · SECURE ACCOUNT ACCESS</div>
+    <div class="core" aria-hidden="true"></div>
+    <h1>SECURE SIGN IN</h1>
+    <p class="intro">Enter your registered email and password. The page stays here until you submit the form.</p>
+
+    <form id="signInForm" class="form" novalidate>
+      <div class="field">
+        <label for="loginEmail">EMAIL ADDRESS</label>
+        <input id="loginEmail" type="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label for="loginPassword">PASSWORD</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Enter your password">
+      </div>
+      <div class="row">
+        <label class="remember"><input id="remember" type="checkbox" checked> Remember me</label>
+        <a class="link" href="forgot-password.html">Forgot password?</a>
+      </div>
+      <button class="action" id="loginBtn" type="submit">SIGN IN TO KINGBOT →</button>
+      <div id="message" class="message" role="status" aria-live="polite"></div>
+    </form>
+
+    <div class="bottom">New to KINGBOT? <a id="createLink" href="access.html#signup">Create a secure account</a></div>
+    <div class="security"><span>FIREBASE AUTH</span><span>EMAIL VERIFIED</span><span>SECURE SESSION</span></div>
+  </section>
 </main>
 
-<script>
-(function(){
-  "use strict";
+<script type="module">
+import "./system/firebase-auth.js";
 
-  function buildDestination(){
-    const params = new URLSearchParams(window.location.search);
-    const target = new URL("access.html", window.location.href);
-    const returnUrl = params.get("return");
+const $=id=>document.getElementById(id);
+const form=$("signInForm");
+const btn=$("loginBtn");
+const msg=$("message");
 
-    if(returnUrl){
-      target.searchParams.set("return", returnUrl);
-    }
+function showMessage(text,type){
+  msg.textContent=text;
+  msg.className="message show "+type;
+}
 
-    target.hash = "signin";
-    return target.href;
+function safeReturn(value){
+  if(!value) return "";
+  try{
+    const u=new URL(value,window.location.href);
+    if(u.origin!==window.location.origin) return "";
+    const p=u.pathname.toLowerCase();
+    if(p.endsWith("/signin.html")||p.endsWith("/signup.html")||p.endsWith("/access.html")||p.endsWith("/verify.html")) return "";
+    return u.pathname+u.search+u.hash;
+  }catch{return "";}
+}
+
+function destinationAfterLogin(){
+  const params=new URLSearchParams(window.location.search);
+  const ret=safeReturn(params.get("return"));
+  return ret||"index.html";
+}
+
+const signupLink=$("createLink");
+const currentReturn=new URLSearchParams(window.location.search).get("return");
+if(currentReturn) signupLink.href="access.html#signup";
+
+form.addEventListener("submit",async function(event){
+  event.preventDefault();
+
+  const email=$("loginEmail").value.trim();
+  const password=$("loginPassword").value;
+  if(!email||!password){
+    showMessage("Enter your email and password.","error");
+    return;
   }
 
-  const destination = buildDestination();
-  const link = document.getElementById("continue");
-  if(link) link.href = destination;
+  btn.disabled=true;
+  btn.textContent="AUTHENTICATING…";
+  msg.className="message";
 
-  // Single deterministic redirect. No meta-refresh race.
-  window.location.replace(destination);
-})();
+  try{
+    const result=await window.KINGBOT_FIREBASE.signIn({
+      email,
+      password,
+      remember:$("remember").checked
+    });
+
+    if(!result.verified){
+      try{sessionStorage.setItem("verification_email",email);}catch{}
+      const params=new URLSearchParams();
+      params.set("return",destinationAfterLogin());
+      window.location.replace("verify.html?"+params.toString());
+      return;
+    }
+
+    showMessage("Authentication verified. Opening KINGBOT…","success");
+    window.setTimeout(function(){
+      window.location.replace(destinationAfterLogin());
+    },250);
+  }catch(error){
+    const code=String(error?.code||"");
+    const messages={
+      "auth/invalid-credential":"Email or password is incorrect.",
+      "auth/wrong-password":"Email or password is incorrect.",
+      "auth/user-not-found":"No KINGBOT account was found for this email.",
+      "auth/invalid-email":"Enter a valid email address.",
+      "auth/too-many-requests":"Too many attempts. Please wait and try again.",
+      "auth/network-request-failed":"Network error. Check your connection."
+    };
+    showMessage(messages[code]||error?.message||"Sign-in failed. Check your details and try again.","error");
+    btn.disabled=false;
+    btn.textContent="SIGN IN TO KINGBOT →";
+  }
+});
 </script>
 </body>
 </html>
