@@ -4,9 +4,17 @@ import { Router } from "express";
 
 const router = Router();
 
-function createMailer() {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS || !process.env.MAIL_FROM) return null;
-  return nodemailer.createTransport({host:process.env.SMTP_HOST,port:Number(process.env.SMTP_PORT||587),secure:Number(process.env.SMTP_PORT||587)===465,auth:{user:process.env.SMTP_USER,pass:process.env.SMTP_PASS}});
+async function sendEmail({to,subject,text,html=""}){
+  const apiKey=String(process.env.RESEND_API_KEY||"").trim();
+  const from=String(process.env.MAIL_FROM||"").trim();
+  if(!apiKey||!from) throw new Error("EMAIL_API_NOT_CONFIGURED");
+  const response=await fetch("https://api.resend.com/emails",{
+    method:"POST",
+    headers:{"Authorization":"Bearer "+apiKey,"Content-Type":"application/json"},
+    body:JSON.stringify({from,to,subject,text,html})
+  });
+  if(!response.ok) throw new Error("EMAIL_API_SEND_FAILED");
+  return response.json().catch(()=>({}));
 }
 function verificationCode(){ return String(crypto.randomInt(100000,1000000)); }
 
@@ -113,13 +121,12 @@ export function createAuthRouter({ pool, sessionTtlHours = 24, limiter }) {
     try {
       const q=await pool.query("SELECT id,email,first_name FROM kingbot_users WHERE email=$1",[email]);
       if(!q.rowCount) return res.json({ok:true,sent:true});
-      const mailer=createMailer(); if(!mailer) return res.status(503).json({ok:false,error:"Password recovery email service is not configured yet."});
       const token=newToken(); const hash=hashToken(token);
       await pool.query("DELETE FROM kingbot_password_resets WHERE user_id=$1",[q.rows[0].id]);
       await pool.query("INSERT INTO kingbot_password_resets(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '30 minutes')",[q.rows[0].id,hash]);
       const base=(process.env.FRONTEND_ORIGIN||"").replace(/\\/$/,"");
       const link=base+"/reset-password.html?token="+encodeURIComponent(token)+"&email="+encodeURIComponent(email);
-      await mailer.sendMail({from:process.env.MAIL_FROM,to:email,subject:"KINGBOT FINTECH — Password reset",text:`Hello ${q.rows[0].first_name}, use this link to reset your KINGBOT password: ${link}. It expires in 30 minutes.`});
+      await sendEmail({to:email,subject:"KINGBOT FINTECH — Password reset",text:`Hello ${q.rows[0].first_name}, use this link to reset your KINGBOT password: ${link}. It expires in 30 minutes.`});
       return res.json({ok:true,sent:true});
     } catch(error){ console.error("[KINGBOT AUTH] password reset request failed:",error?.message||error); return res.status(500).json({ok:false,error:"Password recovery service unavailable."}); }
   });
@@ -176,13 +183,12 @@ export function createAuthRouter({ pool, sessionTtlHours = 24, limiter }) {
 }
 
 async function issueVerification(pool,userId,email,firstName){
-  const mailer=createMailer();
-  if(!mailer) throw new Error("SMTP_NOT_CONFIGURED");
+
   const code=verificationCode();
   const hash=crypto.createHash("sha256").update(code).digest("hex");
   await pool.query("DELETE FROM kingbot_verification_codes WHERE user_id=$1",[userId]);
   await pool.query("INSERT INTO kingbot_verification_codes(user_id,code_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '15 minutes')",[userId,hash]);
-  await mailer.sendMail({from:process.env.MAIL_FROM,to:email,subject:"KINGBOT FINTECH — Verify your account",text:`Hello ${firstName}, your KINGBOT verification code is ${code}. It expires in 15 minutes. If you did not create this account, ignore this email.`});
+  await sendEmail({to:email,subject:"KINGBOT FINTECH — Verify your account",text:`Hello ${firstName}, your KINGBOT verification code is ${code}. It expires in 15 minutes. If you did not create this account, ignore this email.`});
 }
 
 export async function ensureAuthSchema(pool) {
