@@ -1,0 +1,831 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Verify Account — KINGBOT FINTECH</title>
+
+  <link rel="stylesheet" href="system/platform.css">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: #030712;
+      color: #eef2ff;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(25, 230, 255, 0.08), transparent 32%),
+        radial-gradient(circle at 80% 70%, rgba(246, 185, 59, 0.08), transparent 35%);
+    }
+
+    .verify-shell {
+      width: min(480px, 100%);
+      position: relative;
+      z-index: 2;
+    }
+
+    .verify-card {
+      position: relative;
+      padding: 42px 34px;
+      border: 1px solid rgba(246, 185, 59, 0.25);
+      border-radius: 28px;
+      background:
+        linear-gradient(
+          145deg,
+          rgba(10, 18, 40, 0.96),
+          rgba(3, 7, 18, 0.98)
+        );
+      box-shadow:
+        0 30px 100px rgba(0, 0, 0, 0.55),
+        inset 0 0 60px rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(20px);
+    }
+
+    .brand {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .brand-name {
+      font-family: Orbitron, Inter, sans-serif;
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: #f6b93b;
+    }
+
+    .brand-name span {
+      color: #eef2ff;
+    }
+
+    .brand-subtitle {
+      margin-top: 8px;
+      font-size: 10px;
+      letter-spacing: 2.5px;
+      color: rgba(238, 242, 255, 0.45);
+    }
+
+    .verification-core {
+      width: 96px;
+      height: 96px;
+      position: relative;
+      margin: 0 auto 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(25, 230, 255, 0.35);
+    }
+
+    .ring-one {
+      inset: 0;
+      animation: spin 7s linear infinite;
+    }
+
+    .ring-two {
+      inset: 13px;
+      border-color: rgba(246, 185, 59, 0.55);
+      animation: spinReverse 5s linear infinite;
+    }
+
+    .core {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #19e6ff;
+      box-shadow:
+        0 0 15px rgba(25, 230, 255, 0.8),
+        0 0 40px rgba(25, 230, 255, 0.3);
+    }
+
+    h1 {
+      margin: 0;
+      text-align: center;
+      font-family: Orbitron, Inter, sans-serif;
+      font-size: 21px;
+      letter-spacing: 1px;
+    }
+
+    .intro {
+      margin: 12px auto 28px;
+      max-width: 370px;
+      text-align: center;
+      line-height: 1.7;
+      font-size: 13px;
+      color: rgba(238, 242, 255, 0.62);
+    }
+
+    .email-display {
+      display: none;
+      margin-bottom: 22px;
+      padding: 13px 15px;
+      border-radius: 13px;
+      border: 1px solid rgba(25, 230, 255, 0.16);
+      background: rgba(25, 230, 255, 0.04);
+      text-align: center;
+      font-size: 12px;
+      color: #19e6ff;
+      word-break: break-word;
+    }
+
+    .code-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .code-input {
+      width: 100%;
+      height: 58px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 13px;
+      outline: none;
+      background: rgba(255, 255, 255, 0.035);
+      color: #fff;
+      text-align: center;
+      font-size: 22px;
+      font-weight: 800;
+      transition: 0.2s ease;
+    }
+
+    .code-input:focus {
+      border-color: rgba(25, 230, 255, 0.75);
+      box-shadow: 0 0 20px rgba(25, 230, 255, 0.1);
+    }
+
+    .verify-button {
+      width: 100%;
+      min-height: 52px;
+      border: 0;
+      border-radius: 13px;
+      cursor: pointer;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #050812;
+      background: linear-gradient(135deg, #f6b93b, #ffd978);
+      box-shadow: 0 12px 35px rgba(246, 185, 59, 0.14);
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+
+    .verify-button:hover {
+      transform: translateY(-1px);
+    }
+
+    .verify-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      transform: none;
+    }
+
+    .resend-row {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 12px;
+      color: rgba(238, 242, 255, 0.45);
+    }
+
+    .resend-button {
+      border: 0;
+      padding: 0;
+      margin-left: 5px;
+      background: transparent;
+      color: #19e6ff;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .resend-button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .status {
+      display: none;
+      margin-top: 20px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .status.info {
+      display: block;
+      color: #19e6ff;
+      background: rgba(25, 230, 255, 0.06);
+      border: 1px solid rgba(25, 230, 255, 0.14);
+    }
+
+    .status.error {
+      display: block;
+      color: #ff7b8a;
+      background: rgba(255, 70, 90, 0.06);
+      border: 1px solid rgba(255, 70, 90, 0.16);
+    }
+
+    .status.success {
+      display: block;
+      color: #69f0ae;
+      background: rgba(70, 240, 160, 0.06);
+      border: 1px solid rgba(70, 240, 160, 0.16);
+    }
+
+    .footer {
+      margin-top: 25px;
+      text-align: center;
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: rgba(238, 242, 255, 0.28);
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes spinReverse {
+      from {
+        transform: rotate(360deg);
+      }
+
+      to {
+        transform: rotate(0deg);
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 14px;
+      }
+
+      .verify-card {
+        padding: 32px 20px;
+        border-radius: 22px;
+      }
+
+      .code-grid {
+        gap: 5px;
+      }
+
+      .code-input {
+        height: 52px;
+        font-size: 19px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ring-one,
+      .ring-two {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <main class="verify-shell">
+
+    <section class="verify-card">
+
+      <div class="brand">
+        <div class="brand-name">
+          KING<span>BOT</span>
+        </div>
+
+        <div class="brand-subtitle">
+          FINTECH • ACCOUNT SECURITY
+        </div>
+      </div>
+
+      <div class="verification-core" aria-hidden="true">
+        <div class="ring ring-one"></div>
+        <div class="ring ring-two"></div>
+        <div class="core"></div>
+      </div>
+
+      <h1>VERIFY YOUR ACCOUNT</h1>
+
+      <p class="intro">
+        Enter the six-digit verification code sent to your
+        registered email address.
+      </p>
+
+      <div
+        id="emailDisplay"
+        class="email-display">
+      </div>
+
+      <form id="verificationForm">
+
+        <div class="code-grid">
+
+          <input
+            class="code-input"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="1"
+            aria-label="Verification digit 1">
+
+          <input
+            class="code-input"
+            inputmode="numeric"
+            maxlength="1"
+            aria-label="Verification digit 2">
+
+          <input
+            class="code-input"
+            inputmode="numeric"
+            maxlength="1"
+            aria-label="Verification digit 3">
+
+          <input
+            class="code-input"
+            inputmode="numeric"
+            maxlength="1"
+            aria-label="Verification digit 4">
+
+          <input
+            class="code-input"
+            inputmode="numeric"
+            maxlength="1"
+            aria-label="Verification digit 5">
+
+          <input
+            class="code-input"
+            inputmode="numeric"
+            maxlength="1"
+            aria-label="Verification digit 6">
+
+        </div>
+
+        <button
+          id="verifyButton"
+          class="verify-button"
+          type="submit">
+          VERIFY ACCOUNT
+        </button>
+
+      </form>
+
+      <div class="resend-row">
+        Didn't receive the code?
+
+        <button
+          id="resendButton"
+          class="resend-button"
+          type="button">
+          RESEND CODE
+        </button>
+      </div>
+
+      <div
+        id="status"
+        class="status">
+      </div>
+
+      <div class="footer">
+        SECURE ACCOUNT VERIFICATION • GIBSONFX TECH
+      </div>
+
+    </section>
+
+  </main>
+
+  <script src="system/session.js"></script>
+  <script src="system/auth-gate.js"></script>
+  <script src="system/access-control.js"></script>
+  <script src="system/navigation.js"></script>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const inputs =
+        Array.from(
+          document.querySelectorAll(".code-input")
+        );
+
+      const form =
+        document.getElementById("verificationForm");
+
+      const verifyButton =
+        document.getElementById("verifyButton");
+
+      const resendButton =
+        document.getElementById("resendButton");
+
+      const status =
+        document.getElementById("status");
+
+      const emailDisplay =
+        document.getElementById("emailDisplay");
+
+      const params =
+        new URLSearchParams(
+          window.location.search
+        );
+
+      const returnUrl =
+        params.get("return");
+
+      function showStatus(message, type) {
+        status.textContent = message;
+        status.className = "status " + type;
+      }
+
+      function getCode() {
+        return inputs
+          .map(input => input.value.trim())
+          .join("");
+      }
+
+      function setLoading(loading) {
+        verifyButton.disabled = loading;
+        resendButton.disabled = loading;
+
+        verifyButton.textContent =
+          loading
+            ? "VERIFYING..."
+            : "VERIFY ACCOUNT";
+      }
+
+      function focusFirstInput() {
+        if (inputs[0]) {
+          inputs[0].focus();
+        }
+      }
+
+      /*
+       * Display the authenticated user's email
+       * when the real session manager provides it.
+       */
+      async function loadSession() {
+
+        if (!window.KINGBOT_SESSION) {
+          return;
+        }
+
+        try {
+
+          const session =
+            await window.KINGBOT_SESSION.check();
+
+          if (
+            session &&
+            session.user &&
+            session.user.email
+          ) {
+
+            emailDisplay.textContent =
+              session.user.email;
+
+            emailDisplay.style.display =
+              "block";
+          }
+
+        } catch (error) {
+
+          console.warn(
+            "[KINGBOT VERIFY] Session lookup failed.",
+            error
+          );
+
+        }
+      }
+
+      inputs.forEach((input, index) => {
+
+        input.addEventListener(
+          "input",
+          () => {
+
+            input.value =
+              input.value
+                .replace(/\D/g, "")
+                .slice(0, 1);
+
+            if (
+              input.value &&
+              index < inputs.length - 1
+            ) {
+              inputs[index + 1].focus();
+            }
+
+          }
+        );
+
+        input.addEventListener(
+          "keydown",
+          event => {
+
+            if (
+              event.key === "Backspace" &&
+              !input.value &&
+              index > 0
+            ) {
+
+              inputs[index - 1].focus();
+
+            }
+
+          }
+        );
+
+        input.addEventListener(
+          "paste",
+          event => {
+
+            event.preventDefault();
+
+            const pasted =
+              (
+                event.clipboardData ||
+                window.clipboardData
+              )
+                .getData("text")
+                .replace(/\D/g, "")
+                .slice(0, 6);
+
+            pasted
+              .split("")
+              .forEach((digit, i) => {
+
+                if (inputs[i]) {
+                  inputs[i].value = digit;
+                }
+
+              });
+
+            if (pasted.length === 6) {
+              inputs[5].focus();
+            }
+
+          }
+        );
+
+      });
+
+      form.addEventListener(
+        "submit",
+        async event => {
+
+          event.preventDefault();
+
+          const code =
+            getCode();
+
+          if (!/^\d{6}$/.test(code)) {
+
+            showStatus(
+              "Enter the complete six-digit verification code.",
+              "error"
+            );
+
+            return;
+          }
+
+          setLoading(true);
+
+          showStatus(
+            "Securely verifying your account...",
+            "info"
+          );
+
+          try {
+
+            /*
+             * IMPORTANT:
+             *
+             * The frontend does not mark the account
+             * as verified by itself.
+             *
+             * The backend must validate the code and
+             * update the authenticated session.
+             */
+
+            const response =
+              await fetch(
+                "/api/auth/verify",
+                {
+                  method: "POST",
+
+                  credentials: "include",
+
+                  headers: {
+                    "Content-Type":
+                      "application/json"
+                  },
+
+                  cache: "no-store",
+
+                  body: JSON.stringify({
+                    code
+                  })
+                }
+              );
+
+            let data = {};
+
+            try {
+              data =
+                await response.json();
+            } catch (_) {
+              data = {};
+            }
+
+            if (!response.ok) {
+
+              throw new Error(
+                data.message ||
+                data.error ||
+                "Verification failed."
+              );
+
+            }
+
+            showStatus(
+              "Account verified successfully. Redirecting...",
+              "success"
+            );
+
+            /*
+             * Refresh the real session before redirecting.
+             */
+            if (
+              window.KINGBOT_SESSION &&
+              typeof window.KINGBOT_SESSION.check ===
+                "function"
+            ) {
+
+              await window.KINGBOT_SESSION.check();
+
+            }
+
+            setTimeout(() => {
+
+              if (
+                returnUrl &&
+                window.KINGBOT_AUTH &&
+                typeof window.KINGBOT_AUTH
+                  .isSafeReturnUrl === "function" &&
+                window.KINGBOT_AUTH
+                  .isSafeReturnUrl(returnUrl)
+              ) {
+
+                window.location.replace(
+                  returnUrl
+                );
+
+                return;
+              }
+
+              window.location.replace(
+                "index.html"
+              );
+
+            }, 500);
+
+          } catch (error) {
+
+            console.error(
+              "[KINGBOT VERIFY]",
+              error
+            );
+
+            showStatus(
+              error.message ||
+              "Verification failed. Please try again.",
+              "error"
+            );
+
+            setLoading(false);
+
+          }
+
+        }
+      );
+
+      resendButton.addEventListener(
+        "click",
+        async () => {
+
+          resendButton.disabled = true;
+
+          showStatus(
+            "Requesting a new verification code...",
+            "info"
+          );
+
+          try {
+
+            const response =
+              await fetch(
+                "/api/auth/resend-verification",
+                {
+                  method: "POST",
+
+                  credentials: "include",
+
+                  headers: {
+                    "Content-Type":
+                      "application/json"
+                  },
+
+                  cache: "no-store"
+                }
+              );
+
+            let data = {};
+
+            try {
+              data =
+                await response.json();
+            } catch (_) {
+              data = {};
+            }
+
+            if (!response.ok) {
+
+              throw new Error(
+                data.message ||
+                data.error ||
+                "Unable to resend verification code."
+              );
+
+            }
+
+            showStatus(
+              "A new verification code has been sent.",
+              "success"
+            );
+
+          } catch (error) {
+
+            console.error(
+              "[KINGBOT VERIFY RESEND]",
+              error
+            );
+
+            showStatus(
+              error.message ||
+              "Unable to resend the code.",
+              "error"
+            );
+
+          } finally {
+
+            setTimeout(() => {
+
+              resendButton.disabled = false;
+
+            }, 30000);
+
+          }
+
+        }
+      );
+
+      loadSession();
+      focusFirstInput();
+
+    })();
+  </script>
+
+</body>
+</html>
+```
