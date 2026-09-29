@@ -12,7 +12,7 @@ let stopping = false;
 let timer = null;
 
 const num=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
-const timeframeMinutes={1m:1,2m:2,3m:3,4m:4,5m:5,6m:6,10m:10,12m:12,15m:15,20m:20,30m:30,1h:60,2h:120,3h:180,4h:240,6h:360,8h:480,12h:720,1d:1440,1w:10080,1mn:43200};
+const timeframeMinutes={"1m":1,"2m":2,"3m":3,"4m":4,"5m":5,"6m":6,"10m":10,"12m":12,"15m":15,"20m":20,"30m":30,"1h":60,"2h":120,"3h":180,"4h":240,"6h":360,"8h":480,"12h":720,"1d":1440,"1w":10080,"1mn":43200};
 
 async function ensureWorkerSchema(){
   if(!pool) throw new Error("DATABASE_URL_REQUIRED");
