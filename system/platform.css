@@ -1,3 +1,64 @@
+
+/* =========================================================
+   KINGBOT FINTECH — NEON INSTITUTIONAL VISUAL SYSTEM
+========================================================= */
+:root{
+  --kb-neon-cyan:#19e6ff;
+  --kb-neon-blue:#4787ff;
+  --kb-neon-violet:#9b5cff;
+  --kb-neon-pink:#ff4fd8;
+  --kb-neon-gold:#ffc84a;
+}
+.kb-neon-frame{
+  position:relative;
+  border:1px solid rgba(25,230,255,.16);
+  background:
+    radial-gradient(circle at 100% 0%,rgba(155,92,255,.11),transparent 36%),
+    radial-gradient(circle at 0% 100%,rgba(255,200,74,.055),transparent 32%),
+    rgba(8,13,27,.72);
+  box-shadow:0 20px 70px rgba(0,0,0,.34),0 0 28px rgba(25,230,255,.045);
+}
+.kb-neon-frame::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  border-radius:inherit;
+  padding:1px;
+  background:linear-gradient(115deg,rgba(25,230,255,.65),rgba(155,92,255,.5),rgba(255,79,216,.38),rgba(255,200,74,.48));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  opacity:.42;
+}
+.kb-gradient-text{
+  background:linear-gradient(90deg,var(--kb-neon-cyan),var(--kb-neon-violet),var(--kb-neon-pink),var(--kb-neon-gold));
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  filter:drop-shadow(0 0 12px rgba(25,230,255,.18));
+}
+.kb-glow-cyan{box-shadow:0 0 22px rgba(25,230,255,.14);}
+.kb-glow-violet{box-shadow:0 0 22px rgba(155,92,255,.14);}
+.kb-glow-gold{box-shadow:0 0 22px rgba(255,200,74,.12);}
+.kb-scanline{
+  position:relative;
+  overflow:hidden;
+}
+.kb-scanline::after{
+  content:"";
+  position:absolute;
+  left:-20%;
+  right:-20%;
+  top:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,var(--kb-neon-cyan),var(--kb-neon-violet),transparent);
+  box-shadow:0 0 12px rgba(25,230,255,.6);
+  animation:kbScan 5s linear infinite;
+  pointer-events:none;
+}
+@keyframes kbScan{from{transform:translateY(-2px)}to{transform:translateY(900px)}}
+
 /*
 =========================================================
  KINGBOT FINTECH — GLOBAL PLATFORM DESIGN SYSTEM
