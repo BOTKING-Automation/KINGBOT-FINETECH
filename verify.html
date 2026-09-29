@@ -453,7 +453,16 @@ async function check(){
    }
    sessionStorage.removeItem("verification_email");sessionStorage.removeItem("signup_email");
    show("Email verified successfully. Opening KINGBOT...","success");
-   setTimeout(()=>location.replace(new URLSearchParams(location.search).get("return")||"index.html"),700);
+   const rawReturn=new URLSearchParams(location.search).get("return")||"index.html";
+   let destination="index.html";
+   try{
+    const u=new URL(rawReturn,location.href);
+    const lower=u.pathname.toLowerCase();
+    if(u.origin===location.origin&&!/\/(signin|signup|access|access-stable|verify)\.html$/.test(lower)){
+     destination=u.pathname+u.search+u.hash;
+    }
+   }catch{}
+   setTimeout(()=>location.replace(destination),700);
   }else show("Your email is not verified yet. Open the Firebase verification email, then press CHECK VERIFICATION.","info");
  }catch(e){show(e.message||"Verification status could not be checked.","error");}
 }
