@@ -53,10 +53,26 @@ const session={
     if(!window.KINGBOT_FIREBASE){state.error=state.error||new Error("Firebase Authentication is not loaded.");state.checked=true;state.checkedAt=Date.now();state.authenticated=false;state.user=null;return this.getState();}
   state.checking=true;state.error=null;
   try{
-   const fb=await new Promise(resolve=>{
+   const fb=await new Promise((resolve)=>{
     let done=false;
-    const finish=u=>{if(done)return;done=true;resolve(u);};
-    const unsub=fbAuthChange(finish); setTimeout(()=>{try{unsub?.();}catch{} finish(window.KINGBOT_FIREBASE.auth.currentUser);},1200);
+    let unsub=null;
+    const finish=(u)=>{
+      if(done)return;
+      done=true;
+      try{unsub?.();}catch{}
+      resolve(u||null);
+    };
+    try{
+      unsub=fbAuthChange(finish);
+      const current=window.KINGBOT_FIREBASE?.auth?.currentUser;
+      if(current) finish(current);
+      setTimeout(()=>{
+        if(!done) finish(window.KINGBOT_FIREBASE?.auth?.currentUser||null);
+      },10000);
+    }catch(error){
+      state.error=error;
+      finish(window.KINGBOT_FIREBASE?.auth?.currentUser||null);
+    }
    });
    if(!fb){state.authenticated=false;state.user=null;}
    else{
