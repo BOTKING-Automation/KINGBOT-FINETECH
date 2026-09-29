@@ -166,11 +166,12 @@ app.get("/api/health", (_req, res) => {
     ok: true,
     service: "KINGBOT Intelligence",
     aiReady: Boolean(ai),
-    accountServiceReady: Boolean(pool)
+    accountServiceReady: Boolean(pool),
+    passwordRecoveryEmailReady: Boolean(String(process.env.BREVO_API_KEY||"").trim() && String(process.env.MAIL_FROM_EMAIL||"").trim())
   });
 });
 
-app.get("/health", (_req,res) => res.json({ok:true,service:"KINGBOT Intelligence",aiReady:Boolean(ai),accountServiceReady:Boolean(pool)}));
+app.get("/health", (_req,res) => res.json({ok:true,service:"KINGBOT Intelligence",aiReady:Boolean(ai),accountServiceReady:Boolean(pool),passwordRecoveryEmailReady:Boolean(String(process.env.BREVO_API_KEY||"").trim() && String(process.env.MAIL_FROM_EMAIL||"").trim())}));
 
 app.post("/api/ai/query", aiLimiter, async (req, res) => {
   const aiUser = await requireUser(pool, req, res);
