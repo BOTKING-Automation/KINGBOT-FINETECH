@@ -5,7 +5,7 @@ import { UserBrokerManager } from "./user-broker-manager.js";
 import { evaluateBot, getBotDefinitions } from "./bot-engines.js";
 import { authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
 import { ensureAuthSchema } from "./auth.js";
-import { ensureSubscriptionSchema } from "./subscriptions.js";
+import { ensureSubscriptionSchema, expireStaleSubscriptions } from "./subscriptions.js";
 import { ensureBotEngineSchema } from "./bot-engines.js";
 import { ensureBotRuntimeSchema } from "./bot-runtime.js";
 
@@ -14,6 +14,7 @@ const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env
 const broker = new UserBrokerManager({pool});
 let stopping = false;
 let timer = null;
+let lastSubscriptionSweep = 0;
 
 const num=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
 const timeframeMinutes={"1m":1,"2m":2,"3m":3,"4m":4,"5m":5,"6m":6,"10m":10,"12m":12,"15m":15,"20m":20,"30m":30,"1h":60,"2h":120,"3h":180,"4h":240,"6h":360,"8h":480,"12h":720,"1d":1440,"1w":10080,"1mn":43200};
@@ -165,6 +166,10 @@ async function execute(row){
 
 async function cycle(){
   if(stopping||!pool)return;
+  if(Date.now()-lastSubscriptionSweep>30000){
+    lastSubscriptionSweep=Date.now();
+    await expireStaleSubscriptions(pool);
+  }
   const q=await pool.query("SELECT user_id,bot_id,state FROM kingbot_bot_runtime WHERE state='RUNNING' ORDER BY updated_at ASC LIMIT 100");
   for(const row of q.rows){
     if(stopping)break;
