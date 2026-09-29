@@ -100,7 +100,7 @@ app.get("/api/orders", async (req,res)=>{
 });
 app.get("/api/trades", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
-  try{const x=await broker.getTrades({startTime:req.query.startTime,endTime:req.query.endTime});res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Trade history unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
+  try{const x=await broker.getTrades({startTime:req.query.startTime,endTime:req.query.endTime,userId:user.id});res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Trade history unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
 });
 
 const aiLimiter = rateLimit({
