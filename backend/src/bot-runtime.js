@@ -128,12 +128,29 @@ export function createBotRuntimeRouter({pool,broker}){
         const side=signal==="LONG_CANDIDATE"?"BUY":"SELL";
         const volume=Number(req.body?.volume);
         if(!Number.isFinite(volume)||volume<=0)return res.status(400).json({ok:false,error:"ORDER_VOLUME_REQUIRED",message:"Supply a broker-valid order volume; no order was submitted.",analysis,risk});
+        let specification;
+        try{ specification=(await broker.getSymbolSpecification(requestedSymbol,user.id)).data||{}; }
+        catch(error){ return res.status(503).json({ok:false,error:"SYMBOL_SPECIFICATION_UNAVAILABLE",reason:error?.message||"BROKER_SPECIFICATION_FAILED",message:"Broker symbol constraints could not be verified. No order was submitted.",analysis,risk}); }
+        const minVolume=Number(specification.minVolume),maxVolume=Number(specification.maxVolume),volumeStep=Number(specification.volumeStep),point=Number(specification.point),stopsLevel=Number(specification.stopsLevel);
+        if(!Number.isFinite(minVolume)||!Number.isFinite(maxVolume)||!Number.isFinite(volumeStep)||minVolume<=0||maxVolume<minVolume||volumeStep<=0)return res.status(503).json({ok:false,error:"INVALID_SYMBOL_SPECIFICATION",message:"Broker returned incomplete symbol constraints. No order was submitted.",analysis,risk});
+        const stepAligned=Math.abs((volume-minVolume)/volumeStep-Math.round((volume-minVolume)/volumeStep))<1e-9;
+        if(volume<minVolume||volume>maxVolume||!stepAligned)return res.status(400).json({ok:false,error:"INVALID_ORDER_VOLUME_STEP",message:"Order volume violates the broker's minimum, maximum, or volume-step constraints. No order was submitted.",minVolume,maxVolume,volumeStep,analysis,risk});
+        const stopLoss=req.body?.stopLoss==null?null:Number(req.body.stopLoss);
+        const takeProfit=req.body?.takeProfit==null?null:Number(req.body.takeProfit);
+        if(!Number.isFinite(point)||point<=0||!Number.isFinite(stopsLevel)||stopsLevel<0)return res.status(503).json({ok:false,error:"INVALID_STOP_CONSTRAINTS",message:"Broker stop-distance constraints could not be verified. No order was submitted.",analysis,risk});
+        const minDistance=stopsLevel*point;
+        if(stopLoss!=null){
+          if(stopLoss<=0|| (side==="BUY" && stopLoss>=bid) || (side==="SELL" && stopLoss<=ask) || Math.abs((side==="BUY"?bid:ask)-stopLoss)<minDistance)return res.status(400).json({ok:false,error:"INVALID_STOP_LOSS",message:"Stop loss violates broker-side price direction or minimum distance. No order was submitted.",analysis,risk});
+        }
+        if(takeProfit!=null){
+          if(takeProfit<=0|| (side==="BUY" && takeProfit<=ask) || (side==="SELL" && takeProfit>=bid) || Math.abs(takeProfit-(side==="BUY"?ask:bid))<minDistance)return res.status(400).json({ok:false,error:"INVALID_TAKE_PROFIT",message:"Take profit violates broker-side price direction or minimum distance. No order was submitted.",analysis,risk});
+        }
         if(symbolPositions.length>=s.maxPositions)return res.status(409).json({ok:false,error:"MAX_SYMBOL_POSITIONS",message:"Maximum positions for this symbol are already open. No order was submitted.",analysis,risk});
         const clientId="kb_"+crypto.randomUUID();
         const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[user.id,b.id,clientId,s.executionMode,analysis.market.symbol,side,volume]);
         if(!journal.rowCount)return res.status(409).json({ok:false,error:"DUPLICATE_EXECUTION_REQUEST",message:"Duplicate execution request blocked. No order was submitted.",analysis,risk});
         try{
-          order=await broker.placeOrder({side,symbol:analysis.market.symbol,volume,stopLoss:req.body?.stopLoss,takeProfit:req.body?.takeProfit,comment:"KINGBOT",clientId,userId:user.id});
+          order=await broker.placeOrder({side,symbol:analysis.market.symbol,volume,stopLoss,takeProfit,comment:"KINGBOT",clientId,userId:user.id});
           await pool.query("UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,JSON.stringify(order)]);
           action="ORDER_SUBMITTED";
         }catch(error){
