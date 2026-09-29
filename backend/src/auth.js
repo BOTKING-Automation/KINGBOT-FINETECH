@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { Router } from "express";
-import nodemailer from "nodemailer";
 
 const router = Router();
 
