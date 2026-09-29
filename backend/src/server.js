@@ -9,7 +9,7 @@ import cookieParser from "cookie-parser";
 import pg from "pg";
 import { createAuthRouter, ensureAuthSchema } from "./auth.js";
 import { createSubscriptionRouter, ensureSubscriptionSchema } from "./subscriptions.js";
-import { createBotEngineRouter } from "./bot-engines.js";
+import { createBotEngineRouter, ensureBotEngineSchema } from "./bot-engines.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -157,7 +157,7 @@ app.use((_req, res) => {
   });
 });
 
-ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => {
+ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => {
 app.listen(PORT, () => {
   console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
 });
