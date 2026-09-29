@@ -26,14 +26,14 @@ html.kb-entry-check body{visibility:hidden}
   let finished=false;
   const finish=()=>{if(finished)return;finished=true;root.classList.remove("kb-entry-check")};
   const deny=(path)=>{window.location.replace(path)};
-  const fallback=setTimeout(()=>{if(!finished)deny("access.html#signin")},5000);
+  const fallback=setTimeout(()=>{if(!finished)deny("access-stable.html#signin")},5000);
   import("./system/firebase-auth.js").then(async()=>{
     const fb=window.KINGBOT_FIREBASE;
     const user=fb?.auth?.currentUser||null;
-    if(!user){clearTimeout(fallback);deny("access.html#signin");return}
+    if(!user){clearTimeout(fallback);deny("access-stable.html#signin");return}
     await fb.refresh();
     const current=fb.auth.currentUser;
-    if(!current){clearTimeout(fallback);deny("access.html#signin");return}
+    if(!current){clearTimeout(fallback);deny("access-stable.html#signin");return}
     if(!current.emailVerified){
       clearTimeout(fallback);
       deny("verify.html");
@@ -43,7 +43,7 @@ html.kb-entry-check body{visibility:hidden}
     finish();
   }).catch(()=>{
     clearTimeout(fallback);
-    deny("access.html#signin");
+    deny("access-stable.html#signin");
   });
 })();
 </script>
@@ -2050,7 +2050,7 @@ footer{
 
         <a
           class="btn btn-gold"
-          href="access.html#signin"
+          href="access-stable.html#signin"
           data-kb-auth-cta
           data-guest-text="ENTER KINGBOT →"
         >
@@ -3030,7 +3030,7 @@ footer{
 
         <a
           class="btn btn-gold kb-guest-only"
-          href="access.html#signup"
+          href="access-stable.html#signup"
           data-kb-guest-only
         >
           CREATE ACCOUNT →
