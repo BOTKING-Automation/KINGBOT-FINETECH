@@ -1,8 +1,15 @@
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { Router } from "express";
+import nodemailer from "nodemailer";
 
 const router = Router();
+
+function createMailer() {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS || !process.env.MAIL_FROM) return null;
+  return nodemailer.createTransport({host:process.env.SMTP_HOST,port:Number(process.env.SMTP_PORT||587),secure:Number(process.env.SMTP_PORT||587)===465,auth:{user:process.env.SMTP_USER,pass:process.env.SMTP_PASS}});
+}
+function verificationCode(){ return String(crypto.randomInt(100000,1000000)); }
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -62,6 +69,46 @@ export function createAuthRouter({ pool, sessionTtlHours = 24, limiter }) {
     }
   });
 
+
+  router.post("/signin", async (req,res) => {
+    if (!pool) return res.status(503).json({ok:false,error:"Account service is not configured on the server yet."});
+    const email=String(req.body?.email||"").trim().toLowerCase();
+    const password=String(req.body?.password||"");
+    if(!validEmail(email)||!password) return res.status(400).json({ok:false,error:"Enter a valid email and password."});
+    try {
+      const q=await pool.query("SELECT id,email,first_name,last_name,password_hash,email_verified,phone_verified FROM kingbot_users WHERE email=$1",[email]);
+      if(!q.rowCount || !(await bcrypt.compare(password,q.rows[0].password_hash))) return res.status(401).json({ok:false,error:"Invalid email or password."});
+      const u=q.rows[0];
+      if(!u.email_verified) await issueVerification(pool,u.id,u.email,u.first_name);
+      const token=newToken();
+      await pool.query("DELETE FROM kingbot_sessions WHERE user_id=$1",[u.id]);
+      await pool.query("INSERT INTO kingbot_sessions(token_hash,user_id,expires_at) VALUES($1,$2,NOW()+make_interval(hours => $3))",[hashToken(token),u.id,sessionTtlHours]);
+      res.cookie("kingbot_session",token,{httpOnly:true,secure:true,sameSite:"lax",maxAge:sessionTtlHours*3600000});
+      return res.json({ok:true,emailVerified:u.email_verified,phoneVerified:u.phone_verified,user:{id:u.id,email:u.email,name:`${u.first_name} ${u.last_name}`,verified:u.email_verified&&u.phone_verified}});
+    } catch(error){ console.error("[KINGBOT AUTH] signin failed:",error?.message||error); return res.status(500).json({ok:false,error:"Authentication service unavailable."}); }
+  });
+
+  router.post("/verify", async (req,res) => {
+    if(!pool) return res.status(503).json({ok:false,error:"Account service is not configured."});
+    const email=String(req.body?.email||"").trim().toLowerCase(), code=String(req.body?.code||"").trim();
+    if(!validEmail(email)||!/^\d{6}$/.test(code)) return res.status(400).json({ok:false,error:"Enter the six-digit verification code."});
+    try {
+      const q=await pool.query("SELECT u.id,u.email,u.first_name,u.last_name,v.code_hash,v.expires_at FROM kingbot_users u JOIN kingbot_verification_codes v ON v.user_id=u.id WHERE u.email=$1 ORDER BY v.expires_at DESC LIMIT 1",[email]);
+      if(!q.rowCount || new Date(q.rows[0].expires_at)<new Date() || !crypto.timingSafeEqual(Buffer.from(q.rows[0].code_hash,"hex"),Buffer.from(crypto.createHash("sha256").update(code).digest("hex")))) return res.status(400).json({ok:false,error:"Invalid or expired verification code."});
+      await pool.query("UPDATE kingbot_users SET email_verified=TRUE WHERE id=$1",[q.rows[0].id]);
+      await pool.query("DELETE FROM kingbot_verification_codes WHERE user_id=$1",[q.rows[0].id]);
+      return res.json({ok:true,verified:true});
+    } catch(error){ console.error("[KINGBOT AUTH] verification failed:",error?.message||error); return res.status(500).json({ok:false,error:"Verification service unavailable."}); }
+  });
+
+  router.post("/resend-verification", async (req,res) => {
+    if(!pool) return res.status(503).json({ok:false,error:"Account service is not configured."});
+    const email=String(req.body?.email||"").trim().toLowerCase();
+    if(!validEmail(email)) return res.status(400).json({ok:false,error:"Enter a valid email address."});
+    try { const q=await pool.query("SELECT id,email,first_name,email_verified FROM kingbot_users WHERE email=$1",[email]); if(!q.rowCount) return res.status(404).json({ok:false,error:"Account not found."}); if(q.rows[0].email_verified) return res.json({ok:true,verified:true}); await issueVerification(pool,q.rows[0].id,q.rows[0].email,q.rows[0].first_name); return res.json({ok:true,sent:true}); }
+    catch(error){ console.error("[KINGBOT AUTH] resend failed:",error?.message||error); return res.status(500).json({ok:false,error:"Verification email could not be sent."}); }
+  });
+
   router.get("/session", async (req,res) => {
     if (!pool) return res.status(503).json({ok:false,error:"Account service is not configured."});
     const token=req.cookies?.kingbot_session;
@@ -90,6 +137,16 @@ export function createAuthRouter({ pool, sessionTtlHours = 24, limiter }) {
   return router;
 }
 
+async function issueVerification(pool,userId,email,firstName){
+  const mailer=createMailer();
+  if(!mailer) throw new Error("SMTP_NOT_CONFIGURED");
+  const code=verificationCode();
+  const hash=crypto.createHash("sha256").update(code).digest("hex");
+  await pool.query("DELETE FROM kingbot_verification_codes WHERE user_id=$1",[userId]);
+  await pool.query("INSERT INTO kingbot_verification_codes(user_id,code_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '15 minutes')",[userId,hash]);
+  await mailer.sendMail({from:process.env.MAIL_FROM,to:email,subject:"KINGBOT FINTECH — Verify your account",text:`Hello ${firstName}, your KINGBOT verification code is ${code}. It expires in 15 minutes. If you did not create this account, ignore this email.`});
+}
+
 export async function ensureAuthSchema(pool) {
   if (!pool) return;
   await pool.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
@@ -104,6 +161,7 @@ export async function ensureAuthSchema(pool) {
     phone_verified BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS kingbot_verification_codes (user_id UUID PRIMARY KEY REFERENCES kingbot_users(id) ON DELETE CASCADE, code_hash TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL);`);
   await pool.query(`CREATE TABLE IF NOT EXISTS kingbot_sessions (
     token_hash TEXT PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,
