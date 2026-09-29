@@ -298,9 +298,17 @@ form.addEventListener("submit",async e=>{
    showMessage("Sign-in successful. Please verify your email using the Firebase verification message.","success");
    setTimeout(()=>window.location.replace("verify.html"),700); return;
   }
-  showMessage("Authentication verified. Opening KINGBOT...","success");
-  if(window.KINGBOT_SESSION&&typeof window.KINGBOT_SESSION.redirectAfterLogin==="function") window.KINGBOT_SESSION.redirectAfterLogin();
-  else window.location.replace("index.html");
+  if(result.syncError){
+   sessionStorage.setItem("auth_sync_pending","1");
+   showMessage("Authentication verified. Your Firebase account is valid. KINGBOT account sync will complete when the backend is available.","success");
+  }else{
+   sessionStorage.removeItem("auth_sync_pending");
+   showMessage("Authentication verified. Opening KINGBOT...","success");
+  }
+  setTimeout(()=>{
+   if(window.KINGBOT_SESSION&&typeof window.KINGBOT_SESSION.redirectAfterLogin==="function") window.KINGBOT_SESSION.redirectAfterLogin();
+   else window.location.replace("index.html");
+  },700);
  }catch(error){
   const code=String(error?.code||"");
   const messages={
@@ -308,13 +316,14 @@ form.addEventListener("submit",async e=>{
    "auth/user-not-found":"Invalid email or password.",
    "auth/wrong-password":"Invalid email or password.",
    "auth/too-many-requests":"Too many attempts. Please wait and try again.",
-   "auth/network-request-failed":"Network error. Check your connection."
+   "auth/network-request-failed":"Network error. Check your connection.",
+   "auth/configuration-not-found":"Firebase Authentication is not configured correctly for KINGBOT.",
+   "auth/invalid-email":"Enter the same email you used to register."
   };
   showMessage(messages[code]||error.message||"Sign in failed.","error");
   button.disabled=false;button.textContent="SECURE SIGN IN";
  }
 });
-</script>
 </script>
 
 </body>
