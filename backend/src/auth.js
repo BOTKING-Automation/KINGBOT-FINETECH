@@ -58,7 +58,7 @@ export function createAuthRouter({ pool, sessionTtlHours = 24, limiter }) {
       );
 
       try { await issueVerification(pool,user.rows[0].id,user.rows[0].email,user.rows[0].first_name); } catch(mailError) { console.error("[KINGBOT AUTH] verification email failed:",mailError?.message||mailError); return res.status(503).json({ok:false,error:"Account created, but the verification email service is not configured yet. Please contact support."}); }
-      res.cookie("kingbot_session",token,{httpOnly:true,secure:true,sameSite:"lax",maxAge:sessionTtlHours*3600000});
+      res.cookie("kingbot_session",token,{httpOnly:true,secure:true,sameSite:"none",maxAge:sessionTtlHours*3600000});
       return res.status(201).json({
         ok:true,
         user:{id:user.rows[0].id,email:user.rows[0].email,name:`${user.rows[0].first_name} ${user.rows[0].last_name}`},
@@ -84,7 +84,7 @@ export function createAuthRouter({ pool, sessionTtlHours = 24, limiter }) {
       const token=newToken();
       await pool.query("DELETE FROM kingbot_sessions WHERE user_id=$1",[u.id]);
       await pool.query("INSERT INTO kingbot_sessions(token_hash,user_id,expires_at) VALUES($1,$2,NOW()+make_interval(hours => $3))",[hashToken(token),u.id,sessionTtlHours]);
-      res.cookie("kingbot_session",token,{httpOnly:true,secure:true,sameSite:"lax",maxAge:sessionTtlHours*3600000});
+      res.cookie("kingbot_session",token,{httpOnly:true,secure:true,sameSite:"none",maxAge:sessionTtlHours*3600000});
       return res.json({ok:true,emailVerified:u.email_verified,phoneVerified:u.phone_verified,user:{id:u.id,email:u.email,name:`${u.first_name} ${u.last_name}`,verified:u.email_verified}});
     } catch(error){ console.error("[KINGBOT AUTH] signin failed:",error?.message||error); return res.status(500).json({ok:false,error:"Authentication service unavailable."}); }
   });
@@ -164,7 +164,7 @@ export function createAuthRouter({ pool, sessionTtlHours = 24, limiter }) {
   router.post("/logout", async (req,res) => {
     const token=req.cookies?.kingbot_session;
     if(pool && token) await pool.query("DELETE FROM kingbot_sessions WHERE token_hash=$1",[hashToken(token)]).catch(()=>{});
-    res.clearCookie("kingbot_session",{httpOnly:true,secure:true,sameSite:"lax"});
+    res.clearCookie("kingbot_session",{httpOnly:true,secure:true,sameSite:"none"});
     return res.json({ok:true});
   });
 
