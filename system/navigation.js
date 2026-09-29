@@ -40,7 +40,7 @@
       #kb-command-nav{
         position:fixed;
         top:16px;
-        left:16px;
+        right:16px;
         z-index:2147483000;
         font-family:Space Grotesk,Inter,system-ui,sans-serif;
       }
@@ -514,7 +514,7 @@
       }
 
       @media(max-width:900px){
-        #kb-command-nav{top:10px;left:10px}
+        #kb-command-nav{top:10px;right:10px}
         .kb-command-trigger{width:48px;height:48px;border-radius:14px}
         .kb-command-panel{top:8px;right:8px;bottom:8px;width:calc(100vw - 16px);border-radius:22px}
         .kb-panel-shell{padding:20px 16px}
