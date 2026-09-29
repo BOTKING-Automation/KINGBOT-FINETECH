@@ -57,6 +57,7 @@ export function createAuthRouter({ pool, sessionTtlHours = 24, limiter }) {
         [hashToken(token),user.rows[0].id,sessionTtlHours]
       );
 
+      try { await issueVerification(pool,user.rows[0].id,user.rows[0].email,user.rows[0].first_name); } catch(mailError) { console.error("[KINGBOT AUTH] verification email failed:",mailError?.message||mailError); return res.status(503).json({ok:false,error:"Account created, but the verification email service is not configured yet. Please contact support."}); }
       res.cookie("kingbot_session",token,{httpOnly:true,secure:true,sameSite:"lax",maxAge:sessionTtlHours*3600000});
       return res.status(201).json({
         ok:true,
@@ -99,6 +100,39 @@ export function createAuthRouter({ pool, sessionTtlHours = 24, limiter }) {
       await pool.query("DELETE FROM kingbot_verification_codes WHERE user_id=$1",[q.rows[0].id]);
       return res.json({ok:true,verified:true});
     } catch(error){ console.error("[KINGBOT AUTH] verification failed:",error?.message||error); return res.status(500).json({ok:false,error:"Verification service unavailable."}); }
+  });
+
+  router.post("/forgot-password", async (req,res) => {
+    if(!pool) return res.status(503).json({ok:false,error:"Account service is not configured."});
+    const email=String(req.body?.email||"").trim().toLowerCase();
+    if(!validEmail(email)) return res.status(400).json({ok:false,error:"Enter a valid email address."});
+    try {
+      const q=await pool.query("SELECT id,email,first_name FROM kingbot_users WHERE email=$1",[email]);
+      if(!q.rowCount) return res.json({ok:true,sent:true});
+      const mailer=createMailer(); if(!mailer) return res.status(503).json({ok:false,error:"Password recovery email service is not configured yet."});
+      const token=newToken(); const hash=hashToken(token);
+      await pool.query("DELETE FROM kingbot_password_resets WHERE user_id=$1",[q.rows[0].id]);
+      await pool.query("INSERT INTO kingbot_password_resets(user_id,token_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '30 minutes')",[q.rows[0].id,hash]);
+      const base=(process.env.FRONTEND_ORIGIN||"").replace(/\\/$/,"");
+      const link=base+"/reset-password.html?token="+encodeURIComponent(token)+"&email="+encodeURIComponent(email);
+      await mailer.sendMail({from:process.env.MAIL_FROM,to:email,subject:"KINGBOT FINTECH — Password reset",text:`Hello ${q.rows[0].first_name}, use this link to reset your KINGBOT password: ${link}. It expires in 30 minutes.`});
+      return res.json({ok:true,sent:true});
+    } catch(error){ console.error("[KINGBOT AUTH] password reset request failed:",error?.message||error); return res.status(500).json({ok:false,error:"Password recovery service unavailable."}); }
+  });
+
+  router.post("/reset-password", async (req,res) => {
+    if(!pool) return res.status(503).json({ok:false,error:"Account service is not configured."});
+    const token=String(req.body?.token||""), email=String(req.body?.email||"").trim().toLowerCase(), password=String(req.body?.password||"");
+    if(!token||!validEmail(email)||password.length<8||password.length>128) return res.status(400).json({ok:false,error:"Invalid reset request."});
+    try {
+      const q=await pool.query("SELECT u.id,r.token_hash,r.expires_at FROM kingbot_password_resets r JOIN kingbot_users u ON u.id=r.user_id WHERE u.email=$1 AND r.token_hash=$2",[email,hashToken(token)]);
+      if(!q.rowCount||new Date(q.rows[0].expires_at)<new Date()) return res.status(400).json({ok:false,error:"Reset link is invalid or expired."});
+      const passwordHash=await bcrypt.hash(password,12);
+      await pool.query("UPDATE kingbot_users SET password_hash=$1 WHERE id=$2",[passwordHash,q.rows[0].id]);
+      await pool.query("DELETE FROM kingbot_password_resets WHERE user_id=$1",[q.rows[0].id]);
+      await pool.query("DELETE FROM kingbot_sessions WHERE user_id=$1",[q.rows[0].id]);
+      return res.json({ok:true,reset:true});
+    } catch(error){ console.error("[KINGBOT AUTH] password reset failed:",error?.message||error); return res.status(500).json({ok:false,error:"Password reset service unavailable."}); }
   });
 
   router.post("/resend-verification", async (req,res) => {
@@ -162,6 +196,7 @@ export async function ensureAuthSchema(pool) {
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );`);
   await pool.query(`CREATE TABLE IF NOT EXISTS kingbot_verification_codes (user_id UUID PRIMARY KEY REFERENCES kingbot_users(id) ON DELETE CASCADE, code_hash TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL);`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS kingbot_password_resets (user_id UUID PRIMARY KEY REFERENCES kingbot_users(id) ON DELETE CASCADE, token_hash TEXT UNIQUE NOT NULL, expires_at TIMESTAMPTZ NOT NULL);`);
   await pool.query(`CREATE TABLE IF NOT EXISTS kingbot_sessions (
     token_hash TEXT PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,
