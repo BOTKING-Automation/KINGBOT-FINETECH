@@ -669,6 +669,10 @@
     .bot-choice-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:9px;color:#687590;font:800 7px var(--mono);letter-spacing:.12em}
     .bot-choice-head b{color:#ffe28a}
     .bot-choice-note{margin-top:7px;color:#6f7e9b;font-size:8px;line-height:1.55}
+    .access-state{margin:11px 0 0;padding:13px 14px;border-radius:12px;font:800 9px var(--mono);letter-spacing:.04em;border:1px solid rgba(255,255,255,.08)}
+    .access-state.approved{color:#9fffd4;background:rgba(35,247,163,.045);border-color:rgba(35,247,163,.22);box-shadow:0 0 28px rgba(35,247,163,.08)}
+    .access-state.waiting{color:#ffd889;background:rgba(255,181,46,.045);border-color:rgba(255,181,46,.22);box-shadow:0 0 28px rgba(255,181,46,.07)}
+    .access-state.denied{color:#ff9eae;background:rgba(255,77,109,.045);border-color:rgba(255,77,109,.22);box-shadow:0 0 28px rgba(255,77,109,.07)}
     @media(max-width:1100px){
       .layout{grid-template-columns:1fr}
       .plans{grid-template-columns:repeat(3,1fr)}
@@ -871,6 +875,7 @@
           <div id="accountStatus" class="status-box">
             Checking your subscription state…
           </div>
+          <div id="accessState" class="access-state waiting">● WAITING — checking payment and subscription status…</div>
 
           <div class="console-label" style="margin-top:15px">PAYMENT HISTORY</div>
           <div id="history" class="history-list">
@@ -1099,14 +1104,35 @@
         }
 
         const subscription=data.subscription;
+        const latest=data.latestPayment || (Array.isArray(data.payments)?data.payments[0]:null);
+        const accessState=document.getElementById("accessState");
 
         if(subscription){
           accountStatus.innerHTML=
             '<span style="color:var(--green);font-weight:800">ACTIVE · '+esc(String(subscription.plan_id||"").toUpperCase())+
             '</span> · expires '+
-            esc(new Date(subscription.expires_at).toLocaleDateString());
+            esc(new Date(subscription.expires_at).toLocaleString())+
+            ' · <span style="color:var(--gold2);font-weight:800">'+Math.max(0,Math.ceil((new Date(subscription.expires_at).getTime()-Date.now())/86400000))+' day(s) remaining</span>';
         }else{
-          accountStatus.textContent="No active subscription. Access remains locked until an eligible payment is approved.";
+          accountStatus.textContent="No active subscription. Bot execution is locked until an eligible payment is approved.";
+        }
+
+        const paymentStatus=String(latest?.status||"").toLowerCase();
+        if(paymentStatus==="approved"){
+          accessState.className="access-state approved";
+          accessState.innerHTML="● APPROVED — payment verified. Your subscription and entitled bot access are active.";
+        }else if(paymentStatus==="rejected"){
+          accessState.className="access-state denied";
+          accessState.textContent="● DENIED — payment was not approved. "+(latest?.reviewer_note||"Review the payment details and submit a valid transaction.");
+        }else if(paymentStatus==="pending"){
+          accessState.className="access-state waiting";
+          accessState.innerHTML="● WAITING — payment received and awaiting administrator verification.";
+        }else if(subscription){
+          accessState.className="access-state approved";
+          accessState.innerHTML="● APPROVED — active subscription detected.";
+        }else{
+          accessState.className="access-state waiting";
+          accessState.innerHTML="● WAITING — no active subscription yet.";
         }
 
         const payments=Array.isArray(data.payments)?data.payments:[];
