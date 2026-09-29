@@ -57,7 +57,12 @@ export function createAuthRouter({ pool, sessionTtlHours = 24, limiter }) {
         [hashToken(token),user.rows[0].id,sessionTtlHours]
       );
 
-      try { await issueVerification(pool,user.rows[0].id,user.rows[0].email,user.rows[0].first_name); } catch(mailError) { console.error("[KINGBOT AUTH] verification email failed:",mailError?.message||mailError); return res.status(503).json({ok:false,error:"Account created, but the verification email service is not configured yet. Please contact support."}); }
+      try { await issueVerification(pool,user.rows[0].id,user.rows[0].email,user.rows[0].first_name); } catch(mailError) {
+        console.error("[KINGBOT AUTH] verification email failed:",mailError?.message||mailError);
+        await pool.query("DELETE FROM kingbot_sessions WHERE user_id=$1",[user.rows[0].id]).catch(()=>{});
+        await pool.query("DELETE FROM kingbot_users WHERE id=$1",[user.rows[0].id]).catch(()=>{});
+        return res.status(503).json({ok:false,error:"We could not send your verification email. Your signup was not completed. Please try again or contact support."});
+      }
       res.cookie("kingbot_session",token,{httpOnly:true,secure:true,sameSite:"none",maxAge:sessionTtlHours*3600000});
       return res.status(201).json({
         ok:true,
