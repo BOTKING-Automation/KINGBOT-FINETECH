@@ -256,6 +256,92 @@ a {
 
 
 /* =====================================================
+   INSTITUTIONAL GLOW TYPOGRAPHY
+===================================================== */
+
+.kb-display,
+.kb-title,
+.kb-heading,
+.kb-brand-text strong {
+  font-family:
+    Orbitron,
+    "Space Grotesk",
+    Inter,
+    system-ui,
+    sans-serif;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.kb-display {
+  background:
+    linear-gradient(
+      110deg,
+      var(--kb-gold),
+      var(--kb-gold-2) 30%,
+      var(--kb-cyan) 62%,
+      var(--kb-violet)
+    );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow:
+    0 0 22px rgba(246,185,59,.16),
+    0 0 42px rgba(25,230,255,.10);
+}
+
+.kb-title {
+  color: var(--kb-text);
+  text-shadow:
+    0 0 18px rgba(25,230,255,.10),
+    0 0 34px rgba(246,185,59,.08);
+}
+
+.kb-neon-text {
+  color: var(--kb-cyan);
+  text-shadow:
+    0 0 8px rgba(25,230,255,.70),
+    0 0 24px rgba(25,230,255,.28);
+}
+
+.kb-gold-text {
+  color: var(--kb-gold-2);
+  text-shadow:
+    0 0 8px rgba(246,185,59,.62),
+    0 0 24px rgba(246,185,59,.24);
+}
+
+.kb-violet-text {
+  color: var(--kb-violet);
+  text-shadow:
+    0 0 8px rgba(155,92,255,.65),
+    0 0 24px rgba(155,92,255,.24);
+}
+
+.kb-gradient-label {
+  font-family:
+    "JetBrains Mono",
+    monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  background:
+    linear-gradient(
+      90deg,
+      var(--kb-cyan),
+      var(--kb-gold),
+      var(--kb-pink)
+    );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow:
+    0 0 14px rgba(25,230,255,.18);
+}
+
+/* =====================================================
    GLOBAL CONTAINER
 ===================================================== */
 
