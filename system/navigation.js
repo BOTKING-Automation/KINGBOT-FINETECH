@@ -43,11 +43,15 @@
         z-index:2147483000;
         display:flex;
         align-items:center;
-        gap:8px;
+        gap:0;
         font-family:Space Grotesk,Inter,system-ui,sans-serif;
       }
 
       #kb-compact-nav .kb-fintech-logo{
+        position:fixed;
+        top:14px;
+        left:14px;
+        z-index:2147483001;
         width:42px;
         height:42px;
         display:block;
@@ -326,8 +330,8 @@
       }
 
       @media(max-width:560px){
-        #kb-compact-nav{top:10px;right:10px;gap:6px}
-        #kb-compact-nav .kb-fintech-logo{width:38px;height:38px;border-radius:10px}
+        #kb-compact-nav{top:10px;right:10px}
+        #kb-compact-nav .kb-fintech-logo{top:10px;left:10px;width:38px;height:38px;border-radius:10px}
         #kb-compact-nav .kb-nav-trigger{width:44px;height:44px}
         #kb-compact-nav .kb-menu{
           top:53px;
