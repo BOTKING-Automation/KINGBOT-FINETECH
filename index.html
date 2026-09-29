@@ -58,6 +58,22 @@ html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
 @keyframes kbBootGradient{to{background-position:500% center}}@keyframes kbBootSpin{to{transform:rotate(360deg)}}@keyframes kbBootSpinReverse{to{transform:rotate(-360deg)}}@keyframes kbBootFloat{50%{transform:translateY(-8px) rotateY(-4deg) rotateX(2deg)}}@keyframes kbBootPulse{50%{transform:translate(-50%,-50%) translateZ(35px) scale(1.8);opacity:.45}}@keyframes kbNeuralFlow{to{stroke-dashoffset:-54}}@keyframes kbNodePulse{to{r:4;opacity:.55}}@keyframes kbTrace{to{stroke-dashoffset:-88}}@keyframes kbCandleFloat{to{transform:translateZ(28px) translateY(-4px) skewY(-3deg);filter:brightness(1.35)}}@keyframes kbBootProgress{to{width:100%}}
 @media(max-width:640px){.kb-boot-stage{height:300px}.kb-boot-brain{width:300px;height:225px}.kb-market-plane{width:335px}.kb-boot-brand{font-size:15px}.kb-boot-sub{font-size:6px}.kb-candle{width:15px}}
 @media(prefers-reduced-motion:reduce){#kb-boot-loader *{animation-duration:.01ms!important;animation-iteration-count:1!important}}
+
+.kb-tech-brain{position:absolute;inset:0;transform-style:preserve-3d}
+.kb-tech-brain .brain-body{fill:url(#kbTechFill);fill-opacity:.11;stroke:url(#kbTechStroke);stroke-width:2.8;filter:url(#kbTechGlow)}
+.kb-tech-brain .brain-rim{fill:none;stroke:url(#kbTechStroke);stroke-width:1.25;opacity:.58;transform:translateZ(-20px) scale(.94)}
+.kb-tech-brain .brain-shellline{fill:none;stroke:url(#kbTechStroke);stroke-width:1.15;stroke-dasharray:3 7;opacity:.72;animation:kbCircuitFlow 2.2s linear infinite}
+.kb-tech-brain .brain-circuit{fill:none;stroke:url(#kbCircuit);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:9 5;filter:url(#kbTechGlow);animation:kbCircuitFlow 1.6s linear infinite}
+.kb-tech-brain .brain-circuit.s2{animation-duration:2.5s;animation-delay:-.7s}.kb-tech-brain .brain-circuit.s3{animation-duration:3.1s;animation-delay:-1.4s}
+.kb-tech-brain .node{fill:#fff;stroke:url(#kbCircuit);stroke-width:1.2;filter:url(#kbTechGlow);animation:kbTechNode 1s ease-in-out infinite alternate}
+.kb-tech-brain .chip{fill:rgba(4,12,28,.7);stroke:url(#kbCircuit);stroke-width:1.4;filter:url(#kbTechGlow)}
+.kb-tech-brain .chipline{stroke:url(#kbCircuit);stroke-width:1.1;opacity:.9}
+.kb-tech-brain .scan{fill:none;stroke:url(#kbCircuit);stroke-width:2;stroke-dasharray:25 18;opacity:.8;filter:url(#kbTechGlow);animation:kbScan 2.2s linear infinite}
+.kb-candle{box-shadow:0 0 10px var(--glow),0 0 24px var(--glow);border:1px solid rgba(255,255,255,.28);transform:translateZ(16px) skewY(-2deg)}
+.kb-candle.bull{--c1:#25f7a5;--c2:#08cfff;--glow:#25f7a5}
+.kb-candle.bear{--c1:#ff687f;--c2:#ff3b9f;--glow:#ff4f8f}
+.kb-market-plane:after{content:"";position:absolute;left:4%;right:4%;top:12%;bottom:12%;border-top:1px solid rgba(35,247,163,.14);border-bottom:1px solid rgba(25,230,255,.1);transform:translateZ(-2px);box-shadow:0 -22px 0 rgba(155,92,255,.035),0 22px 0 rgba(246,185,59,.03)}
+@keyframes kbCircuitFlow{to{stroke-dashoffset:-56}}@keyframes kbTechNode{to{opacity:.38;filter:url(#kbTechGlow) brightness(1.6)}}@keyframes kbScan{to{stroke-dashoffset:-86}}
 </style>
 <script src="system/boot-loader.js?v=24"></script>
   
@@ -2019,46 +2035,48 @@ footer{
 <div class="kb-boot-stage">
 <div class="kb-boot-halo"></div>
 <div class="kb-boot-brain">
-<div class="kb-brain-shell">
-<svg class="kb-brain-layer kb-brain-back" viewBox="0 0 360 270" aria-hidden="true"><path class="kb-brain-fill" d="M180 31c-25-27-75-22-90 15-34-11-67 14-63 50-22 18-18 57 10 72-8 37 22 60 54 52 14 38 70 41 89 8 19 33 75 30 89-8 32 8 62-15 54-52 28-15 32-54 10-72 4-36-29-61-63-50-15-37-65-42-90-15Z"/></svg>
-<svg class="kb-brain-layer kb-brain-mid" viewBox="0 0 360 270" aria-hidden="true"><path d="M180 31c-25-27-75-22-90 15-34-11-67 14-63 50-22 18-18 57 10 72-8 37 22 60 54 52 14 38 70 41 89 8 19 33 75 30 89-8 32 8 62-15 54-52 28-15 32-54 10-72 4-36-29-61-63-50-15-37-65-42-90-15Z"/></svg>
-<svg class="kb-brain-layer kb-brain-front" viewBox="0 0 360 270" aria-hidden="true">
+<div class="kb-tech-brain">
+<svg viewBox="0 0 360 270" aria-hidden="true">
 <defs>
-<linearGradient id="kbBrainFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#19e6ff"/><stop offset="28%" stop-color="#9b5cff"/><stop offset="54%" stop-color="#ff4fd8"/><stop offset="78%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
-<linearGradient id="kbBrainStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#19e6ff"/><stop offset="28%" stop-color="#9b5cff"/><stop offset="54%" stop-color="#ff4fd8"/><stop offset="78%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
-<linearGradient id="kbNeuralStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="18%" stop-color="#19e6ff"/><stop offset="46%" stop-color="#ff4fd8"/><stop offset="72%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
-<filter id="kbGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<linearGradient id="kbTechFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#19e6ff"/><stop offset="30%" stop-color="#5e7cff"/><stop offset="55%" stop-color="#ff4fd8"/><stop offset="76%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
+<linearGradient id="kbTechStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#19e6ff"/><stop offset="24%" stop-color="#9b5cff"/><stop offset="50%" stop-color="#ff4fd8"/><stop offset="74%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient>
+<linearGradient id="kbCircuit" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#23f7a3"/><stop offset="25%" stop-color="#19e6ff"/><stop offset="50%" stop-color="#9b5cff"/><stop offset="72%" stop-color="#ff4fd8"/><stop offset="100%" stop-color="#ffd977"/></linearGradient>
+<filter id="kbTechGlow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="3.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
-<path class="kb-brain-fill" d="M180 31c-25-27-75-22-90 15-34-11-67 14-63 50-22 18-18 57 10 72-8 37 22 60 54 52 14 38 70 41 89 8 19 33 75 30 89-8 32 8 62-15 54-52 28-15 32-54 10-72 4-36-29-61-63-50-15-37-65-42-90-15Z"/>
-<path class="kb-brain-rim" d="M180 31c-25-27-75-22-90 15-34-11-67 14-63 50-22 18-18 57 10 72-8 37 22 60 54 52 14 38 70 41 89 8 19 33 75 30 89-8 32 8 62-15 54-52 28-15 32-54 10-72 4-36-29-61-63-50-15-37-65-42-90-15Z"/>
-<path class="kb-neural-path" d="M180 40v190M125 54c25 23 31 48 27 74-5 25 7 46 34 57M235 54c-25 23-31 48-27 74 5 25-7 46-34 57M80 97c32 4 44 24 46 47M280 97c-32 4-44 24-46 47M73 145c29-9 49 2 59 28M287 145c-29-9-49 2-59 28M126 196c20-11 36-10 54 4M234 196c-20-11-36-10-54 4"/>
-<path class="kb-neural-path p2" d="M106 66c25 7 37 24 39 47M254 66c-25 7-37 24-39 47M106 168c17-17 31-18 50-7M254 168c-17-17-31-18-50-7"/>
-<path class="kb-neural-path p3" d="M145 82c12-13 25-15 35-6M215 82c-12-13-25-15-35-6M139 119c15-13 29-13 41 0M221 119c-15-13-29-13-41 0"/>
-<circle class="kb-neural-node" cx="180" cy="40" r="3"/><circle class="kb-neural-node" cx="126" cy="54" r="3"/><circle class="kb-neural-node" cx="234" cy="54" r="3"/><circle class="kb-neural-node" cx="80" cy="97" r="3"/><circle class="kb-neural-node" cx="280" cy="97" r="3"/><circle class="kb-neural-node" cx="132" cy="173" r="3"/><circle class="kb-neural-node" cx="228" cy="173" r="3"/>
+<path class="brain-rim" d="M180 26c-28-28-76-18-89 17-37-8-67 17-63 54-23 18-20 55 7 70-9 39 23 65 56 57 15 35 67 37 89 6 22 31 74 29 89-6 33 8 65-18 56-57 27-15 30-52 7-70 4-37-26-62-63-54-13-35-61-45-89-17Z"/>
+<path class="brain-body" d="M180 32c-25-24-67-16-78 18-33-8-59 15-56 47-21 16-17 45 7 58-8 33 19 54 47 48 13 30 58 33 80 4 22 29 67 26 80-4 28 6 55-15 47-48 24-13 28-42 7-58 3-32-23-55-56-47-11-34-53-42-78-18Z"/>
+<path class="brain-shellline" d="M180 38v190M112 58c20 19 29 42 24 68-4 22 6 40 29 51M248 58c-20 19-29 42-24 68 4 22-6 40-29 51M79 94c27 4 40 18 42 42M281 94c-27 4-40 18-42 42M73 139c25-8 42 0 51 24M287 139c-25-8-42 0-51 24M118 193c21-10 40-7 62 8M242 193c-21-10-40-7-62 8"/>
+<path class="brain-circuit" d="M180 47V76h-31v26h-27v32h-24M180 47v29h31v27h27v31h24M149 102h-19V78h-22M211 103h19V79h22M98 134H74v-22H58M262 134h24v-22h16M129 134h25v22h26v37M231 134h-25v22h-26v37M128 78v-20h-18M232 78v-20h18M105 169h-22v18H67M255 169h22v18h16"/>
+<path class="brain-circuit s2" d="M180 78v24M154 102v32M206 102v32M155 156h25M205 156h-25M180 190v27M130 134h-30M230 134h30"/>
+<path class="brain-circuit s3" d="M111 58l17 17M249 58l-17 17M74 113l24 21M286 113l-24 21M84 187l21-18M276 187l-21-18"/>
+<rect class="chip" x="161" y="108" width="38" height="32" rx="5"/>
+<path class="chipline" d="M166 115h28M166 122h28M166 129h28M166 136h28M172 108v-7M181 108v-8M190 108v-7M172 140v7M181 140v8M190 140v-7"/>
+<circle class="node" cx="180" cy="47" r="3"/><circle class="node" cx="149" cy="102" r="3"/><circle class="node" cx="211" cy="102" r="3"/><circle class="node" cx="98" cy="134" r="3"/><circle class="node" cx="262" cy="134" r="3"/><circle class="node" cx="118" cy="193" r="3"/><circle class="node" cx="242" cy="193" r="3"/>
+<path class="scan" d="M68 220 Q180 188 292 220"/>
 </svg>
 </div>
 <div class="kb-boot-pulse"></div>
 <div class="kb-market-plane">
 <div class="kb-market-grid"></div>
 <svg class="kb-market-line" viewBox="0 0 410 112" preserveAspectRatio="none" aria-hidden="true">
-<defs><linearGradient id="kbLineStroke" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#19e6ff"/><stop offset="26%" stop-color="#9b5cff"/><stop offset="50%" stop-color="#ff4fd8"/><stop offset="72%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient></defs>
-<polyline points="4,88 42,76 71,82 102,58 133,65 161,41 192,55 218,28 246,45 276,20 301,35 330,14 360,29 406,7"/>
+<defs><linearGradient id="kbLineStroke" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#19e6ff"/><stop offset="35%" stop-color="#9b5cff"/><stop offset="58%" stop-color="#ff4fd8"/><stop offset="78%" stop-color="#f6b93b"/><stop offset="100%" stop-color="#23f7a3"/></linearGradient></defs>
+<polyline points="5,94 34,90 62,84 88,86 111,75 137,79 163,66 188,68 213,53 238,58 263,43 288,47 314,32 341,35 368,18 405,8"/>
 </svg>
 <div class="kb-boot-candles">
-<i class="kb-candle" style="--h:27px;--c1:#23f7a3;--c2:#19e6ff;--glow:#23f7a3"></i>
-<i class="kb-candle" style="--h:44px;--c1:#ff4fd8;--c2:#9b5cff;--glow:#ff4fd8"></i>
-<i class="kb-candle" style="--h:62px;--c1:#ffd977;--c2:#f6b93b;--glow:#f6b93b"></i>
-<i class="kb-candle" style="--h:38px;--c1:#19e6ff;--c2:#4d8dff;--glow:#19e6ff"></i>
-<i class="kb-candle" style="--h:72px;--c1:#9b5cff;--c2:#ff4fd8;--glow:#9b5cff"></i>
-<i class="kb-candle" style="--h:51px;--c1:#ff4fd8;--c2:#f6b93b;--glow:#ff4fd8"></i>
-<i class="kb-candle" style="--h:79px;--c1:#23f7a3;--c2:#19e6ff;--glow:#23f7a3"></i>
-<i class="kb-candle" style="--h:43px;--c1:#ffd977;--c2:#ff7a18;--glow:#f6b93b"></i>
-<i class="kb-candle" style="--h:65px;--c1:#19e6ff;--c2:#9b5cff;--glow:#19e6ff"></i>
+<i class="kb-candle bull" style="--h:24px"></i>
+<i class="kb-candle bull" style="--h:31px"></i>
+<i class="kb-candle bear" style="--h:27px"></i>
+<i class="kb-candle bull" style="--h:39px"></i>
+<i class="kb-candle bull" style="--h:48px"></i>
+<i class="kb-candle bull" style="--h:44px"></i>
+<i class="kb-candle bear" style="--h:50px"></i>
+<i class="kb-candle bull" style="--h:61px"></i>
+<i class="kb-candle bull" style="--h:69px"></i>
 </div>
 </div>
 </div>
-</div>
-<div class="kb-boot-readout"><span>AI CORE <b>ACTIVE</b></span><span>3D NEURAL MATRIX <b>ONLINE</b></span><span>MARKET ENGINE <b>LINKING</b></span></div>
+</div>/div>
+<div class="kb-boot-readout"><span>AI CORE <b>ACTIVE</b></span><span>CYBER NEURAL CORE <b>ONLINE</b></span><span>MARKET ENGINE <b>LINKING</b></span></div>
 <div class="kb-boot-status" id="kb-boot-status">NEURAL CORE INITIALIZING</div>
 <div class="kb-boot-progress"><i></i></div>
 <div class="kb-boot-foot">GIBSONFX TECH · KINGBOT FINTECH · 10.00 SEC STARTUP SEQUENCE</div>
