@@ -72,33 +72,47 @@ html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
  const states=["NEURAL CORE INITIALIZING","MARKET MATRIX LINKING","BOT BRAIN SYNCHRONIZING","RISK ENGINE ONLINE","AUTH GATE READY"];
  let n=0;const status=el.querySelector("#kb-boot-status"),ticker=setInterval(()=>{n=(n+1)%states.length;status.textContent=states[n]},900);
  const remove=()=>{clearInterval(ticker);el.style.transition="opacity .45s ease";el.style.opacity="0";setTimeout(()=>{el.remove();document.documentElement.classList.remove("kb-boot-lock")},460)};
- const ready=(async()=>{
+ const getLocalAuth=()=>{
   try{
-    if(!window.KINGBOT_SESSION){
-      await import(new URL("./session.js",window.location.href).href);
-    }
-    if(window.KINGBOT_SESSION?.check){
-      return await window.KINGBOT_SESSION.check({force:true});
+    const user=window.KINGBOT_FIREBASE?.auth?.currentUser||null;
+    if(user){
+      return {authenticated:true,user:{verified:Boolean(user.emailVerified),email:user.email||""}};
     }
   }catch(error){
-    console.warn("[KINGBOT BOOT] Session preflight failed:",error?.message||error);
+    console.warn("[KINGBOT BOOT] Local auth read failed:",error?.message||error);
   }
   return {authenticated:false,user:null};
- })();
- Promise.all([new Promise(r=>setTimeout(r,20000)),ready]).then(([,session])=>{
+ };
+
+ const routeAfterBoot=async()=>{
+  let session=getLocalAuth();
+
+  if(!session.authenticated && window.KINGBOT_SESSION?.check){
+    try{
+      const checked=await Promise.race([
+        window.KINGBOT_SESSION.check({force:true}),
+        new Promise(resolve=>setTimeout(()=>resolve(null),1500))
+      ]);
+      if(checked) session=checked;
+    }catch(error){
+      console.warn("[KINGBOT BOOT] Session preflight failed:",error?.message||error);
+    }
+  }
+
   if(!session?.authenticated){
     window.location.replace("access.html");
     return;
   }
+
   if(!session?.user?.verified){
     window.location.replace("verify.html");
     return;
   }
+
   remove();
- }).catch(error=>{
-  console.warn("[KINGBOT BOOT] Routing fallback:",error?.message||error);
-  window.location.replace("access.html");
- });
+ };
+
+ setTimeout(routeAfterBoot,20000);
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",inject,{once:true});else inject();
 })(window);
