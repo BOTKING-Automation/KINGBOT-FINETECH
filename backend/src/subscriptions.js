@@ -41,6 +41,7 @@ export async function requireUser(pool, req, res) {
   const u = await currentUser(pool,req);
   if (!u) { res.status(401).json({ok:false,error:"Authentication required."}); return null; }
   if (!u.email_verified) { res.status(403).json({ok:false,error:"Email verification is required."}); return null; }
+  if (u.admin_blocked) { res.status(403).json({ok:false,error:"This account has been disabled by KINGBOT administration."}); return null; }
   return u;
 }
 async function requireAdmin(pool, req, res) {
