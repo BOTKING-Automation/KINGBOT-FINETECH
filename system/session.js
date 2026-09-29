@@ -43,8 +43,8 @@ Expected session response:
     // ---------------------------------------------------
 
     config: {
-      sessionEndpoint: "/api/auth/session",
-      logoutEndpoint: "/api/auth/logout",
+      sessionEndpoint: "https://kingbot-fintech-api.onrender.com/api/auth/session",
+      logoutEndpoint: "https://kingbot-fintech-api.onrender.com/api/auth/logout",
 
       // How long cached session information remains usable
       // before another server check is performed.
