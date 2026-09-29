@@ -66,10 +66,31 @@ PURPOSE
           href: "ai.html",
           icon: "✦",
           permission: "ai"
+        },
+        {
+          label: "Academy",
+          href: "academy.html",
+          icon: "◆",
+          permission: null
+        },
+        {
+          label: "Pricing",
+          href: "pricing.html",
+          icon: "◇",
+          permission: null
+        },
+        {
+          label: "About",
+          href: "about.html",
+          icon: "◎",
+          permission: null
         }
       ],
 
-      accountLinks: []
+      accountLinks: [
+        { label: "Settings", href: "settings.html", icon: "⚙" },
+        { label: "Subscription", href: "subscription.html", icon: "◈" }
+      ]
 
     },
 
