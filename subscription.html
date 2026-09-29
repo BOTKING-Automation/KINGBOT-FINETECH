@@ -1,31 +1,1213 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KINGBOT — Subscription</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@600;800&family=Orbitron:wght@600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="system/platform.css"><style>main{width:min(1150px,calc(100% - 30px));margin:auto;padding:42px 0 70px}.hero,.panel{padding:28px;border:1px solid rgba(246,185,59,.16);border-radius:24px;background:linear-gradient(145deg,rgba(10,18,40,.92),rgba(3,7,18,.97))}.ey{font:800 10px "JetBrains Mono";letter-spacing:.2em;color:#19e6ff}.title{font:900 45px Orbitron;margin:12px 0;background:linear-gradient(100deg,#f6b93b,#19e6ff,#9b5cff,#ff4fd8);-webkit-background-clip:text;color:transparent}.muted{color:#8f9bb5;line-height:1.7}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.plan{padding:22px;border-radius:20px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025)}.plan h2{font-family:Orbitron}.price{font:900 28px Orbitron;color:#ffd977}.bots{font:700 10px "JetBrains Mono";color:#19e6ff;line-height:1.8}.form{display:grid;gap:12px;margin-top:20px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{font:700 9px "JetBrains Mono";letter-spacing:.12em;color:#71809b}input,select{width:100%;box-sizing:border-box;margin-top:6px;padding:13px;border-radius:11px;border:1px solid rgba(255,255,255,.1);background:#071021;color:#eef4ff}button{padding:13px 18px;border:0;border-radius:11px;background:linear-gradient(90deg,#f6b93b,#19e6ff,#9b5cff);font-weight:900;cursor:pointer}.status{padding:15px;border-radius:13px;background:rgba(25,230,255,.05);border:1px solid rgba(25,230,255,.12);color:#aebbd2;margin-top:15px}.history{margin-top:20px;display:grid;gap:9px}.item{padding:13px;border:1px solid rgba(255,255,255,.07);border-radius:12px;color:#aebbd2}.active{color:#7dffbd}.pending{color:#ffd977}@media(max-width:850px){.plans{grid-template-columns:1fr}.row{grid-template-columns:1fr}.title{font-size:32px}}</style></head><body><div data-kingbot-navigation></div><main><section class="hero"><div class="ey">KINGBOT FINTECH / ACCESS CONTROL</div><h1 class="title">Subscription Infrastructure</h1><p class="muted">Choose your bot access. Pay through M-Pesa, submit the transaction code, and wait for manual verification. Your developer/admin approval is required before any bot engine is unlocked.</p><div id="receiver" class="status">Loading M-Pesa payment instructions…</div><div id="plans" class="plans"></div></section><section class="panel" style="margin-top:18px"><div class="ey">PAYMENT VERIFICATION</div><h2 style="font-family:Orbitron">Submit M-Pesa Transaction</h2><form id="paymentForm" class="form"><div class="row"><div><label>SUBSCRIPTION PLAN</label><select id="planId" required></select></div><div><label>AMOUNT PAID (KES)</label><input id="amountKes" type="number" min="1" step="0.01" placeholder="Exact amount paid" required></div></div><div class="row"><div><label>M-PESA TRANSACTION CODE</label><input id="mpesaCode" maxlength="30" placeholder="e.g. ABC123XYZ" required></div><div><label>PAYER PHONE (OPTIONAL)</label><input id="payerPhone" placeholder="+254..." ></div></div><button type="submit">SUBMIT PAYMENT FOR VERIFICATION</button></form><div id="status" class="status">Awaiting submission.</div><div id="history" class="history"></div></section></main><script src="system/session.js"></script><script src="system/auth-gate.js"></script><script src="system/access-control.js"></script><script src="system/navigation.js"></script><script>
-(async()=>{
-const plansEl=document.getElementById("plans"), select=document.getElementById("planId"), receiver=document.getElementById("receiver"), status=document.getElementById("status"), history=document.getElementById("history");
-let plans=[];
-function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
-async function load(){
- const r=await window.KINGBOT_API.request("/api/subscription/plans"); const d=await r.json().catch(()=>({}));
- if(!r.ok){status.textContent=d.error||"Could not load subscription plans.";return}
- plans=d.plans||[]; receiver.innerHTML="<strong>PAY VIA M-PESA</strong><br>Send payment to <strong>"+esc(d.mpesaReceiver)+"</strong>. Use the exact amount communicated for your selected plan. Then submit your transaction code below.";
- select.innerHTML=plans.map(p=>"<option value='"+esc(p.id)+"'>"+esc(p.name)+" — $"+esc(p.priceUsd)+"</option>").join("");
- plansEl.innerHTML=plans.map(p=>"<article class='plan'><div class='ey'>"+esc(p.id.toUpperCase())+"</div><h2>"+esc(p.name)+"</h2><div class='price'>$"+esc(p.priceUsd)+"</div><p class='muted'>"+p.features.map(esc).join(" • ")+"</p><div class='bots'>"+p.bots.map(b=>esc(b.name)).join("<br>")+"</div></article>").join("");
- await loadMe();
-}
-async function loadMe(){
- const r=await window.KINGBOT_API.request("/api/subscription/me"); const d=await r.json().catch(()=>({}));
- if(!r.ok){status.textContent=d.error||"Subscription data unavailable.";return}
- const s=d.subscription;
- status.innerHTML=s?"<span class='active'>ACTIVE: "+esc(s.plan_id.toUpperCase())+"</span> • Expires "+esc(new Date(s.expires_at).toLocaleDateString()):"No active subscription. Access remains locked until payment approval.";
- history.innerHTML=(d.payments||[]).map(p=>"<div class='item'><strong>"+esc(p.plan_id.toUpperCase())+"</strong> • "+esc(p.mpesa_code)+" • "+esc(p.status)+" • KES "+esc(p.amount_kes)+(p.reviewer_note?"<br>"+esc(p.reviewer_note):"")+"</div>").join("");
-}
-document.getElementById("paymentForm").addEventListener("submit",async e=>{
- e.preventDefault(); status.textContent="Submitting securely…";
- const body={planId:select.value,amountKes:Number(document.getElementById("amountKes").value),mpesaCode:document.getElementById("mpesaCode").value,payerPhone:document.getElementById("payerPhone").value};
- const r=await window.KINGBOT_API.request("/api/subscription/payments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
- const d=await r.json().catch(()=>({}));
- status.textContent=d.ok?"Payment submitted. Your access stays locked until manual verification.":(d.error||"Submission failed.");
- if(d.ok){document.getElementById("mpesaCode").value="";await loadMe();}
-});
-load();
-})();
-</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#050a18">
+  <meta name="description" content="KINGBOT FINTECH subscription and M-Pesa payment verification dashboard.">
+
+  <title>KINGBOT FINTECH — Subscription Command Center</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="system/platform.css">
+
+  <style>
+    :root{
+      --bg0:#02050d;
+      --bg1:#050a18;
+      --panel:rgba(9,16,35,.84);
+      --panel2:rgba(6,11,25,.92);
+      --line:rgba(255,255,255,.08);
+      --line-cyan:rgba(25,230,255,.20);
+      --line-gold:rgba(246,185,59,.22);
+      --cyan:#19e6ff;
+      --blue:#4787ff;
+      --violet:#9b5cff;
+      --pink:#ff4fd8;
+      --gold:#f6b93b;
+      --gold2:#ffd977;
+      --green:#23f7a3;
+      --red:#ff4d6d;
+      --text:#eef3ff;
+      --muted:#8b98b5;
+      --dim:#5e6b88;
+      --shadow:0 24px 80px rgba(0,0,0,.42);
+      --display:Orbitron,sans-serif;
+      --mono:"JetBrains Mono",monospace;
+    }
+
+    *{box-sizing:border-box}
+
+    html{scroll-behavior:smooth}
+
+    body{
+      margin:0;
+      min-height:100vh;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 5% 5%,rgba(25,230,255,.075),transparent 26%),
+        radial-gradient(circle at 93% 8%,rgba(155,92,255,.09),transparent 26%),
+        radial-gradient(circle at 55% 95%,rgba(246,185,59,.055),transparent 30%),
+        linear-gradient(180deg,var(--bg0),var(--bg1) 48%,var(--bg0));
+      overflow-x:hidden;
+    }
+
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      z-index:-2;
+      pointer-events:none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
+      background-size:44px 44px;
+      mask-image:linear-gradient(to bottom,black,transparent 92%);
+    }
+
+    body::after{
+      content:"";
+      position:fixed;
+      width:520px;
+      height:520px;
+      right:-210px;
+      top:-190px;
+      z-index:-1;
+      border-radius:50%;
+      background:radial-gradient(circle,rgba(25,230,255,.09),transparent 68%);
+      filter:blur(20px);
+      pointer-events:none;
+    }
+
+    .page{
+      width:min(1440px,calc(100% - 28px));
+      margin:0 auto;
+      padding:34px 0 76px;
+    }
+
+    .command-head{
+      position:relative;
+      overflow:hidden;
+      padding:26px;
+      border:1px solid var(--line);
+      border-radius:24px;
+      background:
+        radial-gradient(circle at 88% 20%,rgba(155,92,255,.12),transparent 28%),
+        radial-gradient(circle at 18% 110%,rgba(25,230,255,.07),transparent 30%),
+        linear-gradient(145deg,rgba(10,19,42,.94),rgba(3,8,20,.98));
+      box-shadow:var(--shadow);
+    }
+
+    .command-head::before{
+      content:"";
+      position:absolute;
+      left:-15%;
+      right:-15%;
+      bottom:0;
+      height:1px;
+      background:linear-gradient(90deg,transparent,var(--cyan),var(--violet),var(--pink),var(--gold),transparent);
+      box-shadow:0 0 22px rgba(25,230,255,.34);
+      animation:scan 5s linear infinite;
+    }
+
+    @keyframes scan{from{transform:translateX(-35%)}to{transform:translateX(35%)}}
+
+    .head-grid{
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:22px;
+      align-items:end;
+      position:relative;
+      z-index:1;
+    }
+
+    .eyebrow{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      color:var(--cyan);
+      font:800 9px var(--mono);
+      letter-spacing:.2em;
+      text-transform:uppercase;
+    }
+
+    .eyebrow::before{
+      content:"";
+      width:7px;
+      height:7px;
+      border-radius:50%;
+      background:var(--green);
+      box-shadow:0 0 12px var(--green);
+      animation:pulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulse{50%{opacity:.35;transform:scale(.7)}}
+
+    h1{
+      margin:12px 0 9px;
+      font:900 clamp(30px,5vw,54px)/1.02 var(--display);
+      letter-spacing:-.04em;
+    }
+
+    .gradient{
+      background:linear-gradient(90deg,var(--gold),var(--cyan),var(--violet),var(--pink));
+      -webkit-background-clip:text;
+      background-clip:text;
+      color:transparent;
+    }
+
+    .lead{
+      max-width:850px;
+      margin:0;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.75;
+    }
+
+    .head-status{
+      display:grid;
+      grid-template-columns:repeat(3,auto);
+      gap:8px;
+      align-items:center;
+    }
+
+    .status-chip{
+      padding:9px 11px;
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:10px;
+      background:rgba(255,255,255,.025);
+      color:#8592ae;
+      font:700 8px var(--mono);
+      white-space:nowrap;
+    }
+
+    .status-chip.online{
+      color:#9fffd4;
+      border-color:rgba(35,247,163,.15);
+      background:rgba(35,247,163,.04);
+    }
+
+    .layout{
+      display:grid;
+      grid-template-columns:minmax(0,1.45fr) minmax(350px,.75fr);
+      gap:17px;
+      margin-top:18px;
+      align-items:start;
+    }
+
+    .panel{
+      position:relative;
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:22px;
+      background:
+        linear-gradient(145deg,rgba(10,18,40,.90),rgba(3,8,19,.96));
+      box-shadow:var(--shadow);
+    }
+
+    .panel::before{
+      content:"";
+      position:absolute;
+      inset:-1px;
+      padding:1px;
+      border-radius:23px;
+      background:linear-gradient(125deg,rgba(25,230,255,.24),transparent 35%,rgba(155,92,255,.12) 65%,rgba(246,185,59,.18));
+      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+      -webkit-mask-composite:xor;
+      mask-composite:exclude;
+      pointer-events:none;
+    }
+
+    .panel-inner{padding:21px;position:relative;z-index:1}
+
+    .panel-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:12px;
+      margin-bottom:14px;
+    }
+
+    .section-code{
+      color:var(--cyan);
+      font:800 8px var(--mono);
+      letter-spacing:.18em;
+    }
+
+    .section-title{
+      margin-top:5px;
+      font:800 14px var(--display);
+      letter-spacing:.05em;
+    }
+
+    .section-note{
+      color:var(--dim);
+      font:600 7px var(--mono);
+      letter-spacing:.05em;
+      text-align:right;
+    }
+
+    .plans{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:11px;
+    }
+
+    .plan-card{
+      position:relative;
+      min-height:310px;
+      display:flex;
+      flex-direction:column;
+      padding:17px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:17px;
+      background:
+        linear-gradient(160deg,rgba(16,26,54,.84),rgba(5,10,24,.96));
+      transition:.2s ease;
+    }
+
+    .plan-card::after{
+      content:"";
+      position:absolute;
+      width:180px;
+      height:180px;
+      top:-100px;
+      right:-95px;
+      border-radius:50%;
+      background:radial-gradient(circle,rgba(25,230,255,.10),transparent 68%);
+      pointer-events:none;
+    }
+
+    .plan-card:hover,
+    .plan-card.selected{
+      transform:translateY(-2px);
+      border-color:rgba(25,230,255,.26);
+      box-shadow:0 20px 55px rgba(0,0,0,.35),0 0 24px rgba(25,230,255,.05);
+    }
+
+    .plan-card.selected{
+      border-color:rgba(246,185,59,.44);
+      box-shadow:0 0 30px rgba(246,185,59,.09),0 18px 50px rgba(0,0,0,.35);
+    }
+
+    .plan-card.featured{
+      border-color:rgba(25,230,255,.24);
+    }
+
+    .plan-top{
+      position:relative;
+      z-index:1;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+
+    .plan-code{
+      color:var(--cyan);
+      font:800 7px var(--mono);
+      letter-spacing:.14em;
+    }
+
+    .featured-badge{
+      padding:5px 7px;
+      border-radius:7px;
+      color:#211501;
+      background:linear-gradient(135deg,var(--gold),var(--gold2));
+      font:900 6px var(--display);
+      letter-spacing:.1em;
+    }
+
+    .plan-name{
+      position:relative;
+      z-index:1;
+      margin-top:13px;
+      font:800 13px var(--display);
+    }
+
+    .plan-price{
+      position:relative;
+      z-index:1;
+      margin-top:9px;
+      font:900 32px/1 var(--mono);
+      background:linear-gradient(90deg,var(--gold),var(--gold2),#fff);
+      -webkit-background-clip:text;
+      background-clip:text;
+      color:transparent;
+    }
+
+    .plan-price small{
+      font:700 8px var(--mono);
+      color:#687590;
+      background:none;
+      -webkit-text-fill-color:#687590;
+    }
+
+    .plan-description{
+      position:relative;
+      z-index:1;
+      min-height:54px;
+      margin-top:11px;
+      color:#8390ad;
+      font-size:10px;
+      line-height:1.65;
+    }
+
+    .feature-list{
+      position:relative;
+      z-index:1;
+      list-style:none;
+      padding:0;
+      margin:13px 0 16px;
+      display:grid;
+      gap:7px;
+    }
+
+    .feature-list li{
+      color:#a4aec3;
+      font-size:9px;
+      line-height:1.35;
+    }
+
+    .feature-list li::before{
+      content:"✓";
+      margin-right:6px;
+      color:var(--green);
+      font-weight:900;
+    }
+
+    .plan-select{
+      position:relative;
+      z-index:1;
+      width:100%;
+      margin-top:auto;
+      min-height:37px;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:10px;
+      color:#eef4ff;
+      background:linear-gradient(90deg,rgba(25,230,255,.05),rgba(155,92,255,.05));
+      font:800 8px var(--mono);
+      cursor:pointer;
+    }
+
+    .plan-select.active{
+      border-color:rgba(246,185,59,.32);
+      color:#ffe28a;
+      box-shadow:0 0 18px rgba(246,185,59,.06);
+    }
+
+    .payment-grid{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) minmax(300px,.82fr);
+      gap:12px;
+      margin-top:17px;
+    }
+
+    .payment-console,
+    .payment-summary{
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:17px;
+      background:rgba(255,255,255,.022);
+    }
+
+    .payment-console{padding:17px}
+
+    .payment-summary{
+      padding:15px;
+      background:
+        radial-gradient(circle at 90% 0%,rgba(246,185,59,.08),transparent 34%),
+        linear-gradient(145deg,rgba(246,185,59,.025),rgba(255,255,255,.018));
+    }
+
+    .console-label{
+      color:#65728e;
+      font:800 7px var(--mono);
+      letter-spacing:.16em;
+    }
+
+    .mpesa-card{
+      position:relative;
+      overflow:hidden;
+      margin-top:10px;
+      padding:15px;
+      border-radius:13px;
+      border:1px solid rgba(35,247,163,.16);
+      background:
+        linear-gradient(120deg,rgba(35,247,163,.045),rgba(25,230,255,.035),rgba(155,92,255,.04));
+    }
+
+    .mpesa-card::after{
+      content:"";
+      position:absolute;
+      left:-35%;
+      top:0;
+      bottom:0;
+      width:26%;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);
+      animation:paymentScan 4.2s linear infinite;
+    }
+
+    @keyframes paymentScan{to{left:115%}}
+
+    .mpesa-title{
+      font:900 10px var(--display);
+      color:#b8ffe0;
+      letter-spacing:.06em;
+    }
+
+    .receiver{
+      margin-top:8px;
+      color:#93a1bc;
+      font-size:10px;
+      line-height:1.65;
+    }
+
+    .receiver strong{
+      color:#fff3bd;
+      font-family:var(--mono);
+    }
+
+    .secure-tag{
+      display:inline-flex;
+      margin-top:11px;
+      padding:6px 8px;
+      border-radius:8px;
+      color:#72eac0;
+      border:1px solid rgba(35,247,163,.14);
+      background:rgba(35,247,163,.04);
+      font:700 7px var(--mono);
+    }
+
+    .form{
+      display:grid;
+      gap:10px;
+      margin-top:13px;
+    }
+
+    .row{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    label{
+      display:block;
+      color:#71809d;
+      font:800 7px var(--mono);
+      letter-spacing:.13em;
+      text-transform:uppercase;
+    }
+
+    input,
+    select{
+      width:100%;
+      margin-top:6px;
+      padding:11px 12px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.08);
+      outline:none;
+      background:#050b1a;
+      color:#edf3ff;
+      font-size:10px;
+      transition:.2s;
+    }
+
+    input:focus,
+    select:focus{
+      border-color:rgba(25,230,255,.32);
+      box-shadow:0 0 18px rgba(25,230,255,.06);
+    }
+
+    .submit{
+      min-height:44px;
+      margin-top:2px;
+      border:0;
+      border-radius:11px;
+      color:#05101a;
+      background:linear-gradient(100deg,var(--gold),var(--cyan),var(--violet));
+      box-shadow:0 12px 30px rgba(25,230,255,.10);
+      font:900 8px var(--display);
+      letter-spacing:.07em;
+      cursor:pointer;
+      transition:.2s;
+    }
+
+    .submit:hover{transform:translateY(-1px);box-shadow:0 15px 34px rgba(25,230,255,.15)}
+
+    .submit:disabled{opacity:.55;cursor:not-allowed;transform:none}
+
+    .summary-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+    }
+
+    .summary-name{
+      font:800 10px var(--display);
+      color:#edf2ff;
+    }
+
+    .summary-status{
+      font:700 6px var(--mono);
+      color:#7c8ba7;
+      letter-spacing:.08em;
+    }
+
+    .summary-price{
+      margin-top:10px;
+      font:900 27px var(--mono);
+      color:var(--gold2);
+    }
+
+    .summary-price span{
+      font:700 7px var(--mono);
+      color:#66738e;
+    }
+
+    .summary-line{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:9px 0;
+      border-bottom:1px dashed rgba(255,255,255,.06);
+      color:#7886a2;
+      font-size:9px;
+    }
+
+    .summary-line strong{
+      color:#dfe7f5;
+      font:800 8px var(--mono);
+      text-align:right;
+    }
+
+    .status-box{
+      margin-top:12px;
+      padding:11px;
+      border-radius:11px;
+      border:1px solid rgba(25,230,255,.11);
+      background:rgba(25,230,255,.03);
+      color:#8fa0be;
+      font-size:9px;
+      line-height:1.6;
+    }
+
+    .history-panel{
+      margin-top:17px;
+    }
+
+    .history-list{
+      display:grid;
+      gap:7px;
+      margin-top:11px;
+    }
+
+    .history-item{
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:8px;
+      align-items:center;
+      padding:11px 12px;
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:10px;
+      background:rgba(255,255,255,.018);
+    }
+
+    .history-main strong{
+      display:block;
+      color:#dce4f3;
+      font:800 8px var(--mono);
+    }
+
+    .history-main span{
+      display:block;
+      margin-top:4px;
+      color:#66738e;
+      font-size:8px;
+    }
+
+    .history-state{
+      padding:5px 7px;
+      border-radius:7px;
+      color:#7f91b2;
+      background:rgba(255,255,255,.035);
+      font:800 6px var(--mono);
+      letter-spacing:.07em;
+    }
+
+    .history-state.pending{color:#ffe08c;background:rgba(246,185,59,.06)}
+    .history-state.approved{color:#8fffc9;background:rgba(35,247,163,.05)}
+    .history-state.rejected{color:#ff9baa;background:rgba(255,77,109,.05)}
+
+    .notice{
+      margin-top:11px;
+      padding:10px 11px;
+      border-left:2px solid var(--gold);
+      background:rgba(246,185,59,.035);
+      color:#7f8ca8;
+      font-size:8px;
+      line-height:1.6;
+    }
+
+    .empty{
+      padding:14px;
+      border:1px dashed rgba(255,255,255,.08);
+      border-radius:10px;
+      color:#66738d;
+      font-size:8px;
+      text-align:center;
+    }
+
+    @media(max-width:1100px){
+      .layout{grid-template-columns:1fr}
+      .plans{grid-template-columns:repeat(3,1fr)}
+    }
+
+    @media(max-width:820px){
+      .head-grid{grid-template-columns:1fr}
+      .head-status{grid-template-columns:repeat(3,1fr)}
+      .plans{grid-template-columns:1fr}
+      .payment-grid{grid-template-columns:1fr}
+    }
+
+    @media(max-width:560px){
+      .page{width:calc(100% - 18px);padding-top:20px}
+      .command-head{padding:19px}
+      .panel-inner{padding:15px}
+      .head-status{grid-template-columns:1fr}
+      .row{grid-template-columns:1fr}
+      .payment-console,.payment-summary{padding:13px}
+      .history-item{grid-template-columns:1fr}
+    }
+
+    @media(prefers-reduced-motion:reduce){
+      .command-head::before,
+      .eyebrow::before,
+      .mpesa-card::after{animation:none}
+    }
+  </style>
+</head>
+
+<body>
+  <div data-kingbot-navigation></div>
+
+  <main class="page">
+
+    <section class="command-head">
+      <div class="head-grid">
+        <div>
+          <div class="eyebrow">KINGBOT FINTECH / SUBSCRIPTION COMMAND CENTER</div>
+          <h1>Access the <span class="gradient">KINGBOT infrastructure.</span></h1>
+          <p class="lead">
+            Subscription access is synchronized with the KINGBOT FINTECH home-page pricing.
+            Select a platform plan, review the payment instructions, submit your M-Pesa transaction
+            reference, and wait for manual verification before bot access is unlocked.
+          </p>
+        </div>
+
+        <div class="head-status">
+          <div class="status-chip online">● SYSTEM ONLINE</div>
+          <div class="status-chip">M-PESA VERIFICATION</div>
+          <div class="status-chip">ACCESS CONTROL</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" style="margin-top:18px">
+      <div class="panel-inner">
+        <div class="panel-head">
+          <div>
+            <div class="section-code">01 / PLATFORM PRICING</div>
+            <div class="section-title">HOME-PRICING SYNCHRONIZED PLANS</div>
+          </div>
+          <div class="section-note">USD DISPLAY · PAYMENT ENTERED IN KES</div>
+        </div>
+
+        <div id="plans" class="plans"></div>
+      </div>
+    </section>
+
+    <section class="layout">
+
+      <div class="panel">
+        <div class="panel-inner">
+
+          <div class="panel-head">
+            <div>
+              <div class="section-code">02 / PAYMENT DESK</div>
+              <div class="section-title">SECURE M-PESA SUBMISSION</div>
+            </div>
+            <div class="section-note">MANUAL VERIFICATION</div>
+          </div>
+
+          <div class="payment-grid">
+
+            <div class="payment-console">
+
+              <div class="console-label">PAYMENT INSTRUCTIONS</div>
+
+              <div id="receiver" class="mpesa-card">
+                <div class="mpesa-title">CONNECTING TO PAYMENT DESK…</div>
+                <div class="receiver">Loading secure payment instructions.</div>
+              </div>
+
+              <form id="paymentForm" class="form">
+
+                <div class="row">
+                  <div>
+                    <label for="planId">Selected subscription</label>
+                    <select id="planId" required></select>
+                  </div>
+
+                  <div>
+                    <label for="amountKes">Amount paid (KES)</label>
+                    <input id="amountKes" type="number" min="1" step="0.01" placeholder="Exact amount paid" required>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div>
+                    <label for="mpesaCode">M-Pesa transaction code</label>
+                    <input id="mpesaCode" maxlength="30" autocomplete="off" placeholder="e.g. ABC123XYZ" required>
+                  </div>
+
+                  <div>
+                    <label for="payerPhone">Payer phone (optional)</label>
+                    <input id="payerPhone" maxlength="25" autocomplete="tel" placeholder="+254...">
+                  </div>
+                </div>
+
+                <button class="submit" id="submitButton" type="submit">
+                  SUBMIT PAYMENT FOR VERIFICATION
+                </button>
+
+              </form>
+
+              <div class="notice">
+                Payment submission does not unlock trading access immediately.
+                The transaction remains subject to the existing manual verification and entitlement workflow.
+              </div>
+
+              <div id="status" class="status-box">Awaiting payment submission.</div>
+
+            </div>
+
+            <aside class="payment-summary">
+
+              <div class="console-label">LIVE ORDER SUMMARY</div>
+
+              <div class="summary-head" style="margin-top:9px">
+                <div id="summaryName" class="summary-name">SELECT A PLAN</div>
+                <div id="summaryStatus" class="summary-status">READY</div>
+              </div>
+
+              <div id="summaryPrice" class="summary-price">— <span>USD PLAN PRICE</span></div>
+
+              <div class="summary-line">
+                <span>Bot access</span>
+                <strong id="summaryBots">—</strong>
+              </div>
+
+              <div class="summary-line">
+                <span>Platform tier</span>
+                <strong id="summaryTier">—</strong>
+              </div>
+
+              <div class="summary-line">
+                <span>Payment input</span>
+                <strong>KES</strong>
+              </div>
+
+              <div class="summary-line">
+                <span>Verification</span>
+                <strong>MANUAL</strong>
+              </div>
+
+              <div class="status-box" id="summaryNote">
+                Select a plan above to populate the subscription command summary.
+              </div>
+
+            </aside>
+
+          </div>
+
+        </div>
+      </div>
+
+      <aside class="panel history-panel">
+        <div class="panel-inner">
+
+          <div class="panel-head">
+            <div>
+              <div class="section-code">03 / ACCESS LEDGER</div>
+              <div class="section-title">SUBSCRIPTION STATUS</div>
+            </div>
+            <div class="section-note">ACCOUNT HISTORY</div>
+          </div>
+
+          <div id="accountStatus" class="status-box">
+            Checking your subscription state…
+          </div>
+
+          <div class="console-label" style="margin-top:15px">PAYMENT HISTORY</div>
+          <div id="history" class="history-list">
+            <div class="empty">Loading payment history…</div>
+          </div>
+
+        </div>
+      </aside>
+
+    </section>
+
+  </main>
+
+  <script src="system/session.js"></script>
+  <script src="system/auth-gate.js"></script>
+  <script src="system/access-control.js"></script>
+  <script src="system/navigation.js"></script>
+
+  <script>
+  (async()=>{
+    "use strict";
+
+    const plansEl=document.getElementById("plans");
+    const select=document.getElementById("planId");
+    const receiver=document.getElementById("receiver");
+    const status=document.getElementById("status");
+    const accountStatus=document.getElementById("accountStatus");
+    const history=document.getElementById("history");
+    const submitButton=document.getElementById("submitButton");
+
+    const summaryName=document.getElementById("summaryName");
+    const summaryStatus=document.getElementById("summaryStatus");
+    const summaryPrice=document.getElementById("summaryPrice");
+    const summaryBots=document.getElementById("summaryBots");
+    const summaryTier=document.getElementById("summaryTier");
+    const summaryNote=document.getElementById("summaryNote");
+
+    /*
+      These values intentionally mirror the prices displayed
+      on the KINGBOT FINTECH home/landing page.
+    */
+    const HOME_PRICES={
+      starter:100,
+      pro:250,
+      institutional:1200
+    };
+
+    const HOME_PLANS={
+      starter:{
+        name:"STARTER BOT",
+        price:100,
+        tier:"ENTRY",
+        description:"1 bot system · SMC Lite · basic risk controls · equity tracking.",
+        features:[
+          "1 bot system",
+          "SMC Lite",
+          "Basic risk controls",
+          "Equity tracking"
+        ]
+      },
+      pro:{
+        name:"PRO TRADER BOT",
+        price:250,
+        tier:"PRO",
+        description:"Up to 5 bot systems · AI explanations · live dashboard capability · automated risk controls · drawdown protection.",
+        features:[
+          "Up to 5 bot systems",
+          "AI explanations",
+          "Live dashboard capability",
+          "Automated risk controls",
+          "Drawdown protection"
+        ]
+      },
+      institutional:{
+        name:"INSTITUTIONAL OS",
+        price:1200,
+        tier:"INSTITUTIONAL",
+        description:"Expanded bot infrastructure · Trading OS · MT5 integration layer · AI intelligence · prop-style controls · kill switch.",
+        features:[
+          "Expanded bot infrastructure",
+          "Trading OS",
+          "MT5 integration layer",
+          "AI intelligence",
+          "Prop-style controls",
+          "Kill switch"
+        ]
+      }
+    };
+
+    let plans=[];
+
+    function esc(value){
+      return String(value??"").replace(/[&<>"']/g,c=>({
+        "&":"&amp;",
+        "<":"&lt;",
+        ">":"&gt;",
+        """:"&quot;",
+        "'":"&#39;"
+      }[c]));
+    }
+
+    function planKey(plan){
+      const raw=String(plan?.id||"").toLowerCase();
+      return HOME_PLANS[raw] ? raw : (
+        raw.includes("institution") ? "institutional" :
+        raw.includes("pro") ? "pro" :
+        raw.includes("starter") ? "starter" : raw
+      );
+    }
+
+    function displayPlan(plan){
+      const key=planKey(plan);
+      const home=HOME_PLANS[key]||{};
+      return {
+        id:String(plan?.id||key),
+        key,
+        name:home.name||String(plan?.name||"KINGBOT PLAN").toUpperCase(),
+        price:HOME_PRICES[key] ?? Number(plan?.priceUsd||0),
+        tier:home.tier||String(plan?.name||"PLAN").toUpperCase(),
+        description:home.description||"",
+        features:Array.isArray(home.features)?home.features:(
+          Array.isArray(plan?.features)?plan.features:[]
+        )
+      };
+    }
+
+    function selectedKey(){
+      return planKey(plans.find(p=>String(p.id)===String(select.value)));
+    }
+
+    function renderSummary(){
+      const raw=plans.find(p=>String(p.id)===String(select.value));
+      if(!raw){
+        summaryName.textContent="SELECT A PLAN";
+        summaryStatus.textContent="READY";
+        summaryPrice.innerHTML='— <span>USD PLAN PRICE</span>';
+        summaryBots.textContent="—";
+        summaryTier.textContent="—";
+        summaryNote.textContent="Select a plan above to populate the subscription command summary.";
+        document.querySelectorAll(".plan-card").forEach(card=>card.classList.remove("selected"));
+        return;
+      }
+
+      const p=displayPlan(raw);
+
+      summaryName.textContent=p.name;
+      summaryStatus.textContent=p.tier;
+      summaryPrice.innerHTML="$"+p.price.toLocaleString()+" <span>USD PLAN PRICE</span>";
+      summaryBots.textContent=p.key==="starter"?"1 BOT":p.key==="pro"?"UP TO 5 BOTS":"EXPANDED";
+      summaryTier.textContent=p.tier;
+      summaryNote.textContent=p.description;
+
+      document.querySelectorAll(".plan-card").forEach(card=>{
+        card.classList.toggle("selected",card.dataset.plan===p.key);
+      });
+    }
+
+    function renderPlans(){
+      const display=plans.map(displayPlan);
+
+      plansEl.innerHTML=display.map((p,index)=>`
+        <article class="plan-card ${p.key==="pro"?"featured":""}" data-plan="${esc(p.key)}">
+          <div class="plan-top">
+            <div class="plan-code">PLAN / ${String(index+1).padStart(2,"0")}</div>
+            ${p.key==="pro"?'<div class="featured-badge">FEATURED TIER</div>':""}
+          </div>
+
+          <div class="plan-name">${esc(p.name)}</div>
+          <div class="plan-price">$${p.price.toLocaleString()} <small>USD</small></div>
+          <div class="plan-description">${esc(p.description)}</div>
+
+          <ul class="feature-list">
+            ${p.features.map(feature=>"<li>"+esc(feature)+"</li>").join("")}
+          </ul>
+
+          <button class="plan-select" type="button" data-select-plan="${esc(p.id)}">
+            SELECT ${esc(p.name)}
+          </button>
+        </article>
+      `).join("");
+
+      plansEl.querySelectorAll("[data-select-plan]").forEach(button=>{
+        button.addEventListener("click",()=>{
+          select.value=button.dataset.selectPlan;
+          renderSummary();
+          document.getElementById("paymentForm").scrollIntoView({behavior:"smooth",block:"center"});
+        });
+      });
+
+      renderSummary();
+    }
+
+    async function load(){
+      try{
+        const response=await window.KINGBOT_API.request("/api/subscription/plans");
+        const data=await response.json().catch(()=>({}));
+
+        if(!response.ok){
+          throw new Error(data.error||"Could not load subscription plans.");
+        }
+
+        const serverPlans=Array.isArray(data.plans)?data.plans:[];
+        plans=serverPlans.length
+          ? serverPlans.filter(p=>HOME_PLANS[planKey(p)])
+          : Object.keys(HOME_PLANS).map(id=>({id,name:HOME_PLANS[id].name,priceUsd:HOME_PRICES[id]}));
+
+        if(!plans.length){
+          plans=Object.keys(HOME_PLANS).map(id=>({id,name:HOME_PLANS[id].name,priceUsd:HOME_PRICES[id]}));
+        }
+
+        receiver.innerHTML=
+          '<div class="mpesa-title">PAY VIA M-PESA</div>'+
+          '<div class="receiver">Send payment to <strong>'+esc(data.mpesaReceiver||"the configured M-Pesa receiver")+'</strong>. Use the exact amount communicated for your selected payment and submit the transaction code below.</div>'+
+          '<span class="secure-tag">● SECURE SUBMISSION · MANUAL REVIEW</span>';
+
+        select.innerHTML=plans.map(p=>{
+          const d=displayPlan(p);
+          return '<option value="'+esc(p.id)+'">'+esc(d.name)+' — $'+d.price.toLocaleString()+'</option>';
+        }).join("");
+
+        renderPlans();
+        await loadMe();
+
+      }catch(error){
+        receiver.innerHTML=
+          '<div class="mpesa-title">PAYMENT DESK UNAVAILABLE</div>'+
+          '<div class="receiver">'+esc(error.message||"Subscription payment instructions could not be loaded.")+'</div>';
+
+        plans=Object.keys(HOME_PLANS).map(id=>({
+          id,
+          name:HOME_PLANS[id].name,
+          priceUsd:HOME_PRICES[id],
+          features:HOME_PLANS[id].features
+        }));
+
+        select.innerHTML=plans.map(p=>{
+          const d=displayPlan(p);
+          return '<option value="'+esc(p.id)+'">'+esc(d.name)+' — $'+d.price.toLocaleString()+'</option>';
+        }).join("");
+
+        renderPlans();
+        accountStatus.textContent="Subscription service is currently unavailable.";
+        status.textContent="Plan display is available, but the payment service could not be synchronized.";
+      }
+    }
+
+    async function loadMe(){
+      try{
+        const response=await window.KINGBOT_API.request("/api/subscription/me");
+        const data=await response.json().catch(()=>({}));
+
+        if(!response.ok){
+          throw new Error(data.error||"Subscription data unavailable.");
+        }
+
+        const subscription=data.subscription;
+
+        if(subscription){
+          accountStatus.innerHTML=
+            '<span style="color:var(--green);font-weight:800">ACTIVE · '+esc(String(subscription.plan_id||"").toUpperCase())+
+            '</span> · expires '+
+            esc(new Date(subscription.expires_at).toLocaleDateString());
+        }else{
+          accountStatus.textContent="No active subscription. Access remains locked until an eligible payment is approved.";
+        }
+
+        const payments=Array.isArray(data.payments)?data.payments:[];
+
+        history.innerHTML=payments.length
+          ? payments.map(p=>{
+              const state=String(p.status||"PENDING").toLowerCase();
+              return `
+                <div class="history-item">
+                  <div class="history-main">
+                    <strong>${esc(String(p.plan_id||"").toUpperCase())} · KES ${esc(p.amount_kes)}</strong>
+                    <span>${esc(p.mpesa_code)} · ${esc(p.created_at?new Date(p.created_at).toLocaleString():"—")}</span>
+                    ${p.reviewer_note?'<span>'+esc(p.reviewer_note)+'</span>':""}
+                  </div>
+                  <span class="history-state ${esc(state)}">${esc(String(p.status||"PENDING").toUpperCase())}</span>
+                </div>
+              `;
+            }).join("")
+          : '<div class="empty">No payment submissions recorded yet.</div>';
+
+      }catch(error){
+        accountStatus.textContent=error.message||"Subscription data unavailable.";
+        history.innerHTML='<div class="empty">Payment history is unavailable.</div>';
+      }
+    }
+
+    select.addEventListener("change",renderSummary);
+
+    document.getElementById("paymentForm").addEventListener("submit",async event=>{
+      event.preventDefault();
+
+      const selected=plans.find(p=>String(p.id)===String(select.value));
+      const selectedPlan=selected?displayPlan(selected):null;
+
+      if(!selectedPlan){
+        status.textContent="Please select a valid subscription plan.";
+        return;
+      }
+
+      const amountKes=Number(document.getElementById("amountKes").value);
+      const mpesaCode=document.getElementById("mpesaCode").value.trim();
+      const payerPhone=document.getElementById("payerPhone").value.trim();
+
+      if(!Number.isFinite(amountKes)||amountKes<=0){
+        status.textContent="Enter the exact KES amount paid.";
+        return;
+      }
+
+      if(!mpesaCode){
+        status.textContent="Enter the M-Pesa transaction code.";
+        return;
+      }
+
+      submitButton.disabled=true;
+      submitButton.textContent="SUBMITTING SECURELY…";
+      status.textContent="Sending payment reference to the KINGBOT verification desk…";
+
+      try{
+        const response=await window.KINGBOT_API.request("/api/subscription/payments",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            planId:selectedPlan.id,
+            amountKes,
+            mpesaCode,
+            payerPhone
+          })
+        });
+
+        const data=await response.json().catch(()=>({}));
+
+        if(!response.ok||!data.ok){
+          throw new Error(data.error||"Payment submission failed.");
+        }
+
+        status.innerHTML='<span style="color:var(--green);font-weight:800">PAYMENT SUBMITTED.</span> Your access remains locked until manual verification.';
+        document.getElementById("mpesaCode").value="";
+        await loadMe();
+
+      }catch(error){
+        status.textContent=error.message||"Payment submission failed.";
+      }finally{
+        submitButton.disabled=false;
+        submitButton.textContent="SUBMIT PAYMENT FOR VERIFICATION";
+      }
+    });
+
+    load();
+  })();
+  </script>
+
+</body>
+</html>
