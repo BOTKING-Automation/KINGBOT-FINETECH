@@ -670,10 +670,13 @@ form.addEventListener("submit",async e=>{
   password
  };
  try{
-  await window.KINGBOT_FIREBASE.createAccount(payload);
+  const result=await window.KINGBOT_FIREBASE.createAccount(payload);
   sessionStorage.setItem("signup_email",payload.email);
   sessionStorage.setItem("signup_phone",payload.phone);
-  showMessage("Account created. Firebase has sent a verification email. Open it to verify your account, then sign in.","success");
+  sessionStorage.setItem("signup_phone",payload.phone);
+  showMessage(result.existing&&!result.verified
+    ? "This account already exists but is not verified. We sent a new verification email. Open it, then continue to KINGBOT."
+    : "Account created. Firebase has sent a verification email. Open it to verify your account, then sign in.","success");
   setTimeout(()=>window.location.href="verify.html",900);
  }catch(error){
   const code=String(error?.code||"");
