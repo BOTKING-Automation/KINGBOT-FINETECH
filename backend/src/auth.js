@@ -85,7 +85,7 @@ export function createAuthRouter({ pool, sessionTtlHours = 24, limiter }) {
       await pool.query("DELETE FROM kingbot_sessions WHERE user_id=$1",[u.id]);
       await pool.query("INSERT INTO kingbot_sessions(token_hash,user_id,expires_at) VALUES($1,$2,NOW()+make_interval(hours => $3))",[hashToken(token),u.id,sessionTtlHours]);
       res.cookie("kingbot_session",token,{httpOnly:true,secure:true,sameSite:"lax",maxAge:sessionTtlHours*3600000});
-      return res.json({ok:true,emailVerified:u.email_verified,phoneVerified:u.phone_verified,user:{id:u.id,email:u.email,name:`${u.first_name} ${u.last_name}`,verified:u.email_verified&&u.phone_verified}});
+      return res.json({ok:true,emailVerified:u.email_verified,phoneVerified:u.phone_verified,user:{id:u.id,email:u.email,name:`${u.first_name} ${u.last_name}`,verified:u.email_verified}});
     } catch(error){ console.error("[KINGBOT AUTH] signin failed:",error?.message||error); return res.status(500).json({ok:false,error:"Authentication service unavailable."}); }
   });
 
@@ -154,7 +154,7 @@ export function createAuthRouter({ pool, sessionTtlHours = 24, limiter }) {
       );
       if(!q.rowCount) return res.status(401).json({ok:false});
       const u=q.rows[0];
-      return res.json({ok:true,authenticated:true,user:{id:u.id,email:u.email,name:`${u.first_name} ${u.last_name}`,emailVerified:u.email_verified,phoneVerified:u.phone_verified}});
+      return res.json({ok:true,authenticated:true,user:{id:u.id,email:u.email,name:`${u.first_name} ${u.last_name}`,emailVerified:u.email_verified,phoneVerified:u.phone_verified,verified:u.email_verified}});
     } catch(error) {
       console.error("[KINGBOT AUTH] session check failed:",error?.message||error);
       return res.status(500).json({ok:false,error:"Session service unavailable."});
