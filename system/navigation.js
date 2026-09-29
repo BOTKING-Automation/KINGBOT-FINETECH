@@ -28,7 +28,7 @@ const KINGBOT_NAV={
  state:{initialized:false,user:null,open:false},
  async initialize(){
   if(this.state.initialized)return;
-  this.injectStyles(); await this.loadUser(); this.ensureMount();
+  this.injectStyles(); this.ensureMount(); this.loadUser().then(()=>this.refreshUser()).catch(()=>{});
   this.state.initialized=true;
   window.dispatchEvent(new CustomEvent("kingbot:navigation-ready"));
  },
