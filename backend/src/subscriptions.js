@@ -3,9 +3,9 @@ import { Router } from "express";
 import { resolveFirebaseUser } from "./auth.js";
 
 const PLANS = {
-  starter: { id:"starter", name:"Starter", priceUsd:100, botLimit:1, bots:["smc-pro"], features:["One bot engine","Core risk controls","Equity tracking"] },
-  pro: { id:"pro", name:"Pro Trader Bot", priceUsd:250, botLimit:5, bots:["strategic","flipper","breakout","smc-pro","ladder-flip"], features:["All five bot engines","AI explanations","Advanced risk controls","Drawdown protection"] },
-  institutional: { id:"institutional", name:"Institutional OS", priceUsd:1200, botLimit:999, bots:["strategic","flipper","breakout","smc-pro","ladder-flip"], features:["Full bot ecosystem","Trading OS","Advanced intelligence","MT5 integration layer","Kill switch"] }
+  starter: { id:"starter", name:"Basic", priceUsd:130, botLimit:1, bots:["smc-pro"], features:["One bot engine","Core risk controls","Equity tracking"] },
+  pro: { id:"pro", name:"Professional", priceUsd:465, botLimit:5, bots:["strategic","flipper","breakout","smc-pro","ladder-flip"], features:["All five bot engines","AI explanations","Advanced risk controls","Drawdown protection"] },
+  institutional: { id:"institutional", name:"Institutional", priceUsd:800, botLimit:999, bots:["strategic","flipper","breakout","smc-pro","ladder-flip"], features:["Full bot ecosystem","Trading OS","Advanced intelligence","MT5 integration layer","Kill switch"] }
 };
 const BOT_NAMES = { strategic:"KINGBOT STRATEGIC", flipper:"KINGBOT FLIPPER", breakout:"KINGBOT BREAKOUT", "smc-pro":"KINGBOT SMC PRO", "ladder-flip":"KINGBOT LADDER FLIP V8" };
 const hashToken = token => crypto.createHash("sha256").update(token).digest("hex");
