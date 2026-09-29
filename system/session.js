@@ -28,8 +28,19 @@ const session={
     if(!user){state.authenticated=false;state.user=null;}
     else{
      const token=await user.getIdToken();
-     const r=await fetch(this.config.sessionEndpoint,{headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"});
-     const d=await r.json().catch(()=>({}));
+     let r=await fetch(this.config.sessionEndpoint,{headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"});
+     let d=await r.json().catch(()=>({}));
+     if(!r.ok&&user.emailVerified&&window.KINGBOT_FIREBASE?.syncAccount){
+      try{
+       await window.KINGBOT_FIREBASE.syncAccount();
+       r=await fetch(this.config.sessionEndpoint,{headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"});
+       d=await r.json().catch(()=>({}));
+       if(r.ok)sessionStorage.removeItem("auth_sync_pending");
+      }catch(syncError){
+       console.warn("[KINGBOT SESSION] Backend account sync deferred:",syncError?.message||syncError);
+       sessionStorage.setItem("auth_sync_pending","1");
+      }
+     }
      if(r.ok&&d.authenticated){state.authenticated=true;state.user=d.user||{id:user.uid,email:user.email,name:user.displayName,verified:user.emailVerified};}
      else if(user.emailVerified){state.authenticated=true;state.user={id:user.uid,email:user.email,name:user.displayName,verified:true,emailVerified:true};}
      else{state.authenticated=true;state.user={id:user.uid,email:user.email,name:user.displayName,verified:false,emailVerified:false};}
