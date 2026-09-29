@@ -7,36 +7,110 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;800&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="system/platform.css">
 <style>
-:root{--gold:#f6b93b;--cyan:#19e6ff;--violet:#9b5cff;--pink:#ff4fd8}
-main{width:min(1420px,calc(100% - 40px));margin:auto;padding:38px 0 70px}
-.hero,.card,.media{border:1px solid rgba(255,255,255,.09);border-radius:26px;background:linear-gradient(145deg,rgba(10,18,40,.94),rgba(3,7,18,.98));box-shadow:0 25px 90px rgba(0,0,0,.42)}
-.hero{padding:48px;position:relative;overflow:hidden}.hero:after{content:"";position:absolute;width:380px;height:380px;right:-130px;top:-170px;border-radius:50%;background:radial-gradient(circle,rgba(25,230,255,.18),transparent 68%)}
-.ey{font:800 10px "JetBrains Mono";letter-spacing:.24em;color:var(--cyan);text-shadow:0 0 18px var(--cyan)}
-h1{font:900 clamp(38px,6vw,76px) Orbitron;margin:15px 0;background:linear-gradient(110deg,var(--gold),#fff0ae,var(--cyan),var(--violet),var(--pink));-webkit-background-clip:text;color:transparent;text-shadow:0 0 28px rgba(25,230,255,.12)}
-h2{font:800 18px Orbitron;color:#f2f6ff}.lead,p{color:#98a5c7;line-height:1.8}.lead{max-width:850px;font-size:17px}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:18px}.card{padding:25px}.card h2{margin-top:0}.tag{color:var(--cyan);font:800 9px "JetBrains Mono";letter-spacing:.16em;margin-top:18px}
-.asset{margin-top:18px;padding:18px;border:1px dashed rgba(25,230,255,.28);border-radius:18px;background:rgba(25,230,255,.035)}
-.asset a{color:#fff;text-decoration:none;font-weight:800}.asset a:hover{color:var(--cyan)}
-.media{margin-top:18px;padding:26px}.media-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.media a{display:block;padding:20px;border-radius:18px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(135deg,rgba(155,92,255,.09),rgba(25,230,255,.05));color:#fff;text-decoration:none}.media a strong{display:block;font:800 15px Orbitron;margin-bottom:7px}.media a span{color:#8795b7;font-size:13px}.notice{margin-top:18px;padding:16px 18px;border-left:3px solid var(--gold);background:rgba(246,185,59,.05);color:#aab5d0;font-size:13px}
-@media(max-width:850px){.grid,.media-grid{grid-template-columns:1fr}main{width:calc(100% - 24px)}.hero{padding:28px}}
-</style>
-</head>
+:root{--gold:#ffc84a;--cyan:#19e6ff;--violet:#9b5cff;--pink:#ff4fd8;--blue:#4787ff}
+*{box-sizing:border-box}
+body{background:#030711;color:#eef4ff}
+main{width:min(1480px,calc(100% - 36px));margin:auto;padding:34px 0 80px}
+.hero,.panel,.module,.asset-card{border:1px solid rgba(255,255,255,.09);background:linear-gradient(145deg,rgba(9,18,40,.94),rgba(3,7,18,.98));box-shadow:0 24px 90px rgba(0,0,0,.38);border-radius:26px}
+.hero{position:relative;overflow:hidden;padding:58px}
+.hero:before,.hero:after{content:"";position:absolute;border-radius:50%;pointer-events:none}
+.hero:before{width:520px;height:520px;right:-180px;top:-260px;background:radial-gradient(circle,rgba(25,230,255,.18),transparent 68%)}
+.hero:after{width:420px;height:420px;left:-260px;bottom:-300px;background:radial-gradient(circle,rgba(155,92,255,.16),transparent 68%)}
+.ey{position:relative;z-index:1;color:var(--cyan);font:800 10px "JetBrains Mono";letter-spacing:.25em}
+h1{position:relative;z-index:1;font:900 clamp(42px,6vw,82px) Orbitron;margin:16px 0;background:linear-gradient(110deg,var(--gold),#fff,var(--cyan),var(--violet),var(--pink));-webkit-background-clip:text;color:transparent}
+h2{font:800 19px Orbitron;margin:0;color:#f4f7ff}
+h3{font:800 14px Orbitron;color:#fff;margin:0 0 9px}
+p{color:#96a4c4;line-height:1.75}
+.lead{position:relative;z-index:1;max-width:900px;font-size:18px}
+.hero-actions{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:13px 18px;border-radius:12px;border:1px solid rgba(25,230,255,.35);background:rgba(25,230,255,.08);color:#fff;text-decoration:none;font:800 11px "JetBrains Mono";letter-spacing:.08em;transition:.2s}
+.btn:hover{transform:translateY(-2px);border-color:var(--cyan);box-shadow:0 0 25px rgba(25,230,255,.16)}
+.btn.primary{background:linear-gradient(100deg,rgba(25,230,255,.2),rgba(155,92,255,.2));border-color:rgba(255,255,255,.22)}
+.section{margin-top:22px}
+.section-head{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:13px}
+.kicker{color:#7181a5;font:700 10px "JetBrains Mono";letter-spacing:.18em}
+.module-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.module{padding:25px;min-height:205px;position:relative;overflow:hidden}
+.module:after{content:"";position:absolute;width:150px;height:150px;right:-80px;bottom:-80px;border-radius:50%;background:radial-gradient(circle,rgba(25,230,255,.12),transparent 70%)}
+.number{font:900 11px "JetBrains Mono";color:var(--cyan);letter-spacing:.15em;margin-bottom:25px}
+.module:nth-child(2) .number{color:var(--violet)}
+.module:nth-child(3) .number{color:var(--gold)}
+.module:nth-child(4) .number{color:var(--pink)}
+.module:nth-child(5) .number{color:var(--blue)}
+.module:nth-child(6) .number{color:var(--cyan)}
+.module p{font-size:13px;margin-bottom:0}
+.platform-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:15px}
+.panel{padding:27px}
+.lesson-list{display:grid;gap:9px;margin-top:18px}
+.lesson{display:flex;align-items:center;gap:13px;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025)}
+.lesson-icon{width:32px;height:32px;display:grid;place-items:center;border-radius:9px;background:rgba(25,230,255,.08);color:var(--cyan);font:800 11px "JetBrains Mono"}
+.lesson strong{font-size:13px}.lesson span{display:block;color:#7482a2;font-size:11px;margin-top:3px}
+.asset-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}
+.asset-card{padding:22px}
+.asset-card .type{font:800 9px "JetBrains Mono";letter-spacing:.16em;color:var(--gold);margin-bottom:12px}
+.asset-card p{font-size:12px;margin:8px 0 17px}
+.asset-card a{color:#fff}
+.notice{padding:16px 18px;border-left:3px solid var(--gold);background:rgba(255,200,74,.045);color:#aab6d0;font-size:12px;line-height:1.7;border-radius:4px}
+.certificate{border-color:rgba(255,200,74,.22);background:linear-gradient(135deg,rgba(255,200,74,.055),rgba(155,92,255,.05))}
+@media(max-width:1000px){.module-grid{grid-template-columns:repeat(2,1fr)}.platform-grid{grid-template-columns:1fr}}
+@media(max-width:680px){main{width:calc(100% - 22px);padding-top:22px}.hero{padding:30px 23px}h1{font-size:40px}.module-grid,.asset-grid{grid-template-columns:1fr}.section-head{display:block}.hero-actions .btn{width:100%}}
+</style></head>
 <body><div data-kingbot-navigation></div>
 <main>
-<section class="hero"><div class="ey">KINGBOT KNOWLEDGE SYSTEM / ACADEMY OS</div><h1>Learn. Verify. Build.</h1><p class="lead">A structured intelligence hub for understanding automated trading infrastructure, market structure, risk architecture and the five-system KINGBOT ecosystem.</p>
-<div class="notice">Educational material is provided for learning and system understanding. It does not guarantee trading results.</div></section>
-<section class="grid">
-<article class="card"><h2>01 / MARKET STRUCTURE</h2><p>Foundations of liquidity, price behavior, market context and structured analysis.</p><div class="tag">EDUCATION MODULE</div></article>
-<article class="card"><h2>02 / RISK ARCHITECTURE</h2><p>Position sizing, drawdown controls, disciplined automation and operational risk awareness.</p><div class="tag">RISK INTELLIGENCE</div></article>
-<article class="card"><h2>03 / BOT ECOSYSTEM</h2><p>Understand Strategic, Flipper, Breakout, SMC PRO and Ladder Flip V8 system concepts.</p><div class="tag">SYSTEM INTELLIGENCE</div></article>
+<section class="hero">
+  <div class="ey">KINGBOT ACADEMY / INTELLIGENCE OS</div>
+  <h1>MASTER THE SYSTEM.</h1>
+  <p class="lead">A structured learning environment for understanding markets, risk architecture, automated execution and the KINGBOT ecosystem — from foundations to advanced system intelligence.</p>
+  <div class="hero-actions">
+    <a class="btn primary" href="#curriculum">START LEARNING</a>
+    <a class="btn" href="#resources">VIEW RESOURCES</a>
+    <a class="btn" href="pricing.html">VIEW ACCESS PLANS</a>
+  </div>
 </section>
-<section class="media"><div class="ey">ACADEMY ASSETS / UPLOAD PATHS</div><h2>Verified Learning Resources</h2>
-<div class="media-grid">
-<a href="assets/academy/KINGBOT-ACADEMY.pdf"><strong>ACADEMY PDF</strong><span>Upload the academy curriculum here: assets/academy/KINGBOT-ACADEMY.pdf</span></a>
-<a href="assets/academy/KINGBOT-ACADEMY-CERTIFICATE.png"><strong>ACADEMY CERTIFICATE</strong><span>Upload the certificate artwork here: assets/academy/KINGBOT-ACADEMY-CERTIFICATE.png</span></a>
-<a href="assets/videos/kingbot-ea-working-demo.mp4"><strong>EA WORKING DEMO</strong><span>Upload the large EA demonstration video here: assets/videos/kingbot-ea-working-demo.mp4</span></a>
-<a href="assets/videos/kingbot-advert.mp4"><strong>KINGBOT ADVERT VIDEO</strong><span>Upload the advertising video here: assets/videos/kingbot-advert.mp4</span></a>
-</div>
-<div class="notice">The page already contains the permanent paths. Add the real files later; the interface will not pretend an asset exists before it is uploaded.</div>
+
+<section class="section" id="curriculum">
+  <div class="section-head"><div><div class="kicker">ACADEMY CURRICULUM</div><h2>THE LEARNING ARCHITECTURE</h2></div><div class="kicker">6 CORE DOMAINS</div></div>
+  <div class="module-grid">
+    <article class="module"><div class="number">01 / FOUNDATION</div><h3>MARKET STRUCTURE</h3><p>Understand price action, liquidity, market context, sessions and the foundations behind structured analysis.</p></article>
+    <article class="module"><div class="number">02 / ANALYSIS</div><h3>TECHNICAL INTELLIGENCE</h3><p>Build a disciplined framework for trend, momentum, volatility, breakouts, retests and market confirmation.</p></article>
+    <article class="module"><div class="number">03 / RISK</div><h3>RISK ARCHITECTURE</h3><p>Learn position sizing, drawdown controls, exposure management, execution discipline and account protection.</p></article>
+    <article class="module"><div class="number">04 / AUTOMATION</div><h3>AUTOMATED TRADING</h3><p>Understand EAs, broker connectivity, execution modes, order lifecycle, automation controls and operational safety.</p></article>
+    <article class="module"><div class="number">05 / KINGBOT</div><h3>THE FIVE ENGINES</h3><p>Study Strategic, Flipper, Breakout, SMC PRO and Ladder Flip V8 as separate trading-system architectures.</p></article>
+    <article class="module"><div class="number">06 / OPERATIONS</div><h3>TRADING OS</h3><p>Learn how intelligence, risk gates, broker data, execution and audit systems work together inside KINGBOT FINTECH.</p></article>
+  </div>
+</section>
+
+<section class="section">
+  <div class="platform-grid">
+    <article class="panel">
+      <div class="kicker">LEARNING PATH</div><h2>FROM KNOWLEDGE TO SYSTEM MASTERY</h2>
+      <p>Progress through the curriculum in sequence. Real course completion and student progress will be connected to the Academy system as the learning backend is enabled.</p>
+      <div class="lesson-list">
+        <div class="lesson"><div class="lesson-icon">01</div><div><strong>Foundations</strong><span>Market structure and trading terminology</span></div></div>
+        <div class="lesson"><div class="lesson-icon">02</div><div><strong>Risk First</strong><span>Capital protection and position sizing</span></div></div>
+        <div class="lesson"><div class="lesson-icon">03</div><div><strong>Automation</strong><span>EAs, brokers and execution infrastructure</span></div></div>
+        <div class="lesson"><div class="lesson-icon">04</div><div><strong>KINGBOT Systems</strong><span>Five independent bot architectures</span></div></div>
+      </div>
+    </article>
+    <article class="panel">
+      <div class="kicker">ACADEMY PRINCIPLE</div><h2>CONSISTENCY. RESILIENCE. INNOVATION.</h2>
+      <p>The Academy is designed to teach the thinking behind the technology — not to promise returns.</p>
+      <div class="notice">Education is not financial advice. Trading involves substantial risk. No course, strategy, EA or technology can guarantee profits.</div>
+    </article>
+  </div>
+</section>
+
+<section class="section" id="resources">
+  <div class="section-head"><div><div class="kicker">VERIFIED MEDIA</div><h2>ACADEMY RESOURCES</h2></div><div class="kicker">REAL ASSETS ONLY</div></div>
+  <div class="asset-grid">
+    <article class="asset-card"><div class="type">PDF / CURRICULUM</div><h3>KINGBOT ACADEMY</h3><p>The official Academy curriculum. The link will become active when the real PDF is uploaded.</p><a class="btn" href="assets/academy/KINGBOT-ACADEMY.pdf">OPEN ACADEMY PDF</a></article>
+    <article class="asset-card certificate"><div class="type">CERTIFICATION</div><h3>ACADEMY CERTIFICATE</h3><p>Official certificate artwork supplied by the KINGBOT team. No certificate claims are generated by this page.</p><a class="btn" href="assets/academy/KINGBOT-ACADEMY-CERTIFICATE.png">VIEW CERTIFICATE</a></article>
+    <article class="asset-card"><div class="type">VIDEO / PRODUCT</div><h3>EA WORKING DEMO</h3><p>Real demonstration video for the KINGBOT EA ecosystem.</p><a class="btn" href="assets/videos/kingbot-ea-working-demo.mp4">WATCH EA DEMO</a></article>
+    <article class="asset-card"><div class="type">VIDEO / BRAND</div><h3>KINGBOT ADVERT</h3><p>Official KINGBOT promotional media supplied by the team.</p><a class="btn" href="assets/videos/kingbot-advert.mp4">WATCH ADVERT</a></article>
+  </div>
+</section>
+
+<section class="section">
+  <div class="notice">Asset status: these permanent paths are ready for your uploads. Once you upload the real files to the matching GitHub folders, the Academy can surface them without changing the page structure.</div>
 </section>
 </main><script src="system/navigation.js"></script></body></html>
