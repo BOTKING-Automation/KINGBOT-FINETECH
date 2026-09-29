@@ -2099,77 +2099,7 @@
   <div class="light-orb orb-three"></div>
 
 
-  <!-- =========================================================
-       NAVBAR
-  ========================================================== -->
-
-  <header class="navbar">
-
-    <a class="brand" href="index.html">
-
-      <div class="brand-logo">
-        K
-      </div>
-
-      <div class="brand-name">
-        KING<span>BOT</span>
-      </div>
-
-    </a>
-
-
-    <nav class="nav-links" id="navLinks">
-
-      <a href="index.html">
-        Overview
-      </a>
-
-      <a href="markets.html" class="active">
-        Markets
-      </a>
-
-      <a href="terminal.html">
-        Terminal
-      </a>
-
-      <a href="bots.html">
-        Bots
-      </a>
-
-      <a href="pricing.html">
-        Pricing
-      </a>
-
-      <a href="academy.html">
-        Academy
-      </a>
-
-    </nav>
-
-
-    <div class="nav-actions">
-
-      <div class="nav-status">
-
-        <span class="status-dot"></span>
-
-        MARKET FEED
-
-      </div>
-
-      <button
-        class="menu-btn"
-        id="menuBtn"
-        aria-label="Open navigation"
-      >
-        ☰
-      </button>
-
-    </div>
-
-  </header>
-
-
+  
 
   <!-- =========================================================
        MAIN
@@ -4718,46 +4648,6 @@
         }
       );
 
-
-    /* =========================================================
-       MOBILE MENU
-    ========================================================== */
-
-    $("menuBtn")
-      .addEventListener(
-        "click",
-        () => {
-
-          $("navLinks")
-            .classList.toggle(
-              "open"
-            );
-
-        }
-      );
-
-
-    document
-      .querySelectorAll(
-        ".nav-links a"
-      )
-      .forEach(
-        link => {
-
-          link.addEventListener(
-            "click",
-            () => {
-
-              $("navLinks")
-                .classList.remove(
-                  "open"
-                );
-
-            }
-          );
-
-        }
-      );
 
 
     /* =========================================================
