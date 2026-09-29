@@ -2703,13 +2703,15 @@ async function checkBackend() {
     );
 
     if (backendConnected) {
-      await loadAccount();
-      await loadPositions();
-      await loadOrders();
-      await loadBots();
-      await loadRisk();
-      await loadRuntimeState();
+      try { await loadAccount(); } catch {}
+      try { await loadPositions(); } catch {}
+      try { await loadOrders(); } catch {}
     }
+
+    // The control plane remains usable even when the broker is disconnected.
+    try { await loadBots(); } catch {}
+    try { await loadRisk(); } catch {}
+    try { await loadRuntimeState(); } catch {}
 
   } catch {
 
