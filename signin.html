@@ -284,76 +284,37 @@ a{
 
 </div>
 
-<script>
-
-const form = document.getElementById("loginForm");
-const button = document.getElementById("loginBtn");
-const message = document.getElementById("message");
-
-function showMessage(text,type){
- message.textContent=text;
- message.className="message "+type;
-}
-
+<script type="module">
+import "./system/firebase-auth.js";
+const form=document.getElementById("loginForm"),button=document.getElementById("loginBtn"),message=document.getElementById("message");
+function showMessage(text,type){message.textContent=text;message.className="message "+type;}
 form.addEventListener("submit",async e=>{
-
- e.preventDefault();
-
- button.disabled=true;
- button.textContent="AUTHENTICATING...";
-
+ e.preventDefault(); button.disabled=true; button.textContent="AUTHENTICATING...";
  try{
-
-  const response=await fetch("https://kingbot-fintech-api.onrender.com/api/auth/signin",{
-   method:"POST",
-   headers:{
-    "Content-Type":"application/json"
-   },
-   credentials:"include",
-   body:JSON.stringify({
-    email:document.getElementById("email").value.trim(),
-    password:document.getElementById("password").value,
-    remember:document.getElementById("remember").checked
-   })
-  });
-
-  const data=await response.json().catch(()=>({}));
-
-  if(!response.ok){
-   throw new Error(data.error || data.message || "Sign in failed.");
+  const email=document.getElementById("email").value.trim(), password=document.getElementById("password").value;
+  const result=await window.KINGBOT_FIREBASE.signIn({email,password,remember:document.getElementById("remember").checked});
+  if(!result.verified){
+   sessionStorage.setItem("verification_email",email);
+   showMessage("Sign-in successful. Please verify your email using the Firebase verification message.","success");
+   setTimeout(()=>window.location.replace("verify.html"),700); return;
   }
-
-  /*
-   * The backend decides whether verification is complete.
-   * Never trust a frontend flag for authentication.
-   */
-
-  if(data.emailVerified===false){
-
-   sessionStorage.setItem(
-    "verification_email",
-    document.getElementById("email").value.trim()
-   );
-
-   window.location.href="verify.html";
-   return;
-  }
-
-     if(window.KINGBOT_SESSION && typeof window.KINGBOT_SESSION.redirectAfterLogin==="function"){ window.KINGBOT_SESSION.redirectAfterLogin(); } else { window.location.replace("index.html"); }
-
+  showMessage("Authentication verified. Opening KINGBOT...","success");
+  if(window.KINGBOT_SESSION&&typeof window.KINGBOT_SESSION.redirectAfterLogin==="function") window.KINGBOT_SESSION.redirectAfterLogin();
+  else window.location.replace("index.html");
  }catch(error){
-
-  showMessage(
-   error.message||"Authentication service unavailable.",
-   "error"
-  );
-
-  button.disabled=false;
-  button.textContent="SECURE SIGN IN";
+  const code=String(error?.code||"");
+  const messages={
+   "auth/invalid-credential":"Invalid email or password.",
+   "auth/user-not-found":"Invalid email or password.",
+   "auth/wrong-password":"Invalid email or password.",
+   "auth/too-many-requests":"Too many attempts. Please wait and try again.",
+   "auth/network-request-failed":"Network error. Check your connection."
+  };
+  showMessage(messages[code]||error.message||"Sign in failed.","error");
+  button.disabled=false;button.textContent="SECURE SIGN IN";
  }
-
 });
-
+</script>
 </script>
 
 </body>
