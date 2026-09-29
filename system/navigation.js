@@ -38,6 +38,10 @@
     const s = document.createElement("style");
     s.id = "kb-unified-nav-style";
     s.textContent = `
+      body.kb-has-unified-nav{
+        padding-top:84px;
+      }
+
       #kb-unified-nav{
         position:fixed;
         top:12px;
@@ -418,6 +422,10 @@
       }
 
       @media(max-width:900px){
+        body.kb-has-unified-nav{
+          padding-top:70px;
+        }
+
         #kb-unified-nav{
           top:8px;
           left:8px;
@@ -473,6 +481,7 @@
     if(document.querySelector(".verify-shell,.auth-shell,.auth-card")) return;
 
     style();
+    document.body.classList.add("kb-has-unified-nav");
 
     const page = currentPage();
 
