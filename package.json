@@ -1,0 +1,13 @@
+{
+  "name":"kingbot-fintech",
+  "version":"1.0.0",
+  "private":true,
+  "type":"module",
+  "scripts":{"start":"node backend/src/server.js","worker":"node backend/src/worker.js"},
+  "engines":{"node":">=20"},
+  "dependencies":{
+    "@google/genai":"^1.29.0","cors":"^2.8.5","dotenv":"^16.4.7","express":"^5.1.0",
+    "express-rate-limit":"^8.2.1","bcryptjs":"^3.0.2","pg":"^8.16.3",
+    "cookie-parser":"^1.4.7","metaapi.cloud-sdk":"^23.3.0"
+  }
+}
