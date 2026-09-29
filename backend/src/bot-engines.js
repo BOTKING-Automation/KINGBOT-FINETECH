@@ -222,7 +222,7 @@ export function createBotEngineRouter({ pool }) {
     const user=await requireUser(pool,req,res); if(!user)return;
     const bot=BOT_DEFINITIONS[req.params.botId]; if(!bot)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
     if(!(await hasEntitlement(pool,user.id,bot.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
-    res.json({ok:true,botId:bot.id,settings:(await getRiskSettings(pool,user.id,bot.id))||defaultRisk(bot),defaults:defaultRisk(bot)});
+    const current=(await getRiskSettings(pool,user.id,bot.id))||defaultRisk(bot);\n    res.json({ok:true,botId:bot.id,settings:current,defaults:defaultRisk(bot),executionMode:current.executionMode||"SIMULATION",killSwitch:Boolean(current.killSwitch)});
   });
 
   router.put("/:botId/risk", async (req,res)=>{
