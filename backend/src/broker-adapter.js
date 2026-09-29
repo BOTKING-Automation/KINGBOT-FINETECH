@@ -10,9 +10,12 @@ export class MetaApiBroker {
     this.connection=null;
     this.connected=false;
     this.executionMode="NOT_CONNECTED";
+    this.ownerUserId=null;
   }
   configured(){return Boolean(this.token&&this.accountId);}
-  async connect({executionMode="PAPER"}={}) {
+  async connect({executionMode="PAPER",userId}={}) {
+    if(!userId) return {connected:false,mode:"NOT_CONNECTED",reason:"USER_CONTEXT_REQUIRED"};
+    if(this.connected && this.ownerUserId && this.ownerUserId!==userId) return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_ACCOUNT_IN_USE"};
     if(!this.configured()) return {connected:false,mode:"NOT_CONNECTED",reason:"METAAPI_NOT_CONFIGURED"};
     if(!["PAPER","LIVE"].includes(executionMode)) return {connected:false,mode:"NOT_CONNECTED",reason:"INVALID_EXECUTION_MODE"};
     this.api=new MetaApi(this.token);
@@ -23,18 +26,19 @@ export class MetaApiBroker {
     await this.connection.waitSynchronized();
     this.connected=true;
     this.executionMode=executionMode;
+    this.ownerUserId=userId;
     return {connected:true,mode:executionMode,broker:"metaapi",accountId:this.accountId};
   }
   async disconnect(){
-    try{if(this.connection)await this.connection.close();}finally{this.connected=false;this.connection=null;this.account=null;this.api=null;this.executionMode="NOT_CONNECTED";}
+    try{if(this.connection)await this.connection.close();}finally{this.connected=false;this.connection=null;this.account=null;this.api=null;this.executionMode="NOT_CONNECTED";this.ownerUserId=null;}
     return {connected:false,mode:"NOT_CONNECTED"};
   }
-  ensure(){if(!this.connected||!this.connection)throw new Error("BROKER_NOT_CONNECTED");}
-  async getAccount(){this.ensure();return {connected:true,data:await this.connection.getAccountInformation()};}
-  async getPositions(){this.ensure();return {connected:true,data:await this.connection.getPositions()};}
-  async getOrders(){this.ensure();return {connected:true,data:await this.connection.getOrders()};}
-  async getTrades({startTime,endTime}={}){
-    this.ensure();
+  ensure(userId){if(!this.connected||!this.connection)throw new Error("BROKER_NOT_CONNECTED");if(!userId||userId!==this.ownerUserId)throw new Error("BROKER_ACCOUNT_NOT_AUTHORIZED");}
+  async getAccount(userId){this.ensure(userId);return {connected:true,data:await this.connection.getAccountInformation()};}
+  async getPositions(userId){this.ensure(userId);return {connected:true,data:await this.connection.getPositions()};}
+  async getOrders(userId){this.ensure(userId);return {connected:true,data:await this.connection.getOrders()};}
+  async getTrades({startTime,endTime,userId}={}){
+    this.ensure(userId);
     const end=endTime?new Date(endTime):new Date();
     const start=startTime?new Date(startTime):new Date(end.getTime()-24*60*60*1000);
     const [orders,deals]=await Promise.all([
@@ -43,9 +47,9 @@ export class MetaApiBroker {
     ]);
     return {connected:true,data:{orders,deals}};
   }
-  async getQuote(symbol){this.ensure();return {connected:true,data:await this.connection.getSymbolPrice(symbol)};}
-  async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId}){
-    this.ensure();
+  async getQuote(symbol,userId){this.ensure(userId);return {connected:true,data:await this.connection.getSymbolPrice(symbol)};}
+  async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId}){
+    this.ensure(userId);
     const qty=Number(volume);
     if(!Number.isFinite(qty)||qty<=0)throw new Error("INVALID_ORDER_VOLUME");
     const s=String(symbol||"").trim().toUpperCase();
