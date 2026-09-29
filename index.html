@@ -1964,6 +1964,44 @@ footer{
 }
 
 </style>
+<script>
+(function(){
+  "use strict";
+  // The landing page is entered only after an explicit sign-in or verification handoff.
+  try{
+    if(sessionStorage.getItem("KINGBOT_AUTH_HANDOFF")!=="1"){
+      window.location.replace("access-stable.html#signin");
+      return;
+    }
+  }catch(e){
+    window.location.replace("access-stable.html#signin");
+    return;
+  }
+
+  // Confirm the Firebase session after the handoff without hiding or reloading the page.
+  window.addEventListener("DOMContentLoaded",function(){
+    import("./system/firebase-auth.js").then(async function(){
+      const fb=window.KINGBOT_FIREBASE;
+      const user=fb&&fb.auth&&fb.auth.currentUser;
+      if(!user){
+        sessionStorage.removeItem("KINGBOT_AUTH_HANDOFF");
+        window.location.replace("access-stable.html#signin");
+        return;
+      }
+      await fb.refresh();
+      const current=fb.auth.currentUser;
+      if(!current||!current.emailVerified){
+        sessionStorage.removeItem("KINGBOT_AUTH_HANDOFF");
+        window.location.replace("verify.html");
+      }
+    }).catch(function(){
+      sessionStorage.removeItem("KINGBOT_AUTH_HANDOFF");
+      window.location.replace("access-stable.html#signin");
+    });
+  },{once:true});
+})();
+</script>
+
 </head>
 
 <body><div data-kingbot-navigation></div> 
