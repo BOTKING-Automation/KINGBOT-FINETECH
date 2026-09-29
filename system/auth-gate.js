@@ -98,9 +98,14 @@ IMPORTANT:
 
     isLoaderPage() {
 
-      return window.location.pathname
-        .toLowerCase()
-        .includes("/system/loader.html");
+      const path =
+        window.location.pathname
+          .toLowerCase();
+
+      return (
+        path.endsWith("/loader.html") ||
+        path.endsWith("/system/loader.html")
+      );
 
     },
 
