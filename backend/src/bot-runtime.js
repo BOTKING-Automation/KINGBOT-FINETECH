@@ -119,8 +119,16 @@ export function createBotRuntimeRouter({pool,broker}){
         if(!Number.isFinite(volume)||volume<=0)return res.status(400).json({ok:false,error:"ORDER_VOLUME_REQUIRED",message:"Supply a broker-valid order volume; no order was submitted.",analysis,risk});
         if(symbolPositions.length>=s.maxPositions)return res.status(409).json({ok:false,error:"MAX_SYMBOL_POSITIONS",message:"Maximum positions for this symbol are already open. No order was submitted.",analysis,risk});
         const clientId="kb_"+crypto.randomUUID();
-        order=await broker.placeOrder({side,symbol:analysis.market.symbol,volume,stopLoss:req.body?.stopLoss,takeProfit:req.body?.takeProfit,comment:"KINGBOT",clientId,userId:user.id});
-        action="ORDER_SUBMITTED";
+        const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[user.id,b.id,clientId,s.executionMode,analysis.market.symbol,side,volume]);
+        if(!journal.rowCount)return res.status(409).json({ok:false,error:"DUPLICATE_EXECUTION_REQUEST",message:"Duplicate execution request blocked. No order was submitted.",analysis,risk});
+        try{
+          order=await broker.placeOrder({side,symbol:analysis.market.symbol,volume,stopLoss:req.body?.stopLoss,takeProfit:req.body?.takeProfit,comment:"KINGBOT",clientId,userId:user.id});
+          await pool.query("UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,JSON.stringify(order)]);
+          action="ORDER_SUBMITTED";
+        }catch(error){
+          await pool.query("UPDATE kingbot_execution_journal SET status='REJECTED',error_message=$2,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,String(error?.message||"ORDER_REJECTED").slice(0,500)]);
+          throw error;
+        }
     }else if(signal!=="NO_SIGNAL"&&!risk.allowed){action="RISK_BLOCKED";}
     await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[user.id,b.id,JSON.stringify({signal,score:analysis.score,action})]);
     await audit(pool,user.id,"BOT_RUNTIME_TICK",{botId:b.id,executionMode:s.executionMode,signal,action,score:analysis.score,riskAllowed:risk.allowed});
@@ -132,5 +140,6 @@ export function createBotRuntimeRouter({pool,broker}){
 
 export async function ensureBotRuntimeSchema(pool){
   if(!pool)return;
+  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_execution_journal (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,execution_mode TEXT NOT NULL,symbol TEXT NOT NULL,side TEXT NOT NULL,volume NUMERIC NOT NULL,status TEXT NOT NULL,broker_result JSONB,error_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_runtime (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'STOPPED',last_signal JSONB,last_run_at TIMESTAMPTZ,last_error TEXT,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,bot_id))");
 }
