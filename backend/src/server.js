@@ -96,7 +96,7 @@ app.get("/api/positions", async (req,res)=>{
 });
 app.get("/api/orders", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
-  try{const x=await broker.getOrders();res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Order telemetry unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
+  try{const x=await broker.getOrders(user.id);res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Order telemetry unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
 });
 app.get("/api/trades", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
