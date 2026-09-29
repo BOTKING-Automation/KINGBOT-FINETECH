@@ -79,7 +79,7 @@ app.get("/api/connection", async (req,res)=>{
 app.post("/api/broker/connect", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   const mode=String(req.body?.executionMode||"PAPER").toUpperCase();
-  try{const result=await broker.connect({executionMode:mode}); if(!result.connected)return res.status(503).json({ok:false,...result}); res.json({ok:true,...result});}
+  try{const result=await broker.connect({executionMode:mode,userId:user.id}); if(!result.connected)return res.status(503).json({ok:false,...result}); res.json({ok:true,...result});}
   catch(error){console.error("[KINGBOT BROKER] connect failed:",error?.message||error);res.status(502).json({ok:false,error:"Broker connection failed.",reason:error?.message||"BROKER_CONNECTION_FAILED"});}
 });
 app.post("/api/broker/disconnect", async (req,res)=>{
