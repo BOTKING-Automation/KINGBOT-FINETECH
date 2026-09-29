@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireUser } from "./subscriptions.js";
+import { evaluateRisk, authorizeOrder } from "./risk-engine.js";
 
 const BOT_DEFINITIONS = {
   strategic: {
