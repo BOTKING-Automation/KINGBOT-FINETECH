@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import cookieParser from "cookie-parser";
 import pg from "pg";
 import { createAuthRouter, ensureAuthSchema } from "./auth.js";
+import { createSubscriptionRouter, ensureSubscriptionSchema } from "./subscriptions.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -20,17 +21,12 @@ const pool = DATABASE_URL ? new pg.Pool({ connectionString: DATABASE_URL, ssl: D
 app.disable("x-powered-by");
 app.use(express.json({ limit: "16kb" }));
 app.use(cookieParser());
+const allowedOrigin = process.env.FRONTEND_ORIGIN?.trim();
+app.use(cors({ origin: allowedOrigin || true, credentials: true, methods: ["GET","POST","OPTIONS"], allowedHeaders: ["Content-Type","Authorization"] }));
 
 const authLimiter = rateLimit({ windowMs: 15*60*1000, limit: 12, standardHeaders: "draft-8", legacyHeaders: false });
 app.use("/api/auth", createAuthRouter({ pool, sessionTtlHours: Number(process.env.SESSION_TTL_HOURS || 24), limiter: authLimiter }));
-
-const allowedOrigin = process.env.FRONTEND_ORIGIN?.trim();
-app.use(cors({
-  origin: allowedOrigin || true,
-  credentials: true,
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+app.use("/api/subscription", createSubscriptionRouter({ pool }));
 
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -159,7 +155,7 @@ app.use((_req, res) => {
   });
 });
 
-ensureAuthSchema(pool).then(() => {
+ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => {
 app.listen(PORT, () => {
   console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
 });
