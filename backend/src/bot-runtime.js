@@ -108,7 +108,7 @@ export function createBotRuntimeRouter({pool,broker}){
       peakEquity=Math.max(Number(state.peak_equity)||equity,equity);
     }
     await pool.query("INSERT INTO kingbot_risk_state(user_id,bot_id,baseline_date,day_start_equity,peak_equity,updated_at) VALUES($1,$2,$3,$4,$5,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET baseline_date=EXCLUDED.baseline_date,day_start_equity=EXCLUDED.day_start_equity,peak_equity=EXCLUDED.peak_equity,updated_at=NOW()",[user.id,b.id,today,dayStartEquity,peakEquity]);
-    const requestedRiskPct=Number(req.body?.requestedRiskPct??s.maxRiskPerTradePct);
+    const requestedRiskPct=s.maxRiskPerTradePct;
     const risk=authorizeOrder({
       limits:s,
       executionMode:s.executionMode,
