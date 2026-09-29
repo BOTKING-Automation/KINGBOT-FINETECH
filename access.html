@@ -108,6 +108,7 @@ const signInTab=$("signInTab"),signUpTab=$("signUpTab"),signInForm=$("signInForm
 function showMessage(text,type){message.textContent=text;message.className="message show "+type;}
 function switchMode(mode){const up=mode==="signup";signInTab.classList.toggle("active",!up);signUpTab.classList.toggle("active",up);signInForm.classList.toggle("form-active",!up);signUpForm.classList.toggle("form-active",up);message.className="message";}
 signInTab.addEventListener("click",()=>switchMode("signin"));signUpTab.addEventListener("click",()=>switchMode("signup"));
+switchMode(location.hash.toLowerCase().includes("signup")?"signup":"signin");
 async function goHome(){try{if(window.KINGBOT_SESSION?.redirectAfterLogin){window.KINGBOT_SESSION.redirectAfterLogin();return;}}catch{}location.replace("index.html");}
 $("signInForm").addEventListener("submit",async e=>{
  e.preventDefault();$("loginBtn").disabled=true;$("loginBtn").textContent="AUTHENTICATING...";
