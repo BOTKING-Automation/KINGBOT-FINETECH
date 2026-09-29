@@ -39,7 +39,7 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 <h2 id="botTitle">Select a bot</h2>
 <p class="desc" id="botDesc">Choose an entitled bot to configure its independent risk profile.</p>
 <div class="risk-grid">
-<div class="field"><label>Execution mode <em>ENGINE</em></label><select id="executionMode"><option value="PAPER">PAPER</option><option value="LIVE">LIVE</option></select></div>
+<div class="field"><label>Execution mode <em>ENGINE</em></label><select id="executionMode"><option value="PAPER">PAPER</option><option value="LIVE">LIVE</option></select></div><div class="field"><label>Broker symbol <em>REQUIRED</em></label><input id="symbol" type="text" placeholder="e.g. XAUUSD" maxlength="30"></div><div class="field"><label>Timeframe <em>MARKET</em></label><select id="timeframe"><option>1m</option><option>2m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
 <div class="field"><label>Max risk / trade <em>%</em></label><input id="maxRisk" type="number" min=".1" max="5" step=".05"></div>
 <div class="field"><label>Daily drawdown limit <em>%</em></label><input id="dailyDd" type="number" min=".5" max="20" step=".1"></div>
 <div class="field"><label>Total drawdown limit <em>%</em></label><input id="totalDd" type="number" min="1" max="30" step=".1"></div>
@@ -50,13 +50,13 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 <div class="switch-row full"><div><span>Auto-pause on consecutive losses</span><small>Blocks new orders when the configured loss streak is reached.</small></div><label class="switch"><input id="autoPause" type="checkbox"><span class="slider"></span></label></div>
 <div class="switch-row full"><div><span>Kill switch</span><small>When enabled, the execution authorization layer rejects new orders for this bot.</small></div><label class="switch"><input id="killSwitch" type="checkbox"><span class="slider"></span></label></div>
 </div>
-<div class="actions"><button class="btn primary" id="saveBtn" type="button">SAVE TO RISK ENGINE</button><button class="btn" id="resetBtn" type="button">RESET DEFAULTS</button></div>
+<div class="actions"><button class="btn primary" id="saveBtn" type="button">SAVE RISK PROFILE</button><button class="btn" id="configBtn" type="button">SAVE MARKET CONFIG</button><button class="btn" id="startBtn" type="button">START ENGINE</button><button class="btn warn" id="stopBtn" type="button">STOP ENGINE</button><button class="btn" id="resetBtn" type="button">RESET DEFAULTS</button></div>
 <div class="message" id="message" aria-live="polite"></div>
 </section>
 <aside class="panel">
 <h2>Engine Status</h2><p class="desc">Authoritative state only. No simulated account values are displayed here.</p>
 <div class="status-card"><div class="status-line"><strong>RISK PROFILE</strong><span class="pill" id="riskPill">NOT LOADED</span></div><div class="metric-grid"><div class="metric"><b>MAX RISK</b><span id="mRisk">—</span></div><div class="metric"><b>DAILY DD</b><span id="mDaily">—</span></div><div class="metric"><b>TOTAL DD</b><span id="mTotal">—</span></div><div class="metric"><b>POSITIONS</b><span id="mPositions">—</span></div></div></div>
-<div class="status-card"><div class="status-line"><strong>BOT ENGINE</strong><span class="pill" id="enginePill">UNKNOWN</span></div><div class="metric-grid"><div class="metric"><b>MODE</b><span id="mMode">—</span></div><div class="metric"><b>RUNTIME</b><span id="mRuntime">—</span></div></div><div class="strategy-list" id="strategies"></div></div>
+<div class="status-card"><div class="status-line"><strong>BOT ENGINE</strong><span class="pill" id="enginePill">UNKNOWN</span></div><div class="metric-grid"><div class="metric"><b>MODE</b><span id="mMode">—</span></div><div class="metric"><b>RUNTIME</b><span id="mRuntime">—</span></div><div class="metric"><b>SYMBOL</b><span id="mSymbol">—</span></div><div class="metric"><b>TIMEFRAME</b><span id="mTimeframe">—</span></div></div><div class="strategy-list" id="strategies"></div></div>
 <div class="telemetry-note"><strong>REAL EXECUTION RULE:</strong> saving settings does not create trades. PAPER/LIVE authorization requires a connected broker, verified market/account telemetry, entitlement, and every risk gate to pass. Until then the platform must remain explicitly disconnected.</div>
 </aside>
 </div>
@@ -72,7 +72,7 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 const API="https://kingbot-fintech-api.onrender.com/api";
 const $=id=>document.getElementById(id);
 let bots=[],selected=null;
-const fields={executionMode:$("executionMode"),maxRisk:$("maxRisk"),dailyDd:$("dailyDd"),totalDd:$("totalDd"),maxPositions:$("maxPositions"),spreadRatio:$("spreadRatio"),staleMs:$("staleMs"),lossStreak:$("lossStreak"),autoPause:$("autoPause"),killSwitch:$("killSwitch")};
+const fields={executionMode:$("executionMode"),symbol:$("symbol"),timeframe:$("timeframe"),maxRisk:$("maxRisk"),dailyDd:$("dailyDd"),totalDd:$("totalDd"),maxPositions:$("maxPositions"),spreadRatio:$("spreadRatio"),staleMs:$("staleMs"),lossStreak:$("lossStreak"),autoPause:$("autoPause"),killSwitch:$("killSwitch")};
 function msg(t,kind=""){const e=$("message");e.textContent=t;e.className="message "+kind}
 function setTelemetry(a,d){$("telemetryState").textContent=a;$("telemetryDetail").textContent=d}
 function esc(s){return String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]))}
@@ -83,9 +83,9 @@ function renderBots(){
 function putSettings(s,mode,kill){
  fields.executionMode.value=mode||"PAPER";fields.maxRisk.value=s.maxRiskPerTradePct;fields.dailyDd.value=s.dailyDrawdownPct;fields.totalDd.value=s.totalDrawdownPct;fields.maxPositions.value=s.maxPositions;fields.spreadRatio.value=s.maxSpreadAtrRatio;fields.staleMs.value=s.staleDataMs;fields.lossStreak.value=s.maxConsecutiveLosses;fields.autoPause.checked=Boolean(s.autoPauseOnLossStreak);fields.killSwitch.checked=Boolean(kill);
  $("mRisk").textContent=s.maxRiskPerTradePct+"%";$("mDaily").textContent=s.dailyDrawdownPct+"%";$("mTotal").textContent=s.totalDrawdownPct+"%";$("mPositions").textContent=s.maxPositions;
- $("mMode").textContent=mode||"SIMULATION";$("mRuntime").textContent=selected?.runtime||"STOPPED";
+ $("mMode").textContent=mode||"NOT_CONNECTED";$("mRuntime").textContent=selected?.runtime||"STOPPED";$("mSymbol").textContent=selected?.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected?.timeframe||"—";
  $("riskPill").textContent=fields.killSwitch.checked?"KILL SWITCH":"CONFIGURED";$("enginePill").textContent=selected?.entitled?"ENTITLED":"LOCKED";
- $("strategies").innerHTML=(selected?.strategies||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join("");
+ $("symbol").value=selected?.symbol||"";$("timeframe").value=selected?.timeframe||"1m";$("strategies").innerHTML=(selected?.strategies||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join("");
 }
 async function api(path,options={}){
  const r=await fetch(API+path,{...options,credentials:"include",headers:{"Content-Type":"application/json",...(options.headers||{})}});
@@ -93,25 +93,25 @@ async function api(path,options={}){
  if(!r.ok)throw new Error(data.error||data.reason||("HTTP "+r.status));
  return data;
 }
-async function selectBot(id){
+async function refreshRuntime(){if(!selected)return;try{const r=await api("/runtime/"+encodeURIComponent(selected.id));selected.runtime=r.state||"STOPPED";selected.executionMode=r.executionMode||selected.executionMode;selected.symbol=r.symbol||selected.symbol||"";selected.timeframe=r.timeframe||selected.timeframe||"1m";$("mRuntime").textContent=selected.runtime;$("mMode").textContent=selected.executionMode||"NOT_CONNECTED";$("mSymbol").textContent=selected.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected.timeframe||"—";$("enginePill").textContent=selected.runtime}catch{}}\nsetInterval(refreshRuntime,5000);\nasync function selectBot(id){
  selected=bots.find(x=>x.id===id);if(!selected)return;renderBots();$("botTitle").textContent=selected.name;$("botDesc").textContent=selected.strategies.join(" · ");
- try{const d=await api("/bots/"+encodeURIComponent(id)+"/risk");putSettings(d.settings,d.executionMode||"SIMULATION",d.killSwitch);msg("Risk profile loaded from server.","ok")}catch(e){msg(e.message,"error")}
+ try{const [d,r]=await Promise.all([api("/bots/"+encodeURIComponent(id)+"/risk"),api("/runtime/"+encodeURIComponent(id))]);selected.runtime=r.state||"STOPPED";selected.executionMode=r.executionMode;selected.symbol=r.symbol||"";selected.timeframe=r.timeframe||"1m";putSettings(d.settings,d.executionMode||"NOT_CONNECTED",d.killSwitch);msg("Authoritative bot configuration loaded.","ok")}catch(e){msg(e.message,"error")}
 }
 async function load(){
  setTelemetry("BACKEND TELEMETRY","LOADING VERIFIED BOT STATE…");
  try{
-  const d=await api("/bots");bots=d.bots||[];renderBots();setTelemetry("BACKEND CONNECTED",bots.length+" BOT ENGINES RETURNED");
+  const [d,rt]=await Promise.all([api("/bots"),api("/runtime")]);bots=(d.bots||[]).map(b=>{const x=(rt.bots||[]).find(z=>z.botId===b.id)||{};return {...b,runtime:x.runtime||"STOPPED",executionMode:x.executionMode||b.executionMode,symbol:x.symbol||"",timeframe:x.timeframe||"1m"};});renderBots();setTelemetry("BACKEND CONNECTED",bots.length+" BOT ENGINES / RUNTIME VERIFIED");
   const first=bots.find(b=>b.entitled);if(first)await selectBot(first.id);else{setTelemetry("ENTITLEMENT REQUIRED","No active bot entitlement was returned.");msg("No entitled bot is available for this account.","error")}
  }catch(e){setTelemetry("BACKEND UNAVAILABLE","No authoritative bot state loaded.");msg(e.message,"error")}
 }
-$("saveBtn").addEventListener("click",async()=>{
+$("configBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");const symbol=fields.symbol.value.trim().toUpperCase(),timeframe=fields.timeframe.value;if(!symbol)return msg("Broker symbol is required.","error");msg("Saving market configuration…");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/config",{method:"POST",body:JSON.stringify({symbol,timeframe})});selected.symbol=d.symbol;selected.timeframe=d.timeframe;$("mSymbol").textContent=d.symbol;$("mTimeframe").textContent=d.timeframe;msg("Market configuration saved. Engine remains stopped until explicitly started.","ok")}catch(e){msg(e.message,"error")}});\n$("startBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");msg("Authorizing engine start…");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/start",{method:"POST",body:"{}"});selected.runtime=d.state;selected.executionMode=d.executionMode;$("mRuntime").textContent=d.state;$("enginePill").textContent="RUNNING";msg("Engine started. Broker and server risk gates remain authoritative.","ok")}catch(e){msg(e.message,"error")}});\n$("stopBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/stop",{method:"POST",body:"{}"});selected.runtime=d.state;$("mRuntime").textContent=d.state;$("enginePill").textContent="STOPPED";msg("Engine stopped. No new autonomous orders will be submitted.","ok")}catch(e){msg(e.message,"error")}});\n$("saveBtn").addEventListener("click",async()=>{
  if(!selected)return msg("Select a bot first.","error");
  const payload={executionMode:fields.executionMode.value,maxRiskPerTradePct:Number(fields.maxRisk.value),dailyDrawdownPct:Number(fields.dailyDd.value),totalDrawdownPct:Number(fields.totalDd.value),maxPositions:Number(fields.maxPositions.value),maxSpreadAtrRatio:Number(fields.spreadRatio.value),staleDataMs:Number(fields.staleMs.value),maxConsecutiveLosses:Number(fields.lossStreak.value),autoPauseOnLossStreak:fields.autoPause.checked,killSwitch:fields.killSwitch.checked};
  if(payload.totalDrawdownPct<payload.dailyDrawdownPct)return msg("Total drawdown must be at least the daily drawdown limit.","error");
  msg("Saving…");
  try{const d=await api("/bots/"+encodeURIComponent(selected.id)+"/risk",{method:"PUT",body:JSON.stringify(payload)});putSettings(d.settings,d.executionMode,d.killSwitch);msg("Saved and enforced by the server-side risk engine.","ok")}catch(e){msg(e.message,"error")}
 });
-$("resetBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");try{const d=await api("/bots/"+encodeURIComponent(selected.id)+"/risk");putSettings(d.defaults,"SIMULATION",false);msg("Defaults restored locally. Press SAVE TO RISK ENGINE to persist them.","ok")}catch(e){msg(e.message,"error")}});
+$("resetBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");try{const d=await api("/bots/"+encodeURIComponent(selected.id)+"/risk");putSettings(d.defaults,"PAPER",false);msg("Defaults restored locally. Press SAVE TO RISK ENGINE to persist them.","ok")}catch(e){msg(e.message,"error")}});
 if(window.KINGBOT_SESSION)window.KINGBOT_SESSION.requireVerified({redirect:true}).then(ok=>{if(ok)load()});
 else load();
 })();
