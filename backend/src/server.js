@@ -151,7 +151,7 @@ Response style:
 
 const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
 
-app.get("/health", (_req, res) => {
+app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     service: "KINGBOT Intelligence",
@@ -159,6 +159,8 @@ app.get("/health", (_req, res) => {
     accountServiceReady: Boolean(pool)
   });
 });
+
+app.get("/health", (_req,res) => res.json({ok:true,service:"KINGBOT Intelligence",aiReady:Boolean(ai),accountServiceReady:Boolean(pool)}));
 
 app.post("/api/ai/query", aiLimiter, async (req, res) => {
   const message = typeof req.body?.message === "string"
