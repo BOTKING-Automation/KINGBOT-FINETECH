@@ -66,7 +66,7 @@
       addMessage("user", message);
 
       try {
-        const response = await fetch("/api/ai/query", {
+        const response = await fetch("https://kingbot-fintech-api.onrender.com/api/ai/query", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
