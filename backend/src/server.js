@@ -113,7 +113,8 @@ app.post("/api/broker/account", async (req,res)=>{
       provider:"metaapi",
       accountId,
       accountToken,
-      executionMode
+      executionMode,
+      baseUrl:String(req.body?.baseUrl||"").trim()
     }));
   }catch(error){
     res.status(500).json({ok:false,error:"Broker account mapping failed.",reason:error?.message||"BROKER_ACCOUNT_MAPPING_FAILED"});
