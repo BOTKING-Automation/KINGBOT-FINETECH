@@ -10,6 +10,7 @@
     ["markets.html","Markets","◈","Live market intelligence"],
     ["terminal.html","Terminal","⌁","Trading terminal"],
     ["bots.html","Bots","◉","Automated trading systems"],
+    ["broker-connect.html","Broker Connect","⚡","Secure broker execution"],
     ["analytics.html","Analytics","▦","Performance intelligence"],
     ["ai.html","AI Intelligence","✦","AI intelligence layer"],
     ["academy.html","Academy","◇","Education & research"],
