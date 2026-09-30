@@ -54,7 +54,14 @@ function start(){
   const handoff =
     (() => {
       try{
-        return sessionStorage.getItem("KINGBOT_AUTH_HANDOFF")==="1";
+        const value =
+          sessionStorage.getItem("KINGBOT_AUTH_HANDOFF")==="1";
+
+        if(value){
+          sessionStorage.removeItem("KINGBOT_AUTH_HANDOFF");
+        }
+
+        return value;
       }catch(e){
         return false;
       }
@@ -70,28 +77,24 @@ function start(){
     })();
 
   /*
-    A verified/login handoff explicitly unlocks Home.
-    This is how verify.html returns the user to the landing
-    page without replaying the neural animation.
+    A verification/login handoff is only a one-time navigation
+    hint. It must never permanently bypass authentication.
+    Home still checks the real Firebase session below.
   */
-  if(homeEntry && handoff){
-    return;
-  }
 
   /*
-    Home is the customer gateway when no verified/login handoff
-    exists. Show the neural animation once, then route directly
-    to secure access.
+    Home is the customer gateway. The visual loader is shown
+    only once per browser session, while authentication is
+    checked on every Home entry.
   */
-  if(homeEntry){
-    if(seen){
-      window.location.replace(
-        "access-stable.html?return="+
-        encodeURIComponent("index.html")+
-        "#signin"
-      );
-      return;
-    }
+  if(homeEntry && seen){
+    /*
+      Do not replay the neural animation, but always evaluate
+      the real Firebase session before deciding whether Home
+      or secure access should be shown.
+    */
+    handoffHome();
+    return;
   }
 
   installStyle();
