@@ -6,6 +6,7 @@ import { evaluateBot, getBotDefinitions } from "./bot-engines.js";
 import { authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
 import { ensureAuthSchema } from "./auth.js";
 import { ensureSubscriptionSchema, expireStaleSubscriptions } from "./subscriptions.js";
+import { isAdminUser } from "./admin-access.js";
 import { ensureBotEngineSchema } from "./bot-engines.js";
 import { ensureBotRuntimeSchema } from "./bot-runtime.js";
 
@@ -94,6 +95,7 @@ async function settings(userId,botId){
 }
 
 async function entitled(userId,botId){
+  if(await isAdminUser(pool,userId))return true;
   const q=await pool.query("SELECT 1 FROM kingbot_bot_entitlements e JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 AND e.bot_id=$2 AND e.active=TRUE AND s.status='active' AND (s.expires_at IS NULL OR s.expires_at>NOW()) LIMIT 1",[userId,botId]);
   return q.rowCount>0;
 }
