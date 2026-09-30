@@ -296,11 +296,52 @@ IMPORTANT:
 
       if (this.getPageName() === "index.html") {
 
-        /*
-        Home owns its own startup shell. The startup module in
-        index.html performs the single auth decision and reveals
-        Home only after the canonical loader has completed.
-        */
+        const params =
+          new URLSearchParams(
+            window.location.search
+          );
+
+        const startupComplete =
+          params.get("kb-startup") === "complete";
+
+        if (startupComplete) {
+
+          const auth =
+            await this.checkAuthentication();
+
+          if (
+            auth.authenticated &&
+            auth.verified
+          ) {
+
+            this.grantAccess(
+              auth.user
+            );
+
+            document.documentElement.classList.remove(
+              "kb-index-pending"
+            );
+
+            window.history.replaceState(
+              {},
+              document.title,
+              "index.html"
+            );
+
+            return;
+          }
+
+          window.location.replace(
+            "loader.html"
+          );
+
+          return;
+        }
+
+        window.location.replace(
+          "loader.html"
+        );
+
         return;
       }
 
