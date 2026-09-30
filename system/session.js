@@ -59,37 +59,7 @@ const session={
   state.checking=true;state.error=null;
   activeCheck=(async()=>{
   try{
-   const fb=await new Promise((resolve)=>{
-    let done=false;
-    let unsub=null;
-    const finish=(u)=>{
-      if(done)return;
-      done=true;
-      try{unsub?.();}catch{}
-      resolve(u||null);
-    };
-    try{
-      unsub=fbAuthChange((u)=>{
-        if(u) finish(u);
-        else{
-          // Firebase may briefly report null while restoring persisted auth
-          // after an external OAuth redirect. Give persistence a short window
-          // before treating the user as signed out.
-          setTimeout(()=>{
-            if(!done) finish(window.KINGBOT_FIREBASE?.auth?.currentUser||null);
-          },8000);
-        }
-      });
-      const current=window.KINGBOT_FIREBASE?.auth?.currentUser;
-      if(current) finish(current);
-      setTimeout(()=>{
-        if(!done) finish(window.KINGBOT_FIREBASE?.auth?.currentUser||null);
-      },10000);
-    }catch(error){
-      state.error=error;
-      finish(window.KINGBOT_FIREBASE?.auth?.currentUser||null);
-    }
-   });
+   const fb=await window.KINGBOT_FIREBASE.waitForAuthReady(10000).catch(()=>window.KINGBOT_FIREBASE?.auth?.currentUser||null);
    if(!fb){state.authenticated=false;state.user=null;}
    else{
     await window.KINGBOT_FIREBASE.refresh();
