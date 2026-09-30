@@ -8,11 +8,12 @@ function finite(value){
 }
 
 export class DerivTraderClient {
-  constructor({accessToken,accountId,executionMode="PAPER"}={}){
+  constructor({accessToken,accountId,executionMode="PAPER",accountType=""}={}){
     this.id="deriv";
     this.accessToken=String(accessToken||"").trim();
     this.accountId=String(accountId||"").trim();
     this.executionMode=String(executionMode||"PAPER").toUpperCase();
+    this.accountType=String(accountType||"").toLowerCase();
     this.ws=null;
     this.connected=false;
     this.requestId=0;
@@ -74,6 +75,7 @@ export class DerivTraderClient {
   }
 
   accountTypeFromBalance(balance){
+    if(this.accountType==="demo"||this.accountType==="real")return this.accountType;
     const loginid=String(balance?.loginid||"");
     if(loginid.startsWith("VR"))return "demo";
     if(loginid.includes("_VRTC"))return "demo";
@@ -206,20 +208,8 @@ export class DerivTraderClient {
     };
   }
 
-  async getSymbolSpecification(symbol){
-    return {
-      connected:true,
-      data:{
-        symbol:String(symbol||"").trim(),
-        minVolume:0.35,
-        maxVolume:100000,
-        volumeStep:0.01,
-        point:0.01,
-        stopsLevel:0,
-        tickSize:0.01,
-        tickValue:1
-      }
-    };
+  async getSymbolSpecification(){
+    throw new Error("DERIV_CONTRACT_SPECIFICATION_REQUIRES_OPTIONS_MODEL");
   }
 
   async getHistoricalCandles(){
