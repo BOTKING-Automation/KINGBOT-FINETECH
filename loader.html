@@ -65,57 +65,65 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
 <div class="foot">GIBSONFX TECH · KINGBOT FINTECH · 3.00 SEC STARTUP SEQUENCE</div>
 </div></div>
 
-<script>
+<script type="module">
+import "./system/firebase-auth.js";
+import "./system/session.js";
+
 (function(){
   "use strict";
-  var states=["NEURAL CORE INITIALIZING","MARKET MATRIX LINKING","BOT BRAIN SYNCHRONIZING","RISK ENGINE ONLINE","AUTH GATE READY"];
-  var status=document.getElementById("status");
-  var i=0;
-  var params=new URLSearchParams(window.location.search);
-  var requestedDuration=Number(params.get("duration"));
-  var duration=(Number.isFinite(requestedDuration)&&requestedDuration>=800&&requestedDuration<=10000)?requestedDuration:3000;
-  var ticker=window.setInterval(function(){
-    i=(i+1)%states.length;
-    if(status) status.textContent=states[i];
-  },900);
 
-  window.setTimeout(function(){
+  const params=new URLSearchParams(window.location.search);
+  const durationRaw=Number(params.get("duration"));
+  const duration=(Number.isFinite(durationRaw)&&durationRaw>=800&&durationRaw<=10000)?durationRaw:3000;
+  const status=document.getElementById("status");
+
+  const states=[
+    "NEURAL CORE INITIALIZING",
+    "MARKET MATRIX LINKING",
+    "BOT BRAIN SYNCHRONIZING",
+    "RISK ENGINE ONLINE",
+    "AUTH GATE READY"
+  ];
+
+  let index=0;
+  const ticker=window.setInterval(()=>{
+    index=(index+1)%states.length;
+    if(status)status.textContent=states[index];
+  },600);
+
+  function go(path){
+    window.location.replace(path);
+  }
+
+  async function routeAfterStartup(){
     window.clearInterval(ticker);
-    var embedded=params.get("embed")==="1";
-    if(embedded){
-      try{
-        window.parent.postMessage({type:"KINGBOT_BOOT_COMPLETE"},"*");
-      }catch(e){}
-      return;
-    }
-
-    /*
-      Embedded startup:
-        The parent page owns routing and receives the
-        KINGBOT_BOOT_COMPLETE event.
-
-      Direct startup:
-        loader.html itself is a valid entry surface and
-        continues to secure Sign In after the animation.
-    */
-    if(!embedded){
-      try{
-        sessionStorage.setItem("KINGBOT_NEURAL_BOOT_SEEN","1");
-      }catch(e){}
-
-      var next=params.get("next");
-      var target="access-stable.html?return="+encodeURIComponent("index.html")+"#signin";
-      if(next){
-        try{
-          var candidate=new URL(next,window.location.href);
-          if(candidate.origin===window.location.origin){
-            target=candidate.pathname+candidate.search+candidate.hash;
-          }
-        }catch(e){}
+    try{
+      const session=window.KINGBOT_SESSION;
+      if(!session){
+        go("access-stable.html?return="+encodeURIComponent("index.html")+"#signin");
+        return;
       }
-      window.location.replace(target);
+
+      const state=await session.check({force:true});
+
+      if(state?.authenticated && state?.user?.verified){
+        go("index.html");
+        return;
+      }
+
+      if(state?.authenticated && state?.user && !state.user.verified){
+        go("verify.html?return="+encodeURIComponent("index.html"));
+        return;
+      }
+
+      go("access-stable.html?return="+encodeURIComponent("index.html")+"#signin");
+    }catch(error){
+      console.warn("[KINGBOT LOADER] Startup auth routing failed:",error?.message||error);
+      go("access-stable.html?return="+encodeURIComponent("index.html")+"#signin");
     }
-  },duration);
+  }
+
+  window.setTimeout(routeAfterStartup,duration);
 })();
 </script>
 </body>
