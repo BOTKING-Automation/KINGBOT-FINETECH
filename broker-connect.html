@@ -234,7 +234,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
         <div class="title">SELECT THE ACCOUNT KINGBOT WILL MANAGE</div>
         <div class="account-list" id="accountList"></div>
         <div class="status-line">Select exactly one authorized trading account. KINGBOT will bind bot execution to that selected account.</div>
-        <div class="modal-actions"><button class="modal-btn" id="authorizeBtn" type="button" disabled>AUTHORIZE KINGBOT</button></div>
+        <div class="modal-actions"><button class="modal-btn" id="authorizeBtn" type="button" disabled>AUTHORIZE KINGBOT</button><button class="modal-btn alt" id="disconnectBtn" type="button" style="display:none">DISCONNECT CURRENT BROKER</button></div>
       </div>
 
       <div class="status-line" id="flowStatus">Waiting for broker selection.</div>
@@ -262,7 +262,7 @@ const logos={
   fxcm:"https://fxcmpy.tpq.io/_static/fxcm_logo_bg.png",
   ibkr:"https://rankia.com.br/_next/image/?q=100&url=https%3A%2F%2Frankia.com.br%2Fapp%2Fuploads%2F2024%2F09%2Finteractivebrokers_logo_corretora.webp&w=768"
 };
-let selected=null,step=1,verified=false,selectedAccount=null,partnerOpened=false;
+let selected=null,step=1,verified=false,selectedAccount=null,partnerOpened=false,activeConnection=null;
 const $=id=>document.getElementById(id);
 function setStep(n){
   step=n;
@@ -308,6 +308,10 @@ function textFor(){
   if(selected!=="deriv")$("flowStatus").textContent=step===1?"Waiting for broker account confirmation.":step===2?(selected==="exness"?"Create or manage the Exness API key in Key Management, then return with the issued credentials.":(native?"Native API authorization is selected for this broker.":"Bridge credential entry is ready.")):(step===3?"Choose one account to continue.":"Account authorization is ready.");
 }
 function selectBroker(slug){
+  if(activeConnection?.connected){
+    setStatus("BROKER LOCK ACTIVE · Disconnect "+String(activeConnection.broker||"the current broker").toUpperCase()+" account before connecting another broker or account.");
+    return;
+  }
   const card=document.querySelector('.broker[data-broker="'+slug+'"]');
   if(card?.querySelector('.connect')?.disabled)return;
   selected=slug;step=1;verified=false;selectedAccount=null;
@@ -358,6 +362,29 @@ async function startDerivOAuth(){
   }catch(e){setStatus(e.message||"Unable to start Deriv authorization.");}
 }
 function setStatus(t){$("flowStatus").textContent=t}
+function applyConnectionLock(connection){
+  activeConnection=connection||null;
+  const locked=Boolean(activeConnection?.connected);
+  document.querySelectorAll(".broker .connect").forEach(btn=>{
+    btn.disabled=locked || btn.dataset.originalAllowed==="false";
+    if(locked)btn.textContent="ACCOUNT ALREADY CONNECTED";
+  });
+  const disconnect=$("disconnectBtn");
+  if(disconnect)disconnect.style.display=locked?"inline-flex":"none";
+  if(locked){
+    const label=(String(activeConnection.broker||"BROKER").toUpperCase())+" · "+String(activeConnection.accountId||"AUTHORIZED");
+    setStatus("LOCKED · "+label+". Disconnect the current broker before selecting another account or broker.");
+  }
+}
+async function refreshConnectionLock(){
+  try{
+    const t=await firebaseToken();
+    const r=await fetch(API_BASE+"/connection",{headers:{Authorization:"Bearer "+t},cache:"no-store"});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.connected)applyConnectionLock(d);
+    else applyConnectionLock(null);
+  }catch{}
+}
 function renderAccounts(list){
   const items=Array.isArray(list)?list:[];
   $("accountList").innerHTML=items.map((a,i)=>{
@@ -384,6 +411,30 @@ $("brokerLogin").addEventListener("click",e=>{
   if(selected==="deriv"){
     e.preventDefault();
     startDerivOAuth();
+  }
+});
+$("disconnectBtn").addEventListener("click",async()=>{
+  const btn=$("disconnectBtn");
+  btn.disabled=true;
+  btn.textContent="DISCONNECTING…";
+  try{
+    const t=await firebaseToken();
+    const r=await fetch(API_BASE+"/broker/disconnect",{method:"POST",headers:{Authorization:"Bearer "+t}});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||d.connected)throw new Error(d.error||"Unable to disconnect the current broker.");
+    activeConnection=null;
+    applyExecutionMode();
+    btn.style.display="none";
+    btn.disabled=false;
+    btn.textContent="DISCONNECT CURRENT BROKER";
+    selected=null;selectedAccount=null;verified=false;
+    document.querySelectorAll(".broker").forEach(el=>el.classList.remove("selected"));
+    closeDrawer();
+    setStatus("Broker disconnected. You may now connect a different broker or account.");
+  }catch(e){
+    btn.disabled=false;
+    btn.textContent="DISCONNECT CURRENT BROKER";
+    setStatus(e.message||"Broker disconnect failed.");
   }
 });
 $("closeModal").addEventListener("click",closeDrawer);
@@ -444,6 +495,7 @@ $("authorizeBtn").addEventListener("click",async()=>{
       setStatus("DERIV CONNECTED ✓ · "+(accountType==="real"?"LIVE / REAL":"DEMO / PAPER")+" · "+selectedAccount);
       btn.textContent="CONNECTED ✓";
       window.__KINGBOT_DERIV_PENDING=null;
+      applyConnectionLock({connected:true,broker:"deriv",accountId:selectedAccount,executionMode:accountType==="real"?"LIVE":"PAPER"});
       return;
     }
     const r=await fetch(API_BASE+"/connection",{headers:{Authorization:"Bearer "+t}});
@@ -452,6 +504,7 @@ $("authorizeBtn").addEventListener("click",async()=>{
     setStatus("KINGBOT is authorized for the selected broker connection. You can continue to Bot Workspace.");
     $("flowCopy").innerHTML="<strong>STEP 4 · KINGBOT AUTHORIZATION COMPLETE</strong><br>Broker connection verified. Bot execution can use the authorized account through the secure backend gateway.";
     btn.textContent="AUTHORIZED ✓";
+    applyConnectionLock(d);
   }catch(e){setStep(3);btn.disabled=false;btn.textContent=selected==="deriv"?"CONNECT SELECTED ACCOUNT":"AUTHORIZE KINGBOT";setStatus(e.message||"Authorization failed.")}
 });
 
@@ -548,6 +601,8 @@ applyExecutionMode();
   }));
   search.addEventListener("input",applyFilters);
 })();
+
+void refreshConnectionLock();
 })();
 </script>
 <script>
