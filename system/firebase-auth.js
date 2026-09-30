@@ -19,7 +19,6 @@ import {
   reload,
   updateProfile
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC5FpdO2YRysvERSGjLhO8AprfiB-d4_28",
@@ -33,7 +32,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 let authReadyResolve;
 const authReady = new Promise(resolve => { authReadyResolve = resolve; });
 let authReadyUnsubscribe = null;
@@ -154,6 +152,9 @@ async function uploadProfilePhoto(file){
   if(!user)throw new Error("Please sign in before uploading a profile photo.");
   const blob=await compressProfileImage(file);
   try{
+    const { getStorage, ref: storageRef, uploadBytes, getDownloadURL } =
+      await import("https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js");
+    const storage=getStorage(app);
     const fileRef=storageRef(storage,"profile-photos/"+user.uid+".jpg");
     await uploadBytes(fileRef,blob,{contentType:"image/jpeg",cacheControl:"public,max-age=3600"});
     const photoURL=await getDownloadURL(fileRef);
@@ -199,7 +200,7 @@ async function backendSync(extra={}){
 }
 
 window.KINGBOT_FIREBASE={
-  app,auth,db,storage,API_BASE,persist,waitForAuthReady,getProfile,uploadProfilePhoto,updateProfileDetails,
+  app,auth,db,API_BASE,persist,waitForAuthReady,getProfile,uploadProfilePhoto,updateProfileDetails,
   createAccount:async({email,password,firstName,lastName,phone,remember=true})=>{
     await persist(remember);
     let credential;
