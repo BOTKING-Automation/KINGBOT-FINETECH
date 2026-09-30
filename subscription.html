@@ -1120,8 +1120,13 @@
         const subscription=data.subscription;
         const latest=data.latestPayment || (Array.isArray(data.payments)?data.payments[0]:null);
         const accessState=document.getElementById("accessState");
+        const isAdmin=data.isAdmin===true;
 
-        if(subscription){
+        if(isAdmin){
+          accountStatus.innerHTML='<span style="color:var(--green);font-weight:800">ADMIN ACCESS · NO SUBSCRIPTION REQUIRED</span> · full KINGBOT platform permissions are enabled.';
+          accessState.className="access-state approved";
+          accessState.innerHTML="● ADMIN ACCESS — subscription status does not restrict this administrator account.";
+        }else if(subscription){
           accountStatus.innerHTML=
             '<span style="color:var(--green);font-weight:800">ACTIVE · '+esc(String(subscription.plan_id||"").toUpperCase())+
             '</span> · expires '+
@@ -1132,7 +1137,7 @@
         }
 
         const paymentStatus=String(latest?.status||"").toLowerCase();
-        if(paymentStatus==="approved"){
+        if(isAdmin){
           accessState.className="access-state approved";
           accessState.innerHTML="● APPROVED — payment verified. Your subscription and entitled bot access are active.";
         }else if(paymentStatus==="rejected"){
