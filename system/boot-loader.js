@@ -60,7 +60,7 @@ function start(){
 
   // Safety release if the embedded loader fails to signal completion.
   // Admin surfaces must never remain covered by the loader indefinitely.
-  const releaseMs=location.search.includes("surface=admin")?4500:11000;
+  const isAdminEntry=/\/admin-entry\.html$/i.test(window.location.pathname);\n  const releaseMs=isAdminEntry?4500:11000;
   window.setTimeout(finish,releaseMs);
 }
 
