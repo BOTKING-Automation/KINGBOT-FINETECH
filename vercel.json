@@ -56,7 +56,7 @@
   "redirects": [
     {
       "source": "/",
-      "destination": "/loader.html",
+      "destination": "/index.html",
       "permanent": false
     }
   ]
