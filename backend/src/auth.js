@@ -185,8 +185,8 @@ export async function ensureAuthSchema(pool){
  await pool.query("ALTER TABLE kingbot_users ALTER COLUMN phone DROP NOT NULL").catch(()=>{});
  await pool.query("ALTER TABLE kingbot_users ADD COLUMN IF NOT EXISTS firebase_uid TEXT").catch(()=>{});
  await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS kingbot_users_firebase_uid_unique ON kingbot_users(firebase_uid) WHERE firebase_uid IS NOT NULL").catch(()=>{});
- await pool.query("ALTER TABLE kingbot_users ADD COLUMN IF NOT EXISTS admin_blocked BOOLEAN NOT NULL DEFAULT FALSE").catch(()=>{});
  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),firebase_uid TEXT UNIQUE,first_name TEXT NOT NULL,last_name TEXT NOT NULL,email TEXT UNIQUE NOT NULL,phone TEXT,password_hash TEXT,email_verified BOOLEAN NOT NULL DEFAULT FALSE,phone_verified BOOLEAN NOT NULL DEFAULT FALSE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());");
+ await pool.query("ALTER TABLE kingbot_users ADD COLUMN IF NOT EXISTS admin_blocked BOOLEAN NOT NULL DEFAULT FALSE").catch(()=>{});
  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_password_resets (id BIGSERIAL PRIMARY KEY,firebase_uid TEXT NOT NULL,email TEXT NOT NULL,code_hash TEXT NOT NULL,expires_at TIMESTAMPTZ NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,verified_at TIMESTAMPTZ,recovery_token_hash TEXT,recovery_expires_at TIMESTAMPTZ,consumed_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());");
  await pool.query("CREATE INDEX IF NOT EXISTS kingbot_password_resets_email_created_idx ON kingbot_password_resets(email,created_at DESC);");
 }
