@@ -264,6 +264,20 @@ const logos={
 };
 let selected=null,step=1,verified=false,selectedAccount=null,partnerOpened=false,activeConnection=null;
 const $=id=>document.getElementById(id);
+function cacheBrokerIdentity(connection){
+  if(!connection?.broker || !connection?.accountId)return;
+  try{
+    localStorage.setItem("KINGBOT_BROKER_IDENTITY",JSON.stringify({
+      broker:String(connection.broker),
+      accountId:String(connection.accountId),
+      executionMode:String(connection.executionMode||"PAPER"),
+      accountType:String(connection.accountType||(
+        String(connection.executionMode||"PAPER").toUpperCase()==="LIVE"?"REAL":"DEMO"
+      )),
+      verifiedAt:new Date().toISOString()
+    }));
+  }catch{}
+}
 function setStep(n){
   step=n;
   document.querySelectorAll(".step").forEach(el=>{
@@ -384,6 +398,7 @@ async function disconnectCurrentBroker(){
 }
 function applyConnectionLock(connection){
   activeConnection=connection||null;
+  if(connection?.connected) cacheBrokerIdentity(connection);
   const locked=Boolean(activeConnection?.connected);
   document.querySelectorAll(".broker .connect").forEach(btn=>{
     btn.disabled=locked || btn.dataset.originalAllowed==="false";
