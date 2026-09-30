@@ -91,7 +91,7 @@ app.post("/api/broker/account", async (req,res)=>{
     if(!apiKey)return res.status(400).json({ok:false,error:"EXNESS_API_KEY_REQUIRED"});
     if(!secretKey)return res.status(400).json({ok:false,error:"EXNESS_SECRET_KEY_REQUIRED"});
     try{
-      return res.status(201).json(await broker.saveMapping({
+      const saved=await broker.saveMapping({
         userId:user.id,
         provider:"exness",
         accountId,
@@ -99,7 +99,12 @@ app.post("/api/broker/account", async (req,res)=>{
         apiKey,
         secretKey,
         baseUrl
-      }));
+      });
+      if(saved?.ok===false){
+        const status=saved.error==="BROKER_ALREADY_CONNECTED"?409:400;
+        return res.status(status).json(saved);
+      }
+      return res.status(201).json(saved);
     }catch(error){
       return res.status(500).json({ok:false,error:"Exness account mapping failed.",reason:error?.message||"EXNESS_ACCOUNT_MAPPING_FAILED"});
     }
@@ -109,14 +114,19 @@ app.post("/api/broker/account", async (req,res)=>{
   if(!accountToken)return res.status(400).json({ok:false,error:"BROKER_ACCOUNT_TOKEN_REQUIRED"});
   if(!/^[A-Za-z0-9._:-]{3,100}$/.test(accountId))return res.status(400).json({ok:false,error:"INVALID_BROKER_ACCOUNT_ID"});
   try{
-    res.status(201).json(await broker.saveMapping({
+    const saved=await broker.saveMapping({
       userId:user.id,
       provider:"metaapi",
       accountId,
       accountToken,
       executionMode,
       baseUrl:String(req.body?.baseUrl||"").trim()
-    }));
+    });
+    if(saved?.ok===false){
+      const status=saved.error==="BROKER_ALREADY_CONNECTED"?409:400;
+      return res.status(status).json(saved);
+    }
+    return res.status(201).json(saved);
   }catch(error){
     res.status(500).json({ok:false,error:"Broker account mapping failed.",reason:error?.message||"BROKER_ACCOUNT_MAPPING_FAILED"});
   }
@@ -149,6 +159,17 @@ app.get("/api/broker/deriv/oauth/start", async (req,res)=>{
   const redirectUri=derivEnv("DERIV_OAUTH_REDIRECT_URI");
   if(!clientId||!redirectUri){
     return res.status(503).json({ok:false,error:"DERIV_OAUTH_NOT_CONFIGURED"});
+  }
+  const activeMapping=await broker.getMapping(user.id);
+  if(activeMapping){
+    return res.status(409).json({
+      ok:false,
+      error:"BROKER_ALREADY_CONNECTED",
+      message:"A broker account is already connected. Disconnect it before connecting another broker or account.",
+      broker:activeMapping.provider,
+      accountId:activeMapping.account_id,
+      executionMode:activeMapping.execution_mode
+    });
   }
   if(!/^https:\/\//i.test(redirectUri)){
     return res.status(503).json({ok:false,error:"DERIV_OAUTH_REDIRECT_URI_MUST_USE_HTTPS"});
