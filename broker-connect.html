@@ -299,9 +299,6 @@ async function firebaseToken(){
   return u.getIdToken(true);
 }
 function setStatus(t){$("flowStatus").textContent=t}
-function fakeAccounts(){
-  return [{id:$("accountId").value.trim()||"BROKER-ACCOUNT",label:"Selected authorized trading account",mode:$("executionMode").value}];
-}
 function renderAccounts(list){
   $("accountList").innerHTML=list.map((a,i)=>'<div class="account-item'+(i===0?" active":"")+' data-account="'+String(a.id).replace(/"/g,"&quot;")+'"><div><b>'+String(a.label||a.id)+'</b><span>'+String(a.mode||"AUTHORIZED")+'</span></div><span>SELECT</span></div>').join("");
   selectedAccount=list[0]?.id||null;
