@@ -254,14 +254,14 @@ async function showAdminSignIn(fb){
  if(form)return new Promise(resolve=>form.dataset.resolve="pending");
  card.insertAdjacentHTML("beforeend",`
    <form id="adminLoginForm" style="margin-top:18px;text-align:left" novalidate>
-     <label style="display:block;color:#73829e;font:800 7px "JetBrains Mono";letter-spacing:.12em;margin-bottom:6px">ADMIN EMAIL</label>
+     <label style='display:block;color:#73829e;font:800 7px "JetBrains Mono";letter-spacing:.12em;margin-bottom:6px'>ADMIN EMAIL</label>
      <input id="adminLoginEmail" type="email" autocomplete="username" value="kingbotofficial001@gmail.com" required
-       style="width:100%;height:42px;padding:0 11px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:#050b18;color:#edf3ff;outline:none;font:700 9px "JetBrains Mono";box-sizing:border-box">
+       style='width:100%;height:42px;padding:0 11px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:#050b18;color:#edf3ff;outline:none;font:700 9px "JetBrains Mono";box-sizing:border-box'>
      <label style="display:block;color:#73829e;font:800 7px "JetBrains Mono";letter-spacing:.12em;margin:12px 0 6px">PASSWORD</label>
      <input id="adminLoginPassword" type="password" autocomplete="current-password" required
-       style="width:100%;height:42px;padding:0 11px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:#050b18;color:#edf3ff;outline:none;font:700 9px "JetBrains Mono";box-sizing:border-box">
+       style='width:100%;height:42px;padding:0 11px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:#050b18;color:#edf3ff;outline:none;font:700 9px "JetBrains Mono";box-sizing:border-box'>
      <button id="adminLoginButton" type="submit" class="btn cyan" style="width:100%;margin-top:12px;min-height:42px">VERIFY ADMIN & ENTER</button>
-     <div id="adminLoginError" style="margin-top:9px;color:#ff9baa;font:700 8px "JetBrains Mono";line-height:1.5"></div>
+     <div id="adminLoginError" style='margin-top:9px;color:#ff9baa;font:700 8px "JetBrains Mono";line-height:1.5'></div>
    </form>`);
  form=document.getElementById("adminLoginForm");
  return await new Promise(resolve=>{
