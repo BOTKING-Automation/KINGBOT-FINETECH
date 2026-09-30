@@ -17,6 +17,8 @@ function installStyle(){
   style.id="kb-boot-bridge-style";
   style.textContent=`
     html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
+    html.kb-home-pending body{visibility:hidden!important}
+    html.kb-home-pending{background:#02040a!important}
     #kb-boot-frame{
       position:fixed;inset:0;z-index:2147483647;
       width:100vw;height:100vh;border:0;display:block;
@@ -36,6 +38,17 @@ function start(){
   const homeEntry =
     window.location.pathname === "/" ||
     /\/index\.html$/i.test(window.location.pathname);
+
+  /*
+    IMPORTANT:
+    The customer must never see the Home page before authentication.
+    On the very first entry, hide Home immediately and route directly
+    into the neural loader. Home is revealed only after a verified
+    session is established.
+  */
+  if(homeEntry){
+    document.documentElement.classList.add("kb-home-pending");
+  }
 
   /*
     CUSTOMER ENTRY CONTRACT
@@ -73,6 +86,7 @@ function start(){
       ]);
 
       if(state?.authenticated && state?.user?.verified){
+        document.documentElement.classList.remove("kb-home-pending");
         return;
       }
 
@@ -132,15 +146,15 @@ function start(){
     checked on every Home entry.
   */
   if(homeEntry && seen){
-    /* Subsequent Home entries skip the visual startup and use
-       the real Firebase-backed session for routing. */
+    /* Subsequent Home entries skip the visual startup. Use the
+       real Firebase-backed session for routing. */
     handoffHome();
     return;
   }
 
   if(homeEntry && !seen){
-    /* First customer entry uses the loader as the top-level page.
-       This removes the fragile iframe/postMessage dependency. */
+    /* First customer entry goes directly to the loader. The Home
+       surface remains hidden until authentication has completed. */
     window.location.replace(
       "loader.html?duration=3000&next="+
       encodeURIComponent("access-stable.html?return=index.html#signin")+
