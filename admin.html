@@ -289,7 +289,7 @@ async function showAdminSignIn(fb){
  });
 }
 async function ensureAdminSession(){
- lockMsg.textContent="Restoring secure administrator identity…";
+ lockMsg.textContent="Checking administrator session…";
  if(!window.KINGBOT_FIREBASE){
    try{await import(new URL("system/firebase-auth.js",location.href).href)}catch{}
  }
@@ -304,11 +304,11 @@ async function ensureAdminSession(){
      try{
        unsubscribe=fb.onChange(finish);
        if(fb.auth.currentUser)finish(fb.auth.currentUser);
-       setTimeout(()=>finish(fb.auth.currentUser||null),15000);
+       setTimeout(()=>finish(fb.auth.currentUser||null),3500);
      }catch{finish(fb.auth.currentUser||null)}
    });
  }
- if(!user)return showAdminSignIn(fb);
+ if(!user){ lockMsg.textContent="No active administrator session. Sign in below."; return showAdminSignIn(fb); }
  try{await fb.refresh()}catch{}
  user=fb.auth.currentUser;
  if(!user)return showAdminSignIn(fb);
