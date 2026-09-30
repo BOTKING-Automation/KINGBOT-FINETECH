@@ -38,7 +38,6 @@ let authReadyResolve;
 const authReady = new Promise(resolve => { authReadyResolve = resolve; });
 let authReadyUnsubscribe = null;
 authReadyUnsubscribe = onAuthStateChanged(auth, user => { authReadyResolve(user || null); try{authReadyUnsubscribe?.();}catch{} });
-const defaultPersistenceReady = setPersistence(auth, browserLocalPersistence).catch(error => { console.warn("[KINGBOT AUTH] Default persistence setup deferred:", error?.message || error); return null; });
 
 async function saveUserProfile(user, extra={}, initialize=false) {
   if (!user) throw new Error("Cannot save a missing Firebase user.");
@@ -82,7 +81,6 @@ async function persist(remember=true){
   await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
 }
 async function waitForAuthReady(timeoutMs=10000){
-  await defaultPersistenceReady.catch(()=>{});
   return await Promise.race([
     authReady,
     new Promise((_,reject)=>setTimeout(()=>reject(new Error("Authentication service did not finish loading. Please refresh once.")),Number(timeoutMs)||10000))
