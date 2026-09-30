@@ -78,6 +78,13 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
 
   window.setTimeout(function(){
     window.clearInterval(ticker);
+    var embedded=new URLSearchParams(window.location.search).get("embed")==="1";
+    if(embedded){
+      try{
+        window.parent.postMessage({type:"KINGBOT_BOOT_COMPLETE"},"*");
+      }catch(e){}
+      return;
+    }
     window.location.replace("access-stable.html#signin");
   },10000);
 })();
