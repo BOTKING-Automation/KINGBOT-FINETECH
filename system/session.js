@@ -108,5 +108,6 @@ const session={
 };
 function fbAuthChange(callback){return window.KINGBOT_FIREBASE.onChange(callback);}
 window.KINGBOT_SESSION=session;
-document.addEventListener("DOMContentLoaded",async()=>{await session.check();session.updateUserElements();session.emitChange();});
+async function bootSession(){await session.check();session.updateUserElements();session.emitChange();}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bootSession,{once:true});else void bootSession();
 })(window);
