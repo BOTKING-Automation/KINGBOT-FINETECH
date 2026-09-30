@@ -385,6 +385,69 @@ overscroll-behavior:none;}
       letter-spacing: .15em;
     }
 
+    .verified-account-strip{
+      display:grid;
+      grid-template-columns:minmax(240px,1.5fr) repeat(6,minmax(110px,1fr));
+      gap:10px;
+      align-items:stretch;
+      margin:0 0 12px;
+      padding:13px;
+      border:1px solid rgba(25,230,255,.2);
+      border-radius:20px;
+      background:
+        radial-gradient(circle at 12% 20%,rgba(25,230,255,.09),transparent 28%),
+        radial-gradient(circle at 88% 20%,rgba(155,92,255,.08),transparent 28%),
+        linear-gradient(115deg,rgba(10,18,38,.96),rgba(7,10,24,.96));
+      box-shadow:0 18px 55px rgba(0,0,0,.24),0 0 34px rgba(25,230,255,.045);
+    }
+    .verified-account-main{
+      min-width:0;
+      padding:8px 10px;
+      border-right:1px solid rgba(255,255,255,.07);
+    }
+    .verified-account-kicker{
+      color:var(--cyan);
+      font:700 8px "JetBrains Mono";
+      letter-spacing:.16em;
+    }
+    .verified-account-status{
+      margin-top:7px;
+      color:var(--gold);
+      font:800 15px Orbitron;
+      letter-spacing:.05em;
+    }
+    .verified-account-note{
+      margin-top:6px;
+      color:#73809a;
+      font-size:9px;
+      line-height:1.45;
+    }
+    .verified-account-item{
+      min-width:0;
+      padding:8px 9px;
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:12px;
+      background:rgba(255,255,255,.022);
+    }
+    .verified-account-item span{
+      display:block;
+      color:#5f6b84;
+      font-size:8px;
+      text-transform:uppercase;
+      letter-spacing:.1em;
+    }
+    .verified-account-item strong{
+      display:block;
+      margin-top:7px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      color:#dbe4f7;
+      font:700 10px "JetBrains Mono";
+    }
+    .verified-account-item strong.live{color:var(--green);}
+    .verified-account-item strong.warn{color:var(--orange);}
+    
     .cards {
       display: grid;
       grid-template-columns: repeat(6, 1fr);
@@ -984,6 +1047,9 @@ overscroll-behavior:none;}
     /* ================= RESPONSIVE ================= */
 
     @media (max-width: 1250px) {
+      .verified-account-strip{grid-template-columns:repeat(3,minmax(0,1fr));}
+      .verified-account-main{grid-column:1/-1;border-right:0;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:11px;}
+      
       .cards {
         grid-template-columns: repeat(3, 1fr);
       }
@@ -1035,6 +1101,8 @@ overscroll-behavior:none;}
         font-size: 31px;
       }
 
+      .verified-account-strip{grid-template-columns:1fr 1fr;}
+      
       .cards {
         grid-template-columns: repeat(2, 1fr);
       }
@@ -1077,7 +1145,7 @@ overscroll-behavior:none;}
 
 <div data-kingbot-navigation></div>
 
-<script src="system/session.js"></script>
+<script src="system/session.js?v=20260930-3"></script>
 
 <main>
 
@@ -1123,13 +1191,18 @@ overscroll-behavior:none;}
       <div class="section-tag mono">BROKER_LAYER / ACCOUNT</div>
     </div>
 
-    <div id="accountIdentity" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:0 0 12px;padding:12px;border:1px solid rgba(25,230,255,.12);border-radius:18px;background:linear-gradient(110deg,rgba(25,230,255,.035),rgba(155,92,255,.045),rgba(255,200,74,.035));box-shadow:0 15px 45px rgba(0,0,0,.18)">
-      <div><div class="metric-label">Broker</div><div class="metric-note" id="accountBroker">NOT CONNECTED</div></div>
-      <div><div class="metric-label">Account ID</div><div class="metric-note" id="accountIdDisplay">—</div></div>
-      <div><div class="metric-label">Account Type</div><div class="metric-note" id="accountType">—</div></div>
-      <div><div class="metric-label">Currency</div><div class="metric-note" id="accountCurrency">—</div></div>
-      <div><div class="metric-label">Execution</div><div class="metric-note" id="accountMode">—</div></div>
-      <div><div class="metric-label">Trading</div><div class="metric-note" id="accountTradingStatus">—</div></div>
+    <div id="accountIdentity" class="verified-account-strip">
+      <div class="verified-account-main">
+        <div class="verified-account-kicker">VERIFIED BROKER ACCOUNT</div>
+        <div class="verified-account-status" id="accountConnectionValue">VERIFYING…</div>
+        <div class="verified-account-note" id="accountConnectionNote">Reading the authenticated broker connection from KINGBOT backend.</div>
+      </div>
+      <div class="verified-account-item"><span>Broker</span><strong id="accountBroker">—</strong></div>
+      <div class="verified-account-item"><span>Account ID</span><strong id="accountIdDisplay">—</strong></div>
+      <div class="verified-account-item"><span>Type</span><strong id="accountType">—</strong></div>
+      <div class="verified-account-item"><span>Currency</span><strong id="accountCurrency">—</strong></div>
+      <div class="verified-account-item"><span>Execution</span><strong id="accountMode">—</strong></div>
+      <div class="verified-account-item"><span>Trading</span><strong id="accountTradingStatus">—</strong></div>
     </div>
 
     <div class="cards">
@@ -2210,13 +2283,14 @@ async function checkBackend() {
   try{
     const data=await fetchApi("/api/account");
     const account=data.account||data.data||data;
+    if(!account || (!account.accountId && !account.broker)){
+      throw new Error("ACCOUNT_TELEMETRY_INCOMPLETE");
+    }
     backendConnected=true;
     accountLoaded=true;
 
     $("accountConnectionValue").textContent="CONNECTED";
     $("accountConnectionValue").style.color="#23f7a3";
-    $("accountConnectionState").style.borderColor="rgba(35,247,163,.22)";
-    $("accountConnectionState").style.background="rgba(35,247,163,.045)";
     $("accountConnectionNote").textContent="Verified broker account is active. Connection controls remain on Broker Connect.";
 
     $("heroBrokerBadge").textContent="● "+String(account.broker||"BROKER").toUpperCase()+" · ACCOUNT CONNECTED";
@@ -2313,6 +2387,7 @@ function renderAccountOverview(account){
   if($("terminalExecutionMode"))$("terminalExecutionMode").textContent=String(account.executionMode||"—").toUpperCase();
   $("accountTradingStatus").textContent=(account.tradingEnabled?"ENABLED":"DISABLED")+" · "+String(account.accountStatus||"ACTIVE").toUpperCase();
   $("accountTradingStatus").style.color=account.tradingEnabled?"#23f7a3":"#ff4d6d";
+  $("accountTradingStatus").className=account.tradingEnabled?"live":"warn";
 
   $("accountBalance").textContent=formatMoney(account.balance,currency);
   $("accountEquity").textContent=formatMoney(account.equity,currency);
