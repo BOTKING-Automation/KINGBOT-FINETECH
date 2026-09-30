@@ -114,13 +114,36 @@ export class UserBrokerManager {
   }
 
   async isConnected(userId){
-    for(const [key] of this.connections){ if(key.startsWith(String(userId)+":")) return true; }
-    return false;
+    const prefix=String(userId)+":";
+    for(const [key] of this.connections){
+      if(key.startsWith(prefix))return true;
+    }
+
+    // Broker connection objects live in process memory, while the verified
+    // account mapping is persistent. Rehydrate the connection after a
+    // Render restart, idle wake-up, or worker/page transition.
+    const mapping=await this.getMapping(userId);
+    if(!mapping)return false;
+
+    try{
+      const result=await this.connect(userId,mapping.execution_mode);
+      return Boolean(result?.connected);
+    }catch(error){
+      console.warn("[KINGBOT BROKER] Connection rehydration deferred:",error?.message||error);
+      return false;
+    }
   }
 
   async getStatus(userId){
     const mapping=await this.getMapping(userId);
-    return {configured:Boolean(mapping),connected:await this.isConnected(userId),broker:mapping?.provider||null,accountId:mapping?.account_id||null,executionMode:mapping?.execution_mode||"NOT_CONNECTED"};
+    const connected=Boolean(mapping) ? await this.isConnected(userId) : false;
+    return {
+      configured:Boolean(mapping),
+      connected,
+      broker:mapping?.provider||null,
+      accountId:mapping?.account_id||null,
+      executionMode:mapping?.execution_mode||"NOT_CONNECTED"
+    };
   }
 
   async getMapping(userId){
@@ -316,7 +339,14 @@ export class UserBrokerManager {
     const mapping=await this.getMapping(userId);
     if(!mapping)throw new Error("BROKER_ACCOUNT_NOT_CONFIGURED");
     const key=userId+":"+mapping.provider+":"+mapping.account_id;
-    const entry=this.connections.get(key);
+    let entry=this.connections.get(key);
+
+    if(!entry){
+      const result=await this.connect(userId,mapping.execution_mode);
+      if(!result?.connected)throw new Error(result?.reason||"BROKER_NOT_CONNECTED");
+      entry=this.connections.get(key);
+    }
+
     if(!entry)throw new Error("BROKER_NOT_CONNECTED");
     return entry;
   }
