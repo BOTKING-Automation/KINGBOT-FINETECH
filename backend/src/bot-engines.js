@@ -231,7 +231,7 @@ export function createBotEngineRouter({ pool }) {
   router.put("/:botId/risk", async (req,res)=>{
     const user=await requireUser(pool,req,res); if(!user)return;
     const bot=BOT_DEFINITIONS[req.params.botId]; if(!bot)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
-    if(!(await hasEntitlement(pool,user.id,bot.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
+    if(!(await hasEntitlement(pool,user.id,bot.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const checked=validateUserRisk(req.body,bot); if(checked.error)return res.status(400).json({ok:false,error:checked.error});
     const s=checked.settings;
     const mode=String(req.body?.executionMode||"PAPER").toUpperCase();
