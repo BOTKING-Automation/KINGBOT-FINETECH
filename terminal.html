@@ -2261,16 +2261,66 @@ async function waitForKingbotApi(timeoutMs=5000){
   return window.KINGBOT_API;
 }
 
+async function getTerminalAuthToken(timeoutMs=2500){
+  let firebase=window.KINGBOT_FIREBASE||null;
+  if(!firebase){
+    try{
+      await import(new URL("system/firebase-auth.js",window.location.href).href);
+      firebase=window.KINGBOT_FIREBASE||null;
+    }catch{}
+  }
+  if(!firebase) throw new Error("FIREBASE_AUTH_UNAVAILABLE");
+
+  let user=null;
+  try{
+    user=await firebase.waitForAuthReady(timeoutMs);
+  }catch{
+    user=firebase.auth?.currentUser||null;
+  }
+  if(!user) throw new Error("AUTH_TOKEN_NOT_READY");
+  const token=await firebase.getToken(false);
+  if(!token) throw new Error("AUTH_TOKEN_NOT_READY");
+  return {firebase,token};
+}
+
 async function fetchApi(path, options = {}) {
-  const api=await waitForKingbotApi();
+  await waitForKingbotApi();
   const controller=new AbortController();
   const timeoutMs=Number(options.timeoutMs)||9000;
   const timer=setTimeout(()=>controller.abort(),timeoutMs);
   const requestOptions={...options,signal:controller.signal};
   delete requestOptions.timeoutMs;
+
   try{
-    const response = await api.request(path, requestOptions);
-    const data = await response.json().catch(() => ({}));
+    const auth=await getTerminalAuthToken(Math.min(2500,timeoutMs));
+    const headers=new Headers(requestOptions.headers||{});
+    headers.set("Accept","application/json");
+    if(requestOptions.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
+    headers.set("Authorization","Bearer "+auth.token);
+
+    let response=await fetch(window.KINGBOT_API.baseUrl+path,{
+      ...requestOptions,
+      headers,
+      credentials:"omit",
+      cache:"no-store"
+    });
+
+    if(response.status===401){
+      try{
+        const refreshed=await auth.firebase.getToken(true);
+        if(refreshed){
+          headers.set("Authorization","Bearer "+refreshed);
+          response=await fetch(window.KINGBOT_API.baseUrl+path,{
+            ...requestOptions,
+            headers,
+            credentials:"omit",
+            cache:"no-store"
+          });
+        }
+      }catch{}
+    }
+
+    const data=await response.json().catch(() => ({}));
     if (!response.ok || data?.ok === false) {
       throw new Error(data.error || data.reason || data.message || `Backend HTTP ${response.status}`);
     }
