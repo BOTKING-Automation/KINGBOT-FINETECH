@@ -149,12 +149,15 @@ input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(25,2
     $("loginBtn").disabled=true;$("loginBtn").textContent="AUTHENTICATING…";
     try{
       const fb=await firebase();
+      await fb.waitForAuthReady(10000).catch(()=>null);
       const result=await fb.signIn({email,password,remember:$("remember").checked});
       if(!result.verified){
         try{sessionStorage.setItem("verification_email",email)}catch{}
         location.replace("verify.html?return="+encodeURIComponent(destination()));
         return;
       }
+      await fb.waitForAuthReady(10000);
+      await fb.getToken(true);
       try{sessionStorage.setItem("KINGBOT_AUTH_HANDOFF","1")}catch{}
       showMessage("Authentication verified. Opening KINGBOT…","success");
       setTimeout(()=>location.replace(destination()),250);
