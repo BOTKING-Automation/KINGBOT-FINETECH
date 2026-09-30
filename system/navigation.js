@@ -11,6 +11,7 @@
     ["terminal.html","Terminal","⌁","Trading terminal"],
     ["bots.html","Bots","◉","Automated trading systems"],
     ["broker-connect.html","Broker Connect","⚡","Secure broker execution"],
+    ["partner-revenue.html","Partner Revenue","◌","Broker referral intelligence"],
     ["analytics.html","Analytics","▦","Performance intelligence"],
     ["ai.html","AI Intelligence","✦","AI intelligence layer"],
     ["academy.html","Academy","◇","Education & research"],
