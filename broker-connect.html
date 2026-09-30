@@ -192,6 +192,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
           <div class="field" id="secretKeyField" style="grid-column:1/-1;display:none"><label>EXNESS SECRET KEY</label><input id="secretKey" type="password" autocomplete="off" placeholder="Secret shown once by Exness"></div>
           <div class="field" id="hostField" style="grid-column:1/-1;display:none"><label>API HOST (OPTIONAL)</label><input id="apiHost" autocomplete="off" placeholder="https://api.exness.com · leave blank for discovery"></div>
           <div class="field" id="bridgeTokenField" style="grid-column:1/-1;display:none"><label>BRIDGE ACCESS TOKEN</label><input id="accessToken" type="password" autocomplete="off" placeholder="MetaApi access token"></div>
+<div class="field" id="oandaTokenField" style="grid-column:1/-1;display:none"><label>OANDA PERSONAL API TOKEN</label><input id="oandaToken" type="password" autocomplete="off" placeholder="Paste the OANDA token from Manage API Access"></div>
         </div>
         <div class="status-line" id="credentialHelp">Exness flow: create the API key in Exness Key Management, select the trading account that the key may access, copy the secret once, and paste the values here. KINGBOT signs requests on the server; credentials are encrypted and never stored in browser localStorage.</div>
         <div class="modal-actions"><button class="modal-btn" id="verifyBtn" type="button">VERIFY EXNESS CONNECTION</button></div>
@@ -214,7 +215,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
 "use strict";
 const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbot-fintech-api-etfv.onrender.com/api";
 const cfg={
-  oanda:{name:"OANDA",login:"https://fxtrade.oanda.com/",api:"https://developer.oanda.com/rest-live-v20/authentication/",native:true,mode:"native"},
+  oanda:{name:"OANDA",login:"https://fxtrade.oanda.com/",api:"https://developer.oanda.com/rest-live-v20/authentication/",native:true,mode:"oanda"},
   deriv:{name:"DERIV",login:"https://app.deriv.com/",api:"https://auth.deriv.com/oauth2/auth",native:true,mode:"oauth"},
   exness:{name:"EXNESS",login:"https://my.exness.com/",api:"https://my.exness.com/",native:false,mode:"exness"},
   ig:{name:"IG",login:"https://my.ig.com/",api:"https://labs.ig.com/gettingstarted",native:false,mode:"metaapi"},
@@ -271,9 +272,9 @@ function selectBroker(slug){
   $("modalTitle").textContent=d.name;
   $("modalSubtitle").textContent=selected==="exness"?"EXNESS PUBLIC TRADER API":"SECURE BROKER CONNECTION FLOW";
   $("modalLogo").src=logos[slug];$("modalLogo").alt=d.name;
-  $("accountId").value="";$("apiKey").value="";$("secretKey").value="";$("apiHost").value="";$("accessToken").value="";$("secretKey").value="";$("apiKey").value="";
+  $("accountId").value="";$("apiKey").value="";$("secretKey").value="";$("apiHost").value="";$("accessToken").value="";$("oandaToken").value="";
   $("accountList").innerHTML="";$("authorizeBtn").disabled=true;
-  $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=selected==="exness"?"block":"none";$("bridgeTokenField").style.display=selected==="exness"?"none":"block";
+  $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=(selected==="exness"||selected==="oanda")?"block":"none";$("bridgeTokenField").style.display=(selected==="exness"||selected==="oanda")?"none":"block";$("oandaTokenField").style.display=selected==="oanda"?"block":"none";
   $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION";
   if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
   textFor();showDrawer();
@@ -320,20 +321,24 @@ $("verifyBtn").addEventListener("click",async()=>{
   const accountId=$("accountId").value.trim(),token=$("accessToken").value.trim();
   if(selected==="exness"){
     if(!accountId||!$("apiKey").value.trim()||!$("secretKey").value.trim()){setStatus("Enter the Exness account ID, API key and secret key.");return}
+  }else if(selected==="oanda"){
+    if(!accountId||!$("oandaToken").value.trim()){setStatus("Enter the OANDA account ID and personal API token.");return}
   }else if(!accountId||!token){setStatus("Enter both the account ID and bridge access token.");return}
   const btn=$("verifyBtn");btn.disabled=true;btn.textContent="VERIFYING…";setStep(3);
   try{
     const t=await firebaseToken();
     const body=selected==="exness"
       ? {provider:"exness",accountId,apiKey:$("apiKey").value.trim(),secretKey:$("secretKey").value,baseUrl:$("apiHost").value.trim(),executionMode:$("executionMode").value}
-      : {provider:"metaapi",accountId,accountToken:token,executionMode:$("executionMode").value};
+      : selected==="oanda"
+        ? {provider:"oanda",accountId,accountToken:$("oandaToken").value.trim(),baseUrl:$("apiHost").value.trim(),executionMode:$("executionMode").value}
+        : {provider:"metaapi",accountId,accountToken:token,executionMode:$("executionMode").value};
     const r=await fetch(API_BASE+"/broker/account",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify(body)});
     const d=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(d.error||d.reason||"Broker credential mapping failed.");
     const c=await fetch(API_BASE+"/broker/connect",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify({executionMode:$("executionMode").value})});
     const cd=await c.json().catch(()=>({}));
     if(!c.ok||!cd.connected)throw new Error(cd.reason||cd.error||"Broker connection verification failed.");
-    verified=true;$("accessToken").value="";
+    verified=true;$("accessToken").value="";$("oandaToken").value="";$("apiKey").value="";$("secretKey").value="";
     renderAccounts([{id:cd.accountId||accountId,label:selected.toUpperCase()+" verified account",mode:cd.mode||$("executionMode").value}]);
     textFor();setStatus("Connection verified. Select the account and authorize KINGBOT.");
   }catch(e){setStep(2);textFor();setStatus(e.message||"Connection verification failed.")}finally{btn.disabled=false;btn.textContent="VERIFY CONNECTION"}
