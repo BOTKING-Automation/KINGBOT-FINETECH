@@ -1969,95 +1969,16 @@ footer{
   "use strict";
 
   /*
-   * KINGBOT landing-page auth guard.
+   * The landing page is intentionally NOT an authentication gate.
+   * Authentication/verification is enforced by auth-gate.js on
+   * protected platform pages. The access and verification pages
+   * explicitly navigate here after successful authentication.
    *
-   * Firebase persistence restores the session asynchronously.
-   * Never redirect to sign-in merely because currentUser is null
-   * during the initial page load. Wait for the first auth-state
-   * event, then verify the account before deciding where to go.
+   * Keeping index.html free of a second Firebase redirect prevents
+   * the race where Firebase persistence is still restoring and the
+   * landing page sends a valid user back to sign-in.
    */
-  function goSignIn(){
-    try{ sessionStorage.removeItem("KINGBOT_AUTH_HANDOFF"); }catch(e){}
-    window.location.replace("access-stable.html#signin");
-  }
-
-  function goVerify(){
-    try{ sessionStorage.removeItem("KINGBOT_AUTH_HANDOFF"); }catch(e){}
-    window.location.replace("verify.html");
-  }
-
-  function isAuthPage(pathname){
-    return /\/(signin|signup|access|access-stable|verify)\.html$/i.test(pathname || "");
-  }
-
-  window.addEventListener("DOMContentLoaded",function(){
-    import("./system/firebase-auth.js").then(async function(){
-      const fb=window.KINGBOT_FIREBASE;
-      if(!fb || !fb.auth){
-        goSignIn();
-        return;
-      }
-
-      // Wait for Firebase to restore browser persistence before deciding.
-      const user=await new Promise(function(resolve){
-        let settled=false;
-        let unsubscribe=null;
-
-        function finish(value){
-          if(settled) return;
-          settled=true;
-          try{ unsubscribe && unsubscribe(); }catch(e){}
-          resolve(value || null);
-        }
-
-        try{
-          unsubscribe=fb.onChange(finish);
-
-          // If Firebase has already restored the user, finish immediately.
-          if(fb.auth.currentUser) finish(fb.auth.currentUser);
-
-          // Fail safely only after Firebase has had time to restore persistence.
-          setTimeout(function(){
-            if(!settled) finish(fb.auth.currentUser || null);
-          },10000);
-        }catch(e){
-          finish(fb.auth.currentUser || null);
-        }
-      });
-
-      if(!user){
-        goSignIn();
-        return;
-      }
-
-      try{
-        await fb.refresh();
-      }catch(e){
-        // Keep the existing authenticated Firebase session if refresh fails transiently.
-      }
-
-      const current=fb.auth.currentUser;
-
-      if(!current){
-        goSignIn();
-        return;
-      }
-
-      if(!current.emailVerified){
-        goVerify();
-        return;
-      }
-
-      // Verified Firebase session is valid. Keep the user on the landing page.
-      // The handoff flag is no longer required once Firebase has confirmed identity.
-      try{ sessionStorage.removeItem("KINGBOT_AUTH_HANDOFF"); }catch(e){}
-
-      console.info("[KINGBOT AUTH] Verified landing-page session confirmed.");
-    }).catch(function(error){
-      console.error("[KINGBOT AUTH] Landing-page session check failed:",error);
-      goSignIn();
-    });
-  },{once:true});
+  console.info("[KINGBOT] Landing page loaded.");
 })();
 </script>
 
