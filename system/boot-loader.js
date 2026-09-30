@@ -52,6 +52,55 @@ function start(){
   */
 
   /*
+    Authentication handoff for the customer Home entry.
+    This checks the real Firebase-backed session every time;
+    the sessionStorage marker is never treated as authentication.
+  */
+  const handoffHome=async()=>{
+    if(!homeEntry) return;
+
+    try{
+      const session=window.KINGBOT_SESSION;
+
+      if(!session){
+        window.setTimeout(handoffHome,100);
+        return;
+      }
+
+      const state=await session.check({force:true});
+
+      if(state?.authenticated && state?.user?.verified){
+        return;
+      }
+
+      if(state?.authenticated && !state?.user?.verified){
+        window.location.replace(
+          "verify.html?return="+
+          encodeURIComponent("index.html")
+        );
+        return;
+      }
+
+      window.location.replace(
+        "access-stable.html?return="+
+        encodeURIComponent("index.html")+
+        "#signin"
+      );
+    }catch(error){
+      console.warn(
+        "[KINGBOT BOOT] Auth handoff check failed:",
+        error?.message || error
+      );
+
+      window.location.replace(
+        "access-stable.html?return="+
+        encodeURIComponent("index.html")+
+        "#signin"
+      );
+    }
+  };
+
+  /*
     Verification writes a one-time auth handoff marker. Consume it
     immediately, but never use it as proof of authentication.
   */
