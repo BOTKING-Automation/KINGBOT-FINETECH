@@ -2292,36 +2292,6 @@ async function checkBackend() {
 
   await waitForKingbotApi(5000);
 
-  // Protected broker endpoints require the real Firebase identity.
-  // Wait for Firebase restoration before sending the first request.
-  try{
-    if(window.KINGBOT_SESSION?.check){
-      const auth=await window.KINGBOT_SESSION.check({force:true});
-      if(!auth.authenticated){
-        if($("accountConnectionValue")) $("accountConnectionValue").textContent="SIGN IN REQUIRED";
-        if($("accountConnectionValue")) $("accountConnectionValue").style.color="#ff7a18";
-        if($("accountConnectionNote")) $("accountConnectionNote").textContent="Sign in with the verified KINGBOT account to load the connected broker account.";
-        if($("heroBrokerBadge")) {
-          $("heroBrokerBadge").textContent="● AUTHENTICATION REQUIRED";
-          $("heroBrokerBadge").className="hero-badge offline";
-        }
-        return false;
-      }
-      if(auth.user?.verified!==true){
-        if($("accountConnectionValue")) $("accountConnectionValue").textContent="VERIFICATION REQUIRED";
-        if($("accountConnectionValue")) $("accountConnectionValue").style.color="#ffc84a";
-        if($("accountConnectionNote")) $("accountConnectionNote").textContent="Complete email verification before broker account telemetry can be displayed.";
-        if($("heroBrokerBadge")) {
-          $("heroBrokerBadge").textContent="● ACCOUNT VERIFICATION REQUIRED";
-          $("heroBrokerBadge").className="hero-badge";
-        }
-        return false;
-      }
-    }
-  }catch(error){
-    logActivity(`Authentication readiness check: ${error.message}`);
-  }
-
   const setConnection=(state,color,note)=>{
     if($("accountConnectionValue")){
       $("accountConnectionValue").textContent=state;
@@ -2765,8 +2735,10 @@ function formatCompact(value) {
 
   await accountBoot;
 
-  // Firebase/Render session restoration can finish just after first paint.
-  setTimeout(async()=>{try{await checkBackend();}catch{}},1200);
+  // Firebase may finish restoring the token just after first paint.
+  // Retry identity/telemetry without blocking the first render.
+  setTimeout(async()=>{try{await checkBackend();}catch{}},800);
+  setTimeout(async()=>{try{await checkBackend();}catch{}},2500);
   setTimeout(async()=>{try{await checkBackend();}catch{}},5000);
 
   clearInterval(window.__KINGBOT_ACCOUNT_REFRESH);
