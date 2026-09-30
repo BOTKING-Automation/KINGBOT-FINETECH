@@ -313,6 +313,17 @@ app.post("/api/broker/deriv/oauth/connect", async (req,res)=>{
   }
 });
 
+app.get("/api/broker/identity", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  try{
+    const identity=await broker.getStoredIdentity(user.id);
+    res.json({ok:true,...identity});
+  }catch(error){
+    console.error("[KINGBOT BROKER] stored identity lookup failed:",error?.message||error);
+    res.status(503).json({ok:false,error:"Broker account identity unavailable.",reason:error?.message||"BROKER_IDENTITY_UNAVAILABLE"});
+  }
+});
+
 app.get("/api/connection", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   const status=await broker.getStatus(user.id); res.json({ok:true,...status});
