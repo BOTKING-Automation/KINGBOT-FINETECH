@@ -90,10 +90,21 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
     }
 
     /*
-      The neural loader is visual-only.
-      Authentication and routing belong to the platform
-      entry/auth gate, not this animation page.
+      Embedded startup:
+        The parent page owns routing and receives the
+        KINGBOT_BOOT_COMPLETE event.
+
+      Direct startup:
+        loader.html itself is a valid entry surface and
+        continues to secure Sign In after the animation.
     */
+    if(!embedded){
+      window.location.replace(
+        "access-stable.html?return="+
+        encodeURIComponent("index.html")+
+        "#signin"
+      );
+    }
   },duration);
 })();
 </script>
