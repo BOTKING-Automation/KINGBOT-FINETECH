@@ -63,29 +63,48 @@ const session={
   activeCheck=(async()=>{
   try{
    const fb=await window.KINGBOT_FIREBASE.waitForAuthReady(10000).catch(()=>window.KINGBOT_FIREBASE?.auth?.currentUser||null);
-   if(!fb){state.authenticated=false;state.user=null;}
-   else{
-    await window.KINGBOT_FIREBASE.refresh();
-    const user=window.KINGBOT_FIREBASE.auth.currentUser;
-    if(!user){state.authenticated=false;state.user=null;}
-    else{
-     const token=await user.getIdToken();
-     let r=await withTimeout(fetch(this.config.sessionEndpoint,{headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"}),3000).catch(()=>null);
-     let d=r?await r.json().catch(()=>({})):{};
-     if((!r||!r.ok)&&user.emailVerified&&window.KINGBOT_FIREBASE?.syncAccount){
-      try{
-       await withTimeout(window.KINGBOT_FIREBASE.syncAccount(),3000);
-       r=await withTimeout(fetch(this.config.sessionEndpoint,{headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"}),3000).catch(()=>null);
-       d=r?await r.json().catch(()=>({})):{};
-       if(r?.ok)sessionStorage.removeItem("auth_sync_pending");
-      }catch(syncError){
-       console.warn("[KINGBOT SESSION] Backend account sync deferred:",syncError?.message||syncError);
-       sessionStorage.setItem("auth_sync_pending","1");
+   if(!fb){
+    state.authenticated=false;
+    state.user=null;
+   }else{
+    const user=window.KINGBOT_FIREBASE.auth.currentUser||fb;
+    if(!user){
+      state.authenticated=false;
+      state.user=null;
+    }else{
+      // Firebase is the source of truth for browser authentication.
+      // Do not block protected-page startup on Render/backend latency.
+      state.authenticated=true;
+      state.user={
+        id:user.uid,
+        email:user.email||"",
+        name:user.displayName||user.email||"KINGBOT User",
+        verified:user.emailVerified===true,
+        emailVerified:user.emailVerified===true
+      };
+
+      // Refresh backend account linkage opportunistically in the background.
+      if(user.emailVerified){
+        void (async()=>{
+          try{
+            const token=await user.getIdToken();
+            const response=await withTimeout(fetch(this.config.sessionEndpoint,{
+              headers:{Authorization:"Bearer "+token,Accept:"application/json"},
+              cache:"no-store"
+            }),2500);
+            if(response.ok){
+              const data=await response.json().catch(()=>({}));
+              if(data.authenticated&&data.user){
+                state.user={...state.user,...data.user,verified:true,emailVerified:true};
+              }
+            }else if(window.KINGBOT_FIREBASE?.syncAccount){
+              await withTimeout(window.KINGBOT_FIREBASE.syncAccount(),2500);
+            }
+          }catch(error){
+            console.warn("[KINGBOT SESSION] Background backend sync deferred:",error?.message||error);
+          }
+        })();
       }
-     }
-     if(r?.ok&&d.authenticated){state.authenticated=true;state.user=d.user||{id:user.uid,email:user.email,name:user.displayName,verified:user.emailVerified};}
-     else if(user.emailVerified){state.authenticated=true;state.user={id:user.uid,email:user.email,name:user.displayName,verified:true,emailVerified:true};}
-     else{state.authenticated=true;state.user={id:user.uid,email:user.email,name:user.displayName,verified:false,emailVerified:false};}
     }
    }
    state.checked=true;state.checkedAt=Date.now();return this.getState();
