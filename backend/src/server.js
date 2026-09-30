@@ -575,12 +575,13 @@ app.use((_req, res) => {
 });
 
 ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => partners.ensureSchema()).then(() => {
-app.listen(PORT, () => {
-  console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
-  void startWorker().then(() => {
-    console.log("[KINGBOT WORKER] embedded execution supervisor initialized");
-  }).catch(error => {
-    console.error("[KINGBOT WORKER] embedded startup failed:", error?.message || error);
+  app.listen(PORT, () => {
+    console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
+    void startWorker().then(() => {
+      console.log("[KINGBOT WORKER] embedded execution supervisor initialized");
+    }).catch(error => {
+      console.error("[KINGBOT WORKER] embedded startup failed:", error?.message || error);
+    });
   });
 }).catch((error) => {
   console.error("[KINGBOT] Startup initialization failed:", error?.message || error);
