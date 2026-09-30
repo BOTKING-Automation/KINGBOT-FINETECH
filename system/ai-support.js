@@ -402,7 +402,8 @@
       }
 
       const conversation = state.messages
-        .slice(-11)
+        .slice(0, -1)
+        .slice(-10)
         .map(item => ({
           role: item.role,
           content: String(item.content || "").slice(0, 4000)
@@ -412,6 +413,8 @@
         method: "POST",
         body: JSON.stringify({
           message: clean,
+          symbol: byId("symbolSelect")?.value || "",
+          timeframe: byId("timeframeSelect")?.value || "",
           history: conversation
         })
       });
@@ -505,8 +508,6 @@
     mobileToggle?.addEventListener("click", () => {
       nav?.classList.toggle("mobile-open");
     });
-
-    button?.addEventListener("click", () => runQuery(input?.value || ""));
 
     input?.addEventListener("keydown", event => {
       if (event.key === "Enter" && !event.shiftKey) {
