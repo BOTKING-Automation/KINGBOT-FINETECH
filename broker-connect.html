@@ -25,21 +25,65 @@ main{width:min(1500px,calc(100% - 32px));margin:auto;padding:30px 0 70px}.hero,.
 .security{margin-top:16px;border-radius:20px;padding:16px 18px;border-color:rgba(246,185,59,.1);background:linear-gradient(90deg,rgba(246,185,59,.035),rgba(25,230,255,.025),rgba(155,92,255,.03))}.security strong{font:900 9px Orbitron;color:var(--gold)}.security p{margin-top:6px;color:#68758d;font-size:8.5px;line-height:1.65}.links{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.links a{padding:7px 9px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);color:#93a0b9;font:700 7px "JetBrains Mono";text-decoration:none}
 .foot{margin-top:18px;color:#48546c;text-align:center;font:700 7px "JetBrains Mono";letter-spacing:.1em}
 @media(max-width:1050px){.layout{grid-template-columns:1fr}.broker-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.broker-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero{padding:24px}.panel{padding:17px}.fields{grid-template-columns:1fr}}@media(max-width:520px){main{width:min(100% - 18px,1500px)}.broker-grid{grid-template-columns:1fr}.hero h1{font-size:29px}.connect{align-items:flex-start;flex-direction:column}.submitrow{flex-direction:column;align-items:stretch}.primary,.secondary{width:100%}}
+
+/* INSTITUTIONAL CONNECTIVITY CONSOLE */
+body{background:
+ radial-gradient(circle at 12% 4%,rgba(25,230,255,.14),transparent 23%),
+ radial-gradient(circle at 88% 7%,rgba(255,79,216,.12),transparent 24%),
+ radial-gradient(circle at 72% 88%,rgba(246,185,59,.10),transparent 25%),
+ radial-gradient(circle at 28% 70%,rgba(35,247,163,.07),transparent 22%),#01030a}
+main{position:relative}
+main:after{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(180deg,transparent 0%,rgba(25,230,255,.018) 48%,transparent 100%);animation:screenPulse 7s ease-in-out infinite}
+@keyframes screenPulse{0%,100%{opacity:.35}50%{opacity:1}}
+.hero{min-height:365px;border-color:rgba(25,230,255,.16);box-shadow:0 0 0 1px rgba(155,92,255,.04),0 0 60px rgba(25,230,255,.07),0 35px 110px rgba(0,0,0,.58)}
+.hero:after{content:"";position:absolute;left:-10%;right:-10%;bottom:48px;height:1px;background:linear-gradient(90deg,transparent,#19e6ff 15%,#4787ff 32%,#9b5cff 50%,#ff4fd8 68%,#f6b93b 85%,transparent);box-shadow:0 0 12px #19e6ff,0 0 28px rgba(155,92,255,.75);animation:scanRail 4.5s linear infinite}
+@keyframes scanRail{0%{transform:translateX(-4%);opacity:.35}50%{transform:translateX(4%);opacity:1}100%{transform:translateX(-4%);opacity:.35}}
+.network-stage{position:absolute;right:22px;top:26px;width:min(48%,620px);height:250px;pointer-events:none;opacity:.95}
+.network-stage svg{width:100%;height:100%;overflow:visible}
+.net-grid{stroke:rgba(25,230,255,.13);stroke-width:1;fill:none}
+.net-line{fill:none;stroke:url(#kbGrad);stroke-width:2.2;stroke-linecap:round;stroke-dasharray:8 12;animation:netFlow 3s linear infinite;filter:url(#glow)}
+.net-line.p2{animation-duration:4.7s;animation-delay:-1.7s}.net-line.p3{animation-duration:3.9s;animation-delay:-.8s}
+@keyframes netFlow{to{stroke-dashoffset:-240}}
+.net-node{fill:#050b18;stroke:#19e6ff;stroke-width:1.6;filter:url(#glow)}.net-node.g{stroke:#23f7a3}.net-node.v{stroke:#9b5cff}.net-node.p{stroke:#ff4fd8}.net-node.gold{stroke:#f6b93b}
+.net-pulse{fill:none;stroke:#19e6ff;stroke-width:1.5;opacity:.6;animation:nodePulse 2s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes nodePulse{0%{transform:scale(.7);opacity:.8}100%{transform:scale(2.1);opacity:0}}
+.hero-copy{position:relative;z-index:2;max-width:54%}
+.platform-kicker{display:flex;align-items:center;gap:8px;margin-bottom:11px;color:#687792;font:800 8px "JetBrains Mono";letter-spacing:.14em}.platform-kicker i{width:6px;height:6px;border-radius:50%;background:#23f7a3;box-shadow:0 0 14px #23f7a3}
+.signal-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:20px;max-width:830px}.signal-box{padding:10px 11px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.012));position:relative;overflow:hidden}.signal-box:before{content:"";position:absolute;left:-40%;top:0;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(25,230,255,.11),transparent);animation:dataSweep 3.8s linear infinite}.signal-box:nth-child(2):before{animation-delay:-1s}.signal-box:nth-child(3):before{animation-delay:-2s}.signal-box:nth-child(4):before{animation-delay:-3s}@keyframes dataSweep{to{left:110%}}.signal-box span{display:block;color:#5b6882;font:700 7px "JetBrains Mono";letter-spacing:.09em}.signal-box b{display:block;margin-top:5px;color:#dce6ff;font:800 9px Orbitron}
+.broker{min-height:245px}.broker:after{content:"";position:absolute;top:0;bottom:0;width:2px;left:0;background:linear-gradient(180deg,transparent,var(--c1),transparent);box-shadow:0 0 14px var(--c1);opacity:.75;animation:sideTrace 2.8s ease-in-out infinite}@keyframes sideTrace{0%,100%{transform:translateY(-18%);opacity:.2}50%{transform:translateY(18%);opacity:1}}
+.logo{width:58px;height:58px;padding:8px;background:linear-gradient(145deg,#070c19,#02050d);box-shadow:0 0 22px rgba(25,230,255,.08),inset 0 0 24px rgba(255,255,255,.03)}.logo img{width:100%;height:100%;object-fit:contain;border-radius:7px;filter:drop-shadow(0 0 7px rgba(255,255,255,.18))}
+.broker-meta{display:flex;align-items:center;gap:7px;margin-top:9px}.broker-meta .signal{width:6px;height:6px;border-radius:50%;background:#23f7a3;box-shadow:0 0 10px #23f7a3}.broker-meta span{font:700 7px "JetBrains Mono";color:#6f7d96;letter-spacing:.08em}
+.broker h3{font-size:15px}.broker p{min-height:47px}
+.tag{backdrop-filter:blur(8px)}
+.connect button{position:relative;overflow:hidden}.connect button:after{content:"";position:absolute;top:0;left:-120%;width:80%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-20deg);animation:buttonSweep 3.5s linear infinite}@keyframes buttonSweep{to{left:145%}}
+.connection-card{box-shadow:0 0 0 1px rgba(25,230,255,.035),0 0 35px rgba(25,230,255,.055);border-color:rgba(25,230,255,.18)}
+.connection-card:before{content:"";position:absolute;inset:0;background:linear-gradient(115deg,rgba(25,230,255,.035),transparent 28%,rgba(155,92,255,.035) 56%,transparent 76%,rgba(246,185,59,.03));pointer-events:none}
+.step{transition:.2s;min-height:84px}.step:hover{transform:translateX(3px);border-color:rgba(25,230,255,.18);box-shadow:0 0 25px rgba(25,230,255,.06)}
+.security{border-color:rgba(25,230,255,.13)}.security:after{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,transparent);box-shadow:0 0 12px rgba(25,230,255,.5);animation:rail 5s linear infinite}@keyframes rail{0%,100%{opacity:.35;transform:scaleX(.8)}50%{opacity:1;transform:scaleX(1)}}
+@media(max-width:900px){.network-stage{position:relative;right:auto;top:auto;width:100%;height:190px;margin-top:20px}.hero-copy{max-width:100%}.hero{min-height:auto}.signal-strip{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.network-stage{height:155px}.signal-strip{grid-template-columns:1fr}.broker{min-height:0}}
+
 </style>
 </head>
 <body>
 <main>
-<section class="hero">
-  <div class="eyebrow">BROKER CONNECTIVITY · EXECUTION GATEWAY</div>
-  <h1>Connect your broker to the <span>KINGBOT engine.</span></h1>
-  <p>Select your broker, use the broker's official account/API authorization path, then provide only the API credential the broker requires. KINGBOT sends that credential to the secure backend gateway for validation; it is not stored in browser localStorage or Firestore.</p>
-  <div class="statusbar">
-    <div class="status online">● FIREBASE SESSION VERIFIED</div>
-    <div class="status secure">● SERVER-SIDE CREDENTIAL GATE</div>
-    <div class="status">● REAL-TIME ACCOUNT MONITORING</div>
-    <div class="status">● BOT EXECUTION GATE</div>
-  </div>
-</section>
+<section class="hero"><div class="platform-kicker"><i></i> GLOBAL BROKER ROUTING FABRIC · LIVE TELEMETRY READY</div>
+<div class="hero-copy">
+<div class="eyebrow">BROKER CONNECTIVITY · EXECUTION GATEWAY</div>
+<h1>Route capital through the <span>KINGBOT execution fabric.</span></h1>
+<p>One control plane for broker authorization, encrypted credentials, account telemetry and bot execution. Users authenticate on the broker's own domain; KINGBOT then verifies the approved connection through the secure server gateway.</p>
+<div class="statusbar"><div class="status online">● SESSION VERIFIED</div><div class="status secure">● ENCRYPTED CREDENTIAL VAULT</div><div class="status">● REAL-TIME TELEMETRY</div><div class="status">● EXECUTION GATE</div></div>
+<div class="signal-strip"><div class="signal-box"><span>AUTH FABRIC</span><b>FIREBASE → GATE</b></div><div class="signal-box"><span>SECURE VAULT</span><b>AES-256-GCM</b></div><div class="signal-box"><span>EXECUTION</span><b>MT4 / MT5 BRIDGE</b></div><div class="signal-box"><span>MONITORING</span><b>ACCOUNT · P/L · ORDERS</b></div></div>
+</div>
+<div class="network-stage" aria-hidden="true">
+<svg viewBox="0 0 620 250" preserveAspectRatio="xMidYMid meet">
+<defs><linearGradient id="kbGrad" x1="0" x2="1"><stop offset="0" stop-color="#19e6ff"/><stop offset=".33" stop-color="#4787ff"/><stop offset=".62" stop-color="#9b5cff"/><stop offset=".82" stop-color="#ff4fd8"/><stop offset="1" stop-color="#f6b93b"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<path class="net-grid" d="M40 35H580M20 125H600M55 215H565M105 10V240M310 8V242M515 10V240"/>
+<path class="net-line" d="M70 190C145 185 155 90 245 93S360 165 430 135S515 56 575 62"/><path class="net-line p2" d="M40 125C125 125 150 42 220 44S330 100 390 95S465 180 575 170"/><path class="net-line p3" d="M85 55C155 70 175 180 270 177S395 55 470 72S535 122 590 122"/>
+<circle class="net-node" cx="70" cy="190" r="7"/><circle class="net-pulse" cx="70" cy="190" r="7"/>
+<circle class="net-node v" cx="245" cy="93" r="7"/><circle class="net-node p" cx="430" cy="135" r="7"/><circle class="net-node gold" cx="575" cy="62" r="7"/>
+<circle class="net-node g" cx="390" cy="95" r="7"/><circle class="net-node" cx="575" cy="170" r="7"/>
+</svg></div></section>
 
 <div class="layout">
 <section class="panel">
@@ -47,37 +91,37 @@ main{width:min(1500px,calc(100% - 32px));margin:auto;padding:30px 0 70px}.hero,.
   <div class="desc">Choose a connector based on the broker's documented API capabilities, account eligibility, and the market instruments you trade.</div>
   <div class="broker-grid" id="brokerGrid">
     <article class="broker oanda" data-broker="oanda">
-      <div class="broker-head"><div class="logo">OA</div><span class="tag live">REST API</span></div>
+      <div class="broker-head"><div class="logo"><img src="https://mma.prnewswire.com/media/1581985/OANDA_colour_logo_Logo.jpg?p=facebook" alt="OANDA"></div><span class="tag live">REST API</span></div>
       <h3>OANDA</h3><p>v20 API supports live account access, market data, and programmatic order placement.</p>
       <div class="caps"><span class="cap">FOREX</span><span class="cap">METALS</span><span class="cap">ORDERS</span><span class="cap">STREAMING</span></div>
       <div class="connect"><button type="button" data-connect="oanda">ROADMAP</button><a href="https://developer.oanda.com/rest-live-v20/introduction/" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
     <article class="broker deriv" data-broker="deriv">
-      <div class="broker-head"><div class="logo">DV</div><span class="tag live">OAUTH / PAT</span></div>
+      <div class="broker-head"><div class="logo"><img src="https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg" alt="Deriv"></div><span class="tag live">OAUTH / PAT</span></div>
       <h3>DERIV</h3><p>Deriv supports OAuth 2.0 or personal access tokens, with real-time trading and monitoring over WebSocket.</p>
       <div class="caps"><span class="cap">OPTIONS</span><span class="cap">WEBSOCKET</span><span class="cap">REAL-TIME</span><span class="cap">BOT READY</span></div>
       <div class="connect"><button type="button" data-connect="deriv">ROADMAP</button><a href="https://developers.deriv.com/docs/intro/authentication/" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
     <article class="broker ig" data-broker="ig">
-      <div class="broker-head"><div class="logo">IG</div><span class="tag live">REST / STREAM</span></div>
+      <div class="broker-head"><div class="logo"><img src="https://cdn.sanity.io/images/k8qzcdw3/prod1503/8cd8307f715b88868cd45fa7fbeebbcec5dc2f64-1920x1080.png?w=1200" alt="IG"></div><span class="tag live">REST / STREAM</span></div>
       <h3>IG</h3><p>IG Labs exposes REST trading and streaming APIs with API-key authentication and order endpoints.</p>
       <div class="caps"><span class="cap">FOREX</span><span class="cap">CFDs</span><span class="cap">COMMODITIES</span><span class="cap">STREAMING</span></div>
       <div class="connect"><button type="button" data-connect="ig">CONNECT</button><a href="https://labs.ig.com/rest-trading-api-guide.html" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
     <article class="broker fxcm" data-broker="fxcm">
-      <div class="broker-head"><div class="logo">FX</div><span class="tag live">FIX / REST</span></div>
+      <div class="broker-head"><div class="logo"><img src="https://fxcmpy.tpq.io/_static/fxcm_logo_bg.png" alt="FXCM"></div><span class="tag live">FIX / REST</span></div>
       <h3>FXCM</h3><p>FXCM provides FIX, Java, ForexConnect and current API authentication options for automated trading.</p>
       <div class="caps"><span class="cap">FOREX</span><span class="cap">FIX</span><span class="cap">JAVA</span><span class="cap">AUTOMATION</span></div>
       <div class="connect"><button type="button" data-connect="fxcm">CONNECT</button><a href="https://www.fxcm.com/eu/algorithmic-trading/api-trading/" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
     <article class="broker exness" data-broker="exness">
-      <div class="broker-head"><div class="logo">EX</div><span class="tag regional">ELIGIBILITY</span></div>
+      <div class="broker-head"><div class="logo"><img src="https://www.forextradinghunters.com/wp-content/uploads/2022/12/Vertical_Exness_Logo_Black.jpg" alt="Exness"></div><span class="tag regional">ELIGIBILITY</span></div>
       <h3>EXNESS</h3><p>Exness currently documents a Public Trader API with signed requests, account data, trading operations and live streams; availability can depend on client region/account eligibility.</p>
       <div class="caps"><span class="cap">FOREX</span><span class="cap">XAUUSD</span><span class="cap">REST</span><span class="cap">WEBSOCKET</span></div>
       <div class="connect"><button type="button" data-connect="exness">CONNECT</button><a href="https://www.exness-api.com/" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
     <article class="broker ibkr" data-broker="ibkr">
-      <div class="broker-head"><div class="logo">IB</div><span class="tag">OAUTH</span></div>
+      <div class="broker-head"><div class="logo"><img src="https://rankia.com.br/_next/image/?q=100&url=https%3A%2F%2Frankia.com.br%2Fapp%2Fuploads%2F2024%2F09%2Finteractivebrokers_logo_corretora.webp&w=768" alt="Interactive Brokers"></div><span class="tag">OAUTH</span></div>
       <h3>INTERACTIVE BROKERS</h3><p>IBKR Web API supports OAuth-based connectivity and authenticated trading/account requests, subject to its application onboarding model.</p>
       <div class="caps"><span class="cap">MULTI-ASSET</span><span class="cap">TRADING API</span><span class="cap">OAUTH</span><span class="cap">PORTFOLIO</span></div>
       <div class="connect"><button type="button" data-connect="ibkr">ROADMAP</button><a href="https://www.interactivebrokers.com/docs/web-api/introduction" target="_blank" rel="noopener">API DOCS ↗</a></div>
