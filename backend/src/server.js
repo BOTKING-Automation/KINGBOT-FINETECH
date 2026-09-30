@@ -12,6 +12,7 @@ import { createBotEngineRouter, ensureBotEngineSchema } from "./bot-engines.js";
 import { UserBrokerManager } from "./user-broker-manager.js";
 import { PartnerManager } from "./partner-manager.js";
 import { requireUser } from "./subscriptions.js";
+import { isAdminEmail } from "./admin-access.js";
 import { createBotRuntimeRouter, ensureBotRuntimeSchema } from "./bot-runtime.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -407,15 +408,17 @@ app.post("/api/ai/query", aiLimiter, async (req, res) => {
   const aiUser = await requireUser(pool, req, res);
   if (!aiUser) return;
 
-  const aiAccess = await pool.query(
-    "SELECT plan_id FROM kingbot_subscriptions WHERE user_id=$1 AND status='active' AND (expires_at IS NULL OR expires_at>NOW()) AND plan_id IN ('pro','institutional') ORDER BY expires_at DESC NULLS LAST LIMIT 1",
-    [aiUser.id]
-  );
-  if (!aiAccess.rowCount) {
-    return res.status(403).json({
-      ok:false,
-      error:"KINGBOT Intelligence requires an active Pro Trader Bot or Institutional OS subscription."
-    });
+  if (!isAdminEmail(aiUser.email)) {
+    const aiAccess = await pool.query(
+      "SELECT plan_id FROM kingbot_subscriptions WHERE user_id=$1 AND status='active' AND (expires_at IS NULL OR expires_at>NOW()) AND plan_id IN ('pro','institutional') ORDER BY expires_at DESC NULLS LAST LIMIT 1",
+      [aiUser.id]
+    );
+    if (!aiAccess.rowCount) {
+      return res.status(403).json({
+        ok:false,
+        error:"KINGBOT Intelligence requires an active Pro Trader Bot or Institutional OS subscription."
+      });
+    }
   }
   const message = typeof req.body?.message === "string"
     ? req.body.message.trim()
