@@ -338,7 +338,8 @@ async function trackExnessPartner(){
 }
 async function firebaseToken(){
   if(!window.KINGBOT_FIREBASE)await import("./system/firebase-auth.js");
-  const u=window.KINGBOT_FIREBASE?.auth?.currentUser;
+  const fb=window.KINGBOT_FIREBASE;
+  const u=await fb.waitForAuthReady(10000).catch(()=>fb?.auth?.currentUser||null);
   if(!u)throw new Error("Please sign in to KINGBOT first.");
   if(!u.emailVerified)throw new Error("Verify your email before connecting a broker.");
   return u.getIdToken(true);
