@@ -1219,7 +1219,7 @@ overscroll-behavior:none;}
 
     <div class="hero-badges">
       <div class="hero-badge public">● PUBLIC MARKET DATA ACTIVE</div>
-      <div class="hero-badge offline">● BROKER ACCOUNT NOT CONNECTED</div>
+      <div class="hero-badge offline" id="heroBrokerBadge">● BROKER ACCOUNT NOT CONNECTED</div>
       <div class="hero-badge">◆ 5 BOT SYSTEMS</div>
       <div class="hero-badge">◆ RISK ENGINE READY</div>
       <div class="hero-badge">◆ API BACKEND READY</div>
@@ -1241,44 +1241,30 @@ overscroll-behavior:none;}
       <div class="section-tag mono">BROKER_LAYER / ACCOUNT</div>
     </div>
 
+    <div id="accountIdentity" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:0 0 12px;padding:12px;border:1px solid rgba(25,230,255,.12);border-radius:18px;background:linear-gradient(110deg,rgba(25,230,255,.035),rgba(155,92,255,.045),rgba(255,200,74,.035));box-shadow:0 15px 45px rgba(0,0,0,.18)">
+      <div><div class="metric-label">Broker</div><div class="metric-note" id="accountBroker">NOT CONNECTED</div></div>
+      <div><div class="metric-label">Account ID</div><div class="metric-note" id="accountIdDisplay">—</div></div>
+      <div><div class="metric-label">Account Type</div><div class="metric-note" id="accountType">—</div></div>
+      <div><div class="metric-label">Currency</div><div class="metric-note" id="accountCurrency">—</div></div>
+      <div><div class="metric-label">Execution</div><div class="metric-note" id="accountMode">—</div></div>
+      <div><div class="metric-label">Trading</div><div class="metric-note" id="accountTradingStatus">—</div></div>
+    </div>
+
     <div class="cards">
-
-      <div class="card metric">
-        <div class="metric-label">Balance</div>
-        <div class="metric-value gold" id="accountBalance">—</div>
-        <div class="metric-note">Awaiting broker</div>
-      </div>
-
-      <div class="card metric">
-        <div class="metric-label">Equity</div>
-        <div class="metric-value cyan" id="accountEquity">—</div>
-        <div class="metric-note">Awaiting broker</div>
-      </div>
-
-      <div class="card metric">
-        <div class="metric-label">Free Margin</div>
-        <div class="metric-value" id="freeMargin">—</div>
-        <div class="metric-note">Awaiting broker</div>
-      </div>
-
-      <div class="card metric">
-        <div class="metric-label">Daily P&L</div>
-        <div class="metric-value green" id="dailyPnl">—</div>
-        <div class="metric-note">No fabricated values</div>
-      </div>
-
-      <div class="card metric">
-        <div class="metric-label">Drawdown</div>
-        <div class="metric-value red" id="drawdown">—</div>
-        <div class="metric-note">Risk engine awaiting data</div>
-      </div>
-
-      <div class="card metric">
-        <div class="metric-label">Open Positions</div>
-        <div class="metric-value" id="positionCount">0</div>
-        <div class="metric-note">Broker positions only</div>
-      </div>
-
+      <div class="card metric"><div class="metric-label">Balance</div><div class="metric-value gold" id="accountBalance">—</div><div class="metric-note">Broker authoritative</div></div>
+      <div class="card metric"><div class="metric-label">Equity</div><div class="metric-value cyan" id="accountEquity">—</div><div class="metric-note">Broker authoritative</div></div>
+      <div class="card metric"><div class="metric-label">Floating P&L</div><div class="metric-value" id="floatingPnl">—</div><div class="metric-note">Equity − balance</div></div>
+      <div class="card metric"><div class="metric-label">Realized P&L</div><div class="metric-value" id="realizedPnl">—</div><div class="metric-note">Current trading day</div></div>
+      <div class="card metric"><div class="metric-label">Day P&L</div><div class="metric-value green" id="dailyPnl">—</div><div class="metric-note">KINGBOT day baseline</div></div>
+      <div class="card metric"><div class="metric-label">Margin Used</div><div class="metric-value" id="accountMargin">—</div><div class="metric-note">Broker supplied</div></div>
+      <div class="card metric"><div class="metric-label">Free Margin</div><div class="metric-value" id="freeMargin">—</div><div class="metric-note">Broker supplied</div></div>
+      <div class="card metric"><div class="metric-label">Margin Level</div><div class="metric-value" id="marginLevel">—</div><div class="metric-note">Percentage</div></div>
+      <div class="card metric"><div class="metric-label">Daily Drawdown</div><div class="metric-value red" id="dailyDrawdown">—</div><div class="metric-note">From day baseline</div></div>
+      <div class="card metric"><div class="metric-label">Total Drawdown</div><div class="metric-value red" id="drawdown">—</div><div class="metric-note">From equity peak</div></div>
+      <div class="card metric"><div class="metric-label">Open Positions</div><div class="metric-value" id="positionCount">0</div><div class="metric-note">Broker positions</div></div>
+      <div class="card metric"><div class="metric-label">Open Orders</div><div class="metric-value" id="orderCount">0</div><div class="metric-note">Broker orders</div></div>
+      <div class="card metric"><div class="metric-label">Leverage</div><div class="metric-value" id="accountLeverage">—</div><div class="metric-note">When broker supplies</div></div>
+      <div class="card metric"><div class="metric-label">Last Sync</div><div class="metric-value" id="accountSync" style="font-size:12px">—</div><div class="metric-note" id="accountTelemetryState">Awaiting broker</div></div>
     </div>
 
   </section>
@@ -2855,30 +2841,69 @@ $("disconnectBroker").addEventListener(
    ACCOUNT
 ========================================================= */
 
-async function loadAccount() {
-
-  const data =
-    await fetchApi("/api/account");
-
-  if (!data) return;
-
-  const account = data.data || data;
-
-  $("accountBalance").textContent =
-    account.balance ?? "—";
-
-  $("accountEquity").textContent =
-    account.equity ?? "—";
-
-  $("freeMargin").textContent =
-    account.freeMargin ?? "—";
-
-  $("dailyPnl").textContent =
-    account.dailyPnl ?? "—";
-
-  $("drawdown").textContent =
-    account.drawdown ?? "—";
+function formatMoney(value,currency){
+  const n=Number(value);
+  if(!Number.isFinite(n))return "—";
+  return (currency ? currency+" " : "")+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 }
+function formatPct(value){
+  const n=Number(value);
+  return Number.isFinite(n) ? n.toFixed(2)+"%" : "—";
+}
+function formatSignedMoney(value,currency){
+  const n=Number(value);
+  if(!Number.isFinite(n))return "—";
+  return (n>0?"+":"")+formatMoney(n,currency);
+}
+function renderPnl(id,value,currency){
+  const el=$(id);
+  if(!el)return;
+  el.textContent=formatSignedMoney(value,currency);
+  el.style.color=Number(value)>0?"#23f7a3":Number(value)<0?"#ff4d6d":"#dfe7ff";
+}
+function renderAccountOverview(account){
+  const currency=account.currency||"";
+  $("accountBroker").textContent=String(account.broker||"—").toUpperCase();
+  $("accountIdDisplay").textContent=account.accountId||"—";
+  $("accountType").textContent=String(account.accountType||"—").toUpperCase();
+  $("accountCurrency").textContent=currency||"—";
+  $("accountMode").textContent=String(account.executionMode||"—").toUpperCase();
+  $("accountTradingStatus").textContent=account.tradingEnabled?"ENABLED":"DISABLED";
+  $("accountTradingStatus").style.color=account.tradingEnabled?"#23f7a3":"#ff4d6d";
+
+  $("accountBalance").textContent=formatMoney(account.balance,currency);
+  $("accountEquity").textContent=formatMoney(account.equity,currency);
+  renderPnl("floatingPnl",account.floatingPnl,currency);
+  renderPnl("realizedPnl",account.realizedPnl,currency);
+  renderPnl("dailyPnl",account.dailyPnl,currency);
+  $("accountMargin").textContent=formatMoney(account.margin,currency);
+  $("freeMargin").textContent=formatMoney(account.freeMargin,currency);
+  $("marginLevel").textContent=formatPct(account.marginLevel);
+  $("dailyDrawdown").textContent=formatPct(account.dailyDrawdownPct);
+  $("drawdown").textContent=formatPct(account.totalDrawdownPct);
+  $("positionCount").textContent=Number.isFinite(Number(account.positionCount))?String(account.positionCount):"—";
+  $("orderCount").textContent=Number.isFinite(Number(account.orderCount))?String(account.orderCount):"—";
+  $("accountLeverage").textContent=Number.isFinite(Number(account.leverage))?"1:"+Number(account.leverage).toFixed(0):"—";
+
+  if(account.syncedAt){
+    $("accountSync").textContent=new Date(account.syncedAt).toLocaleTimeString([], {hour12:false});
+  }
+  const telemetry=account.telemetry||{};
+  $("accountTelemetryState").textContent=telemetry.positions&&telemetry.orders&&telemetry.trades?"LIVE / COMPLETE":"LIVE / PARTIAL";
+
+  const badge=$("heroBrokerBadge");
+  if(badge){
+    badge.textContent="● "+String(account.broker||"BROKER").toUpperCase()+" / "+String(account.accountType||"ACCOUNT").toUpperCase()+" CONNECTED";
+    badge.className="hero-badge public";
+  }
+}
+async function loadAccount(){
+  const data=await fetchApi("/api/account");
+  if(!data)return;
+  const account=data.account||data.data||data;
+  renderAccountOverview(account);
+}
+
 
 /* =========================================================
    POSITIONS
@@ -3180,7 +3205,16 @@ document.querySelectorAll("[data-runtime-action]").forEach(btn=>{
 
   connectMarketSocket();
 
-  checkBackend();
+  await checkBackend();
+
+  clearInterval(window.__KINGBOT_ACCOUNT_REFRESH);
+  window.__KINGBOT_ACCOUNT_REFRESH=setInterval(async()=>{
+    if(backendConnected){
+      try{await loadAccount();}catch{}
+      try{await loadPositions();}catch{}
+      try{await loadOrders();}catch{}
+    }
+  },5000);
 
 })();
 </script>
