@@ -407,7 +407,10 @@ No fake trading permissions.
           "platform",
 
         "subscription.html":
-          "billing"
+          "billing",
+
+        "partner-revenue.html":
+          "admin"
 
       };
 
