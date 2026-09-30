@@ -67,7 +67,10 @@ function start(){
         return;
       }
 
-      const state=await session.check({force:true});
+      const state=await Promise.race([
+        session.check({force:true}),
+        new Promise(resolve=>window.setTimeout(()=>resolve(null),5000))
+      ]);
 
       if(state?.authenticated && state?.user?.verified){
         return;
@@ -146,7 +149,7 @@ function start(){
   frame.title="KINGBOT FINTECH neural startup";
   frame.setAttribute("aria-label","KINGBOT FINTECH neural startup");
   const isAdminEntry=/\/admin-entry\.html$/i.test(window.location.pathname);
-  frame.src="loader.html?embed=1&duration=3200&surface="+(isAdminEntry?"admin":"home")+"&v=5";
+  frame.src="loader.html?embed=1&duration=3000&surface="+(isAdminEntry?"admin":"home")+"&v=6";
   document.body.appendChild(frame);
 
   let finished=false;
@@ -198,7 +201,7 @@ function start(){
     Home must still reach secure access rather than remain covered.
   */
   const isAdminEntry=/\/admin-entry\.html$/i.test(window.location.pathname);
-  const releaseMs=isAdminEntry?3200:11000;
+  const releaseMs=isAdminEntry?4200:5200;
   window.setTimeout(finish,releaseMs);
 }
 if(document.readyState==="loading"){
