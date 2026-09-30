@@ -63,7 +63,17 @@ const session={
       resolve(u||null);
     };
     try{
-      unsub=fbAuthChange(finish);
+      unsub=fbAuthChange((u)=>{
+        if(u) finish(u);
+        else{
+          // Firebase may briefly report null while restoring persisted auth
+          // after an external OAuth redirect. Give persistence a short window
+          // before treating the user as signed out.
+          setTimeout(()=>{
+            if(!done) finish(window.KINGBOT_FIREBASE?.auth?.currentUser||null);
+          },1800);
+        }
+      });
       const current=window.KINGBOT_FIREBASE?.auth?.currentUser;
       if(current) finish(current);
       setTimeout(()=>{
