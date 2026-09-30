@@ -430,46 +430,6 @@
       }
     });
 
-    async function checkAdminAccess(){
-      try{
-        if(!window.KINGBOT_SESSION?.isAuthenticated?.()) return false;
-        if(!window.KINGBOT_API?.request) return false;
-        const response=await window.KINGBOT_API.request("/subscription/admin/overview",{cache:"no-store"});
-        if(!response.ok)return false;
-        const data=await response.json().catch(()=>({}));
-        return data.ok===true;
-      }catch{return false}
-    }
-
-    async function syncAdminLink(){
-      const link=root.querySelector("[data-kb-admin-link]");
-      if(!link)return;
-      link.hidden=true;
-      if(await checkAdminAccess()) link.hidden=false;
-    }
-
-    async function syncAuthUI(detail){
-      const authenticated = detail?.authenticated === true ||
-        window.KINGBOT_SESSION?.isAuthenticated?.() === true;
-
-      const accountNode=root.querySelector(".kb-menu-account");
-      if(accountNode){
-        const activeLinks=authenticated ? authenticatedAccountLinks : guestAccountLinks;
-        accountNode.innerHTML=activeLinks.map(([href,name,action])=>{
-          if(action==="logout") return '<a href="#" data-kb-logout>'+name+'</a>';
-          return '<a href="'+href+'"'+(action==="admin"?' data-kb-admin-link hidden':'')+'>'+name+'</a>';
-        }).join("");
-        accountNode.querySelectorAll("a").forEach(a=>a.addEventListener("click",close));
-        accountNode.querySelector("[data-kb-logout]")?.addEventListener("click",async event=>{
-          event.preventDefault();
-          close();
-          const logout=window.KINGBOT_SESSION?.logout;
-          if(logout) await logout({redirect:true});
-          else window.location.replace("access-stable.html");
-        });
-        if(authenticated) syncAdminLink();
-      }
-
       const state=root.querySelector(".kb-menu-state");
       if(state){
         state.innerHTML=authenticated
