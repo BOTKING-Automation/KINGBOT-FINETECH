@@ -305,7 +305,7 @@ function textFor(){
     }
   }else $("credentials").classList.remove("show");
   if(step===3)$("accountSelect").classList.add("show");else $("accountSelect").classList.remove("show");
-  $("flowStatus").textContent=step===1?"Waiting for broker account confirmation.":step===2?(selected==="exness"?"Create or manage the Exness API key in Key Management, then return with the issued credentials.":(native?"Native API authorization is selected for this broker.":"Bridge credential entry is ready.")):(step===3?"Choose one account to continue.":"Account authorization is ready.");
+  if(selected!=="deriv")$("flowStatus").textContent=step===1?"Waiting for broker account confirmation.":step===2?(selected==="exness"?"Create or manage the Exness API key in Key Management, then return with the issued credentials.":(native?"Native API authorization is selected for this broker.":"Bridge credential entry is ready.")):(step===3?"Choose one account to continue.":"Account authorization is ready.");
 }
 function selectBroker(slug){
   const card=document.querySelector('.broker[data-broker="'+slug+'"]');
