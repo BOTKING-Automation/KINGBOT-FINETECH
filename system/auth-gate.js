@@ -64,8 +64,25 @@ IMPORTANT:
 
     getPageName() {
 
+      const pathname =
+        window.location.pathname || "/";
+
+      /*
+      GitHub Pages and normal static hosts serve index.html
+      when the user opens the site directory itself.
+      Normalize that directory URL to index.html so the
+      landing page cannot bypass the authentication gate.
+      */
+
+      if (
+        pathname === "/" ||
+        pathname.endsWith("/")
+      ) {
+        return "index.html";
+      }
+
       const path =
-        window.location.pathname
+        pathname
           .split("/")
           .filter(Boolean)
           .pop();
