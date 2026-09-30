@@ -799,9 +799,14 @@
                   </div>
 
                   <div>
-                    <label for="payerPhone">Payer phone (optional)</label>
-                    <input id="payerPhone" maxlength="25" autocomplete="tel" placeholder="+254...">
+                    <label for="payerPhone">M-Pesa phone number</label>
+                    <input id="payerPhone" maxlength="16" autocomplete="tel" inputmode="tel" placeholder="+254712345678" required>
                   </div>
+                </div>
+
+                <div>
+                  <label for="payerName">M-Pesa account name</label>
+                  <input id="payerName" maxlength="120" autocomplete="name" placeholder="Name exactly as shown on the M-Pesa payment" required>
                 </div>
 
                 <button class="submit" id="submitButton" type="submit">
@@ -1176,6 +1181,7 @@
       const amountKes=Number(document.getElementById("amountKes").value);
       const mpesaCode=document.getElementById("mpesaCode").value.trim();
       const payerPhone=document.getElementById("payerPhone").value.trim();
+      const payerName=document.getElementById("payerName").value.trim();
       const selectedBotId=selectedPlan.key==="starter" ? document.getElementById("basicBotId").value : null;
 
       if(!Number.isFinite(amountKes)||amountKes<=0){
@@ -1185,6 +1191,16 @@
 
       if(!mpesaCode){
         status.textContent="Enter the M-Pesa transaction code.";
+        return;
+      }
+
+      if(!payerPhone){
+        status.textContent="Enter the M-Pesa phone number used for payment.";
+        return;
+      }
+
+      if(!payerName){
+        status.textContent="Enter the M-Pesa account name used for payment.";
         return;
       }
 
@@ -1201,6 +1217,7 @@
             amountKes,
             mpesaCode,
             payerPhone,
+            payerName,
             selectedBotId
           })
         });
