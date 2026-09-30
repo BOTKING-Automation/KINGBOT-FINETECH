@@ -132,7 +132,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
         </div>
       </article>
 
-      <article class="broker deriv" data-broker="deriv" data-mode="oauth" data-cap-demo="yes" data-cap-live="yes" data-native="build" data-search="deriv oauth websocket trading demo real">
+      <article class="broker deriv" data-broker="deriv" data-mode="oauth" data-cap-demo="yes" data-cap-live="yes" data-native="yes" data-search="deriv oauth websocket trading demo real">
         <div class="broker-inner">
           <div class="broker-top"><div class="brand"><div class="logo"><img src="https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg" alt="Deriv"></div><div><div class="broker-name">DERIV</div><div class="broker-code">OAUTH · WEBSOCKET API</div></div></div><span class="availability live">OAUTH</span></div>
           <div class="broker-copy">Deriv documents OAuth 2.0 with delegated trading scopes for web applications and secure browser redirects.</div>
@@ -284,9 +284,19 @@ function textFor(){
   }[step];
   $("flowCopy").innerHTML="<strong>"+copy[0]+"</strong><br>"+copy[1];
   $("brokerLogin").textContent=step===1?"OPEN "+d.name+" ↗":step===2?"OPEN API ACCESS ↗":"OPEN "+d.name+" ↗";
-  $("brokerLogin").href=step===1?(selected==="exness" && partnerOpened ? $("brokerLogin").href : d.login):d.api;
-  $("nextStep").style.display=(step<2||(!verified&&step===2&&d.native&&!['oanda'].includes(selected)))?"inline-flex":"none";
-  if(step===2 && (!d.native || selected==='oanda')){
+  if(selected==="deriv"){
+    $("brokerLogin").textContent="CONTINUE WITH DERIV ↗";
+    $("brokerLogin").href="#";
+    $("nextStep").style.display="none";
+  }else{
+    $("brokerLogin").href=step===1?(selected==="exness" && partnerOpened ? $("brokerLogin").href : d.login):d.api;
+  }
+  if(selected!=="deriv")$("nextStep").style.display=(step<2||(!verified&&step===2&&d.native&&!["oanda"].includes(selected)))?"inline-flex":"none";
+  if(selected==="deriv"){
+    $("credentials").classList.remove("show");
+    $("verifyBtn").style.display="none";
+    $("flowStatus").textContent="Deriv uses secure OAuth 2.0. KINGBOT will redirect you to Deriv for sign-in and consent, then return here after verification.";
+  }else if(step===2 && (!d.native || selected==='oanda')){
     $("credentials").classList.add("show");
     if(selected==="exness"){
       $("credentialHelp").textContent="Create the Exness API key in Key Management, select the trading account that this key can access, copy the API key and secret once, and paste them here. The host is optional because KINGBOT can resolve the Exness access point.";
@@ -304,12 +314,12 @@ function selectBroker(slug){
   document.querySelectorAll(".broker").forEach(el=>el.classList.toggle("selected",el.dataset.broker===slug));
   const d=cfg[slug];
   $("modalTitle").textContent=d.name;
-  $("modalSubtitle").textContent=selected==="exness"?"EXNESS PUBLIC TRADER API":"SECURE BROKER CONNECTION FLOW";
+  $("modalSubtitle").textContent=selected==="exness"?"EXNESS PUBLIC TRADER API":selected==="deriv"?"DERIV OAUTH 2.0 · SECURE REDIRECT":"SECURE BROKER CONNECTION FLOW";
   $("modalLogo").src=logos[slug];$("modalLogo").alt=d.name;
   $("accountId").value="";$("apiKey").value="";$("secretKey").value="";$("apiHost").value="";$("accessToken").value="";$("oandaToken").value="";
   $("accountList").innerHTML="";$("authorizeBtn").disabled=true;
   $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=(selected==="exness"||selected==="oanda")?"block":"none";$("bridgeTokenField").style.display=(selected==="exness"||selected==="oanda")?"none":"block";$("oandaTokenField").style.display=selected==="oanda"?"block":"none";
-  $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION";
+  $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION"; $("verifyBtn").style.display=selected==="deriv"?"none":"inline-flex"; $("executionMode").value=selectedExecution;
   if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
   textFor();showDrawer();
   if(selected==="exness")trackExnessPartner();
@@ -333,6 +343,17 @@ async function firebaseToken(){
   if(!u.emailVerified)throw new Error("Verify your email before connecting a broker.");
   return u.getIdToken(true);
 }
+async function startDerivOAuth(){
+  try{
+    const t=await firebaseToken();
+    const mode=selectedExecution;
+    setStatus("Opening secure Deriv authorization…");
+    const r=await fetch(API_BASE+"/broker/deriv/oauth/start?executionMode="+encodeURIComponent(mode),{headers:{Authorization:"Bearer "+t}});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.authorizationUrl)throw new Error(d.error||"Deriv OAuth is not configured.");
+    window.location.href=d.authorizationUrl;
+  }catch(e){setStatus(e.message||"Unable to start Deriv authorization.");}
+}
 function setStatus(t){$("flowStatus").textContent=t}
 function renderAccounts(list){
   $("accountList").innerHTML=list.map((a,i)=>'<div class="account-item'+(i===0?" active":"")+' data-account="'+String(a.id).replace(/"/g,"&quot;")+'"><div><b>'+String(a.label||a.id)+'</b><span>'+String(a.mode||"AUTHORIZED")+'</span></div><span>SELECT</span></div>').join("");
@@ -343,6 +364,12 @@ function renderAccounts(list){
   }));
 }
 document.querySelectorAll("[data-open]").forEach(btn=>btn.addEventListener("click",()=>selectBroker(btn.dataset.open)));
+$("brokerLogin").addEventListener("click",e=>{
+  if(selected==="deriv"){
+    e.preventDefault();
+    startDerivOAuth();
+  }
+});
 $("closeModal").addEventListener("click",closeDrawer);
 $("drawer").addEventListener("click",e=>{if(e.target===$("drawer"))closeDrawer()});
 $("nextStep").addEventListener("click",()=>{
@@ -352,6 +379,7 @@ $("nextStep").addEventListener("click",()=>{
 });
 $("verifyBtn").addEventListener("click",async()=>{
   if(!selected)return;
+  if(selected==="deriv"){startDerivOAuth();return;}
   const accountId=$("accountId").value.trim(),token=$("accessToken").value.trim();
   if(selected==="exness"){
     if(!accountId||!$("apiKey").value.trim()||!$("secretKey").value.trim()){setStatus("Enter the Exness account ID, API key and secret key.");return}
@@ -415,6 +443,27 @@ function applyExecutionMode(){
 }
 modeButtons.forEach(btn=>btn.addEventListener("click",()=>{selectedExecution=btn.dataset.exec||"PAPER";applyExecutionMode()}));
 applyExecutionMode();
+
+(function handleDerivReturn(){
+  const params=new URLSearchParams(window.location.search);
+  const status=params.get("deriv");
+  if(!status)return;
+  selectBroker("deriv");
+  if(status==="connected"){
+    verified=true; selectedAccount=params.get("account")||null; setStep(4);
+    $("flowCopy").innerHTML="<strong>STEP 4 · DERIV CONNECTION VERIFIED</strong><br>Deriv OAuth authorization completed. KINGBOT is connected to the authorized "+(selectedAccount||"trading")+" account in "+(params.get("mode")||"PAPER")+" mode.";
+    $("flowStatus").textContent="Deriv connection is active. You can continue to Bot Workspace.";
+    $("brokerLogin").style.display="none";
+    $("nextStep").style.display="none";
+    $("credentials").classList.remove("show");
+    $("accountSelect").classList.add("show");
+    $("accountList").innerHTML='<div class="account-item active"><div><b>'+String(selectedAccount||"DERIV ACCOUNT")+'</b><span>'+String(params.get("mode")||"PAPER")+'</span></div><span>CONNECTED ✓</span></div>';
+    $("authorizeBtn").disabled=false; $("authorizeBtn").textContent="CONNECTED ✓";
+  }else{
+    setStatus(params.get("message")||"Deriv authorization was not completed.");
+  }
+  window.history.replaceState({},document.title,window.location.pathname);
+})(); 
 
 (function(){
   const cards=[...document.querySelectorAll(".broker")];
