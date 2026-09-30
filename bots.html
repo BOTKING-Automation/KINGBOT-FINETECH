@@ -49,7 +49,9 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 .metric b{display:block;color:#66738e;font:700 8px "JetBrains Mono";letter-spacing:.08em}.metric span{display:block;margin-top:5px;font:800 13px "JetBrains Mono";color:#dfe8f7}.strategy-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.tag{padding:7px 9px;border-radius:8px;color:#8794ad;background:rgba(255,255,255,.035);font:700 8px "JetBrains Mono";border:1px solid rgba(255,255,255,.06)}.message{position:relative;min-height:20px;margin-top:13px;color:#76839b;font:700 9px "JetBrains Mono";line-height:1.5}.message.ok{color:#69e6c1}.message.error{color:#ff8f9a}.telemetry-note{padding:13px 14px;border-radius:13px;background:rgba(155,92,255,.045);border:1px solid rgba(155,92,255,.14);color:#7e8aa4;font-size:10px;line-height:1.65}
 @media(max-width:1100px){.bot-grid{grid-template-columns:repeat(3,1fr)}.layout{grid-template-columns:1fr}}
 @media(max-width:680px){main{width:calc(100% - 20px);padding-top:18px}.bot-detail-hero{grid-template-columns:1fr}.detail-image{height:150px}.shell{padding:20px}.top{flex-direction:column}.telemetry{width:100%}.bot-grid{grid-template-columns:1fr 1fr}.bot-media{height:120px}.risk-grid{grid-template-columns:1fr}.full{grid-column:auto}}
-</style>
+<style>
+.bot-symbol-default{display:inline-flex;align-items:center;gap:7px;margin:0 0 13px;padding:9px 11px;border-radius:11px;border:1px solid rgba(25,230,255,.14);background:rgba(25,230,255,.035);color:#8b99b3;font:700 8px "JetBrains Mono";letter-spacing:.04em}.bot-symbol-default strong{color:#19e6ff}
+</style></style>
 </head>
 <body>
 <div data-kingbot-navigation></div>
@@ -64,9 +66,9 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 <div class="layout">
 <section class="panel">
 <div id="botHero" class="bot-detail-hero"><div class="detail-image"><img id="detailImage" src="assets/images/hero-bot.png" alt="Selected KINGBOT bot"></div><div class="detail-copy"><span id="detailCode" class="bot-chip">BOT ENGINE / READY</span><h2 id="botTitle">Select a bot</h2><p id="detailRole">Choose an engine to inspect its architecture.</p></div></div>
-<p class="desc" id="botDesc">Choose an entitled bot to configure its independent risk profile.</p>
+<p class="desc" id="botDesc">Choose an entitled bot to configure its independent risk profile.</p><div class="bot-symbol-default"><span>DEFAULT MARKET</span><strong>XAUUSD</strong><span>· editable before start</span></div>
 <div class="risk-grid">
-<div class="field"><label>Execution mode <em>ENGINE</em></label><select id="executionMode"><option value="PAPER">PAPER</option><option value="LIVE">LIVE</option></select></div><div class="field"><label>Broker symbol <em>REQUIRED</em></label><input id="symbol" type="text" placeholder="e.g. XAUUSD" maxlength="30"></div><div class="field"><label>Timeframe <em>MARKET</em></label><select id="timeframe"><option>1m</option><option>2m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
+<div class="field"><label>Execution mode <em>ENGINE</em></label><select id="executionMode"><option value="PAPER">PAPER</option><option value="LIVE">LIVE</option></select></div><div class="field"><label>Broker symbol <em>REQUIRED</em></label><input id="symbol" type="text" placeholder="XAUUSD (or your broker symbol, e.g. XAUUSDm)" maxlength="30"></div><div class="field"><label>Timeframe <em>MARKET</em></label><select id="timeframe"><option>1m</option><option>2m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
 <div class="field"><label>Max risk / trade <em>%</em></label><input id="maxRisk" type="number" min=".1" max="5" step=".05"></div>
 <div class="field"><label>Daily drawdown limit <em>%</em></label><input id="dailyDd" type="number" min=".5" max="20" step=".1"></div>
 <div class="field"><label>Total drawdown limit <em>%</em></label><input id="totalDd" type="number" min="1" max="30" step=".1"></div>
@@ -221,7 +223,23 @@ async function selectBot(id){
  const imageMap={"strategic":"assets/images/bots/strategic.png","flipper":"assets/images/bots/flipper.png","breakout":"assets/images/bots/breakout.png","smc-pro":"assets/images/bots/smc-pro.png","ladder-flip":"assets/images/bots/ladder-flip.png"};
  const roleMap={"strategic":"MULTI-STRATEGY ENGINE","flipper":"HIGH-SPEED FLIPPING","breakout":"BREAKOUT & MOMENTUM","smc-pro":"SMART MONEY CONCEPTS","ladder-flip":"ADAPTIVE LADDER SYSTEM"};
  $("detailImage").src=imageMap[selected.id]||"assets/images/hero-bot.png";$("detailImage").alt=selected.name;$("detailCode").textContent="BOT ENGINE // "+(selected.entitled?"ENTITLED":"LOCKED");$("detailRole").textContent=roleMap[selected.id]||selected.mode;$("botTitle").textContent=selected.name;$("botDesc").textContent=selected.strategies.join(" · ");
- try{const [d,r]=await Promise.all([api("/bots/"+encodeURIComponent(id)+"/risk"),api("/runtime/"+encodeURIComponent(id))]);selected.runtime=r.state||"STOPPED";selected.executionMode=r.executionMode;selected.symbol=r.symbol||"";selected.timeframe=r.timeframe||"1m";selected.lastSignal=r.lastSignal||null;putSettings(d.settings,d.executionMode||"NOT_CONNECTED",d.killSwitch);msg("Authoritative bot configuration loaded.","ok")}catch(e){msg(e.message,"error")}
+ try{
+   const [d,r]=await Promise.all([api("/bots/"+encodeURIComponent(id)+"/risk"),api("/runtime/"+encodeURIComponent(id))]);
+   selected.runtime=r.state||"STOPPED";
+   selected.executionMode=r.executionMode;
+   selected.symbol=r.symbol||"XAUUSD";
+   selected.timeframe=r.timeframe||"5m";
+   selected.lastSignal=r.lastSignal||null;
+   putSettings(d.settings,d.executionMode||"NOT_CONNECTED",d.killSwitch);
+   if(!r.symbol){
+     $("symbol").value="XAUUSD";
+     $("timeframe").value=selected.timeframe;
+     $("mSymbol").textContent="XAUUSD · DEFAULT";
+     msg("No market symbol was saved for this bot. XAUUSD is loaded as the editable default; change it for your broker before starting if needed.","ok");
+   }else{
+     msg("Authoritative bot configuration loaded.","ok");
+   }
+ }catch(e){msg(e.message,"error")}
 }
 async function load(){
  setTelemetry("BACKEND TELEMETRY","LOADING VERIFIED BOT STATE…");
@@ -262,7 +280,24 @@ async function load(){
  }
 }
 $("configBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");const symbol=fields.symbol.value.trim().toUpperCase(),timeframe=fields.timeframe.value;if(!symbol)return msg("Broker symbol is required.","error");msg("Saving market configuration…");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/config",{method:"POST",body:JSON.stringify({symbol,timeframe})});selected.symbol=d.symbol;selected.timeframe=d.timeframe;$("mSymbol").textContent=d.symbol;$("mTimeframe").textContent=d.timeframe;msg("Market configuration saved. Engine remains stopped until explicitly started.","ok")}catch(e){msg(e.message,"error")}});
-$("startBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");msg("Authorizing engine start…");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/start",{method:"POST",body:"{}"});selected.runtime=d.state;selected.executionMode=d.executionMode;$("mRuntime").textContent=d.state;$("enginePill").textContent="RUNNING";msg("Engine started. Broker and server risk gates remain authoritative.","ok")}catch(e){msg(e.message,"error")}});
+$("startBtn").addEventListener("click",async()=>{
+ if(!selected)return msg("Select a bot first.","error");
+ msg("Preparing market configuration…");
+ try{
+   let symbol=fields.symbol.value.trim().toUpperCase()||selected.symbol||"XAUUSD";
+   let timeframe=fields.timeframe.value||selected.timeframe||"5m";
+   if(!selected.symbol){
+     const cfg=await api("/runtime/"+encodeURIComponent(selected.id)+"/config",{method:"POST",body:JSON.stringify({symbol,timeframe})});
+     selected.symbol=cfg.symbol;selected.timeframe=cfg.timeframe;
+     $("mSymbol").textContent=cfg.symbol;$("mTimeframe").textContent=cfg.timeframe;
+   }
+   msg("Authorizing engine start…");
+   const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/start",{method:"POST",body:"{}"});
+   selected.runtime=d.state;selected.executionMode=d.executionMode;
+   $("mRuntime").textContent=d.state;$("enginePill").textContent="RUNNING";
+   msg("Engine started with "+selected.symbol+" / "+selected.timeframe+". Broker and server risk gates remain authoritative.","ok");
+ }catch(e){msg(e.message,"error")}
+});
 $("stopBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/stop",{method:"POST",body:"{}"});selected.runtime=d.state;$("mRuntime").textContent=d.state;$("enginePill").textContent="STOPPED";msg("Engine stopped. No new autonomous orders will be submitted.","ok")}catch(e){msg(e.message,"error")}});
 $("saveBtn").addEventListener("click",async()=>{
  if(!selected)return msg("Select a bot first.","error");
