@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="KINGBOT FINTECH partner revenue and broker referral attribution dashboard.">
+<meta name="theme-color" content="#02040a">
+<title>KINGBOT — Partner Revenue</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700;800&family=Orbitron:wght@500;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#02040a;--panel:rgba(7,13,29,.9);--line:rgba(255,255,255,.08);--text:#edf4ff;--muted:#7c89a3;--cyan:#19e6ff;--blue:#4787ff;--violet:#9b5cff;--pink:#ff4fd8;--gold:#f6b93b;--green:#23f7a3;--red:#ff5c7a}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 12% 2%,rgba(25,230,255,.12),transparent 25%),radial-gradient(circle at 90% 8%,rgba(155,92,255,.12),transparent 24%),radial-gradient(circle at 55% 100%,rgba(246,185,59,.07),transparent 28%),#01030a;color:var(--text);font-family:Inter,sans-serif}body:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(to bottom,#000,transparent)}
+main{width:min(1450px,calc(100% - 28px));margin:auto;padding:34px 0 60px}.hero,.card{border:1px solid var(--line);border-radius:22px;background:linear-gradient(145deg,rgba(10,18,38,.94),rgba(2,6,16,.98));box-shadow:0 25px 85px rgba(0,0,0,.42);position:relative;overflow:hidden}.hero{padding:28px}.hero:after,.card:after{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),var(--violet),var(--pink),var(--gold),transparent);opacity:.7}.kicker{color:#667694;font:800 8px "JetBrains Mono";letter-spacing:.14em}.kicker i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green);margin-right:7px}.hero h1{margin:14px 0 9px;font:900 clamp(28px,5vw,52px) Orbitron;letter-spacing:-.03em}.hero h1 span{background:linear-gradient(90deg,var(--gold),var(--cyan),var(--violet),var(--pink));-webkit-background-clip:text;color:transparent}.hero p{max-width:850px;color:#8b98b2;line-height:1.75;font-size:12px}.bar{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.pill{padding:8px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025);font:800 8px "JetBrains Mono";color:#8190aa}.pill.green{color:var(--green);border-color:rgba(35,247,163,.18)}.pill.gold{color:var(--gold);border-color:rgba(246,185,59,.18)}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:15px}.kpi{padding:18px 17px;min-height:118px}.kpi span{display:block;color:#64718b;font:800 7px "JetBrains Mono";letter-spacing:.11em}.kpi b{display:block;margin-top:14px;font:900 25px Orbitron}.kpi small{display:block;margin-top:7px;color:#596781;font-size:9px}.accent-cyan{box-shadow:0 0 30px rgba(25,230,255,.05)}.accent-gold{box-shadow:0 0 30px rgba(246,185,59,.05)}.accent-green{box-shadow:0 0 30px rgba(35,247,163,.05)}.accent-violet{box-shadow:0 0 30px rgba(155,92,255,.05)}
+.two{display:grid;grid-template-columns:1.4fr .6fr;gap:13px;margin-top:13px}.card{padding:20px}.title{font:800 13px Orbitron;letter-spacing:.08em}.desc{margin-top:6px;color:#68758d;font-size:9.5px;line-height:1.6}.table-wrap{overflow:auto;margin-top:14px}.table{width:100%;border-collapse:collapse;min-width:760px}.table th{padding:10px 9px;text-align:left;color:#5d6a83;border-bottom:1px solid rgba(255,255,255,.06);font:800 7px "JetBrains Mono";letter-spacing:.08em}.table td{padding:12px 9px;border-bottom:1px solid rgba(255,255,255,.045);font:700 9px "JetBrains Mono";color:#cad5e9}.table td.money{font-size:10px}.status{font:800 7px "JetBrains Mono";padding:5px 7px;border-radius:999px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02)}.status.ready{color:var(--green);border-color:rgba(35,247,163,.18)}.status.pending{color:var(--gold);border-color:rgba(246,185,59,.18)}.status.off{color:#7c89a3}
+.feed{display:grid;gap:8px;margin-top:12px}.event{padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.055);background:rgba(255,255,255,.02)}.event-top{display:flex;justify-content:space-between;gap:10px}.event b{font:800 8px Orbitron}.event small{font:700 7px "JetBrains Mono";color:#596781}.event p{margin:6px 0 0;color:#7b88a3;font:600 8px "JetBrains Mono";line-height:1.45}
+.config{display:grid;gap:8px;margin-top:13px}.config-row{display:flex;justify-content:space-between;gap:12px;padding:11px;border:1px solid rgba(255,255,255,.05);border-radius:11px;background:rgba(255,255,255,.018)}.config-row span{font:700 8px "JetBrains Mono";color:#8a97b0}.note{margin-top:13px;padding:13px;border-radius:12px;border:1px solid rgba(25,230,255,.1);background:rgba(25,230,255,.03);color:#708099;font-size:8.5px;line-height:1.6}.note strong{color:var(--cyan);font-family:"JetBrains Mono"}
+.empty{padding:22px;border:1px dashed rgba(255,255,255,.09);border-radius:13px;text-align:center;color:#61708b;font-size:9px}
+.top-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.btn{display:inline-flex;align-items:center;justify-content:center;padding:9px 11px;border-radius:9px;text-decoration:none;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.025);color:#9aa7be;font:800 8px "JetBrains Mono";cursor:pointer}.btn.primary{border:0;color:#04070d;background:linear-gradient(90deg,var(--gold),#ffe08a,var(--cyan))}.footer{text-align:center;margin-top:16px;color:#4b5870;font:700 7px "JetBrains Mono";letter-spacing:.1em}
+@media(max-width:1050px){.grid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+@media(max-width:560px){main{width:min(100% - 16px,1450px);padding-top:70px}.grid{grid-template-columns:1fr}.hero{padding:21px}.card{padding:16px}}
+</style>
+</head>
+<body>
+<main>
+<section class="hero">
+  <div class="kicker"><i></i> PARTNER REVENUE CONTROL · ADMIN CONSOLE</div>
+  <h1>Broker <span>partnership intelligence.</span></h1>
+  <p>Track KINGBOT-attributed broker referrals from click through qualified activity, then reconcile commission events imported from contracted broker partner feeds. No broker commission amount is invented by the frontend.</p>
+  <div class="bar"><span class="pill green">ATTRIBUTION ENGINE ONLINE</span><span class="pill">SERVER-SIDE EVENT LOG</span><span class="pill gold">USD LEDGER</span><span class="pill">30-DAY VIEW</span></div>
+  <div class="top-actions"><a class="btn primary" href="broker-connect.html">← BROKER MARKETPLACE</a><button class="btn" id="refreshBtn" type="button">REFRESH DATA</button><select class="btn" id="days" aria-label="Time window"><option value="30">30 DAYS</option><option value="7">7 DAYS</option><option value="90">90 DAYS</option><option value="365">365 DAYS</option></select></div>
+</section>
+
+<section class="grid">
+  <article class="card kpi accent-cyan"><span>ATTRIBUTED CLICKS</span><b id="clicks">—</b><small>KINGBOT partner click events</small></article>
+  <article class="card kpi accent-violet"><span>QUALIFIED REFERRALS</span><b id="qualified">—</b><small>Signup / KYC / funded / active events</small></article>
+  <article class="card kpi accent-gold"><span>GROSS COMMISSION</span><b id="gross">$—</b><small>Broker-reported commission events</small></article>
+  <article class="card kpi accent-green"><span>OUTSTANDING</span><b id="outstanding">$—</b><small>Gross minus paid and reversed events</small></article>
+</section>
+
+<section class="two">
+  <article class="card">
+    <div class="title">BROKER PARTNER LEDGER</div>
+    <div class="desc">Configuration shows whether KINGBOT has a tracked partner URL configured on the server. “Official fallback” means the broker link is informational and does not establish a commission relationship.</div>
+    <div class="table-wrap"><table class="table"><thead><tr><th>BROKER</th><th>MODEL</th><th>LINK</th><th>CLICKS</th><th>QUALIFIED</th><th>GROSS</th><th>PAID</th></tr></thead><tbody id="brokerRows"></tbody></table></div>
+  </article>
+  <aside class="card">
+    <div class="title">PARTNER ROUTE STATUS</div>
+    <div class="desc">These flags are read from backend configuration, not guessed by the browser.</div>
+    <div class="config" id="configRows"></div>
+    <div class="note"><strong>COMMISSION CONTROL</strong><br>Partner links and payout agreements are broker-specific. Configure only the contracted tracking URL in Render environment variables and import verified broker commission events into the protected event API.</div>
+  </aside>
+</section>
+
+<section class="card" style="margin-top:13px">
+  <div class="title">RECENT PARTNER EVENTS</div>
+  <div class="desc">Clicks are generated by KINGBOT. Conversion and commission events should come from a verified broker partner feed, approved export, or other auditable source.</div>
+  <div class="feed" id="feed"></div>
+</section>
+<div class="footer">KINGBOT FINTECH · PARTNER INTELLIGENCE · POWERED BY GIBSONFX TECH</div>
+</main>
+<script>
+(function(){
+"use strict";
+const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbot-fintech-api-etfv.onrender.com/api";
+const $=id=>document.getElementById(id);
+async function token(){
+  if(!window.KINGBOT_FIREBASE) await import("./system/firebase-auth.js");
+  const u=window.KINGBOT_FIREBASE?.auth?.currentUser;
+  if(!u) throw new Error("Please sign in.");
+  if(!u.emailVerified) throw new Error("Verify your email first.");
+  return u.getIdToken();
+}
+function money(value){return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:2}).format(Number(value||0))}
+function statusHtml(config){
+  return '<span class="status '+(config.partnerLinkConfigured?"ready":"pending")+'">'+(config.partnerLinkConfigured?"TRACKED LINK READY":"AGREEMENT / URL PENDING")+'</span>';
+}
+function render(d){
+  $("clicks").textContent=d.totals.clicks.toLocaleString();
+  $("qualified").textContent=d.totals.qualifiedReferrals.toLocaleString();
+  $("gross").textContent=money(d.totals.grossCommission);
+  $("outstanding").textContent=money(d.totals.outstandingCommission);
+  $("brokerRows").innerHTML=(d.brokers||[]).map(b=>
+    '<tr><td>'+b.brokerName+'</td><td>'+b.partnerModel+'</td><td>'+statusHtml((d.config||[]).find(x=>x.slug===b.brokerSlug)||{})+'</td><td>'+b.clicks.toLocaleString()+'</td><td>'+b.qualifiedReferrals.toLocaleString()+'</td><td class="money">'+money(b.grossCommission)+'</td><td class="money">'+money(b.paidCommission)+'</td></tr>'
+  ).join("");
+  $("configRows").innerHTML=(d.config||[]).map(c=>
+    '<div class="config-row"><span>'+c.name+' · '+c.commissionBasis+'</span><span class="status '+(c.partnerLinkConfigured?"ready":"pending")+'">'+c.routeMode.replaceAll("_"," ")+'</span></div>'
+  ).join("");
+  const events=d.recent||[];
+  $("feed").innerHTML=events.length?events.map(e=>
+    '<article class="event"><div class="event-top"><b>'+e.broker_name+' · '+e.event_type+'</b><small>'+new Date(e.occurred_at).toLocaleString()+'</small></div><p>'+(e.amount!==null?money(e.amount)+" "+e.currency+" · ":"")+(e.external_reference||"No external reference")+" · "+e.source+'</p></article>'
+  ).join(""):'<div class="empty">No partner events have been recorded yet. Clicks will appear after broker-marketplace attribution is enabled; commission events require a verified broker feed or import.</div>';
+}
+async function load(){
+  const btn=$("refreshBtn");btn.disabled=true;btn.textContent="LOADING…";
+  try{
+    const t=await token(),days=$("days").value;
+    const r=await fetch(API_BASE+"/partners/dashboard?days="+encodeURIComponent(days),{headers:{Authorization:"Bearer "+t}});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||"Partner dashboard unavailable.");
+    render(d);
+  }catch(e){
+    $("feed").innerHTML='<div class="empty">'+(e.message||"Unable to load partner telemetry.")+'</div>';
+  }finally{btn.disabled=false;btn.textContent="REFRESH DATA"}
+}
+$("refreshBtn").addEventListener("click",load);$("days").addEventListener("change",load);
+})();
+</script>
+<script>
+(function(){
+  var s=document.createElement("script");s.src="system/auth-gate.js";s.defer=true;document.head.appendChild(s);
+  var n=document.createElement("script");n.src="system/navigation.js";n.defer=true;document.head.appendChild(n);
+})();
+</script>
+</body>
+</html>
