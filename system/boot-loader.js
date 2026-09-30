@@ -1,49 +1,70 @@
-/* KINGBOT FINTECH — deterministic startup loader
-   Auth routing is owned by Firebase session/auth-gate.
-   This loader must never make an independent login decision.
+/* KINGBOT FINTECH — canonical neural startup bridge
+   Uses the existing loader.html visual system as the startup surface.
+   This bridge never decides authentication or performs a login redirect.
 */
 (function(window,document){
 "use strict";
-if(document.documentElement.dataset.kingbotBootLoaded==="1")return;
-document.documentElement.dataset.kingbotBootLoaded="1";
+if(window.__KINGBOT_BOOT_BRIDGE__) return;
+window.__KINGBOT_BOOT_BRIDGE__=true;
 
-const states=["NEURAL CORE INITIALIZING","MARKET MATRIX LINKING","BOT BRAIN SYNCHRONIZING","RISK ENGINE ONLINE","AUTH GATE READY"];
-let el=document.getElementById("kb-boot-loader");
-
-function ensureLoader(){
-  if(el)return el;
-  el=document.createElement("div");
-  el.id="kb-boot-loader";
-  el.innerHTML='<div class="kb-boot-core"><div class="kb-boot-brand">KINGBOT FINTECH</div><div class="kb-boot-sub">NEURAL TRADING INFRASTRUCTURE · SECURE INITIALIZATION</div><div class="kb-boot-stage"><div class="kb-boot-halo"></div><div class="kb-boot-brain"></div></div><div class="kb-boot-status">NEURAL CORE INITIALIZING</div><div class="kb-boot-progress"><i></i></div></div>';
-  (document.body||document.documentElement).prepend(el);
-  return el;
+function installStyle(){
+  if(document.getElementById("kb-boot-bridge-style")) return;
+  const style=document.createElement("style");
+  style.id="kb-boot-bridge-style";
+  style.textContent=`
+    html.kb-boot-lock,html.kb-boot-lock body{overflow:hidden!important}
+    #kb-boot-frame{
+      position:fixed;inset:0;z-index:2147483647;
+      width:100vw;height:100vh;border:0;display:block;
+      background:#02040a;opacity:1;
+      transition:opacity .42s ease;
+    }
+    #kb-boot-frame.kb-boot-hide{opacity:0;pointer-events:none}
+    @media(prefers-reduced-motion:reduce){
+      #kb-boot-frame{transition:none}
+    }
+  `;
+  (document.head||document.documentElement).appendChild(style);
 }
 
 function start(){
-  ensureLoader();
+  installStyle();
   document.documentElement.classList.add("kb-boot-lock");
-  const status=el.querySelector("#kb-boot-status")||el.querySelector(".kb-boot-status");
-  let n=0;
-  const ticker=setInterval(()=>{
-    if(status){n=(n+1)%states.length;status.textContent=states[n];}
-  },900);
 
-  const remove=()=>{
-    clearInterval(ticker);
-    if(!el)return;
-    el.style.transition="opacity .45s ease";
-    el.style.opacity="0";
-    setTimeout(()=>{
-      el?.remove();
+  const frame=document.createElement("iframe");
+  frame.id="kb-boot-frame";
+  frame.title="KINGBOT FINTECH neural startup";
+  frame.setAttribute("aria-label","KINGBOT FINTECH neural startup");
+  frame.src="loader.html?embed=1";
+  document.body.appendChild(frame);
+
+  let finished=false;
+  const finish=()=>{
+    if(finished) return;
+    finished=true;
+    window.removeEventListener("message",onMessage);
+    frame.classList.add("kb-boot-hide");
+    window.setTimeout(()=>{
+      frame.remove();
       document.documentElement.classList.remove("kb-boot-lock");
     },460);
   };
 
-  // IMPORTANT: no auth lookup and no redirect here.
-  // Firebase + session.js + auth-gate.js are the single auth authority.
-  setTimeout(remove,10000);
+  const onMessage=(event)=>{
+    if(event.origin!==window.location.origin) return;
+    if(event.source!==frame.contentWindow) return;
+    if(event.data&&event.data.type==="KINGBOT_BOOT_COMPLETE") finish();
+  };
+
+  window.addEventListener("message",onMessage);
+
+  // Safety release if the embedded loader fails to signal completion.
+  window.setTimeout(finish,11000);
 }
 
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});
-else start();
+if(document.readyState==="loading"){
+  document.addEventListener("DOMContentLoaded",start,{once:true});
+}else{
+  start();
+}
 })(window,document);
