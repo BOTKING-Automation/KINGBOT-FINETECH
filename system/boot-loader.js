@@ -35,6 +35,8 @@ function installStyle(){
 
 function start(){
 
+  installStyle();
+
   const homeEntry =
     window.location.pathname === "/" ||
     /\/index\.html$/i.test(window.location.pathname);
@@ -163,7 +165,6 @@ function start(){
     return;
   }
 
-  installStyle();
   document.documentElement.classList.add("kb-boot-lock");
 
   const frame=document.createElement("iframe");
@@ -222,7 +223,6 @@ function start(){
     Safety release if the embedded loader fails to signal.
     Home must still reach secure access rather than remain covered.
   */
-  const isAdminEntry=/\/admin-entry\.html$/i.test(window.location.pathname);
   const releaseMs=isAdminEntry?4200:5200;
   window.setTimeout(finish,releaseMs);
 }
