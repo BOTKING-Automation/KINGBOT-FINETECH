@@ -147,12 +147,14 @@ export class UserBrokerManager {
       accountId:null,
       executionMode:"NOT_CONNECTED"
     };
+    const executionMode=String(mapping.execution_mode||"PAPER").toUpperCase();
     return {
       configured:true,
       connected:true,
       broker:mapping.provider||null,
       accountId:mapping.account_id||null,
-      executionMode:mapping.execution_mode||"PAPER"
+      executionMode,
+      accountType:executionMode==="LIVE"?"REAL":"DEMO"
     };
   }
 
