@@ -16,8 +16,10 @@ import {
   sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
-  reload
+  reload,
+  updateProfile
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC5FpdO2YRysvERSGjLhO8AprfiB-d4_28",
@@ -31,6 +33,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
+let authReadyResolve;
+const authReady = new Promise(resolve => { authReadyResolve = resolve; });
+let authReadyUnsubscribe = null;
+authReadyUnsubscribe = onAuthStateChanged(auth, user => { authReadyResolve(user || null); try{authReadyUnsubscribe?.();}catch{} });
+const defaultPersistenceReady = setPersistence(auth, browserLocalPersistence).catch(error => { console.warn("[KINGBOT AUTH] Default persistence setup deferred:", error?.message || error); return null; });
 
 async function saveUserProfile(user, extra={}, initialize=false) {
   if (!user) throw new Error("Cannot save a missing Firebase user.");
@@ -73,6 +81,99 @@ const API_BASE = window.KINGBOT_API?.baseUrl || "https://kingbot-fintech-api-etf
 async function persist(remember=true){
   await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
 }
+async function waitForAuthReady(timeoutMs=10000){
+  await defaultPersistenceReady.catch(()=>{});
+  return await Promise.race([
+    authReady,
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error("Authentication service did not finish loading. Please refresh once.")),Number(timeoutMs)||10000))
+  ]);
+}
+async function getProfile(){
+  const user=await waitForAuthReady().catch(()=>auth.currentUser);
+  if(!user)return null;
+  const snap=await getDoc(doc(db,"users",user.uid));
+  const data=snap.exists()?snap.data():{};
+  return {
+    uid:user.uid,
+    email:user.email||data.email||"",
+    emailVerified:user.emailVerified===true,
+    displayName:user.displayName||data.displayName||[data.firstName,data.lastName].filter(Boolean).join(" ").trim(),
+    firstName:data.firstName||"",
+    lastName:data.lastName||"",
+    phone:data.phone||"",
+    photoURL:user.photoURL||data.photoURL||"",
+    profilePhotoData:data.profilePhotoData||""
+  };
+}
+function readBlobAsDataUrl(blob){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result||""));
+    reader.onerror=()=>reject(new Error("Unable to prepare the profile photo."));
+    reader.readAsDataURL(blob);
+  });
+}
+function readFileAsDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result||""));
+    reader.onerror=()=>reject(new Error("Unable to read the selected image."));
+    reader.readAsDataURL(file);
+  });
+}
+async function compressProfileImage(file){
+  if(!file||!String(file.type||"").startsWith("image/"))throw new Error("Select a JPG, PNG or WebP image.");
+  if(Number(file.size)>5*1024*1024)throw new Error("Profile photo must be 5 MB or smaller.");
+  const source=await readFileAsDataUrl(file);
+  const image=await new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=()=>reject(new Error("The selected image could not be decoded."));
+    img.src=source;
+  });
+  const max=640;
+  const scale=Math.min(1,max/Math.max(image.naturalWidth||image.width,image.naturalHeight||image.height));
+  const w=Math.max(1,Math.round((image.naturalWidth||image.width)*scale));
+  const h=Math.max(1,Math.round((image.naturalHeight||image.height)*scale));
+  const canvas=document.createElement("canvas");
+  canvas.width=w;canvas.height=h;
+  const ctx=canvas.getContext("2d");
+  if(!ctx)throw new Error("Image processor is unavailable in this browser.");
+  ctx.drawImage(image,0,0,w,h);
+  return await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error("Image compression failed.")),"image/jpeg",0.78));
+}
+async function uploadProfilePhoto(file){
+  const user=await waitForAuthReady();
+  if(!user)throw new Error("Please sign in before uploading a profile photo.");
+  const blob=await compressProfileImage(file);
+  try{
+    const fileRef=storageRef(storage,"profile-photos/"+user.uid+".jpg");
+    await uploadBytes(fileRef,blob,{contentType:"image/jpeg",cacheControl:"public,max-age=3600"});
+    const photoURL=await getDownloadURL(fileRef);
+    await updateProfile(user,{photoURL});
+    await saveUserProfile(user,{displayName:user.displayName||"",photoURL});
+    return {photoURL,stored:"storage"};
+  }catch(storageError){
+    console.warn("[KINGBOT PROFILE] Firebase Storage upload unavailable; using Firestore profile fallback:",storageError?.message||storageError);
+    const dataUrl=await readBlobAsDataUrl(blob);
+    if(dataUrl.length>700000)throw new Error("Profile photo is too large after compression. Choose a smaller image.");
+    await saveUserProfile(user,{displayName:user.displayName||"",profilePhotoData:dataUrl});
+    return {photoURL:dataUrl,stored:"firestore"};
+  }
+}
+async function updateProfileDetails({firstName="",lastName="",phone=""}={}){
+  const user=await waitForAuthReady();
+  if(!user)throw new Error("Please sign in first.");
+  const cleanFirst=String(firstName||"").trim().slice(0,80);
+  const cleanLast=String(lastName||"").trim().slice(0,80);
+  const cleanPhone=String(phone||"").trim().slice(0,40);
+  const displayName=[cleanFirst,cleanLast].filter(Boolean).join(" ").trim();
+  if(!displayName)throw new Error("Enter your first and last name.");
+  await updateProfile(user,{displayName});
+  await saveUserProfile(user,{firstName:cleanFirst,lastName:cleanLast,phone:cleanPhone,displayName});
+  try{await backendSync({firstName:cleanFirst,lastName:cleanLast,phone:cleanPhone});}catch(error){console.warn("[KINGBOT PROFILE] Backend sync deferred:",error?.message||error);}
+  return getProfile();
+}
 
 async function backendSync(extra={}){
   const user=auth.currentUser;
@@ -91,7 +192,7 @@ async function backendSync(extra={}){
 }
 
 window.KINGBOT_FIREBASE={
-  app,auth,db,API_BASE,persist,
+  app,auth,db,storage,API_BASE,persist,waitForAuthReady,getProfile,uploadProfilePhoto,updateProfileDetails,
   createAccount:async({email,password,firstName,lastName,phone,remember=true})=>{
     await persist(remember);
     let credential;
