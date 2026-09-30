@@ -329,7 +329,161 @@ app.post("/api/broker/disconnect", async (req,res)=>{
 });
 app.get("/api/account", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
-  try{const x=await broker.getAccount(user.id);res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Account telemetry unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
+  try{
+    const connection=await broker.getStatus(user.id);
+    if(!connection.connected){
+      return res.status(503).json({
+        ok:false,
+        error:"Account telemetry unavailable.",
+        reason:"BROKER_NOT_CONNECTED"
+      });
+    }
+
+    const now=new Date();
+    const dayStartDate=new Date(now);
+    dayStartDate.setUTCHours(0,0,0,0);
+
+    const [rawAccountResult, positionsResult, ordersResult, tradesResult] = await Promise.allSettled([
+      broker.getAccount(user.id),
+      broker.getPositions(user.id),
+      broker.getOrders(user.id),
+      broker.getTrades({startTime:dayStartDate.toISOString(),endTime:now.toISOString(),userId:user.id})
+    ]);
+
+    if(rawAccountResult.status!=="fulfilled"){
+      throw rawAccountResult.reason || new Error("BROKER_ACCOUNT_TELEMETRY_UNAVAILABLE");
+    }
+
+    const raw=rawAccountResult.value?.data||{};
+    const finiteOrNull=(value)=>Number.isFinite(Number(value))?Number(value):null;
+    const balance=finiteOrNull(raw.balance);
+    const equity=finiteOrNull(raw.equity);
+    const margin=finiteOrNull(raw.margin);
+    const freeMargin=finiteOrNull(raw.freeMargin);
+    const marginLevel=finiteOrNull(raw.marginLevel);
+
+    if(balance===null && equity===null){
+      throw new Error("BROKER_ACCOUNT_TELEMETRY_INCOMPLETE");
+    }
+
+    const positionData=positionsResult.status==="fulfilled" && Array.isArray(positionsResult.value?.data)
+      ? positionsResult.value.data
+      : [];
+    const orderData=ordersResult.status==="fulfilled" && Array.isArray(ordersResult.value?.data)
+      ? ordersResult.value.data
+      : [];
+
+    const deals=tradesResult.status==="fulfilled" ? (tradesResult.value?.data?.deals||[]) : [];
+    const ordersFromHistory=tradesResult.status==="fulfilled" ? (tradesResult.value?.data?.orders||[]) : [];
+    const pnlFromRecord=(record)=>{
+      if(record===null||record===undefined)return null;
+      const keys=["profit","pnl","realizedPnl","realized_pnl","realizedPL","realized_pl","closePnl","close_pl"];
+      if(typeof record==="object"){
+        for(const key of keys){
+          const n=Number(record[key]);
+          if(Number.isFinite(n))return n;
+        }
+      }
+      const n=Number(record);
+      return Number.isFinite(n)?n:null;
+    };
+    const sumPnl=(list)=>{
+      if(!Array.isArray(list))return null;
+      let total=0,count=0;
+      for(const item of list){
+        const value=pnlFromRecord(item);
+        if(value!==null){total+=value;count++;}
+      }
+      return count?total:null;
+    };
+
+    const realizedPnl=sumPnl(deals.length?deals:ordersFromHistory);
+    const floatingPnl=equity!==null && balance!==null ? equity-balance : null;
+
+    let dayStartEquity=equity;
+    let peakEquity=equity;
+    try{
+      if(user.id && connection.broker && connection.accountId && equity!==null){
+        const q=await pool.query(
+          "SELECT baseline_date,day_start_equity,peak_equity FROM kingbot_account_risk_state WHERE user_id=$1 AND provider=$2 AND account_id=$3",
+          [user.id,connection.broker,connection.accountId]
+        );
+        if(q.rowCount && q.rows[0].baseline_date===now.toISOString().slice(0,10)){
+          dayStartEquity=finiteOrNull(q.rows[0].day_start_equity) ?? equity;
+          peakEquity=Math.max(finiteOrNull(q.rows[0].peak_equity) ?? equity,equity);
+        }else if(equity!==null){
+          dayStartEquity=equity;
+          peakEquity=equity;
+          await pool.query(
+            "INSERT INTO kingbot_account_risk_state(user_id,provider,account_id,baseline_date,day_start_equity,peak_equity,updated_at) VALUES($1,$2,$3,$4,$5,$6,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET baseline_date=EXCLUDED.baseline_date,day_start_equity=EXCLUDED.day_start_equity,peak_equity=EXCLUDED.peak_equity,updated_at=NOW()",
+            [user.id,connection.broker,connection.accountId,now.toISOString().slice(0,10),equity,equity]
+          );
+        }
+        if(equity!==null){
+          await pool.query(
+            "UPDATE kingbot_account_risk_state SET peak_equity=GREATEST(peak_equity,$4),updated_at=NOW() WHERE user_id=$1 AND provider=$2 AND account_id=$3 AND baseline_date=$5",
+            [user.id,connection.broker,connection.accountId,equity,now.toISOString().slice(0,10)]
+          );
+          peakEquity=Math.max(peakEquity,equity);
+        }
+      }
+    }catch(error){
+      // Risk baseline is supplementary telemetry; account values remain authoritative.
+    }
+
+    const dailyPnl=equity!==null && dayStartEquity!==null ? equity-dayStartEquity : null;
+    const dailyDrawdownPct=equity!==null && dayStartEquity>0 ? Math.max(0,((dayStartEquity-equity)/dayStartEquity)*100) : null;
+    const totalDrawdownPct=equity!==null && peakEquity>0 ? Math.max(0,((peakEquity-equity)/peakEquity)*100) : null;
+    const accountType=String(raw.accountType||raw.account_type||"").trim().toUpperCase()
+      || (connection.executionMode==="LIVE" ? "REAL" : "DEMO");
+    const currency=String(raw.currency||"").trim().slice(0,12)||null;
+    const tradingEnabled=raw.tradeAllowed!==false
+      && raw.tradingEnabled!==false
+      && String(raw.account_status||"active").toLowerCase()!=="trading_disabled"
+      && String(raw.trade_mode||"enabled").toLowerCase()!=="trading_disabled";
+
+    res.json({
+      ok:true,
+      connected:true,
+      account:{
+        accountId:connection.accountId||raw.loginid||raw.id||null,
+        broker:connection.broker||raw.provider||null,
+        executionMode:connection.executionMode||"NOT_CONNECTED",
+        accountType,
+        currency,
+        balance,
+        equity,
+        floatingPnl,
+        realizedPnl,
+        dailyPnl,
+        dailyDrawdownPct,
+        totalDrawdownPct,
+        margin,
+        freeMargin,
+        marginLevel,
+        positionCount:positionData.length,
+        orderCount:orderData.length,
+        leverage:finiteOrNull(raw.leverage||raw.max_leverage),
+        tradingEnabled,
+        accountStatus:String(raw.account_status||raw.status||"ACTIVE").toUpperCase(),
+        group:raw.group||raw.account_group||null,
+        lastTransactionId:raw.lastTransactionID||raw.last_transaction_id||null,
+        syncedAt:now.toISOString(),
+        telemetry:{
+          positions:positionsResult.status==="fulfilled",
+          orders:ordersResult.status==="fulfilled",
+          trades:tradesResult.status==="fulfilled"
+        }
+      }
+    });
+  }catch(error){
+    console.error("[KINGBOT ACCOUNT] telemetry failed:",error?.message||error);
+    res.status(503).json({
+      ok:false,
+      error:"Account telemetry unavailable.",
+      reason:error?.message||"BROKER_ACCOUNT_TELEMETRY_UNAVAILABLE"
+    });
+  }
 });
 app.get("/api/positions", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
