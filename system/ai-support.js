@@ -398,7 +398,9 @@
 
     try {
       if (!state.context) {
-        await loadContext();
+        // Do not block the first AI reply on telemetry synchronization.
+        // The secured backend fetches fresh verified context during the AI request.
+        void loadContext();
       }
 
       const conversation = state.messages
