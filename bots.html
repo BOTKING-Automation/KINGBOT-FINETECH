@@ -31,7 +31,7 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 .bot-body{position:relative;padding:15px 16px 17px}
 .bot-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;border:1px solid color-mix(in srgb,var(--bot-c1) 35%,transparent);background:color-mix(in srgb,var(--bot-c1) 8%,transparent);color:var(--bot-c1);font:800 7px "JetBrains Mono";letter-spacing:.12em}
 .bot:hover img,.bot.active img{transform:scale(1.06);opacity:1}
-.bot:hover,.bot.active{transform:translateY(-5px);box-shadow:0 0 25px color-mix(in srgb,var(--bot-c1) 15%,transparent),0 20px 55px rgba(0,0,0,.42)}
+.bot:hover,.bot.active{transform:translateY(-5px);box-shadow:0 0 25px color-mix(in srgb,var(--bot-c1) 15%,transparent),0 20px 55px rgba(0,0,0,.42)}.bot[aria-disabled="true"]{opacity:.48;filter:saturate(.58)}.bot[aria-disabled="true"]:hover{transform:none;box-shadow:none}.bot[aria-disabled="true"] .bot-chip{color:#69758c;border-color:rgba(255,255,255,.07);background:rgba(255,255,255,.02)}
 .bot:hover:after,.bot.active:after{opacity:1;box-shadow:0 0 20px color-mix(in srgb,var(--bot-c1) 35%,transparent)}
 .bot>*{position:relative;z-index:1}
 .bot-strategic{--bot-c1:#19e6ff;--bot-c2:#4787ff;--bot-c3:#9b5cff}
@@ -58,9 +58,9 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 <div class="hud-line"><i></i><i></i><i></i><span>KINGBOT // SECURE AUTOMATION GRID // LIVE CONTROL SURFACE</span></div>
 <div class="top">
 <div><div class="eyebrow">KINGBOT FINTECH / INTELLIGENT CONTROL CENTER</div><h1>BOT <span style="background:linear-gradient(90deg,#19e6ff,#4787ff,#9b5cff,#ff4fd8,#f6b93b);-webkit-background-clip:text;color:transparent">CONTROL OS</span></h1><p class="sub">Configure each bot's risk envelope and execution mode from one institutional control surface. Settings are stored per user and enforced by the server-side risk engine before execution.</p></div>
-<div class="telemetry"><b id="telemetryState">BACKEND TELEMETRY</b><span id="telemetryDetail">VERIFYING SESSION…</span></div>
+<div class="telemetry"><b id="telemetryState">BACKEND TELEMETRY</b><span id="telemetryDetail">VERIFYING SESSION…</span><span id="subscriptionState" style="display:block;margin-top:9px;color:#f6b93b;font:800 8px &quot;JetBrains Mono&quot;">SUBSCRIPTION: CHECKING…</span></div>
 </div>
-<div class="bot-grid" id="botGrid"></div>
+<div class="bot-grid" id="botGrid"></div><div id="selectionNotice" style="margin-top:12px;padding:11px 13px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.018);color:#68768f;font:700 8px &quot;JetBrains Mono&quot;">Select a subscribed bot to open its control surface.</div>
 <div class="layout">
 <section class="panel">
 <div id="botHero" class="bot-detail-hero"><div class="detail-image"><img id="detailImage" src="assets/images/hero-bot.png" alt="Selected KINGBOT bot"></div><div class="detail-copy"><span id="detailCode" class="bot-chip">BOT ENGINE / READY</span><h2 id="botTitle">Select a bot</h2><p id="detailRole">Choose an engine to inspect its architecture.</p></div></div>
@@ -106,8 +106,21 @@ function renderBots(){
  const imageMap={"strategic":"assets/images/bots/strategic.png","flipper":"assets/images/bots/flipper.png","breakout":"assets/images/bots/breakout.png","smc-pro":"assets/images/bots/smc-pro.png","ladder-flip":"assets/images/bots/ladder-flip.png"};
  const roleMap={"strategic":"MULTI-STRATEGY ENGINE","flipper":"HIGH-SPEED FLIPPING","breakout":"BREAKOUT & MOMENTUM","smc-pro":"SMART MONEY CONCEPTS","ladder-flip":"ADAPTIVE LADDER SYSTEM"};
  const classMap={"strategic":"bot-strategic","flipper":"bot-flipper","breakout":"bot-breakout","smc-pro":"bot-smc","ladder-flip":"bot-ladder"};
- $("botGrid").innerHTML=bots.map((b,i)=>'<button type="button" class="bot '+(classMap[b.id]||"")+' '+(selected?.id===b.id?"active":"")+'" data-id="'+esc(b.id)+'"><div class="bot-media"><img src="'+(imageMap[b.id]||"assets/images/hero-bot.png")+'" alt="'+esc(b.name)+'" loading="lazy" onerror="this.style.display=\'none\'"></div><div class="bot-body"><span class="bot-chip"><span class="dot"></span>SYSTEM '+String(i+1).padStart(2,"0")+' // '+(b.entitled?"ENTITLED":"LOCKED")+'</span><strong>'+esc(b.name.replace("KINGBOT ",""))+'</strong><small>'+esc(roleMap[b.id]||b.mode)+'</small></div></button>').join("");
- document.querySelectorAll(".bot").forEach(x=>x.addEventListener("click",()=>selectBot(x.dataset.id)));
+ $("botGrid").innerHTML=bots.map((b,i)=>{
+  const entitled=Boolean(b.entitled);
+  const state=entitled?"SUBSCRIBED":"NOT INCLUDED";
+  return '<button type="button" class="bot '+(classMap[b.id]||"")+' '+(selected?.id===b.id?"active":"")+'" data-id="'+esc(b.id)+'" '+(entitled?"":"aria-disabled=\"true\"")+'><div class="bot-media"><img src="'+(imageMap[b.id]||"assets/images/hero-bot.png")+'" alt="'+esc(b.name)+'" loading="lazy" onerror="this.style.display=\'none\'"></div><div class="bot-body"><span class="bot-chip"><span class="dot"></span>SYSTEM '+String(i+1).padStart(2,"0")+' // '+state+'</span><strong>'+esc(b.name.replace("KINGBOT ",""))+'</strong><small>'+esc(roleMap[b.id]||b.mode)+(entitled?"":" · OPEN SUBSCRIPTION TO UNLOCK")+'</small></div></button>';
+}).join("");
+
+ document.querySelectorAll(".bot").forEach(x=>x.addEventListener("click",()=>{
+  const bot=bots.find(b=>b.id===x.dataset.id);
+  if(!bot?.entitled){
+    $("selectionNotice").innerHTML='This bot is not included in your active subscription. <a href="subscription.html" style="color:#19e6ff;text-decoration:none">Open Subscription →</a>';
+    msg("That bot is locked by subscription. Choose an included bot or upgrade your subscription.","error");
+    return;
+  }
+  selectBot(x.dataset.id);
+}));
 }
 function putSettings(s,mode,kill){
  fields.executionMode.value=mode||"PAPER";fields.maxRisk.value=s.maxRiskPerTradePct;fields.dailyDd.value=s.dailyDrawdownPct;fields.totalDd.value=s.totalDrawdownPct;fields.maxPositions.value=s.maxPositions;fields.spreadRatio.value=s.maxSpreadAtrRatio;fields.staleMs.value=s.staleDataMs;fields.lossStreak.value=s.maxConsecutiveLosses;fields.autoPause.checked=Boolean(s.autoPauseOnLossStreak);fields.killSwitch.checked=Boolean(kill);
@@ -125,7 +138,20 @@ async function api(path,options={}){
 async function refreshRuntime(){if(!selected)return;try{const r=await api("/runtime/"+encodeURIComponent(selected.id));selected.runtime=r.state||"STOPPED";selected.executionMode=r.executionMode||selected.executionMode;selected.symbol=r.symbol||selected.symbol||"";selected.timeframe=r.timeframe||selected.timeframe||"1m";$("mRuntime").textContent=selected.runtime;$("mMode").textContent=selected.executionMode||"NOT_CONNECTED";$("mSymbol").textContent=selected.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected.timeframe||"—";$("enginePill").textContent=selected.runtime}catch{}}
 setInterval(refreshRuntime,5000);
 async function selectBot(id){
- selected=bots.find(x=>x.id===id);if(!selected)return;renderBots();
+ selected=bots.find(x=>x.id===id);
+ if(!selected)return;
+ if(!selected.entitled){
+   renderBots();
+   $("selectionNotice").innerHTML='This bot is not included in your active subscription. <a href="subscription.html" style="color:#19e6ff;text-decoration:none">Open Subscription →</a>';
+   $("selectionNotice").style.borderColor="rgba(246,185,59,.18)";
+   $("selectionNotice").style.color="#c3a45e";
+   msg("Select a bot included in your subscription, or choose a subscription that includes this bot.","error");
+   return;
+ }
+ $("selectionNotice").textContent="SUBSCRIBED BOT SELECTED · Configuration changes apply to this bot only.";
+ $("selectionNotice").style.borderColor="rgba(35,247,163,.16)";
+ $("selectionNotice").style.color="#69e6c1";
+ renderBots();
  const imageMap={"strategic":"assets/images/bots/strategic.png","flipper":"assets/images/bots/flipper.png","breakout":"assets/images/bots/breakout.png","smc-pro":"assets/images/bots/smc-pro.png","ladder-flip":"assets/images/bots/ladder-flip.png"};
  const roleMap={"strategic":"MULTI-STRATEGY ENGINE","flipper":"HIGH-SPEED FLIPPING","breakout":"BREAKOUT & MOMENTUM","smc-pro":"SMART MONEY CONCEPTS","ladder-flip":"ADAPTIVE LADDER SYSTEM"};
  $("detailImage").src=imageMap[selected.id]||"assets/images/hero-bot.png";$("detailImage").alt=selected.name;$("detailCode").textContent="BOT ENGINE // "+(selected.entitled?"ENTITLED":"LOCKED");$("detailRole").textContent=roleMap[selected.id]||selected.mode;$("botTitle").textContent=selected.name;$("botDesc").textContent=selected.strategies.join(" · ");
@@ -134,9 +160,39 @@ async function selectBot(id){
 async function load(){
  setTelemetry("BACKEND TELEMETRY","LOADING VERIFIED BOT STATE…");
  try{
-  const [d,rt]=await Promise.all([api("/bots"),api("/runtime")]);bots=(d.bots||[]).map(b=>{const x=(rt.bots||[]).find(z=>z.botId===b.id)||{};return {...b,runtime:x.runtime||"STOPPED",executionMode:x.executionMode||b.executionMode,symbol:x.symbol||"",timeframe:x.timeframe||"1m"};});renderBots();setTelemetry("BACKEND CONNECTED",bots.length+" BOT ENGINES / RUNTIME VERIFIED");
-  const first=bots.find(b=>b.entitled);if(first)await selectBot(first.id);else{setTelemetry("ENTITLEMENT REQUIRED","No active bot entitlement was returned.");msg("No entitled bot is available for this account.","error")}
- }catch(e){setTelemetry("BACKEND UNAVAILABLE","No authoritative bot state loaded.");msg(e.message,"error")}
+  const [d,rt,sub]=await Promise.all([
+    api("/bots"),
+    api("/runtime"),
+    api("/subscription/me")
+  ]);
+  const entitledIds=new Set((sub.entitlements||[]).map(x=>String(x.botId||"").toLowerCase()));
+  bots=(d.bots||[]).map(b=>{
+    const x=(rt.bots||[]).find(z=>z.botId===b.id)||{};
+    return {...b,
+      entitled:entitledIds.size?entitledIds.has(b.id):Boolean(b.entitled),
+      runtime:x.runtime||"STOPPED",
+      executionMode:x.executionMode||b.executionMode,
+      symbol:x.symbol||"",
+      timeframe:x.timeframe||"1m"
+    };
+  });
+  const plan=sub.subscription?.plan_id?String(sub.subscription.plan_id).toUpperCase():"NO ACTIVE PLAN";
+  $("subscriptionState").textContent="SUBSCRIPTION: "+plan;
+  renderBots();
+  setTelemetry("BACKEND CONNECTED",bots.length+" BOT ENGINES / ENTITLEMENT VERIFIED");
+  const first=bots.find(b=>b.entitled);
+  if(first){
+    await selectBot(first.id);
+  }else{
+    setTelemetry("ENTITLEMENT REQUIRED","No active bot entitlement was returned.");
+    $("selectionNotice").innerHTML='No bot is currently subscribed on this account. <a href="subscription.html" style="color:#19e6ff;text-decoration:none">Open Subscription →</a>';
+    msg("No entitled bot is available for this account.","error");
+  }
+ }catch(e){
+   setTelemetry("BACKEND UNAVAILABLE","No authoritative bot state loaded.");
+   $("subscriptionState").textContent="SUBSCRIPTION: UNAVAILABLE";
+   msg(e.message,"error");
+ }
 }
 $("configBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");const symbol=fields.symbol.value.trim().toUpperCase(),timeframe=fields.timeframe.value;if(!symbol)return msg("Broker symbol is required.","error");msg("Saving market configuration…");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/config",{method:"POST",body:JSON.stringify({symbol,timeframe})});selected.symbol=d.symbol;selected.timeframe=d.timeframe;$("mSymbol").textContent=d.symbol;$("mTimeframe").textContent=d.timeframe;msg("Market configuration saved. Engine remains stopped until explicitly started.","ok")}catch(e){msg(e.message,"error")}});
 $("startBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");msg("Authorizing engine start…");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/start",{method:"POST",body:"{}"});selected.runtime=d.state;selected.executionMode=d.executionMode;$("mRuntime").textContent=d.state;$("enginePill").textContent="RUNNING";msg("Engine started. Broker and server risk gates remain authoritative.","ok")}catch(e){msg(e.message,"error")}});
