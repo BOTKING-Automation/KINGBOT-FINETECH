@@ -205,10 +205,26 @@ function esc(v){return String(v??"").replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&
 function fmtDate(v){if(!v)return"—";const d=new Date(v);return Number.isNaN(d.getTime())?"—":d.toLocaleString()}
 function money(v){return Number(v||0).toLocaleString("en-US",{maximumFractionDigits:2})}
 function toastMsg(msg,kind){toast.textContent=msg;toast.className="toast show "+(kind||"");setTimeout(()=>toast.className="toast",3500)}
+async function adminApiRequest(path,options={}){
+ const fb=window.KINGBOT_FIREBASE;
+ if(!fb?.auth?.currentUser||!fb?.getToken)throw new Error("Authentication required.");
+ const send=async(force=false)=>{
+   const token=await fb.getToken(force);
+   if(!token)throw new Error("Authentication required.");
+   const headers=new Headers(options.headers||{});
+   headers.set("Accept","application/json");
+   if(options.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
+   headers.set("Authorization","Bearer "+token);
+   return fetch("https://kingbot-fintech-api-etfv.onrender.com/api"+(String(path).startsWith("/")?path:"/"+path),{...options,headers,cache:"no-store"});
+ };
+ let response=await send(false);
+ if(response.status===401)response=await send(true);
+ return response;
+}
 async function api(path,options={}){
  const controller=new AbortController();
  const timer=setTimeout(()=>controller.abort(),12000);
- try{return await window.KINGBOT_API.request(path,{...options,signal:controller.signal});}
+ try{return await adminApiRequest(path,{...options,signal:controller.signal});}
  catch(error){
   if(error?.name==="AbortError") {
    const e=new Error("KINGBOT backend did not respond within 12 seconds.");
@@ -276,6 +292,7 @@ async function showAdminSignIn(fb){
        const result=await fb.signIn({email,password,remember:true});
        if(!result?.verified)throw new Error("Administrator email is not verified in Firebase.");
        await fb.refresh();
+       await fb.getToken(true);
        const signedIn=fb.auth.currentUser;
        if(!signedIn?.emailVerified)throw new Error("Administrator email is not verified in Firebase.");
        form.remove();
