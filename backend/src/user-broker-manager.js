@@ -48,8 +48,15 @@ export class UserBrokerManager {
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT TRUE");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()");
-    await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_deriv_oauth_states (state TEXT PRIMARY KEY,user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,code_verifier TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'PAPER',expires_at TIMESTAMPTZ NOT NULL)");
+    await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_deriv_oauth_states (state TEXT PRIMARY KEY,user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,code_verifier TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'PAPER',expires_at TIMESTAMPTZ NOT NULL,pending_id TEXT,token_ciphertext TEXT,token_iv TEXT,token_tag TEXT,accounts_json JSONB,status TEXT NOT NULL DEFAULT 'pending')");
+    await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS pending_id TEXT");
+    await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS token_ciphertext TEXT");
+    await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS token_iv TEXT");
+    await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS token_tag TEXT");
+    await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS accounts_json JSONB");
+    await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'");
     await this.pool.query("CREATE INDEX IF NOT EXISTS kingbot_deriv_oauth_states_expires_idx ON kingbot_deriv_oauth_states(expires_at)");
+    await this.pool.query("CREATE UNIQUE INDEX IF NOT EXISTS kingbot_deriv_oauth_states_pending_idx ON kingbot_deriv_oauth_states(pending_id) WHERE pending_id IS NOT NULL");
   }
 
   async createDerivOAuthState({userId,codeVerifier,executionMode="PAPER"}={}){
@@ -64,8 +71,46 @@ export class UserBrokerManager {
 
   async consumeDerivOAuthState(state){
     if(!this.pool)return null;
-    const q=await this.pool.query("DELETE FROM kingbot_deriv_oauth_states WHERE state=$1 AND expires_at>NOW() RETURNING user_id,code_verifier,execution_mode",[String(state||"")]);
+    const q=await this.pool.query("SELECT user_id,code_verifier,execution_mode,status FROM kingbot_deriv_oauth_states WHERE state=$1 AND expires_at>NOW() AND status='pending' FOR UPDATE",[String(state||"")]);
     return q.rowCount?q.rows[0]:null;
+  }
+
+  async finalizeDerivOAuthState({state,tokenPayload,accounts}={}){
+    if(!this.pool||!state)throw new Error("DERIV_OAUTH_STATE_REQUIRED");
+    const token=JSON.stringify({
+      accessToken:String(tokenPayload?.access_token||""),
+      refreshToken:tokenPayload?.refresh_token||undefined,
+      expiresAt:Date.now()+Number(tokenPayload?.expires_in||3600)*1000
+    });
+    if(!JSON.parse(token).accessToken)throw new Error("DERIV_ACCESS_TOKEN_REQUIRED");
+    const encrypted=encryptSecret(token);
+    const pendingId=crypto.randomBytes(24).toString("base64url");
+    const q=await this.pool.query(
+      "UPDATE kingbot_deriv_oauth_states SET code_verifier='',pending_id=$2,token_ciphertext=$3,token_iv=$4,token_tag=$5,accounts_json=$6::jsonb,status='authorized',expires_at=NOW()+INTERVAL '10 minutes' WHERE state=$1 AND status='pending' AND expires_at>NOW() RETURNING user_id,execution_mode,pending_id",
+      [String(state),pendingId,encrypted.ciphertext,encrypted.iv,encrypted.tag,JSON.stringify(Array.isArray(accounts)?accounts:[])]
+    );
+    if(!q.rowCount)throw new Error("DERIV_OAUTH_STATE_INVALID_OR_EXPIRED");
+    return q.rows[0];
+  }
+
+  async getDerivOAuthPending({userId,pendingId}={}){
+    if(!this.pool||!userId||!pendingId)return null;
+    const q=await this.pool.query(
+      "SELECT user_id,execution_mode,pending_id,token_ciphertext,token_iv,token_tag,accounts_json,status,expires_at FROM kingbot_deriv_oauth_states WHERE user_id=$1 AND pending_id=$2 AND status='authorized' AND expires_at>NOW()",
+      [userId,String(pendingId)]
+    );
+    if(!q.rowCount)return null;
+    const row=q.rows[0];
+    let token;
+    try{token=JSON.parse(decryptSecret({credential_ciphertext:row.token_ciphertext,credential_iv:row.token_iv,credential_tag:row.token_tag}));}catch{throw new Error("DERIV_OAUTH_TOKEN_DECRYPTION_FAILED");}
+    return {...row,token,accounts:Array.isArray(row.accounts_json)?row.accounts_json:[]};
+  }
+
+  async consumeDerivOAuthPending({userId,pendingId}={}){
+    const pending=await this.getDerivOAuthPending({userId,pendingId});
+    if(!pending)return null;
+    await this.pool.query("DELETE FROM kingbot_deriv_oauth_states WHERE user_id=$1 AND pending_id=$2",[userId,String(pendingId)]);
+    return pending;
   }
 
   async isConnected(userId){
