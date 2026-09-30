@@ -62,7 +62,7 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
 <div class="readout"><span>AI CORE <b>ACTIVE</b></span><span>CYBER NEURAL CORE <b>ONLINE</b></span><span>UPTREND MATRIX <b>LINKING</b></span></div>
 <div class="status" id="status">NEURAL CORE INITIALIZING</div>
 <div class="progress"><i></i></div>
-<div class="foot">GIBSONFX TECH · KINGBOT FINTECH · 10.00 SEC STARTUP SEQUENCE</div>
+<div class="foot">GIBSONFX TECH · KINGBOT FINTECH · 3.00 SEC STARTUP SEQUENCE</div>
 </div></div>
 
 <script>
@@ -73,7 +73,7 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
   var i=0;
   var params=new URLSearchParams(window.location.search);
   var requestedDuration=Number(params.get("duration"));
-  var duration=(Number.isFinite(requestedDuration)&&requestedDuration>=800&&requestedDuration<=10000)?requestedDuration:10000;
+  var duration=(Number.isFinite(requestedDuration)&&requestedDuration>=800&&requestedDuration<=10000)?requestedDuration:3000;
   var ticker=window.setInterval(function(){
     i=(i+1)%states.length;
     if(status) status.textContent=states[i];
