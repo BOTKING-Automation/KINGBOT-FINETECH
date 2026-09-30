@@ -74,14 +74,47 @@ app.get("/api/analytics", async (req,res)=>{
 
 app.post("/api/broker/account", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
+  const provider=String(req.body?.provider||"metaapi").trim().toLowerCase();
   const accountId=String(req.body?.accountId||"").trim();
-  const accountToken=String(req.body?.accountToken||"").trim();
   const executionMode=String(req.body?.executionMode||"PAPER").toUpperCase();
   if(!accountId)return res.status(400).json({ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"});
+
+  if(provider==="exness"){
+    if(!/^[0-9]{1,20}$/.test(accountId))return res.status(400).json({ok:false,error:"INVALID_EXNESS_ACCOUNT_ID"});
+    const apiKey=String(req.body?.apiKey||"").trim();
+    const secretKey=String(req.body?.secretKey||"").trim();
+    const baseUrl=String(req.body?.baseUrl||"").trim();
+    if(!apiKey)return res.status(400).json({ok:false,error:"EXNESS_API_KEY_REQUIRED"});
+    if(!secretKey)return res.status(400).json({ok:false,error:"EXNESS_SECRET_KEY_REQUIRED"});
+    try{
+      return res.status(201).json(await broker.saveMapping({
+        userId:user.id,
+        provider:"exness",
+        accountId,
+        executionMode,
+        apiKey,
+        secretKey,
+        baseUrl
+      }));
+    }catch(error){
+      return res.status(500).json({ok:false,error:"Exness account mapping failed.",reason:error?.message||"EXNESS_ACCOUNT_MAPPING_FAILED"});
+    }
+  }
+
+  const accountToken=String(req.body?.accountToken||"").trim();
   if(!accountToken)return res.status(400).json({ok:false,error:"BROKER_ACCOUNT_TOKEN_REQUIRED"});
   if(!/^[A-Za-z0-9._:-]{3,100}$/.test(accountId))return res.status(400).json({ok:false,error:"INVALID_BROKER_ACCOUNT_ID"});
-  try{res.status(201).json(await broker.saveMapping({userId:user.id,provider:"metaapi",accountId,accountToken,executionMode}));}
-  catch(error){res.status(500).json({ok:false,error:"Broker account mapping failed.",reason:error?.message||"BROKER_ACCOUNT_MAPPING_FAILED"});}
+  try{
+    res.status(201).json(await broker.saveMapping({
+      userId:user.id,
+      provider:"metaapi",
+      accountId,
+      accountToken,
+      executionMode
+    }));
+  }catch(error){
+    res.status(500).json({ok:false,error:"Broker account mapping failed.",reason:error?.message||"BROKER_ACCOUNT_MAPPING_FAILED"});
+  }
 });
 
 app.get("/api/connection", async (req,res)=>{
