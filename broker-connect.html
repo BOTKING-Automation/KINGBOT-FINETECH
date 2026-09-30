@@ -137,11 +137,14 @@ h1{margin:10px 0 6px;font:900 clamp(28px,4.4vw,48px) Orbitron;letter-spacing:-.0
       <div class="credentials" id="credentials">
         <div class="fields">
           <div class="field"><label>EXECUTION MODE</label><select id="executionMode"><option value="PAPER">PAPER · DEMO</option><option value="LIVE">LIVE · REAL</option></select></div>
-          <div class="field"><label>API / BRIDGE ACCOUNT ID</label><input id="accountId" autocomplete="off" placeholder="Account identifier"></div>
-          <div class="field" style="grid-column:1/-1"><label>API / BRIDGE ACCESS TOKEN</label><input id="accessToken" type="password" autocomplete="off" placeholder="Paste the credential issued by the broker/bridge"></div>
+          <div class="field"><label>ACCOUNT ID</label><input id="accountId" autocomplete="off" placeholder="Exness trading account ID"></div>
+          <div class="field" id="apiKeyField" style="grid-column:1/-1"><label>EXNESS API KEY</label><input id="apiKey" autocomplete="off" placeholder="exnsk_…"></div>
+          <div class="field" id="secretKeyField" style="grid-column:1/-1"><label>EXNESS SECRET KEY</label><input id="secretKey" type="password" autocomplete="off" placeholder="Secret shown once by Exness"></div>
+          <div class="field" id="hostField" style="grid-column:1/-1"><label>API HOST (OPTIONAL)</label><input id="apiHost" autocomplete="off" placeholder="https://api.exness.com · leave blank for discovery"></div>
+          <div class="field" id="bridgeTokenField" style="grid-column:1/-1;display:none"><label>BRIDGE ACCESS TOKEN</label><input id="accessToken" type="password" autocomplete="off" placeholder="MetaApi access token"></div>
         </div>
-        <div class="status-line">Credentials are sent over HTTPS to the authenticated KINGBOT backend and are not stored in browser localStorage.</div>
-        <div class="modal-actions"><button class="modal-btn" id="verifyBtn" type="button">VERIFY CONNECTION</button></div>
+        <div class="status-line" id="credentialHelp">Exness flow: create the API key in Exness Key Management, select the trading account that the key may access, copy the secret once, and paste the values here. KINGBOT signs requests on the server; credentials are encrypted and never stored in browser localStorage.</div>
+        <div class="modal-actions"><button class="modal-btn" id="verifyBtn" type="button">VERIFY EXNESS CONNECTION</button></div>
       </div>
 
       <div class="account-select" id="accountSelect">
@@ -176,7 +179,7 @@ const logos={
   fxcm:"https://fxcmpy.tpq.io/_static/fxcm_logo_bg.png",
   ibkr:"https://rankia.com.br/_next/image/?q=100&url=https%3A%2F%2Frankia.com.br%2Fapp%2Fuploads%2F2024%2F09%2Finteractivebrokers_logo_corretora.webp&w=768"
 };
-let selected=null,step=1,verified=false,selectedAccount=null;
+let selected=null,step=1,verified=false,selectedAccount=null,partnerOpened=false;
 const $=id=>document.getElementById(id);
 function setStep(n){
   step=n;
@@ -198,7 +201,7 @@ function textFor(){
   }[step];
   $("flowCopy").innerHTML="<strong>"+copy[0]+"</strong><br>"+copy[1];
   $("brokerLogin").textContent=step===1?"OPEN "+d.name+" ↗":step===2?"OPEN API ACCESS ↗":"OPEN "+d.name+" ↗";
-  $("brokerLogin").href=step===1?d.login:d.api;
+  $("brokerLogin").href=step===1?(selected==="exness" && partnerOpened ? $("brokerLogin").href : d.login):d.api;
   $("nextStep").style.display=(step<2||(!verified&&step===2&&d.native))?"inline-flex":"none";
   if(step===2&&!d.native)$("credentials").classList.add("show");else $("credentials").classList.remove("show");
   if(step===3)$("accountSelect").classList.add("show");else $("accountSelect").classList.remove("show");
@@ -211,9 +214,25 @@ function selectBroker(slug){
   $("modalTitle").textContent=d.name;
   $("modalSubtitle").textContent=d.native?(d.mode==="oauth"?"NATIVE OAUTH / APPLICATION FLOW":"NATIVE API / TOKEN FLOW"):"MT4 / MT5 BRIDGE FLOW";
   $("modalLogo").src=logos[slug];$("modalLogo").alt=d.name;
-  $("accountId").value="";$("accessToken").value="";
+  $("accountId").value="";$("apiKey").value="";$("secretKey").value="";$("apiHost").value="";$("accessToken").value="";$("secretKey").value="";
   $("accountList").innerHTML="";$("authorizeBtn").disabled=true;
+  $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=selected==="exness"?"block":"none";$("bridgeTokenField").style.display=selected==="exness"?"none":"block";
+  $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION";
+  if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
   textFor();showDrawer();
+  if(selected==="exness")trackExnessPartner();
+}
+async function trackExnessPartner(){
+  try{
+    const t=await firebaseToken();
+    const r=await fetch(API_BASE+"/partners/click",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify({brokerSlug:"exness",landingUrl:window.location.href,metadata:{source:"broker-connect",surface:"exness-native"}})});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.redirectUrl){
+      $("brokerLogin").href=d.redirectUrl;
+      partnerOpened=Boolean(d.tracked);
+      if(d.tracked)setStatus("Your Exness partner route is ready. Open it to register/sign in, then create the API key in Key Management.");
+    }
+  }catch{}
 }
 async function firebaseToken(){
   if(!window.KINGBOT_FIREBASE)await import("./system/firebase-auth.js");
@@ -245,11 +264,16 @@ $("nextStep").addEventListener("click",()=>{
 $("verifyBtn").addEventListener("click",async()=>{
   if(!selected)return;
   const accountId=$("accountId").value.trim(),token=$("accessToken").value.trim();
-  if(!accountId||!token){setStatus("Enter both the account ID and access token.");return}
+  if(selected==="exness"){
+    if(!accountId||!$("apiKey").value.trim()||!$("secretKey").value.trim()){setStatus("Enter the Exness account ID, API key and secret key.");return}
+  }else if(!accountId||!token){setStatus("Enter both the account ID and bridge access token.");return}
   const btn=$("verifyBtn");btn.disabled=true;btn.textContent="VERIFYING…";setStep(3);
   try{
     const t=await firebaseToken();
-    const r=await fetch(API_BASE+"/broker/account",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify({provider:"metaapi",accountId,accountToken:token,executionMode:$("executionMode").value})});
+    const body=selected==="exness"
+      ? {provider:"exness",accountId,apiKey:$("apiKey").value.trim(),secretKey:$("secretKey").value,baseUrl:$("apiHost").value.trim(),executionMode:$("executionMode").value}
+      : {provider:"metaapi",accountId,accountToken:token,executionMode:$("executionMode").value};
+    const r=await fetch(API_BASE+"/broker/account",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify(body)});
     const d=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(d.error||d.reason||"Broker credential mapping failed.");
     const c=await fetch(API_BASE+"/broker/connect",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify({executionMode:$("executionMode").value})});
