@@ -99,11 +99,21 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
         continues to secure Sign In after the animation.
     */
     if(!embedded){
-      window.location.replace(
-        "access-stable.html?return="+
-        encodeURIComponent("index.html")+
-        "#signin"
-      );
+      try{
+        sessionStorage.setItem("KINGBOT_NEURAL_BOOT_SEEN","1");
+      }catch(e){}
+
+      var next=params.get("next");
+      var target="access-stable.html?return="+encodeURIComponent("index.html")+"#signin";
+      if(next){
+        try{
+          var candidate=new URL(next,window.location.href);
+          if(candidate.origin===window.location.origin){
+            target=candidate.pathname+candidate.search+candidate.hash;
+          }
+        }catch(e){}
+      }
+      window.location.replace(target);
     }
   },duration);
 })();
