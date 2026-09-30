@@ -70,14 +70,29 @@
   }
 
   async function getToken(forceRefresh = false) {
-    if (!window.KINGBOT_FIREBASE?.auth?.currentUser) {
+    // The shared session manager is the authoritative browser auth state.
+    // Wait for it to restore Firebase persistence before touching currentUser.
+    if (window.KINGBOT_SESSION?.check) {
+      const session = await window.KINGBOT_SESSION.check({ force: forceRefresh });
+      if (!session?.authenticated) {
+        throw new Error("Please sign in to use KINGBOT Intelligence.");
+      }
+      if (!session?.user?.verified) {
+        throw new Error("Verify your email before using KINGBOT Intelligence.");
+      }
+    }
+
+    const user = window.KINGBOT_FIREBASE?.auth?.currentUser;
+    if (!user) {
       throw new Error("Please sign in to use KINGBOT Intelligence.");
     }
-    const user = window.KINGBOT_FIREBASE.auth.currentUser;
     if (!user.emailVerified) {
       throw new Error("Verify your email before using KINGBOT Intelligence.");
     }
-    return user.getIdToken(forceRefresh);
+
+    // A forced refresh prevents an expired/stale ID token from being sent
+    // immediately after Firebase restores a persisted session.
+    return user.getIdToken(Boolean(forceRefresh));
   }
 
   async function requestJson(url, options = {}, auth = true) {
