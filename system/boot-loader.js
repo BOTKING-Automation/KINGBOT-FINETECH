@@ -35,7 +35,7 @@ function start(){
   frame.id="kb-boot-frame";
   frame.title="KINGBOT FINTECH neural startup";
   frame.setAttribute("aria-label","KINGBOT FINTECH neural startup");
-  frame.src="loader.html?embed=1";
+  frame.src="loader.html?embed=1&duration=3200&surface=admin";
   document.body.appendChild(frame);
 
   let finished=false;
