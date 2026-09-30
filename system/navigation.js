@@ -382,7 +382,7 @@
       if(action==="logout"){
         return '<a href="#" data-kb-logout>'+name+'</a>';
       }
-      return '<a href="'+href+'"'+(action==="admin"?' data-kb-admin-link hidden':'')+'>'+name+'</a>';
+      return '<a href="'+href+'">'+name+'</a>';
     }).join("");
 
     const root=document.createElement("div");
