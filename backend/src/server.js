@@ -271,9 +271,20 @@ async function buildIntelligenceContext(user, requestedSymbol=null){
   }
 
   if(context.broker.connected){
-    try{
-      const account=await broker.getAccount(user.id);
-      const raw=account?.data||{};
+    const accountTask = broker.getAccount(user.id);
+    const positionsTask = broker.getPositions(user.id);
+    const quoteTask = requestedSymbol
+      ? broker.getQuote(requestedSymbol, user.id)
+      : Promise.resolve(null);
+
+    const [accountResult, positionsResult, quoteResult] = await Promise.allSettled([
+      accountTask,
+      positionsTask,
+      quoteTask
+    ]);
+
+    if (accountResult.status === "fulfilled") {
+      const raw=accountResult.value?.data||{};
       const currency=String(raw.currency||"").trim().slice(0,12) || null;
       context.account={
         available:true,
@@ -284,12 +295,12 @@ async function buildIntelligenceContext(user, requestedSymbol=null){
         freeMargin:finiteNumber(raw.freeMargin),
         marginLevel:finiteNumber(raw.marginLevel)
       };
-    }catch(error){
+    } else {
       context.account={available:false,reason:"BROKER_ACCOUNT_TELEMETRY_UNAVAILABLE"};
     }
 
-    try{
-      const positions=await broker.getPositions(user.id);
+    if (positionsResult.status === "fulfilled") {
+      const positions=positionsResult.value;
       context.positions=(Array.isArray(positions?.data)?positions.data:[]).slice(0,25).map(position=>({
         symbol:String(position.symbol||"").slice(0,30),
         type:String(position.type||position.side||"").slice(0,20),
@@ -298,28 +309,23 @@ async function buildIntelligenceContext(user, requestedSymbol=null){
         currentPrice:finiteNumber(position.currentPrice),
         profit:finiteNumber(position.profit)
       }));
-    }catch(error){
+    } else {
       context.positions=[];
     }
 
-    if(requestedSymbol){
-      try{
-        const quote=await broker.getQuote(requestedSymbol,user.id);
-        const raw=quote?.data||{};
-        const bid=finiteNumber(raw.bid);
-        const ask=finiteNumber(raw.ask);
-        const time=raw.time||raw.timestamp||null;
-        if(bid!==null&&ask!==null&&bid>0&&ask>0&&ask>=bid){
-          context.marketQuote={
-            symbol:requestedSymbol,
-            bid,
-            ask,
-            spread:ask-bid,
-            time
-          };
-        }
-      }catch(error){
-        context.marketQuote=null;
+    if (requestedSymbol && quoteResult.status === "fulfilled") {
+      const raw=quoteResult.value?.data||{};
+      const bid=finiteNumber(raw.bid);
+      const ask=finiteNumber(raw.ask);
+      const time=raw.time||raw.timestamp||null;
+      if(bid!==null&&ask!==null&&bid>0&&ask>0&&ask>=bid){
+        context.marketQuote={
+          symbol:requestedSymbol,
+          bid,
+          ask,
+          spread:ask-bid,
+          time
+        };
       }
     }
   }
@@ -334,7 +340,7 @@ app.get("/api/intelligence/context", async (req,res)=>{
     return res.status(400).json({ok:false,error:"INVALID_SYMBOL"});
   }
   try{
-    const context=await buildIntelligenceContext(user,symbol||null);
+    const context=await getCachedIntelligenceContext(user,symbol||null);
     res.json({ok:true,...context});
   }catch(error){
     console.error("[KINGBOT INTELLIGENCE] context failed:",error?.message||error);
@@ -391,6 +397,36 @@ Response style:
 `;
 
 const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
+
+const intelligenceContextCache = new Map();
+const INTELLIGENCE_CONTEXT_TTL_MS = 7000;
+
+async function getCachedIntelligenceContext(user, requestedSymbol = null) {
+  const key = String(user.id) + ":" + String(requestedSymbol || "");
+  const now = Date.now();
+  const hit = intelligenceContextCache.get(key);
+  if (hit?.value && hit.expiresAt > now) return hit.value;
+  if (hit?.promise) return hit.promise;
+
+  const promise = buildIntelligenceContext(user, requestedSymbol)
+    .then(value => {
+      intelligenceContextCache.set(key, {
+        value,
+        expiresAt: Date.now() + INTELLIGENCE_CONTEXT_TTL_MS
+      });
+      return value;
+    })
+    .catch(error => {
+      intelligenceContextCache.delete(key);
+      throw error;
+    });
+
+  intelligenceContextCache.set(key, {
+    promise,
+    expiresAt: now + INTELLIGENCE_CONTEXT_TTL_MS
+  });
+  return promise;
+}
 
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -469,7 +505,7 @@ app.post("/api/ai/query", aiLimiter, async (req, res) => {
         ? requestedSymbolFromBody
         : extractRequestedSymbol(message);
 
-    const verifiedContext=await buildIntelligenceContext(aiUser,requestedSymbol);
+    const verifiedContext=await getCachedIntelligenceContext(aiUser,requestedSymbol);
     const contextText=JSON.stringify({
       ...verifiedContext,
       analysisHint: {
@@ -500,7 +536,7 @@ app.post("/api/ai/query", aiLimiter, async (req, res) => {
       config: {
         systemInstruction: KINGBOT_SYSTEM_INSTRUCTION,
         temperature: 0.25,
-        maxOutputTokens: 900
+        maxOutputTokens: 600
       }
     });
 
