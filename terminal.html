@@ -1234,7 +1234,7 @@ overscroll-behavior:none;}
       <div>
         <div class="section-title">ACCOUNT COMMAND METRICS</div>
         <div class="section-desc">
-          Broker values remain unavailable until a real account connection exists.
+          Live broker telemetry is authoritative and refreshes automatically while connected.
         </div>
       </div>
 
@@ -2868,7 +2868,7 @@ function renderAccountOverview(account){
   $("accountType").textContent=String(account.accountType||"—").toUpperCase();
   $("accountCurrency").textContent=currency||"—";
   $("accountMode").textContent=String(account.executionMode||"—").toUpperCase();
-  $("accountTradingStatus").textContent=account.tradingEnabled?"ENABLED":"DISABLED";
+  $("accountTradingStatus").textContent=(account.tradingEnabled?"ENABLED":"DISABLED")+" · "+String(account.accountStatus||"ACTIVE").toUpperCase();
   $("accountTradingStatus").style.color=account.tradingEnabled?"#23f7a3":"#ff4d6d";
 
   $("accountBalance").textContent=formatMoney(account.balance,currency);
