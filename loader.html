@@ -100,7 +100,7 @@ import "./system/session.js";
     try{
       const session=window.KINGBOT_SESSION;
       if(!session){
-        go("access-stable.html?return="+encodeURIComponent("index.html")+"#signin");
+        go("access-stable.html?return="+encodeURIComponent("index.html?kb-startup=complete")+"#signin");
         return;
       }
 
@@ -112,7 +112,7 @@ import "./system/session.js";
       }
 
       if(state?.authenticated && state?.user && !state.user.verified){
-        go("verify.html?return="+encodeURIComponent("index.html"));
+        go("verify.html?return="+encodeURIComponent("index.html?kb-startup=complete"));
         return;
       }
 
