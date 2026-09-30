@@ -112,9 +112,15 @@ async function execute(row){
   if(!status.configured){await pool.query("UPDATE kingbot_bot_runtime SET state='ERROR',last_error='BROKER_ACCOUNT_NOT_MAPPED',updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);return;}
   if(!status.connected){const connected=await broker.connect(userId,s.executionMode);if(!connected.connected)throw new Error(connected.reason||"BROKER_CONNECTION_FAILED");}
   const account=(await broker.getAccount(userId)).data||{};
-  const type=String(account.type||"");
-  if(s.executionMode==="PAPER"&&type!=="ACCOUNT_TRADE_MODE_DEMO")throw new Error("PAPER_REQUIRES_DEMO_ACCOUNT");
-  if(s.executionMode==="LIVE"&&type!=="ACCOUNT_TRADE_MODE_REAL")throw new Error("LIVE_REQUIRES_REAL_ACCOUNT");
+  if(status.broker==="exness"){
+    if(s.executionMode==="PAPER")throw new Error("EXNESS_PAPER_MODE_REQUIRES_DEMO_API_ACCOUNT");
+    if(account.trade_mode==="trading_disabled")throw new Error("EXNESS_TRADING_DISABLED");
+    if(account.account_status==="close_only")throw new Error("EXNESS_ACCOUNT_CLOSE_ONLY");
+  }else{
+    const type=String(account.type||"");
+    if(s.executionMode==="PAPER"&&type!=="ACCOUNT_TRADE_MODE_DEMO")throw new Error("PAPER_REQUIRES_DEMO_ACCOUNT");
+    if(s.executionMode==="LIVE"&&type!=="ACCOUNT_TRADE_MODE_REAL")throw new Error("LIVE_REQUIRES_REAL_ACCOUNT");
+  }
   if(account.tradeAllowed===false)throw new Error("BROKER_TRADING_NOT_ALLOWED");
   const quote=(await broker.getQuote(config.symbol,userId)).data||{};
   const bid=Number(quote.bid),ask=Number(quote.ask),quoteTime=new Date(quote.time||0).getTime();
