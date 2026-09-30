@@ -9,6 +9,10 @@ const BOT_DEFINITIONS = {
     name: "KINGBOT STRATEGIC",
     mode: "multi-strategy",
     strategies: ["trend-following", "mean-reversion", "volatility-regime", "multi-factor-consensus"],
+    signalThreshold: 70,
+    tradePlan: { slAtr: 1.8, tpAtr: 2.7, trailingTriggerR: 1.0, trailingLockR: 0.35, maxHoldBars: 24 },
+    signalThreshold: 75,
+    tradePlan: { slAtr: 1.6, tpAtr: 2.8, trailingTriggerR: 1.0, trailingLockR: 0.5, maxHoldBars: 30 },
     risk: { maxRiskPerTradePct: 1, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
   },
   flipper: {
@@ -16,6 +20,8 @@ const BOT_DEFINITIONS = {
     name: "KINGBOT FLIPPER",
     mode: "high-speed-flipping",
     strategies: ["micro-momentum", "impulse-continuation", "rapid-reversal", "spread-filter"],
+    signalThreshold: 76,
+    tradePlan: { slAtr: 0.75, tpAtr: 1.05, trailingTriggerR: 0.7, trailingLockR: 0.2, maxHoldBars: 8 },
     risk: { maxRiskPerTradePct: 0.5, maxPositions: 2, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
   },
   breakout: {
@@ -23,6 +29,8 @@ const BOT_DEFINITIONS = {
     name: "KINGBOT BREAKOUT",
     mode: "breakout-momentum",
     strategies: ["range-compression", "level-breakout", "volatility-confirmation", "retest-continuation"],
+    signalThreshold: 72,
+    tradePlan: { slAtr: 1.25, tpAtr: 2.5, trailingTriggerR: 1.0, trailingLockR: 0.45, maxHoldBars: 18 },
     risk: { maxRiskPerTradePct: 0.75, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
   },
   "smc-pro": {
@@ -37,6 +45,8 @@ const BOT_DEFINITIONS = {
     name: "KINGBOT LADDER FLIP V8",
     mode: "adaptive-ladder",
     strategies: ["adaptive-spacing", "ladder-levels", "exposure-controller", "reversal-logic", "emergency-unwind"],
+    signalThreshold: 78,
+    tradePlan: { slAtr: 1.3, tpAtr: 1.95, trailingTriggerR: 0.9, trailingLockR: 0.35, maxHoldBars: 20, maxLadderLevels: 3 },
     risk: { maxRiskPerTradePct: 0.5, maxPositions: 5, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
   }
 };
@@ -66,49 +76,66 @@ function baseContext(snapshot = {}) {
 }
 
 function evaluateStrategic(c) {
-  const trend = c.trend * 0.35;
-  const momentum = c.momentum * 0.25;
-  const meanReversion = -c.trend * (1 - c.volatility) * 0.15;
-  const volatilityFit = (c.volatility >= 0.2 && c.volatility <= 0.8 ? 0.15 : -0.05);
-  const score = clamp((trend + momentum + meanReversion + volatilityFit) * 100, -100, 100);
-  return { score, reason: "Consensus of trend, momentum, mean-reversion and volatility regime." };
+  const regime = c.volatility >= 0.82 ? -0.25 : c.volatility <= 0.08 ? -0.1 : 0.15;
+  const trend = c.trend * 0.38;
+  const momentum = c.momentum * 0.24;
+  const structure = (c.structure === "bullish" ? 0.16 : c.structure === "bearish" ? -0.16 : 0);
+  const breakout = c.breakout ? Math.sign(c.trend || 1) * 0.08 : 0;
+  const meanReversion = (!c.breakout && c.volatility < 0.35) ? -c.trend * 0.12 : 0;
+  const score = clamp((trend + momentum + structure + breakout + meanReversion + regime) * 100, -100, 100);
+  return { score, reason: "Regime classification plus trend, structure, momentum and controlled mean-reversion fit." };
 }
 
 function evaluateFlipper(c) {
-  const impulse = c.momentum * 0.45;
-  const microTrend = c.trend * 0.3;
-  const spreadPenalty = c.spread > 0 && c.atr > 0 ? Math.min(c.spread / c.atr, 1) * 0.25 : 0;
-  const score = clamp((impulse + microTrend - spreadPenalty) * 100, -100, 100);
-  return { score, reason: "Short-horizon momentum with spread and impulse filters." };
+  const impulse = c.momentum * 0.5;
+  const microTrend = c.trend * 0.28;
+  const structure = c.structure === "bullish" ? 0.12 : c.structure === "bearish" ? -0.12 : 0;
+  const spreadPenalty = c.spread > 0 && c.atr > 0 ? Math.min(c.spread / c.atr, 1) * 0.35 : 0;
+  const volatilityGate = c.volatility > 0.9 ? -0.3 : c.volatility < 0.08 ? -0.12 : 0.08;
+  const score = clamp((impulse + microTrend + structure - spreadPenalty + volatilityGate) * 100, -100, 100);
+  return { score, reason: "Micro-momentum, impulse, structure and spread/volatility gates for short-horizon entries." };
 }
 
 function evaluateBreakout(c) {
-  const breakout = c.breakout ? 0.45 : 0;
-  const retest = c.retest ? 0.2 : 0;
-  const momentum = c.momentum * 0.2;
-  const volume = c.volume * 0.15;
+  if (!c.breakout) return { score: 0, reason: "No structural breakout is currently detected." };
   const direction = c.trend >= 0 ? 1 : -1;
-  const score = clamp((breakout + retest + momentum + volume) * 100 * direction, -100, 100);
-  return { score, reason: "Breakout, retest, momentum and volume confirmation." };
+  const breakoutImpulse = 0.42;
+  const retest = c.retest ? 0.28 : -0.08;
+  const momentum = Math.abs(c.momentum) * 0.16;
+  const volume = c.volume * 0.14;
+  const volatilityFit = c.volatility >= 0.2 && c.volatility <= 0.9 ? 0.1 : -0.08;
+  const score = clamp((breakoutImpulse + retest + momentum + volume + volatilityFit) * 100 * direction, -100, 100);
+  return { score, reason: c.retest
+    ? "Breakout confirmed with retest, momentum, activity and volatility expansion."
+    : "Breakout detected; waiting for stronger retest confirmation." };
 }
 
 function evaluateSmc(c) {
-  let directional = c.trend * 0.2;
-  if (c.liquiditySweep) directional += c.trend >= 0 ? 0.2 : -0.2;
-  if (c.orderBlock) directional += c.trend * 0.2;
-  if (c.fairValueGap) directional += c.trend * 0.15;
-  if (c.displacement) directional += c.trend * 0.2;
-  if (c.structure === "bullish") directional += 0.1;
-  if (c.structure === "bearish") directional -= 0.1;
-  return { score: clamp(directional * 100, -100, 100), reason: "Market structure, liquidity, order-block, FVG and displacement checks." };
+  const bullish = c.structure === "bullish";
+  const bearish = c.structure === "bearish";
+  const directionalBias = bullish ? 1 : bearish ? -1 : Math.sign(c.trend || 0);
+  if (!c.liquiditySweep || !c.displacement) {
+    return { score: 0, reason: "SMC sequence incomplete: liquidity sweep and displacement confirmation are required." };
+  }
+  let quality = 0.46;
+  if (c.orderBlock) quality += 0.16;
+  if (c.fairValueGap) quality += 0.15;
+  if (bullish || bearish) quality += 0.12;
+  quality += Math.min(Math.abs(c.momentum), 1) * 0.1;
+  quality -= c.volatility > 0.92 ? 0.2 : 0;
+  return {
+    score: clamp(quality * 100 * directionalBias, -100, 100),
+    reason: "Liquidity sweep → displacement → structure alignment, with OB/FVG confirmation and volatility filter."
+  };
 }
 
 function evaluateLadder(c) {
-  const directional = c.momentum * 0.25 + c.trend * 0.25;
-  const volatilityPenalty = c.volatility > 0.85 ? 0.35 : 0;
+  const directional = c.momentum * 0.3 + c.trend * 0.28;
+  const alignment = c.structure === "bullish" ? 0.14 : c.structure === "bearish" ? -0.14 : 0;
+  const volatilityPenalty = c.volatility > 0.82 ? 0.32 : 0;
   const emergency = c.volatility > 0.95;
-  const score = clamp((directional - volatilityPenalty) * 100, -100, 100);
-  return { score, emergency, reason: "Adaptive ladder spacing with exposure and volatility controls." };
+  const score = clamp((directional + alignment - volatilityPenalty) * 100, -100, 100);
+  return { score, emergency, reason: "Bounded ladder entries with volatility-adaptive spacing, structure alignment and emergency exposure control." };
 }
 
 const evaluators = {
@@ -135,6 +162,34 @@ export function getBotDefinitions() {
   return BOT_DEFINITIONS;
 }
 
+export function getTradePlan(botId, snapshot, side) {
+  const bot = BOT_DEFINITIONS[botId];
+  if (!bot) throw new Error("Unknown bot.");
+  const c = baseContext(snapshot);
+  if (!Number.isFinite(c.atr) || c.atr <= 0) return { ok: false, reason: "ATR_REQUIRED" };
+  const plan = bot.tradePlan;
+  const stopDistance = c.atr * plan.slAtr;
+  const takeProfitDistance = c.atr * plan.tpAtr;
+  const entry = Number(c.entryPrice || c.price || 0);
+  const normalizedSide = String(side || "").toUpperCase();
+  if (!entry || !["BUY","SELL"].includes(normalizedSide)) return { ok: false, reason: "TRADE_PLAN_INPUT_INVALID" };
+  return {
+    ok: true,
+    botId,
+    side: normalizedSide,
+    atr: c.atr,
+    stopDistance,
+    takeProfitDistance,
+    riskReward: Number((plan.tpAtr / plan.slAtr).toFixed(2)),
+    stopLoss: normalizedSide === "BUY" ? entry - stopDistance : entry + stopDistance,
+    takeProfit: normalizedSide === "BUY" ? entry + takeProfitDistance : entry - takeProfitDistance,
+    trailingTriggerR: plan.trailingTriggerR,
+    trailingLockR: plan.trailingLockR,
+    maxHoldBars: plan.maxHoldBars,
+    maxLadderLevels: plan.maxLadderLevels || null
+  };
+}
+
 export function evaluateBot(botId, snapshot) {
   const bot = BOT_DEFINITIONS[botId];
   if (!bot) throw new Error("Unknown bot.");
@@ -147,7 +202,8 @@ export function evaluateBot(botId, snapshot) {
     bot: botId,
     name: bot.name,
     status: "ANALYSIS_ONLY",
-    signal: signalFromScore(evaluation.score),
+    signal: Math.abs(evaluation.score) >= bot.signalThreshold ? signalFromScore(evaluation.score) : "NO_SIGNAL",
+    threshold: bot.signalThreshold,
     score: Math.round(evaluation.score * 100) / 100,
     reason: evaluation.reason,
     executionAuthorized: false,
