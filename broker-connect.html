@@ -141,8 +141,8 @@ main{width:min(1500px,calc(100% - 32px));margin:auto;padding:30px 0 70px}.hero,.
 const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbot-fintech-api-etfv.onrender.com/api";
 const configs={
   exness:{name:"EXNESS · MT4/MT5",provider:"metaapi",official:"https://my.exness.com/",form:"exnessForm",live:true},
-  ig:{name:"IG · MT4/MT5",provider:"metaapi",official:"https://my.ig.com/",form:"igForm",live:true},
-  fxcm:{name:"FXCM · MT4/MT5",provider:"metaapi",official:"https://www.fxcm.com/",form:"fxcmForm",live:true},
+  ig:{name:"IG · MT4/MT5",provider:"metaapi",official:"https://my.ig.com/",form:"exnessForm",live:true},
+  fxcm:{name:"FXCM · MT4/MT5",provider:"metaapi",official:"https://www.fxcm.com/",form:"exnessForm",live:true},
   oanda:{name:"OANDA",provider:"oanda",official:"https://fxtrade.oanda.com/",form:"oandaForm",live:false},
   deriv:{name:"DERIV",provider:"deriv",official:"https://app.deriv.com/",form:"derivForm",live:false},
   ibkr:{name:"INTERACTIVE BROKERS",provider:"ibkr",official:"https://www.interactivebrokers.com/",form:"ibkrForm",live:false}
@@ -197,7 +197,7 @@ $("connectBtn").addEventListener("click",async()=>{
   }finally{$("connectBtn").disabled=!selected||!configs[selected].live;$("connectBtn").textContent="VERIFY & CONNECT BROKER"}
 });
 })();
-</script>>
+</script>
 <script>
 (function(){
   var s=document.createElement("script");s.src="system/auth-gate.js";s.defer=true;document.head.appendChild(s);
