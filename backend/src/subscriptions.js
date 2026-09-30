@@ -50,7 +50,7 @@ async function requireAdmin(pool, req, res) {
   if (!admins.includes(String(u.email).toLowerCase())) { res.status(403).json({ok:false,error:"Administrator access required."}); return null; }
   return u;
 }
-export function createSubscriptionRouter({pool}) {
+export function createSubscriptionRouter({pool,broker}) {
   const router = Router();
 
   router.get("/plans",(_req,res)=>res.json({ok:true,plans:Object.values(PLANS).map(p=>({...p,selectableBotDetails:p.selectableBots.map(bot=>({botId:bot,botName:BOT_NAMES[bot]}))})),mpesaReceiver:process.env.MPESA_RECEIVER_PHONE||"0748275015"}));
@@ -265,6 +265,158 @@ export function createSubscriptionRouter({pool}) {
     }catch(error){console.error("[KINGBOT ADMIN ACTIVITY]",error?.message||error);res.status(500).json({ok:false,error:"Activity stream unavailable."});}
   });
 
+
+  router.get("/admin/runtime",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    try{
+      const q=await pool.query(`
+        SELECT r.user_id,u.first_name,u.last_name,u.email,
+               r.bot_id,r.state,r.symbol,r.timeframe,r.last_signal,r.last_run_at,r.last_error,r.updated_at,
+               COALESCE(s.plan_id,'') AS plan_id,
+               COALESCE(rs.execution_mode,'PAPER') AS execution_mode,
+               COALESCE(rs.kill_switch,FALSE) AS kill_switch,
+               COALESCE(rs.max_risk_per_trade_pct,0) AS max_risk_per_trade_pct,
+               COALESCE(rs.daily_drawdown_pct,5) AS daily_drawdown_pct,
+               COALESCE(rs.total_drawdown_pct,10) AS total_drawdown_pct
+        FROM kingbot_bot_runtime r
+        JOIN kingbot_users u ON u.id=r.user_id
+        LEFT JOIN LATERAL (
+          SELECT plan_id FROM kingbot_subscriptions s1
+          WHERE s1.user_id=r.user_id
+          ORDER BY CASE WHEN s1.status='active' AND (s1.expires_at IS NULL OR s1.expires_at>NOW()) THEN 0 ELSE 1 END,s1.started_at DESC
+          LIMIT 1
+        ) s ON TRUE
+        LEFT JOIN kingbot_bot_risk_settings rs ON rs.user_id=r.user_id AND rs.bot_id=r.bot_id
+        ORDER BY CASE WHEN r.state='RUNNING' THEN 0 WHEN r.state='ERROR' THEN 1 ELSE 2 END,r.updated_at DESC
+        LIMIT 500
+      `);
+      res.json({ok:true,runtimes:q.rows});
+    }catch(error){
+      console.error("[KINGBOT ADMIN RUNTIME]",error?.message||error);
+      res.status(500).json({ok:false,error:"Runtime registry unavailable."});
+    }
+  });
+
+  router.get("/admin/risk",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    try{
+      const q=await pool.query(`
+        SELECT r.user_id,u.first_name,u.last_name,u.email,r.bot_id,
+               r.daily_drawdown_pct,r.total_drawdown_pct,r.max_risk_per_trade_pct,r.max_positions,
+               r.max_spread_atr_ratio,r.stale_data_ms,r.max_consecutive_losses,
+               r.auto_pause_on_loss_streak,r.execution_mode,r.kill_switch,r.updated_at
+        FROM kingbot_bot_risk_settings r
+        JOIN kingbot_users u ON u.id=r.user_id
+        ORDER BY r.updated_at DESC
+        LIMIT 500
+      `);
+      res.json({ok:true,risk:q.rows});
+    }catch(error){
+      console.error("[KINGBOT ADMIN RISK]",error?.message||error);
+      res.status(500).json({ok:false,error:"Risk registry unavailable."});
+    }
+  });
+
+  router.get("/admin/brokers",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    try{
+      const q=await pool.query(`
+        SELECT b.id,b.user_id,u.first_name,u.last_name,u.email,
+               b.provider,b.account_id,b.execution_mode,b.enabled,b.created_at,b.updated_at
+        FROM kingbot_broker_accounts b
+        JOIN kingbot_users u ON u.id=b.user_id
+        ORDER BY b.updated_at DESC
+        LIMIT 500
+      `);
+      const accounts=await Promise.all(q.rows.map(async(row)=>{
+        let status={configured:true,connected:false,broker:row.provider,accountId:row.account_id,executionMode:row.execution_mode};
+        try{
+          if(broker?.getStatus)status=await broker.getStatus(row.user_id);
+        }catch(error){
+          status={...status,connected:false,reason:"BROKER_STATUS_UNAVAILABLE"};
+        }
+        return {...row,connected:Boolean(status.connected),statusReason:status.reason||null};
+      }));
+      res.json({ok:true,brokers:accounts});
+    }catch(error){
+      console.error("[KINGBOT ADMIN BROKERS]",error?.message||error);
+      res.status(500).json({ok:false,error:"Broker registry unavailable."});
+    }
+  });
+
+  router.get("/admin/executions",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    try{
+      const q=await pool.query(`
+        SELECT j.id,j.user_id,u.email,j.bot_id,j.client_id,j.execution_mode,j.symbol,j.side,
+               j.volume,j.status,j.error_message,j.created_at,j.updated_at
+        FROM kingbot_execution_journal j
+        JOIN kingbot_users u ON u.id=j.user_id
+        ORDER BY j.created_at DESC
+        LIMIT 300
+      `);
+      res.json({ok:true,executions:q.rows});
+    }catch(error){
+      console.error("[KINGBOT ADMIN EXECUTIONS]",error?.message||error);
+      res.status(500).json({ok:false,error:"Execution journal unavailable."});
+    }
+  });
+
+  router.post("/admin/runtime/:userId/:botId/stop",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    const userId=String(req.params.userId||"");
+    const botId=normalizeBotId(req.params.botId);
+    if(!BOT_NAMES[botId])return res.status(400).json({ok:false,error:"Unknown bot engine."});
+    try{
+      const q=await pool.query(
+        "UPDATE kingbot_bot_runtime SET state='STOPPED',last_error='ADMIN_RUNTIME_STOPPED',updated_at=NOW() WHERE user_id=$1 AND bot_id=$2 RETURNING bot_id,state",
+        [userId,botId]
+      );
+      if(!q.rowCount)return res.status(404).json({ok:false,error:"Bot runtime not found."});
+      await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'ADMIN_RUNTIME_STOPPED',$2::jsonb)",[userId,JSON.stringify({admin:a.email,botId})]);
+      res.json({ok:true,...q.rows[0]});
+    }catch(error){
+      console.error("[KINGBOT ADMIN STOP]",error?.message||error);
+      res.status(500).json({ok:false,error:"Runtime stop failed."});
+    }
+  });
+
+  router.post("/admin/risk/kill-switch",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    const active=Boolean(req.body?.active);
+    const userId=req.body?.userId ? String(req.body.userId) : null;
+    const botId=req.body?.botId ? normalizeBotId(req.body.botId) : null;
+    if(botId&&!BOT_NAMES[botId])return res.status(400).json({ok:false,error:"Unknown bot engine."});
+    try{
+      if(userId&&botId){
+        const q=await pool.query("UPDATE kingbot_bot_risk_settings SET kill_switch=$3,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2 RETURNING user_id,bot_id,kill_switch",[userId,botId,active]);
+        if(!q.rowCount)return res.status(404).json({ok:false,error:"Risk profile not found."});
+      }else if(userId){
+        await pool.query("UPDATE kingbot_bot_risk_settings SET kill_switch=$2,updated_at=NOW() WHERE user_id=$1",[userId,active]);
+      }else{
+        await pool.query("UPDATE kingbot_bot_risk_settings SET kill_switch=$1,updated_at=NOW()",[active]);
+        if(active)await pool.query("UPDATE kingbot_bot_runtime SET state='STOPPED',last_error='ADMIN_GLOBAL_KILL_SWITCH',updated_at=NOW() WHERE state='RUNNING'");
+      }
+      await pool.query("INSERT INTO kingbot_audit_log(event_type,metadata) VALUES('ADMIN_KILL_SWITCH_UPDATED',$1::jsonb)",[JSON.stringify({admin:a.email,active,userId,botId})]);
+      res.json({ok:true,active,userId,botId});
+    }catch(error){
+      console.error("[KINGBOT ADMIN KILL SWITCH]",error?.message||error);
+      res.status(500).json({ok:false,error:"Kill switch update failed."});
+    }
+  });
+
+  router.post("/admin/brokers/:userId/disconnect",async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    const userId=String(req.params.userId||"");
+    try{
+      const result=broker?.disconnect ? await broker.disconnect(userId) : {connected:false,mode:"NOT_CONNECTED"};
+      await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'ADMIN_BROKER_DISCONNECTED',$2::jsonb)",[userId,JSON.stringify({admin:a.email})]);
+      res.json({ok:true,...result});
+    }catch(error){
+      console.error("[KINGBOT ADMIN BROKER DISCONNECT]",error?.message||error);
+      res.status(502).json({ok:false,error:"Broker disconnect failed."});
+    }
+  });
 
   return router;
 }
