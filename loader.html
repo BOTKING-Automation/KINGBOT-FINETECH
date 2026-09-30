@@ -88,7 +88,12 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
       }catch(e){}
       return;
     }
-    window.location.replace("access-stable.html#signin");
+
+    /*
+      The neural loader is visual-only.
+      Authentication and routing belong to the platform
+      entry/auth gate, not this animation page.
+    */
   },duration);
 })();
 </script>
