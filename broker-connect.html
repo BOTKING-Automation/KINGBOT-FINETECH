@@ -63,6 +63,18 @@ main:after{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;back
 @media(max-width:900px){.network-stage{position:relative;right:auto;top:auto;width:100%;height:190px;margin-top:20px}.hero-copy{max-width:100%}.hero{min-height:auto}.signal-strip{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:520px){.network-stage{height:155px}.signal-strip{grid-template-columns:1fr}.broker{min-height:0}}
 
+
+.partner-state{display:block;margin-top:7px;color:#596781;font:800 6px "JetBrains Mono";letter-spacing:.08em}
+.partner-state.ready{color:#23f7a3}
+.partner-state.pending{color:#f6b93b}
+.partner-btn{border:1px solid rgba(35,247,163,.18)!important;background:rgba(35,247,163,.045)!important;color:#86ffd0!important;margin-left:auto}
+.connect{flex-wrap:wrap}
+.partner-btn{padding:9px 10px;border-radius:10px;font:900 8px "JetBrains Mono";cursor:pointer}
+.partner-panel{margin-top:16px;padding:16px;border-radius:18px;border:1px solid rgba(155,92,255,.14);background:radial-gradient(circle at 10% 0%,rgba(155,92,255,.07),transparent 30%),radial-gradient(circle at 90% 100%,rgba(246,185,59,.05),transparent 30%),rgba(3,7,17,.76);position:relative;overflow:hidden}
+.partner-panel:before{content:"";position:absolute;inset:0;border-top:1px solid rgba(25,230,255,.16);pointer-events:none}
+.partner-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.partner-head h3{margin:0;font:800 12px Orbitron}.partner-head p{margin:6px 0 0;color:#6d7b95;font-size:8.5px;line-height:1.55;max-width:780px}.partner-link{display:inline-flex;align-items:center;justify-content:center;padding:9px 11px;border-radius:9px;background:linear-gradient(90deg,var(--violet),var(--cyan));color:#05070d;text-decoration:none;font:900 8px "JetBrains Mono";white-space:nowrap}
+.partner-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:11px}.partner-metric{padding:10px;border:1px solid rgba(255,255,255,.06);border-radius:10px;background:rgba(255,255,255,.02)}.partner-metric span{display:block;color:#56647e;font:800 6.5px "JetBrains Mono";letter-spacing:.08em}.partner-metric b{display:block;margin-top:5px;color:#dde7fa;font:900 12px Orbitron}.partner-note{margin-top:9px;color:#57657f;font-size:7.5px;line-height:1.55}
+@media(max-width:700px){.partner-head{flex-direction:column}.partner-link{width:100%}.partner-metrics{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -91,42 +103,60 @@ main:after{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;back
   <div class="desc">Choose a connector based on the broker's documented API capabilities, account eligibility, and the market instruments you trade.</div>
   <div class="broker-grid" id="brokerGrid">
     <article class="broker oanda" data-broker="oanda">
-      <div class="broker-head"><div class="logo"><img src="https://mma.prnewswire.com/media/1581985/OANDA_colour_logo_Logo.jpg?p=facebook" alt="OANDA"></div><span class="tag live">REST API</span></div>
+      <div class="broker-head"><div class="logo"><img src="https://mma.prnewswire.com/media/1581985/OANDA_colour_logo_Logo.jpg?p=facebook" alt="OANDA"></div><span class="tag live">REST API</span><span class="partner-state" data-partner-state="oanda">PARTNER CHECK…</span></div>
       <h3>OANDA</h3><p>v20 API supports live account access, market data, and programmatic order placement.</p>
       <div class="caps"><span class="cap">FOREX</span><span class="cap">METALS</span><span class="cap">ORDERS</span><span class="cap">STREAMING</span></div>
-      <div class="connect"><button type="button" data-connect="oanda">ROADMAP</button><a href="https://developer.oanda.com/rest-live-v20/introduction/" target="_blank" rel="noopener">API DOCS ↗</a></div>
+      <div class="connect"><button type="button" data-connect="oanda">ROADMAP</button><button class="partner-btn" type="button" data-partner="oanda">OPEN ACCOUNT</button><a href="https://developer.oanda.com/rest-live-v20/introduction/" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
     <article class="broker deriv" data-broker="deriv">
-      <div class="broker-head"><div class="logo"><img src="https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg" alt="Deriv"></div><span class="tag live">OAUTH / PAT</span></div>
+      <div class="broker-head"><div class="logo"><img src="https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg" alt="Deriv"></div><span class="tag live">OAUTH / PAT</span><span class="partner-state" data-partner-state="deriv">PARTNER CHECK…</span></div>
       <h3>DERIV</h3><p>Deriv supports OAuth 2.0 or personal access tokens, with real-time trading and monitoring over WebSocket.</p>
       <div class="caps"><span class="cap">OPTIONS</span><span class="cap">WEBSOCKET</span><span class="cap">REAL-TIME</span><span class="cap">BOT READY</span></div>
-      <div class="connect"><button type="button" data-connect="deriv">ROADMAP</button><a href="https://developers.deriv.com/docs/intro/authentication/" target="_blank" rel="noopener">API DOCS ↗</a></div>
+      <div class="connect"><button type="button" data-connect="deriv">ROADMAP</button><button class="partner-btn" type="button" data-partner="deriv">OPEN ACCOUNT</button><a href="https://developers.deriv.com/docs/intro/authentication/" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
     <article class="broker ig" data-broker="ig">
-      <div class="broker-head"><div class="logo"><img src="https://cdn.sanity.io/images/k8qzcdw3/prod1503/8cd8307f715b88868cd45fa7fbeebbcec5dc2f64-1920x1080.png?w=1200" alt="IG"></div><span class="tag live">REST / STREAM</span></div>
+      <div class="broker-head"><div class="logo"><img src="https://cdn.sanity.io/images/k8qzcdw3/prod1503/8cd8307f715b88868cd45fa7fbeebbcec5dc2f64-1920x1080.png?w=1200" alt="IG"></div><span class="tag live">REST / STREAM</span><span class="partner-state" data-partner-state="ig">PARTNER CHECK…</span></div>
       <h3>IG</h3><p>IG Labs exposes REST trading and streaming APIs with API-key authentication and order endpoints.</p>
       <div class="caps"><span class="cap">FOREX</span><span class="cap">CFDs</span><span class="cap">COMMODITIES</span><span class="cap">STREAMING</span></div>
-      <div class="connect"><button type="button" data-connect="ig">CONNECT</button><a href="https://labs.ig.com/rest-trading-api-guide.html" target="_blank" rel="noopener">API DOCS ↗</a></div>
+      <div class="connect"><button type="button" data-connect="ig">CONNECT</button><button class="partner-btn" type="button" data-partner="ig">OPEN ACCOUNT</button><a href="https://labs.ig.com/rest-trading-api-guide.html" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
     <article class="broker fxcm" data-broker="fxcm">
-      <div class="broker-head"><div class="logo"><img src="https://fxcmpy.tpq.io/_static/fxcm_logo_bg.png" alt="FXCM"></div><span class="tag live">FIX / REST</span></div>
+      <div class="broker-head"><div class="logo"><img src="https://fxcmpy.tpq.io/_static/fxcm_logo_bg.png" alt="FXCM"></div><span class="tag live">FIX / REST</span><span class="partner-state" data-partner-state="fxcm">PARTNER CHECK…</span></div>
       <h3>FXCM</h3><p>FXCM provides FIX, Java, ForexConnect and current API authentication options for automated trading.</p>
       <div class="caps"><span class="cap">FOREX</span><span class="cap">FIX</span><span class="cap">JAVA</span><span class="cap">AUTOMATION</span></div>
-      <div class="connect"><button type="button" data-connect="fxcm">CONNECT</button><a href="https://www.fxcm.com/eu/algorithmic-trading/api-trading/" target="_blank" rel="noopener">API DOCS ↗</a></div>
+      <div class="connect"><button type="button" data-connect="fxcm">CONNECT</button><button class="partner-btn" type="button" data-partner="fxcm">OPEN ACCOUNT</button><a href="https://www.fxcm.com/eu/algorithmic-trading/api-trading/" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
     <article class="broker exness" data-broker="exness">
-      <div class="broker-head"><div class="logo"><img src="https://www.forextradinghunters.com/wp-content/uploads/2022/12/Vertical_Exness_Logo_Black.jpg" alt="Exness"></div><span class="tag regional">ELIGIBILITY</span></div>
+      <div class="broker-head"><div class="logo"><img src="https://www.forextradinghunters.com/wp-content/uploads/2022/12/Vertical_Exness_Logo_Black.jpg" alt="Exness"></div><span class="tag regional">ELIGIBILITY</span><span class="partner-state" data-partner-state="exness">PARTNER CHECK…</span></div>
       <h3>EXNESS</h3><p>Exness currently documents a Public Trader API with signed requests, account data, trading operations and live streams; availability can depend on client region/account eligibility.</p>
       <div class="caps"><span class="cap">FOREX</span><span class="cap">XAUUSD</span><span class="cap">REST</span><span class="cap">WEBSOCKET</span></div>
-      <div class="connect"><button type="button" data-connect="exness">CONNECT</button><a href="https://www.exness-api.com/" target="_blank" rel="noopener">API DOCS ↗</a></div>
+      <div class="connect"><button type="button" data-connect="exness">CONNECT</button><button class="partner-btn" type="button" data-partner="exness">OPEN ACCOUNT</button><a href="https://www.exness-api.com/" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
     <article class="broker ibkr" data-broker="ibkr">
-      <div class="broker-head"><div class="logo"><img src="https://rankia.com.br/_next/image/?q=100&url=https%3A%2F%2Frankia.com.br%2Fapp%2Fuploads%2F2024%2F09%2Finteractivebrokers_logo_corretora.webp&w=768" alt="Interactive Brokers"></div><span class="tag">OAUTH</span></div>
+      <div class="broker-head"><div class="logo"><img src="https://rankia.com.br/_next/image/?q=100&url=https%3A%2F%2Frankia.com.br%2Fapp%2Fuploads%2F2024%2F09%2Finteractivebrokers_logo_corretora.webp&w=768" alt="Interactive Brokers"></div><span class="tag">OAUTH</span><span class="partner-state" data-partner-state="ibkr">PARTNER CHECK…</span></div>
       <h3>INTERACTIVE BROKERS</h3><p>IBKR Web API supports OAuth-based connectivity and authenticated trading/account requests, subject to its application onboarding model.</p>
       <div class="caps"><span class="cap">MULTI-ASSET</span><span class="cap">TRADING API</span><span class="cap">OAUTH</span><span class="cap">PORTFOLIO</span></div>
-      <div class="connect"><button type="button" data-connect="ibkr">ROADMAP</button><a href="https://www.interactivebrokers.com/docs/web-api/introduction" target="_blank" rel="noopener">API DOCS ↗</a></div>
+      <div class="connect"><button type="button" data-connect="ibkr">ROADMAP</button><button class="partner-btn" type="button" data-partner="ibkr">OPEN ACCOUNT</button><a href="https://www.interactivebrokers.com/docs/web-api/introduction" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
   </div>
+
+
+<div class="partner-panel">
+  <div class="partner-head">
+    <div>
+      <h3>PARTNER ACQUISITION ENGINE</h3>
+      <p>Open-account clicks are attributed server-side before the user reaches the broker. A tracked partner URL is used only when KINGBOT has configured a broker-specific partner route; otherwise the official broker website is opened without representing a partnership.</p>
+    </div>
+    <a class="partner-link" href="partner-revenue.html">PARTNER REVENUE →</a>
+  </div>
+  <div class="partner-metrics">
+    <div class="partner-metric"><span>ATTRIBUTION</span><b>CLICK ID</b></div>
+    <div class="partner-metric"><span>SERVER LOG</span><b>POSTGRES</b></div>
+    <div class="partner-metric"><span>CONVERSION</span><b>BROKER FEED</b></div>
+    <div class="partner-metric"><span>PAYOUT</span><b>RECONCILED</b></div>
+  </div>
+  <div class="partner-note">Do not market a broker as a KINGBOT commercial partner until the relevant written agreement, territory eligibility, tracking method and payout terms are confirmed.</div>
+</div>
 
   <div class="connection-card">
     <div class="connection-top"><div><div class="selected" id="selectedBroker">Select a broker to continue</div><div class="hint">The account stays at the broker. KINGBOT only receives the authorization credential required for API access.</div></div><div class="connection-state"><span class="pulse" id="pulse"></span><span id="stateText">WAITING</span></div></div>
@@ -240,6 +270,53 @@ $("connectBtn").addEventListener("click",async()=>{
     setState("CONNECTION FAILED",false);msg(e.message||"Broker connection failed.","err");
   }finally{$("connectBtn").disabled=!selected||!configs[selected].live;$("connectBtn").textContent="VERIFY & CONNECT BROKER"}
 });
+
+async function loadPartnerCatalog(){
+  try{
+    const r=await fetch(API_BASE+"/partners/catalog");
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) return;
+    (d.partners||[]).forEach(p=>{
+      const el=document.querySelector('[data-partner-state="'+p.slug+'"]');
+      if(el){
+        el.textContent=p.partnerLinkConfigured?"PARTNER ROUTE READY":"OFFICIAL ROUTE · PARTNERSHIP PENDING";
+        el.classList.toggle("ready",p.partnerLinkConfigured);
+        el.classList.toggle("pending",!p.partnerLinkConfigured);
+      }
+    });
+  }catch{}
+}
+
+async function openPartner(slug,button){
+  const original=button.textContent;
+  button.disabled=true;
+  button.textContent="ATTRIBUTING…";
+  try{
+    const token=await firebaseToken();
+    const r=await fetch(API_BASE+"/partners/click",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
+      body:JSON.stringify({
+        brokerSlug:slug,
+        landingUrl:window.location.href,
+        metadata:{source:"broker-connect",surface:"broker-marketplace"}
+      })
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.redirectUrl) throw new Error(d.error||"Partner route unavailable.");
+    window.open(d.redirectUrl,"_blank","noopener");
+    msg(d.tracked?"Tracked partner route opened.":"Official broker route opened; KINGBOT partner tracking is not configured for this broker yet.","ok");
+  }catch(e){
+    msg(e.message||"Unable to open broker account route.","err");
+  }finally{
+    button.disabled=false;
+    button.textContent=original;
+  }
+}
+
+document.querySelectorAll("[data-partner]").forEach(btn=>btn.addEventListener("click",()=>openPartner(btn.dataset.partner,btn)));
+loadPartnerCatalog();
+
 })();
 </script>
 <script>
