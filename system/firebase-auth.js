@@ -56,6 +56,15 @@ async function saveUserProfile(user, extra={}, initialize=false) {
     updatedAt: now
   };
 
+  // Optional profile-only fields are written only when explicitly supplied.
+  // This prevents a normal sign-in from clearing an existing profile photo.
+  if (Object.prototype.hasOwnProperty.call(extra, "photoURL")) {
+    profile.photoURL = String(extra.photoURL || "");
+  }
+  if (Object.prototype.hasOwnProperty.call(extra, "profilePhotoData")) {
+    profile.profilePhotoData = String(extra.profilePhotoData || "");
+  }
+
   // Initialize trading/account fields only when the account is first created.
   // Sign-in updates identity metadata without resetting trading state.
   if (initialize) {
