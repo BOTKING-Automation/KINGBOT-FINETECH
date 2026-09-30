@@ -345,6 +345,8 @@ async function firebaseToken(){
 }
 async function startDerivOAuth(){
   try{
+    const fb=window.KINGBOT_FIREBASE;
+    if(fb?.persist) await fb.persist(true);
     const t=await firebaseToken();
     const mode=selectedExecution;
     setStatus("Opening secure Deriv authorization…");
