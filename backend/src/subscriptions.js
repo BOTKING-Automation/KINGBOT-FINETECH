@@ -85,12 +85,28 @@ export function createSubscriptionRouter({pool}) {
     if(!payerName||payerName.length<2)return res.status(400).json({ok:false,error:"Enter the M-Pesa account name used for payment."});
     if(payerName.length>120)return res.status(400).json({ok:false,error:"M-Pesa account name is too long."});
     try {
-      const d=await pool.query("SELECT id FROM kingbot_payments WHERE mpesa_code=$1",[code]);
-      if(d.rowCount)return res.status(409).json({ok:false,error:"That M-Pesa transaction code has already been submitted."});
+      const d=await pool.query("SELECT id,status FROM kingbot_payments WHERE mpesa_code=$1",[code]);
+      if(d.rowCount){
+        const state=String(d.rows[0].status||"submitted").toLowerCase();
+        const message=state==="approved"
+          ? "FAILED: This M-Pesa transaction code has already been verified and cannot be reused."
+          : "FAILED: This M-Pesa transaction code has already been submitted and cannot be reused.";
+        return res.status(409).json({ok:false,code:"MPESA_CODE_REUSED",error:message});
+      }
       const q=await pool.query("INSERT INTO kingbot_payments(user_id,plan_id,amount_kes,mpesa_code,payer_phone,payer_name,selected_bot_id,status) VALUES($1,$2,$3,$4,$5,$6,$7,'pending') RETURNING id,plan_id,amount_kes,mpesa_code,payer_phone,payer_name,status,submitted_at",[u.id,p,amount,code,phone,payerName,selectedBot||null]);
       await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'PAYMENT_SUBMITTED',$2::jsonb)",[u.id,JSON.stringify({paymentId:q.rows[0].id,planId:p,mpesaCode:code,selectedBotId:selectedBot||null})]);
       res.status(201).json({ok:true,payment:q.rows[0],message:"Payment submitted for manual verification. Access remains locked until an administrator approves it."});
-    } catch(err){console.error("[KINGBOT BILLING]",err?.message||err);res.status(500).json({ok:false,error:"Payment submission failed."});}
+    } catch(err){
+      if(err?.code==="23505" && String(err?.constraint||"").toLowerCase().includes("mpesa")){
+        return res.status(409).json({
+          ok:false,
+          code:"MPESA_CODE_REUSED",
+          error:"FAILED: This M-Pesa transaction code has already been used and cannot be reused."
+        });
+      }
+      console.error("[KINGBOT BILLING]",err?.message||err);
+      res.status(500).json({ok:false,error:"Payment submission failed."});
+    }
   });
 
   router.get("/access/:botId",async(req,res)=>{
