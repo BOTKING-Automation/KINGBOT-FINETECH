@@ -176,7 +176,8 @@ export class UserBrokerManager {
           const api=new DerivTraderClient({
             accessToken:parsed.accessToken,
             accountId:mapping.account_id,
-            executionMode:mode
+            executionMode:mode,
+            accountType:parsed.accountType
           });
           const result=await api.connect();
           entry={api,accountId:mapping.account_id,executionMode:mode,provider:"deriv",connectedAt:Date.now(),accountInfo:result.account};
