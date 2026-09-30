@@ -1139,7 +1139,7 @@
         const paymentStatus=String(latest?.status||"").toLowerCase();
         if(isAdmin){
           accessState.className="access-state approved";
-          accessState.innerHTML="● APPROVED — payment verified. Your subscription and entitled bot access are active.";
+          accessState.innerHTML="● ADMIN ACCESS — subscription status does not restrict this administrator account.";
         }else if(paymentStatus==="rejected"){
           accessState.className="access-state denied";
           accessState.textContent="● DENIED — payment was not approved. "+(latest?.reviewer_note||"Review the payment details and submit a valid transaction.");
