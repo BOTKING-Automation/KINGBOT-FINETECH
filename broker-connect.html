@@ -166,7 +166,7 @@ const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbo
 const cfg={
   oanda:{name:"OANDA",login:"https://fxtrade.oanda.com/",api:"https://developer.oanda.com/rest-live-v20/authentication/",native:true,mode:"native"},
   deriv:{name:"DERIV",login:"https://app.deriv.com/",api:"https://auth.deriv.com/oauth2/auth",native:true,mode:"oauth"},
-  exness:{name:"EXNESS",login:"https://my.exness.com/",api:"https://www.exness-api.com/",native:false,mode:"metaapi"},
+  exness:{name:"EXNESS",login:"https://my.exness.com/",api:"https://my.exness.com/",native:false,mode:"exness"},
   ig:{name:"IG",login:"https://my.ig.com/",api:"https://labs.ig.com/gettingstarted",native:false,mode:"metaapi"},
   fxcm:{name:"FXCM",login:"https://www.fxcm.com/",api:"https://www.fxcm.com/markets/help/api-trading-what-api-interfaces-does-fxcm-have/",native:false,mode:"metaapi"},
   ibkr:{name:"IBKR",login:"https://www.interactivebrokers.com/",api:"https://www.interactivebrokers.com/docs/web-api/introduction",native:true,mode:"oauth"}
@@ -212,7 +212,7 @@ function textFor(){
     }
   }else $("credentials").classList.remove("show");
   if(step===3)$("accountSelect").classList.add("show");else $("accountSelect").classList.remove("show");
-  $("flowStatus").textContent=step===1?"Waiting for broker account confirmation.":step===2?(native?"Native API authorization is selected for this broker.":"Bridge credential entry is ready."):(step===3?"Choose one account to continue.":"Account authorization is ready.");
+  $("flowStatus").textContent=step===1?"Waiting for broker account confirmation.":step===2?(selected==="exness"?"Create or manage the Exness API key in Key Management, then return with the issued credentials.":(native?"Native API authorization is selected for this broker.":"Bridge credential entry is ready.")):(step===3?"Choose one account to continue.":"Account authorization is ready.");
 }
 function selectBroker(slug){
   selected=slug;step=1;verified=false;selectedAccount=null;
