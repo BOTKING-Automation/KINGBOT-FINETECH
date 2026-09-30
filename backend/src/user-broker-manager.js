@@ -55,6 +55,10 @@ export class UserBrokerManager {
     await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS token_tag TEXT");
     await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS accounts_json JSONB");
     await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'");
+    // Exactly one active broker account is allowed per KINGBOT user.
+    // Retire stale duplicate active mappings before enforcing the database constraint.
+    await this.pool.query("WITH ranked AS (SELECT id,ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY updated_at DESC,created_at DESC,id DESC) AS rn FROM kingbot_broker_accounts WHERE enabled=TRUE) UPDATE kingbot_broker_accounts a SET enabled=FALSE,updated_at=NOW() FROM ranked r WHERE a.id=r.id AND r.rn>1");
+    await this.pool.query("CREATE UNIQUE INDEX IF NOT EXISTS kingbot_broker_accounts_one_active_per_user ON kingbot_broker_accounts(user_id) WHERE enabled=TRUE");
     await this.pool.query("CREATE INDEX IF NOT EXISTS kingbot_deriv_oauth_states_expires_idx ON kingbot_deriv_oauth_states(expires_at)");
     await this.pool.query("CREATE UNIQUE INDEX IF NOT EXISTS kingbot_deriv_oauth_states_pending_idx ON kingbot_deriv_oauth_states(pending_id) WHERE pending_id IS NOT NULL");
   }
@@ -191,10 +195,19 @@ export class UserBrokerManager {
     if(!id)return {ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"};
     if(!secretValue)return {ok:false,error:isExness?"EXNESS_CREDENTIALS_REQUIRED":providerName==="deriv"?"DERIV_CREDENTIALS_REQUIRED":"BROKER_ACCOUNT_TOKEN_REQUIRED"};
     if(secretValue.length>12000)return {ok:false,error:"BROKER_CREDENTIAL_TOO_LONG"};
+    const existing=await this.getMapping(userId);
+    if(existing && (String(existing.provider)!==providerName || String(existing.account_id)!==id)){
+      return {ok:false,error:"BROKER_ALREADY_CONNECTED",message:"A broker account is already connected. Disconnect it before connecting another broker or account."};
+    }
     const encrypted=encryptSecret(secretValue);
-    const q=await this.pool.query("INSERT INTO kingbot_broker_accounts(user_id,provider,account_id,credential_ciphertext,credential_iv,credential_tag,execution_mode,enabled,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,TRUE,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET credential_ciphertext=EXCLUDED.credential_ciphertext,credential_iv=EXCLUDED.credential_iv,credential_tag=EXCLUDED.credential_tag,execution_mode=EXCLUDED.execution_mode,enabled=TRUE,updated_at=NOW() RETURNING id,user_id,provider,account_id,execution_mode,enabled",[userId,String(provider).toLowerCase(),id,encrypted.ciphertext,encrypted.iv,encrypted.tag,mode]);
-    await this.disconnect(userId);
-    return {ok:true,account:q.rows[0]};
+    try{
+      const q=await this.pool.query("INSERT INTO kingbot_broker_accounts(user_id,provider,account_id,credential_ciphertext,credential_iv,credential_tag,execution_mode,enabled,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,TRUE,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET credential_ciphertext=EXCLUDED.credential_ciphertext,credential_iv=EXCLUDED.credential_iv,credential_tag=EXCLUDED.credential_tag,execution_mode=EXCLUDED.execution_mode,enabled=TRUE,updated_at=NOW() RETURNING id,user_id,provider,account_id,execution_mode,enabled",[userId,providerName,id,encrypted.ciphertext,encrypted.iv,encrypted.tag,mode]);
+      await this.disconnect(userId,{disableMapping:false});
+      return {ok:true,account:q.rows[0]};
+    }catch(error){
+      if(error?.code==="23505")return {ok:false,error:"BROKER_ALREADY_CONNECTED",message:"A broker account is already connected. Disconnect it before connecting another broker or account."};
+      throw error;
+    }
   }
 
   async connect(userId,executionMode="PAPER"){
@@ -323,7 +336,7 @@ export class UserBrokerManager {
     return {connected:true,mode,broker:mapping.provider,accountId:mapping.account_id};
   }
 
-  async disconnect(userId){
+  async disconnect(userId,{disableMapping=true}={}){
     for(const [key,entry] of this.connections){
       if(key.startsWith(String(userId)+":")){
         try{
@@ -331,6 +344,9 @@ export class UserBrokerManager {
           else if(entry.provider!=="exness" && entry.connection?.close)await entry.connection.close();
         }finally{this.connections.delete(key);}
       }
+    }
+    if(disableMapping&&this.pool&&userId){
+      await this.pool.query("UPDATE kingbot_broker_accounts SET enabled=FALSE,updated_at=NOW() WHERE user_id=$1 AND enabled=TRUE",[userId]);
     }
     return {connected:false,mode:"NOT_CONNECTED"};
   }
