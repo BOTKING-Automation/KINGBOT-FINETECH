@@ -132,12 +132,20 @@ function start(){
     checked on every Home entry.
   */
   if(homeEntry && seen){
-    /*
-      Do not replay the neural animation, but always evaluate
-      the real Firebase session before deciding whether Home
-      or secure access should be shown.
-    */
+    /* Subsequent Home entries skip the visual startup and use
+       the real Firebase-backed session for routing. */
     handoffHome();
+    return;
+  }
+
+  if(homeEntry && !seen){
+    /* First customer entry uses the loader as the top-level page.
+       This removes the fragile iframe/postMessage dependency. */
+    window.location.replace(
+      "loader.html?duration=3000&next="+
+      encodeURIComponent("access-stable.html?return=index.html#signin")+
+      "&v=7"
+    );
     return;
   }
 
