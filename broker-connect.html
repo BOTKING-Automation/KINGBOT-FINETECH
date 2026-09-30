@@ -70,7 +70,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
       <div class="health-inner">
         <div class="health-top"><div class="health-label">NETWORK COVERAGE</div><div class="health-state"><i></i> OPERATIONAL</div></div>
         <div class="health-number">06 <small>ROUTES</small></div>
-        <div class="health-sub">Supported broker adapters available in the current KINGBOT connection center.</div>
+        <div class="health-sub">Supported broker adapters available in the current KINGBOT connection center.</div><button id="globalDisconnectBtn" type="button" style="display:none;margin-top:12px;width:100%;padding:10px 11px;border:1px solid rgba(255,92,122,.22);border-radius:9px;background:rgba(255,92,122,.06);color:#ff9cad;font:900 7px &quot;JetBrains Mono&quot;;cursor:pointer">DISCONNECT CURRENT BROKER</button>
         <div class="health-grid">
           <div class="health-item"><b>04</b><span>API / OAUTH</span></div>
           <div class="health-item"><b>02</b><span>BRIDGE</span></div>
@@ -362,6 +362,26 @@ async function startDerivOAuth(){
   }catch(e){setStatus(e.message||"Unable to start Deriv authorization.");}
 }
 function setStatus(t){$("flowStatus").textContent=t}
+async function disconnectCurrentBroker(){
+  const buttons=[$("disconnectBtn"),$("globalDisconnectBtn")].filter(Boolean);
+  buttons.forEach(btn=>{btn.disabled=true;btn.textContent="DISCONNECTING…";});
+  try{
+    const t=await firebaseToken();
+    const r=await fetch(API_BASE+"/broker/disconnect",{method:"POST",headers:{Authorization:"Bearer "+t}});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||d.connected)throw new Error(d.error||"Unable to disconnect the current broker.");
+    activeConnection=null;
+    selected=null;selectedAccount=null;verified=false;
+    document.querySelectorAll(".broker").forEach(el=>el.classList.remove("selected"));
+    applyExecutionMode();
+    buttons.forEach(btn=>{btn.style.display="none";btn.disabled=false;btn.textContent="DISCONNECT CURRENT BROKER";});
+    closeDrawer();
+    setStatus("Broker disconnected. You may now connect a different broker or account.");
+  }catch(e){
+    buttons.forEach(btn=>{btn.disabled=false;btn.textContent="DISCONNECT CURRENT BROKER";});
+    setStatus(e.message||"Broker disconnect failed.");
+  }
+}
 function applyConnectionLock(connection){
   activeConnection=connection||null;
   const locked=Boolean(activeConnection?.connected);
@@ -369,8 +389,9 @@ function applyConnectionLock(connection){
     btn.disabled=locked || btn.dataset.originalAllowed==="false";
     if(locked)btn.textContent="ACCOUNT ALREADY CONNECTED";
   });
-  const disconnect=$("disconnectBtn");
+  const disconnect=$("disconnectBtn"),globalDisconnect=$("globalDisconnectBtn");
   if(disconnect)disconnect.style.display=locked?"inline-flex":"none";
+  if(globalDisconnect){globalDisconnect.style.display=locked?"block":"none";globalDisconnect.textContent=locked?"DISCONNECT "+String(activeConnection.broker||"CURRENT BROKER").toUpperCase():"DISCONNECT CURRENT BROKER";}
   if(locked){
     const label=(String(activeConnection.broker||"BROKER").toUpperCase())+" · "+String(activeConnection.accountId||"AUTHORIZED");
     setStatus("LOCKED · "+label+". Disconnect the current broker before selecting another account or broker.");
@@ -413,30 +434,8 @@ $("brokerLogin").addEventListener("click",e=>{
     startDerivOAuth();
   }
 });
-$("disconnectBtn").addEventListener("click",async()=>{
-  const btn=$("disconnectBtn");
-  btn.disabled=true;
-  btn.textContent="DISCONNECTING…";
-  try{
-    const t=await firebaseToken();
-    const r=await fetch(API_BASE+"/broker/disconnect",{method:"POST",headers:{Authorization:"Bearer "+t}});
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok||d.connected)throw new Error(d.error||"Unable to disconnect the current broker.");
-    activeConnection=null;
-    applyExecutionMode();
-    btn.style.display="none";
-    btn.disabled=false;
-    btn.textContent="DISCONNECT CURRENT BROKER";
-    selected=null;selectedAccount=null;verified=false;
-    document.querySelectorAll(".broker").forEach(el=>el.classList.remove("selected"));
-    closeDrawer();
-    setStatus("Broker disconnected. You may now connect a different broker or account.");
-  }catch(e){
-    btn.disabled=false;
-    btn.textContent="DISCONNECT CURRENT BROKER";
-    setStatus(e.message||"Broker disconnect failed.");
-  }
-});
+$("disconnectBtn").addEventListener("click",disconnectCurrentBroker);
+$("globalDisconnectBtn").addEventListener("click",disconnectCurrentBroker);
 $("closeModal").addEventListener("click",closeDrawer);
 $("drawer").addEventListener("click",e=>{if(e.target===$("drawer"))closeDrawer()});
 $("nextStep").addEventListener("click",()=>{
@@ -522,7 +521,7 @@ function applyExecutionMode(){
     const demo=card.dataset.capDemo==="yes",live=card.dataset.capLive==="yes";
     const connect=card.querySelector(".connect");
     const allowed=selectedExecution==="LIVE"?live:demo;
-    connect.disabled=!allowed;
+    connect.disabled=!allowed || Boolean(activeConnection?.connected);
     connect.textContent=allowed
       ? (selectedExecution==="LIVE"?"CONNECT LIVE":"CONNECT DEMO")
       : (selectedExecution==="LIVE"?"LIVE ADAPTER":"DEMO UNAVAILABLE");
