@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import MetaApi from "metaapi.cloud-sdk/esm-node";
 import { ExnessTraderClient } from "./exness-trader-client.js";
 import { OandaTraderClient } from "./oanda-trader-client.js";
+import { DerivTraderClient } from "./deriv-trader-client.js";
 
 const ALGORITHM="aes-256-gcm";
 
@@ -47,6 +48,24 @@ export class UserBrokerManager {
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT TRUE");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()");
+    await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_deriv_oauth_states (state TEXT PRIMARY KEY,user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,code_verifier TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'PAPER',expires_at TIMESTAMPTZ NOT NULL)");
+    await this.pool.query("CREATE INDEX IF NOT EXISTS kingbot_deriv_oauth_states_expires_idx ON kingbot_deriv_oauth_states(expires_at)");
+  }
+
+  async createDerivOAuthState({userId,codeVerifier,executionMode="PAPER"}={}){
+    if(!this.pool||!userId)throw new Error("USER_CONTEXT_REQUIRED");
+    const state=crypto.randomBytes(32).toString("base64url");
+    const mode=String(executionMode).toUpperCase();
+    if(!["PAPER","LIVE"].includes(mode))throw new Error("INVALID_EXECUTION_MODE");
+    await this.pool.query("DELETE FROM kingbot_deriv_oauth_states WHERE expires_at<NOW()");
+    await this.pool.query("INSERT INTO kingbot_deriv_oauth_states(state,user_id,code_verifier,execution_mode,expires_at) VALUES($1,$2,$3,$4,NOW()+INTERVAL '10 minutes')",[state,userId,String(codeVerifier||""),mode]);
+    return {state,executionMode:mode};
+  }
+
+  async consumeDerivOAuthState(state){
+    if(!this.pool)return null;
+    const q=await this.pool.query("DELETE FROM kingbot_deriv_oauth_states WHERE state=$1 AND expires_at>NOW() RETURNING user_id,code_verifier,execution_mode",[String(state||"")]);
+    return q.rowCount?q.rows[0]:null;
   }
 
   async isConnected(userId){
@@ -65,12 +84,13 @@ export class UserBrokerManager {
     return q.rowCount?q.rows[0]:null;
   }
 
-  async saveMapping({userId,provider="metaapi",accountId,accountToken,executionMode="PAPER",apiKey,secretKey,baseUrl}={}){
+  async saveMapping({userId,provider="metaapi",accountId,accountToken,executionMode="PAPER",apiKey,secretKey,baseUrl,derivAccountType}={}){
     if(!this.pool||!userId)return {ok:false,error:"USER_CONTEXT_REQUIRED"};
     const mode=String(executionMode).toUpperCase();
     if(!["PAPER","LIVE"].includes(mode))return {ok:false,error:"INVALID_EXECUTION_MODE"};
     const id=String(accountId||"").trim();
-    const isExness=String(provider).toLowerCase()==="exness";
+    const providerName=String(provider).toLowerCase();
+    const isExness=providerName==="exness";
     let secretValue=String(accountToken||"").trim();
     if(isExness){
       const key=String(apiKey||"").trim();
@@ -80,15 +100,28 @@ export class UserBrokerManager {
       if(!secret)return {ok:false,error:"EXNESS_PRIVATE_KEY_REQUIRED"};
       if(host && !/^https:\/\//i.test(host))return {ok:false,error:"EXNESS_BASE_URL_MUST_USE_HTTPS"};
       secretValue=JSON.stringify({apiKey:key,secretKey:secret,baseUrl:host||undefined});
-    }else if(String(provider).toLowerCase()==="oanda"){
+    }else if(providerName==="oanda"){
+
       const token=String(accountToken||"").trim();
       if(!token)return {ok:false,error:"OANDA_API_TOKEN_REQUIRED"};
       const host=String(baseUrl||"").trim();
       if(host && !/^https:\/\//i.test(host))return {ok:false,error:"OANDA_BASE_URL_MUST_USE_HTTPS"};
       secretValue=JSON.stringify({apiToken:token,baseUrl:host||undefined});
+    }else if(providerName==="deriv"){
+      const token=String(accountToken||"").trim();
+      if(!token)return {ok:false,error:"DERIV_OAUTH_TOKEN_REQUIRED"};
+      let parsed={};
+      try{parsed=JSON.parse(token);}catch{parsed={accessToken:token};}
+      if(!parsed.accessToken)return {ok:false,error:"DERIV_ACCESS_TOKEN_REQUIRED"};
+      secretValue=JSON.stringify({
+        accessToken:parsed.accessToken,
+        refreshToken:parsed.refreshToken||undefined,
+        expiresAt:parsed.expiresAt||undefined,
+        accountType:String(derivAccountType||parsed.accountType||"").toLowerCase()||undefined
+      });
     }
     if(!id)return {ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"};
-    if(!secretValue)return {ok:false,error:isExness?"EXNESS_CREDENTIALS_REQUIRED":"BROKER_ACCOUNT_TOKEN_REQUIRED"};
+    if(!secretValue)return {ok:false,error:isExness?"EXNESS_CREDENTIALS_REQUIRED":providerName==="deriv"?"DERIV_CREDENTIALS_REQUIRED":"BROKER_ACCOUNT_TOKEN_REQUIRED"};
     if(secretValue.length>12000)return {ok:false,error:"BROKER_CREDENTIAL_TOO_LONG"};
     const encrypted=encryptSecret(secretValue);
     const q=await this.pool.query("INSERT INTO kingbot_broker_accounts(user_id,provider,account_id,credential_ciphertext,credential_iv,credential_tag,execution_mode,enabled,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,TRUE,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET credential_ciphertext=EXCLUDED.credential_ciphertext,credential_iv=EXCLUDED.credential_iv,credential_tag=EXCLUDED.credential_tag,execution_mode=EXCLUDED.execution_mode,enabled=TRUE,updated_at=NOW() RETURNING id,user_id,provider,account_id,execution_mode,enabled",[userId,String(provider).toLowerCase(),id,encrypted.ciphertext,encrypted.iv,encrypted.tag,mode]);
@@ -133,6 +166,31 @@ export class UserBrokerManager {
       }catch(error){
         console.error("[KINGBOT EXNESS] connect failed:",error?.message||error);
         return {connected:false,mode:"NOT_CONNECTED",reason:error?.message||"EXNESS_CONNECTION_FAILED"};
+      }
+    }
+
+    if(mapping.provider==="deriv"){
+      try{
+        const parsed=JSON.parse(credential);
+        if(!entry){
+          const api=new DerivTraderClient({
+            accessToken:parsed.accessToken,
+            accountId:mapping.account_id,
+            executionMode:mode
+          });
+          const result=await api.connect();
+          entry={api,accountId:mapping.account_id,executionMode:mode,provider:"deriv",connectedAt:Date.now(),accountInfo:result.account};
+          this.connections.set(key,entry);
+        }else{
+          entry.executionMode=mode;
+          entry.api.executionMode=mode;
+          entry.accountInfo=(await entry.api.getAccount()).data;
+        }
+        entry.executionMode=mode;
+        return {connected:true,mode,broker:"deriv",accountId:mapping.account_id,account:entry.accountInfo};
+      }catch(error){
+        console.error("[KINGBOT DERIV] connect failed:",error?.message||error);
+        return {connected:false,mode:"NOT_CONNECTED",reason:error?.message||"DERIV_CONNECTION_FAILED"};
       }
     }
 
@@ -240,6 +298,10 @@ export class UserBrokerManager {
         }
       };
     }
+    if(entry.provider==="deriv"){
+      const info=await entry.api.getAccount();
+      return info;
+    }
     if(entry.provider==="oanda"){
       const info=await entry.api.getAccountSummary();
       return {connected:true,data:{
@@ -259,6 +321,7 @@ export class UserBrokerManager {
   async getPositions(userId){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="exness")throw new Error("EXNESS_POSITIONS_USE_SERVER_EVENTS");
+    if(entry.provider==="deriv")return await entry.api.getPositions();
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getPositions()};
     return {connected:true,data:await entry.connection.getPositions()};
   }
@@ -266,6 +329,7 @@ export class UserBrokerManager {
   async getOrders(userId){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="exness")throw new Error("EXNESS_OPEN_ORDERS_USE_SERVER_EVENTS");
+    if(entry.provider==="deriv")return await entry.api.getOrders();
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getOrders()};
     return {connected:true,data:await entry.connection.getOrders()};
   }
@@ -283,6 +347,9 @@ export class UserBrokerManager {
         }
       };
     }
+    if(entry.provider==="deriv"){
+      return await entry.api.getTrades({startTime,endTime});
+    }
     if(entry.provider==="oanda"){
       return {connected:true,data:await entry.api.getTrades({state:"CLOSE"})};
     }
@@ -293,6 +360,7 @@ export class UserBrokerManager {
   async getSymbolSpecification(symbol,userId){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="exness")return {connected:true,data:await entry.api.getInstrumentConditions(String(symbol).trim().toUpperCase())};
+    if(entry.provider==="deriv")return await entry.api.getSymbolSpecification(String(symbol).trim().toUpperCase());
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getInstrumentSpecification(String(symbol).trim().toUpperCase())};
     return {connected:true,data:await entry.connection.getSymbolSpecification(String(symbol).trim().toUpperCase())};
   }
@@ -300,6 +368,7 @@ export class UserBrokerManager {
   async getHistoricalCandles(symbol,timeframe,userId,limit=100){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="exness")throw new Error("EXNESS_CANDLES_ADAPTER_PENDING");
+    if(entry.provider==="deriv")return await entry.api.getHistoricalCandles(String(symbol).trim().toUpperCase(),String(timeframe),limit);
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getHistoricalCandles(String(symbol).trim().toUpperCase(),String(timeframe),limit)};
     const connection=entry.connection;
     const count=Math.max(10,Math.min(1000,Number(limit)||100));
@@ -316,6 +385,9 @@ export class UserBrokerManager {
       const quote=await entry.api.getQuote(String(symbol).trim().toUpperCase());
       return {connected:true,data:{...quote,time:quote.timestamp||quote.time||new Date().toISOString(),lossTickValue:quote.lossTickValue}};
     }
+    if(entry.provider==="deriv"){
+      return await entry.api.getQuote(String(symbol).trim().toUpperCase());
+    }
     if(entry.provider==="oanda"){
       const quote=await entry.api.getQuote(String(symbol).trim().toUpperCase());
       return {connected:true,data:{...quote,lossTickValue:1}};
@@ -325,6 +397,9 @@ export class UserBrokerManager {
 
   async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId}){
     const entry=await this.connectionFor(userId);
+    if(entry.provider==="deriv"){
+      return await entry.api.placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId});
+    }
     if(entry.provider==="oanda"){
       return await entry.api.placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId});
     }
