@@ -287,6 +287,28 @@ IMPORTANT:
 
       /*
       ---------------------------------------------------
+      HOME IS A DESTINATION, NOT THE ENTRY ROUTER.
+      The only customer startup router is loader.html.
+      A direct Home visit is allowed only for a verified
+      Firebase session.
+      ---------------------------------------------------
+      */
+
+      if (this.getPageName() === "index.html") {
+
+        const auth = await this.checkAuthentication();
+
+        if (auth.authenticated && auth.verified) {
+          this.grantAccess(auth.user);
+          return;
+        }
+
+        window.location.replace("loader.html");
+        return;
+      }
+
+      /*
+      ---------------------------------------------------
       Only protected platform pages require authentication.
       ---------------------------------------------------
       */
@@ -427,6 +449,8 @@ IMPORTANT:
           "data-kingbot-verified",
           "true"
         );
+
+      document.documentElement.classList.remove("kb-index-pending");
 
       /*
       ---------------------------------------------------
