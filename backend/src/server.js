@@ -171,6 +171,22 @@ app.post("/api/partners/events", async (req,res)=>{
   }
 });
 
+app.post("/api/partners/webhook", async (req,res)=>{
+  const configured=String(process.env.PARTNER_EVENT_INGEST_KEY||"").trim();
+  const supplied=String(req.get("x-partner-ingest-key")||"").trim();
+  if(!configured || !supplied || supplied!==configured){
+    return res.status(401).json({ok:false,error:"PARTNER_WEBHOOK_UNAUTHORIZED"});
+  }
+  try{
+    const events=Array.isArray(req.body?.events)?req.body.events:[req.body];
+    const result=await partners.ingestEvents(events.map(event=>({...event,source:event?.source||"broker_partner_webhook"})));
+    res.status(201).json(result);
+  }catch(error){
+    console.error("[KINGBOT PARTNERS] webhook ingest failed:",error?.message||error);
+    res.status(400).json({ok:false,error:error?.message||"PARTNER_WEBHOOK_REJECTED"});
+  }
+});
+
 
 function extractRequestedSymbol(message=""){
   const candidates=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD","XAGUSD","AUDUSD","USDCAD","USDCHF","NZDUSD"];
