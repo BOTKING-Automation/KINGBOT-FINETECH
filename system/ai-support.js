@@ -14,7 +14,9 @@
     health: null,
     busy: false,
     contextBusy: false,
-    lastQueryAt: null
+    lastQueryAt: null,
+    messages: [],
+    storageKey: "KINGBOT_AI_CHAT_V1"
   };
 
   function byId(id) {
@@ -39,6 +41,95 @@
     toast.classList.add("show");
     window.clearTimeout(showToast.timer);
     showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 3200);
+  }
+
+  function loadChatSession() {
+    try {
+      const raw = sessionStorage.getItem(state.storageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) {
+        state.messages = parsed
+          .filter(item => item && (item.role === "user" || item.role === "assistant"))
+          .slice(-12)
+          .map(item => ({
+            role: item.role,
+            content: String(item.content || "").slice(0, 4000),
+            at: item.at || Date.now()
+          }));
+      }
+    } catch {
+      state.messages = [];
+    }
+    renderChat();
+  }
+
+  function saveChatSession() {
+    try {
+      sessionStorage.setItem(state.storageKey, JSON.stringify(state.messages.slice(-12)));
+    } catch {}
+  }
+
+  function escapeText(value) {
+    return String(value || "");
+  }
+
+  function renderChat() {
+    const container = byId("chatScroll");
+    if (!container) return;
+    container.innerHTML = "";
+
+    if (!state.messages.length) {
+      const empty = document.createElement("div");
+      empty.id = "chatEmpty";
+      empty.className = "chat-empty";
+      empty.innerHTML = "KINGBOT INTELLIGENCE IS READY.<br>Ask your first question.";
+      container.appendChild(empty);
+      return;
+    }
+
+    state.messages.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "chat-message " + item.role;
+
+      const bubble = document.createElement("div");
+      bubble.className = "chat-bubble";
+
+      const role = document.createElement("div");
+      role.className = "chat-role";
+      role.textContent = item.role === "user"
+        ? "YOU · " + new Date(item.at || Date.now()).toLocaleTimeString()
+        : "KINGBOT INTELLIGENCE · " + new Date(item.at || Date.now()).toLocaleTimeString();
+
+      const body = document.createElement("div");
+      body.className = "chat-body";
+      body.textContent = escapeText(item.content);
+
+      bubble.append(role, body);
+      row.appendChild(bubble);
+      container.appendChild(row);
+    });
+
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function setChatState(value) {
+    const el = byId("chatState");
+    if (el) el.textContent = value;
+  }
+
+  function showTyping() {
+    const container = byId("chatScroll");
+    if (!container) return;
+    const row = document.createElement("div");
+    row.id = "chatTyping";
+    row.className = "chat-message assistant";
+    row.innerHTML = '<div class="chat-bubble"><div class="chat-role">KINGBOT INTELLIGENCE · THINKING</div><div class="chat-typing"><i></i><i></i><i></i></div></div>';
+    container.appendChild(row);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function hideTyping() {
+    byId("chatTyping")?.remove();
   }
 
   function formatMoney(value, currency = "") {
@@ -280,24 +371,14 @@
   }
 
   function addHistory(role, message) {
-    const history = byId("history");
-    if (!history) return;
-    const empty = history.querySelector(".history-empty");
-    if (empty) empty.remove();
-
-    const item = document.createElement("article");
-    item.className = "history-item " + role;
-
-    const head = document.createElement("div");
-    head.className = "history-head";
-    head.textContent = (role === "user" ? "YOU" : "KINGBOT INTELLIGENCE") + " · " + new Date().toLocaleTimeString();
-
-    const body = document.createElement("div");
-    body.className = "history-body";
-    body.textContent = message;
-
-    item.append(head, body);
-    history.prepend(item);
+    state.messages.push({
+      role,
+      content: String(message || ""),
+      at: Date.now()
+    });
+    state.messages = state.messages.slice(-12);
+    saveChatSession();
+    renderChat();
   }
 
   async function runQuery(message) {
@@ -308,38 +389,57 @@
     state.busy = true;
     const input = byId("commandInput");
     const button = byId("runQuery");
-    const responseEl = byId("consoleResponse");
+
     if (input) input.disabled = true;
     if (button) button.disabled = true;
-    if (responseEl) responseEl.textContent = "SECURE REQUEST → ANALYZING VERIFIED KINGBOT CONTEXT…";
+    setChatState("THINKING");
     addHistory("user", clean);
+    showTyping();
 
     try {
       if (!state.context) {
         await loadContext();
       }
+
+      const conversation = state.messages
+        .slice(-11)
+        .map(item => ({
+          role: item.role,
+          content: String(item.content || "").slice(0, 4000)
+        }));
+
       const response = await requestJson(API_BASE + "/ai/query", {
         method: "POST",
-        body: JSON.stringify({ message: clean })
+        body: JSON.stringify({
+          message: clean,
+          history: conversation
+        })
       });
+
       const answer = String(response.answer || "").trim();
       if (!answer) throw new Error("KINGBOT Intelligence returned no analysis.");
-      if (responseEl) responseEl.textContent = answer;
+
+      hideTyping();
       addHistory("assistant", answer);
+
       state.lastQueryAt = new Date();
       setText("lastQuery", state.lastQueryAt.toLocaleTimeString());
-      showToast("Analysis complete.", "good");
+      setChatState("ONLINE");
+      showToast("KINGBOT Intelligence responded.", "good");
     } catch (error) {
+      hideTyping();
       const messageText = error?.message || "KINGBOT Intelligence is temporarily unavailable.";
-      if (responseEl) responseEl.textContent = messageText;
       addHistory("assistant", messageText);
+      setChatState("ERROR");
       showToast(messageText, "bad");
     } finally {
       state.busy = false;
       if (input) input.disabled = false;
       if (button) button.disabled = false;
-      if (input) input.value = "";
-      if (input) input.focus();
+      if (input) {
+        input.value = "";
+        input.focus();
+      }
     }
   }
 
@@ -351,10 +451,16 @@
   }
 
   function clearHistory() {
+    state.messages = [];
+    saveChatSession();
+    renderChat();
+
     const history = byId("history");
-    if (!history) return;
-    history.innerHTML = '<div class="history-empty">NO AI SESSION DATA YET</div>';
-    setText("consoleResponse", "awaiting your command...");
+    if (history) {
+      history.innerHTML = '<div class="history-empty">NO AI SESSION DATA YET</div>';
+    }
+
+    setChatState("READY");
     showToast("AI session cleared.", "good");
   }
 
@@ -401,6 +507,16 @@
     });
 
     button?.addEventListener("click", () => runQuery(input?.value || ""));
+
+    input?.addEventListener("keydown", event => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        form?.requestSubmit();
+      }
+    });
+
+    loadChatSession();
+    setChatState("READY");
     setInterval(loadContext, 20000);
     loadHealth();
     window.setTimeout(loadContext, 700);
