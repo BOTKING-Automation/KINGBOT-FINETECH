@@ -193,6 +193,29 @@ main{width:min(1420px,calc(100% - 28px));padding:24px 0 56px}
   .partner-link{width:100%}
   .partner-metrics{grid-template-columns:repeat(2,1fr)}
 }
+
+/* CONNECTION WIZARD */
+.connection-card{scroll-margin-top:30px}
+.wizard-head{margin:13px 0 0;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.wstep{padding:8px 7px;border:1px solid rgba(255,255,255,.055);border-radius:9px;background:rgba(255,255,255,.018);text-align:center;transition:.2s}
+.wstep .wn{display:block;color:#56647e;font:900 6px "JetBrains Mono"}
+.wstep .wl{display:block;margin-top:4px;color:#68758d;font:800 6px Orbitron;letter-spacing:.04em}
+.wstep.active{border-color:rgba(25,230,255,.22);background:rgba(25,230,255,.035);box-shadow:0 0 20px rgba(25,230,255,.05)}
+.wstep.active .wn,.wstep.done .wn{color:var(--cyan)}
+.wstep.active .wl,.wstep.done .wl{color:#d7e8ff}
+.wstep.done{border-color:rgba(35,247,163,.15);background:rgba(35,247,163,.025)}
+.wstep.done .wn{color:var(--green)}
+.wizard-note{margin-top:11px;padding:10px 11px;border-radius:10px;border:1px solid rgba(255,255,255,.055);background:rgba(255,255,255,.018);color:#68758d;font-size:8px;line-height:1.55}
+.wizard-note strong{color:#aebbd1;font-family:"JetBrains Mono"}
+.flow-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.flow-actions button{padding:9px 10px;border-radius:9px;font:900 7px "JetBrains Mono";cursor:pointer}
+.flow-open{border:0;background:linear-gradient(90deg,var(--gold),#ffe08a,var(--cyan));color:#05070d}
+.flow-skip{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);color:#8d9ab2}
+.bridge-badge{display:inline-flex;align-items:center;gap:5px;margin-left:7px;padding:4px 6px;border-radius:999px;border:1px solid rgba(155,92,255,.18);background:rgba(155,92,255,.035);color:#a98cff;font:800 6px "JetBrains Mono"}
+.telemetry{display:none;margin-top:10px;padding:11px;border-radius:11px;border:1px solid rgba(35,247,163,.13);background:rgba(35,247,163,.035)}
+.telemetry.show{display:block}
+.telemetry-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.telemetry-item span{display:block;color:#596781;font:700 6px "JetBrains Mono"}.telemetry-item b{display:block;margin-top:4px;color:#dce8fa;font:900 8px "JetBrains Mono"}
+@media(max-width:700px){.wizard-head{grid-template-columns:repeat(5,minmax(55px,1fr));overflow:auto}.wstep{min-width:58px}.telemetry-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -277,22 +300,51 @@ main{width:min(1420px,calc(100% - 28px));padding:24px 0 56px}
 </div>
 
   <div class="connection-card">
-    <div class="connection-top"><div><div class="selected" id="selectedBroker">Select a broker to continue</div><div class="hint">The account stays at the broker. KINGBOT only receives the authorization credential required for API access.</div></div><div class="connection-state"><span class="pulse" id="pulse"></span><span id="stateText">WAITING</span></div></div>
+    <div class="connection-top">
+      <div>
+        <div class="selected" id="selectedBroker">Select a broker to begin</div>
+        <div class="hint">KINGBOT separates broker account creation from execution authorization. For the currently enabled MT4/MT5 route, the secure bridge credential is issued by MetaApi.</div>
+      </div>
+      <div class="connection-state"><span class="pulse" id="pulse"></span><span id="stateText">WAITING</span></div>
+    </div>
+
+    <div class="wizard-head" id="wizardHead">
+      <div class="wstep active" data-step="1"><span class="wn">01</span><span class="wl">SELECT</span></div>
+      <div class="wstep" data-step="2"><span class="wn">02</span><span class="wl">BROKER</span></div>
+      <div class="wstep" data-step="3"><span class="wn">03</span><span class="wl">BRIDGE</span></div>
+      <div class="wstep" data-step="4"><span class="wn">04</span><span class="wl">VERIFY</span></div>
+      <div class="wstep" data-step="5"><span class="wn">05</span><span class="wl">READY</span></div>
+    </div>
+
+    <div class="wizard-note" id="wizardNote"><strong>STEP 1 · SELECT A BROKER</strong><br>Choose a broker above. The connection controls will unlock according to the broker's currently implemented adapter.</div>
+
+    <div class="flow-actions">
+      <button class="flow-open" id="openBroker" type="button" disabled>OPEN BROKER / ACCOUNT ↗</button>
+      <button class="flow-skip" id="alreadyHave" type="button" disabled>I ALREADY HAVE AN ACCOUNT</button>
+    </div>
 
     <div class="form" id="exnessForm">
       <div class="fields">
         <div class="field"><label>EXECUTION MODE</label><select id="executionMode"><option value="PAPER">PAPER · DEMO ACCOUNT</option><option value="LIVE">LIVE · REAL ACCOUNT</option></select></div>
-        <div class="field"><label>METAPI ACCOUNT ID</label><input id="mtAccountId" placeholder="MetaApi account ID" autocomplete="off"></div>
-        <div class="field" style="grid-column:1/-1"><label>METAPI API TOKEN</label><input id="mtApiToken" type="password" placeholder="Paste MetaApi access token" autocomplete="off"></div>
+        <div class="field"><label>METAAPI ACCOUNT ID</label><input id="mtAccountId" placeholder="MetaApi account ID" autocomplete="off"></div>
+        <div class="field" style="grid-column:1/-1"><label>METAAPI ACCESS TOKEN</label><input id="mtApiToken" type="password" placeholder="Paste MetaApi access token" autocomplete="off"></div>
       </div>
-      <div class="hint">For the enabled MT4/MT5 bridge, the broker account is onboarded through MetaApi. KINGBOT encrypts the MetaApi token server-side and never stores it in browser localStorage.</div>
+      <div class="hint">MT4/MT5 bridge route: connect your broker account to MetaApi first, then paste the MetaApi account ID and access token here. KINGBOT encrypts the token server-side and clears it from the browser after submission.</div>
     </div>
-    <div class="form" id="igForm"></div>
-    <div class="form" id="fxcmForm"></div>
-    <div class="form" id="oandaForm"><div class="hint">DIRECT OANDA EXECUTION ADAPTER: NOT ENABLED ON THIS GATEWAY YET.</div></div>
-    <div class="form" id="derivForm"><div class="hint">DIRECT DERIV EXECUTION ADAPTER: NOT ENABLED ON THIS GATEWAY YET.</div></div>
-    <div class="form" id="ibkrForm"><div class="hint">DIRECT IBKR EXECUTION ADAPTER: NOT ENABLED ON THIS GATEWAY YET.</div></div>
-    <div class="submitrow"><button class="primary" id="connectBtn" type="button" disabled>VERIFY BROKER CONNECTION</button><button class="secondary" id="openBroker" type="button" disabled>OPEN OFFICIAL BROKER</button></div>
+
+    <div class="form" id="oandaForm"><div class="hint">DIRECT OANDA EXECUTION ADAPTER IS NOT ENABLED ON THIS GATEWAY. You can open the official broker site, but do not paste an OANDA token into the MT4/MT5 bridge form.</div></div>
+    <div class="form" id="derivForm"><div class="hint">DIRECT DERIV EXECUTION ADAPTER IS NOT ENABLED ON THIS GATEWAY. The API roadmap is separate from the current MT4/MT5 bridge.</div></div>
+    <div class="form" id="ibkrForm"><div class="hint">DIRECT IBKR EXECUTION ADAPTER IS NOT ENABLED ON THIS GATEWAY. The API roadmap is separate from the current MT4/MT5 bridge.</div></div>
+
+    <div class="submitrow"><button class="primary" id="connectBtn" type="button" disabled>VERIFY & CONNECT BRIDGE</button></div>
+    <div class="telemetry" id="telemetry">
+      <div class="telemetry-grid">
+        <div class="telemetry-item"><span>ACCOUNT</span><b id="teleAccount">—</b></div>
+        <div class="telemetry-item"><span>BROKER ROUTE</span><b id="teleBroker">—</b></div>
+        <div class="telemetry-item"><span>MODE</span><b id="teleMode">—</b></div>
+        <div class="telemetry-item"><span>STATUS</span><b id="teleStatus">—</b></div>
+      </div>
+    </div>
     <div class="message" id="message" role="status" aria-live="polite"></div>
   </div>
 </section>
@@ -339,102 +391,119 @@ const configs={
   deriv:{name:"DERIV",provider:"deriv",official:"https://app.deriv.com/",form:"derivForm",live:false},
   ibkr:{name:"INTERACTIVE BROKERS",provider:"ibkr",official:"https://www.interactivebrokers.com/",form:"ibkrForm",live:false}
 };
-let selected=null;
+let selected=null, brokerOpened=false, accountReady=false;
 const $=id=>document.getElementById(id);
 function msg(t,type){$("message").textContent=t;$("message").className="message show "+type}
 function setState(text,ready){$("stateText").textContent=text;$("pulse").className="pulse"+(ready?" ready":"")}
 function showForm(slug){document.querySelectorAll(".form").forEach(x=>x.classList.remove("show"));if(slug&&$(configs[slug].form))$(configs[slug].form).classList.add("show")}
-function tokenFormValid(slug){
-  if(slug==="exness"||slug==="ig"||slug==="fxcm")return $("mtAccountId").value.trim()&&$("mtApiToken").value.trim();
-  return false;
+function setStep(n,doneBefore=false){
+  document.querySelectorAll(".wstep").forEach(el=>{
+    const s=Number(el.dataset.step);
+    el.classList.toggle("active",s===n);
+    el.classList.toggle("done",doneBefore?s<n:s<n);
+  });
 }
+function note(title,body){$("wizardNote").innerHTML="<strong>"+title+"</strong><br>"+body}
+function tokenFormValid(){return $("mtAccountId").value.trim()&&$("mtApiToken").value.trim()}
 async function firebaseToken(){
   if(!window.KINGBOT_FIREBASE)await import("./system/firebase-auth.js");
   if(!window.KINGBOT_FIREBASE)throw new Error("Firebase authentication service unavailable.");
   const u=window.KINGBOT_FIREBASE.auth.currentUser;
   if(!u)throw new Error("Please sign in before connecting a broker.");
-  await u.getIdToken(true);
   if(!u.emailVerified)throw new Error("Verify your email before connecting a broker.");
-  return u.getIdToken();
+  return u.getIdToken(true);
 }
-function payload(){
-  return {provider:"metaapi",accountId:$("mtAccountId").value.trim(),accountToken:$("mtApiToken").value,executionMode:$("executionMode").value};
-}
-document.querySelectorAll("[data-connect]").forEach(btn=>btn.addEventListener("click",()=>{
-  selected=btn.dataset.connect;
-  document.querySelectorAll(".broker").forEach(x=>x.classList.toggle("active",x.dataset.broker===selected));
-  $("selectedBroker").textContent=configs[selected].name+" CONNECTOR";
-  $("connectBtn").disabled=!configs[selected].live;
-  $("openBroker").disabled=false;
-  showForm(selected);setState(configs[selected].live?"READY FOR AUTHORIZATION":"ADAPTER NOT ENABLED",configs[selected].live);
-  if(configs[selected].live)msg("Use the official broker account first, then provide the MetaApi account ID and API token used for this MT4/MT5 bridge.","ok");
-  else msg("This broker is shown in the connectivity roadmap, but its direct API adapter is not enabled on the current execution gateway.","err");
-}));
-$("openBroker").addEventListener("click",()=>{if(selected)window.open(configs[selected].official,"_blank","noopener")});
-$("connectBtn").addEventListener("click",async()=>{
-  if(!selected||!configs[selected].live)return;
-  if(!tokenFormValid(selected)){msg("Enter the MetaApi account ID and API token for the selected MT4/MT5 connection.","err");return}
-  $("connectBtn").disabled=true;$("connectBtn").textContent="SECURING…";setState("SAVING ENCRYPTED CREDENTIAL",false);
-  try{
-    const token=await firebaseToken(),p=payload();
-    let r=await fetch(API_BASE+"/broker/account",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(p)});
-    let d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||d.reason||"Broker account mapping failed.");
-    $("mtApiToken").value="";
-    r=await fetch(API_BASE+"/broker/connect",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({executionMode:p.executionMode})});
-    d=await r.json().catch(()=>({}));if(!r.ok||!d.connected)throw new Error(d.reason||d.error||"Broker authorization failed.");
-    setState("CONNECTED · EXECUTION READY",true);
-    msg(configs[selected].name+" is connected. Account telemetry and server-side bot execution can now use this authorized connection.","ok");
-  }catch(e){
-    setState("CONNECTION FAILED",false);msg(e.message||"Broker connection failed.","err");
-  }finally{$("connectBtn").disabled=!selected||!configs[selected].live;$("connectBtn").textContent="VERIFY & CONNECT BROKER"}
-});
-
+function payload(){return {provider:"metaapi",accountId:$("mtAccountId").value.trim(),accountToken:$("mtApiToken").value,executionMode:$("executionMode").value}}
 async function loadPartnerCatalog(){
   try{
-    const r=await fetch(API_BASE+"/partners/catalog");
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok) return;
+    const r=await fetch(API_BASE+"/partners/catalog"),d=await r.json().catch(()=>({}));
+    if(!r.ok)return;
     (d.partners||[]).forEach(p=>{
       const el=document.querySelector('[data-partner-state="'+p.slug+'"]');
-      if(el){
-        el.textContent=p.partnerLinkConfigured?"PARTNER ROUTE READY":"OFFICIAL ROUTE · PARTNERSHIP PENDING";
-        el.classList.toggle("ready",p.partnerLinkConfigured);
-        el.classList.toggle("pending",!p.partnerLinkConfigured);
-      }
+      if(el){const ready=Boolean(p.partnerLinkConfigured);el.textContent=ready?"PARTNER ROUTE READY":"OFFICIAL ROUTE · PARTNERSHIP PENDING";el.classList.toggle("ready",ready);el.classList.toggle("pending",!ready)}
     });
   }catch{}
 }
-
 async function openPartner(slug,button){
-  const original=button.textContent;
-  button.disabled=true;
-  button.textContent="ATTRIBUTING…";
+  const original=button.textContent;button.disabled=true;button.textContent="ATTRIBUTING…";
   try{
     const token=await firebaseToken();
-    const r=await fetch(API_BASE+"/partners/click",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
-      body:JSON.stringify({
-        brokerSlug:slug,
-        landingUrl:window.location.href,
-        metadata:{source:"broker-connect",surface:"broker-marketplace"}
-      })
-    });
+    const r=await fetch(API_BASE+"/partners/click",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({brokerSlug:slug,landingUrl:window.location.href,metadata:{source:"broker-connect",surface:"broker-marketplace"}})});
     const d=await r.json().catch(()=>({}));
-    if(!r.ok||!d.redirectUrl) throw new Error(d.error||"Partner route unavailable.");
+    if(!r.ok||!d.redirectUrl)throw new Error(d.error||"Broker account route unavailable.");
     window.open(d.redirectUrl,"_blank","noopener");
-    msg(d.tracked?"Tracked partner route opened.":"Official broker route opened; KINGBOT partner tracking is not configured for this broker yet.","ok");
-  }catch(e){
-    msg(e.message||"Unable to open broker account route.","err");
-  }finally{
-    button.disabled=false;
-    button.textContent=original;
+    brokerOpened=true; accountReady=true; setStep(selected&&configs[selected].live?3:2);
+    note("STEP 3 · BRIDGE CREDENTIAL",configs[selected]?.live?"You have opened the broker route. For this enabled connector, now provide the MetaApi account ID and access token for the broker-linked MT4/MT5 account.":"This broker does not have a direct execution adapter enabled yet.");
+    if(selected&&configs[selected].live){showForm(selected);$("connectBtn").disabled=false;setState("CREDENTIAL READY",false)}
+    msg(d.tracked?"Tracked broker route opened. Continue with the bridge credential below.":"Official broker route opened. Partner tracking is not configured for this broker yet.","ok");
+  }catch(e){msg(e.message||"Unable to open broker account route.","err")}
+  finally{button.disabled=false;button.textContent=original}
+}
+function selectBroker(slug){
+  selected=slug;brokerOpened=false;accountReady=false;
+  document.querySelectorAll(".broker").forEach(x=>x.classList.toggle("active",x.dataset.broker===selected));
+  $("selectedBroker").textContent=configs[selected].name+" CONNECTOR";
+  $("openBroker").disabled=false;$("alreadyHave").disabled=false;
+  $("connectBtn").disabled=!configs[selected].live;
+  $("telemetry").classList.remove("show");showForm(selected);setStep(2);
+  if(configs[selected].live){
+    note("STEP 2 · BROKER ACCOUNT", "Open the broker's official account area or choose “I already have an account.” KINGBOT does not ask for your broker password.");
+    setState("ACCOUNT STEP",false);msg("Next: complete or confirm the broker account, then continue to the MetaApi bridge credential.","ok");
+  }else{
+    note("STEP 2 · ADAPTER STATUS","This broker is in the roadmap. The official broker route can still be opened, but direct execution is not enabled on this gateway.");
+    setState("ROADMAP",false);msg("Direct execution for this broker is not enabled on the current KINGBOT gateway.","err");
   }
 }
-
+document.querySelectorAll("[data-connect]").forEach(btn=>btn.addEventListener("click",()=>selectBroker(btn.dataset.connect)));
 document.querySelectorAll("[data-partner]").forEach(btn=>btn.addEventListener("click",()=>openPartner(btn.dataset.partner,btn)));
+$("openBroker").addEventListener("click",()=>selected&&openPartner(selected,$("openBroker")));
+$("alreadyHave").addEventListener("click",()=>{
+  if(!selected)return;
+  brokerOpened=true;accountReady=true;
+  setStep(configs[selected].live?3:2);
+  if(configs[selected].live){
+    note("STEP 3 · BRIDGE CREDENTIAL","Use your existing MT4/MT5 broker account with the MetaApi bridge. Enter the MetaApi account ID and access token below.");
+    showForm(selected);$("connectBtn").disabled=false;setState("CREDENTIAL READY",false);msg("Bridge credential entry is unlocked. No broker password is required here.","ok");
+  }
+});
+$("connectBtn").addEventListener("click",async()=>{
+  if(!selected||!configs[selected].live)return;
+  if(!brokerOpened||!accountReady){note("STEP 2 · BROKER ACCOUNT","Open the broker route or confirm that you already have an account before connecting the execution bridge.");msg("Complete the broker-account step first.","err");return}
+  if(!tokenFormValid()){setStep(3);msg("Enter both the MetaApi account ID and access token.","err");return}
+  $("connectBtn").disabled=true;$("connectBtn").textContent="VERIFYING…";setStep(4);setState("VALIDATING ACCOUNT",false);
+  try{
+    const token=await firebaseToken(),p=payload();
+    let r=await fetch(API_BASE+"/broker/account",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(p)});
+    let d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||d.reason||"Broker mapping failed.");
+    r=await fetch(API_BASE+"/broker/connect",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({executionMode:p.executionMode})});
+    d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.connected)throw new Error(d.reason||d.error||"Execution bridge verification failed.");
+    $("mtApiToken").value="";
+    $("teleAccount").textContent=d.accountId||p.accountId;$("teleBroker").textContent=(d.broker||p.provider||"—").toUpperCase();$("teleMode").textContent=d.mode||p.executionMode;$("teleStatus").textContent="CONNECTED";
+    $("telemetry").classList.add("show");setStep(5);setState("CONNECTED · EXECUTION READY",true);
+    note("STEP 5 · EXECUTION READY","The gateway has verified the bridge. Account telemetry and server-side bot execution can now use this authorized connection.");
+    msg(configs[selected].name+" is connected and verified. You can now continue to Bot Workspace.","ok");
+  }catch(e){
+    setStep(4);setState("VERIFICATION FAILED",false);msg(e.message||"Execution bridge verification failed.","err");
+  }finally{$("connectBtn").disabled=!selected||!configs[selected].live;$("connectBtn").textContent="VERIFY & CONNECT BRIDGE"}
+});
+async function restoreConnection(){
+  try{
+    const token=await firebaseToken();
+    const r=await fetch(API_BASE+"/connection",{headers:{Authorization:"Bearer "+token}});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.connected){
+      const brokerSlug=Object.keys(configs).find(k=>configs[k].provider===d.broker)||null;
+      if(brokerSlug)selectBroker(brokerSlug);
+      $("teleAccount").textContent=d.accountId||"—";$("teleBroker").textContent=String(d.broker||"—").toUpperCase();$("teleMode").textContent=d.executionMode||"—";$("teleStatus").textContent="CONNECTED";$("telemetry").classList.add("show");
+      setStep(5);setState("CONNECTED · EXECUTION READY",true);note("STEP 5 · EXECUTION READY","An existing verified broker connection was restored from the secure gateway.");
+      $("connectBtn").disabled=true;
+    }
+  }catch{}
+}
 loadPartnerCatalog();
-
+restoreConnection();
 })();
 </script>
 <script>
