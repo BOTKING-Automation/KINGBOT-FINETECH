@@ -71,6 +71,9 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
   var states=["NEURAL CORE INITIALIZING","MARKET MATRIX LINKING","BOT BRAIN SYNCHRONIZING","RISK ENGINE ONLINE","AUTH GATE READY"];
   var status=document.getElementById("status");
   var i=0;
+  var params=new URLSearchParams(window.location.search);
+  var requestedDuration=Number(params.get("duration"));
+  var duration=(Number.isFinite(requestedDuration)&&requestedDuration>=800&&requestedDuration<=10000)?requestedDuration:10000;
   var ticker=window.setInterval(function(){
     i=(i+1)%states.length;
     if(status) status.textContent=states[i];
@@ -78,7 +81,7 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
 
   window.setTimeout(function(){
     window.clearInterval(ticker);
-    var embedded=new URLSearchParams(window.location.search).get("embed")==="1";
+    var embedded=params.get("embed")==="1";
     if(embedded){
       try{
         window.parent.postMessage({type:"KINGBOT_BOOT_COMPLETE"},"*");
@@ -86,7 +89,7 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
       return;
     }
     window.location.replace("access-stable.html#signin");
-  },10000);
+  },duration);
 })();
 </script>
 </body>
