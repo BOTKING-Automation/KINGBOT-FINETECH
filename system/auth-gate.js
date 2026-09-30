@@ -1084,27 +1084,31 @@ IMPORTANT:
   // INITIALIZATION
   // -----------------------------------------------------
 
-  document.addEventListener(
-    "DOMContentLoaded",
-    async () => {
+  async function bootAuthGate() {
 
-      /*
-      Give session.js time to initialize.
-      */
+    /*
+    Session manager may be injected late on some pages.
+    Poll briefly for the shared session service instead of
+    relying on DOMContentLoaded timing.
+    */
 
-      if (!window.KINGBOT_SESSION) {
-
-        console.warn(
-          "[KINGBOT AUTH] Waiting for session manager..."
-        );
-
-        return;
-
-      }
-
-      await AUTH_GATE.enforce();
-
+    for (let i = 0; i < 80 && !window.KINGBOT_SESSION; i++) {
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
-  );
+
+    if (!window.KINGBOT_SESSION) {
+      console.warn("[KINGBOT AUTH] Session manager is unavailable.");
+      return;
+    }
+
+    await AUTH_GATE.enforce();
+
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootAuthGate, { once: true });
+  } else {
+    void bootAuthGate();
+  }
 
 })(window);
