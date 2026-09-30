@@ -248,7 +248,46 @@ async function loadAll(showToast=false){try{const results=await Promise.all([
  json("/api/health")
 ]);const [ov,us,pa,ac,en,ru,ri,br,ex,pl,he]=results;users=us.users||[];payments=pa.payments||[];activity=ac.activity||[];entitlements=en.entitlements||[];runtimes=ru.runtimes||[];risks=ri.risk||[];brokers=br.brokers||[];executions=ex.executions||[];plans=pl.plans||[];health=he||{};renderMetrics(ov.metrics||{});$("adminBadge").textContent="ADMIN VERIFIED · "+(ov.adminEmail||"");$("lastSync").dataset.value=new Date().toLocaleTimeString();$("lastSync").textContent="SYNC "+$("lastSync").dataset.value;renderUsers();renderPayments();renderPlans();renderEntitlements();renderBotCards();renderRuntimes();renderBrokers();renderRisk();renderActivity();renderExecutions("overviewExecutions");renderExecutions("auditExecutions");renderOverview();if(showToast)toastMsg("Super Admin OS synchronized.","ok")}catch(e){console.error("[KINGBOT ADMIN]",e);if(Number(e.status)===401){lockMsg.textContent="Administrator session expired. Re-authentication required.";return}toastMsg(e.message||"Admin data refresh failed.","err")}}
 async function adminPost(path,body={},okMessage="Operation completed."){try{const d=await json(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});toastMsg(d.message||okMessage,"ok");await loadAll(false);return d}catch(e){toastMsg(e.message||"Operation failed.","err");throw e}}
-async function preserveAdminReturn(){const ret=window.location.pathname+window.location.search+window.location.hash;location.replace("access-stable.html?return="+encodeURIComponent(ret)+"#signin")}
+async function showAdminSignIn(fb){
+ const card=lock.querySelector(".lock-card");
+ let form=document.getElementById("adminLoginForm");
+ if(form)return new Promise(resolve=>form.dataset.resolve="pending");
+ card.insertAdjacentHTML("beforeend",`
+   <form id="adminLoginForm" style="margin-top:18px;text-align:left" novalidate>
+     <label style="display:block;color:#73829e;font:800 7px "JetBrains Mono";letter-spacing:.12em;margin-bottom:6px">ADMIN EMAIL</label>
+     <input id="adminLoginEmail" type="email" autocomplete="username" value="kingbotofficial001@gmail.com" required
+       style="width:100%;height:42px;padding:0 11px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:#050b18;color:#edf3ff;outline:none;font:700 9px "JetBrains Mono";box-sizing:border-box">
+     <label style="display:block;color:#73829e;font:800 7px "JetBrains Mono";letter-spacing:.12em;margin:12px 0 6px">PASSWORD</label>
+     <input id="adminLoginPassword" type="password" autocomplete="current-password" required
+       style="width:100%;height:42px;padding:0 11px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:#050b18;color:#edf3ff;outline:none;font:700 9px "JetBrains Mono";box-sizing:border-box">
+     <button id="adminLoginButton" type="submit" class="btn cyan" style="width:100%;margin-top:12px;min-height:42px">VERIFY ADMIN & ENTER</button>
+     <div id="adminLoginError" style="margin-top:9px;color:#ff9baa;font:700 8px "JetBrains Mono";line-height:1.5"></div>
+   </form>`);
+ form=document.getElementById("adminLoginForm");
+ return await new Promise(resolve=>{
+   form.addEventListener("submit",async e=>{
+     e.preventDefault();
+     const button=document.getElementById("adminLoginButton");
+     const error=document.getElementById("adminLoginError");
+     button.disabled=true;button.textContent="AUTHENTICATING…";error.textContent="";
+     try{
+       const email=document.getElementById("adminLoginEmail").value.trim();
+       const password=document.getElementById("adminLoginPassword").value;
+       const result=await fb.signIn({email,password,remember:true});
+       if(!result?.verified)throw new Error("Administrator email is not verified in Firebase.");
+       await fb.refresh();
+       const signedIn=fb.auth.currentUser;
+       if(!signedIn?.emailVerified)throw new Error("Administrator email is not verified in Firebase.");
+       form.remove();
+       lockMsg.textContent="Administrator identity verified. Connecting to KINGBOT backend…";
+       resolve(true);
+     }catch(err){
+       error.textContent=String(err?.message||"Administrator sign-in failed.").slice(0,220);
+       button.disabled=false;button.textContent="VERIFY ADMIN & ENTER";
+     }
+   },{once:false});
+ });
+}
 async function ensureAdminSession(){
  lockMsg.textContent="Restoring secure administrator identity…";
  if(!window.KINGBOT_FIREBASE){
@@ -265,14 +304,14 @@ async function ensureAdminSession(){
      try{
        unsubscribe=fb.onChange(finish);
        if(fb.auth.currentUser)finish(fb.auth.currentUser);
-       setTimeout(()=>finish(fb.auth.currentUser||null),5000);
+       setTimeout(()=>finish(fb.auth.currentUser||null),15000);
      }catch{finish(fb.auth.currentUser||null)}
    });
  }
- if(!user){await preserveAdminReturn();return false}
+ if(!user)return showAdminSignIn(fb);
  try{await fb.refresh()}catch{}
  user=fb.auth.currentUser;
- if(!user){await preserveAdminReturn();return false}
+ if(!user)return showAdminSignIn(fb);
  if(!user.emailVerified){
    location.replace("verify.html?return="+encodeURIComponent(window.location.pathname+window.location.search+window.location.hash));
    return false;
