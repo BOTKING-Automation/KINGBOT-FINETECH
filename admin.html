@@ -4,50 +4,62 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#050914">
-<title>KINGBOT FINTECH — Admin Operations Center</title>
+<meta http-equiv="Cache-Control" content="no-store">
+<title>KINGBOT FINTECH — Super Admin OS</title>
 <link rel="stylesheet" href="system/platform.css">
 <style>
 :root{
  --a:#19e6ff;--b:#9b5cff;--c:#ff4fd8;--g:#f6b93b;--ok:#23f7a3;--bad:#ff4d6d;--wait:#ffb52e;
- --bg:#02050d;--panel:rgba(8,15,31,.92);--line:rgba(255,255,255,.08);--muted:#7785a2;--text:#edf3ff;
+ --bg:#02050d;--panel:rgba(8,15,31,.93);--line:rgba(255,255,255,.08);--muted:#7785a2;--text:#edf3ff;
 }
-body{background:
+*{box-sizing:border-box}
+html{background:#02050d;color:var(--text);scroll-behavior:auto;overscroll-behavior:none}
+body{margin:0;min-height:100vh;background:
  radial-gradient(circle at 5% 0%,rgba(25,230,255,.10),transparent 25%),
  radial-gradient(circle at 95% 5%,rgba(155,92,255,.12),transparent 25%),
  radial-gradient(circle at 50% 100%,rgba(246,185,59,.07),transparent 30%),
- linear-gradient(180deg,#02050d,#050914 55%,#02040a);}
-.admin-shell{width:min(1500px,calc(100% - 28px));margin:auto;padding:25px 0 70px}
+ linear-gradient(180deg,#02050d,#050914 55%,#02040a);color:var(--text);overscroll-behavior:none}
+.admin-shell{width:min(1520px,calc(100% - 28px));margin:auto;padding:22px 0 70px}
 .lock-screen{min-height:78vh;display:grid;place-items:center}
-.lock-card{width:min(520px,100%);padding:36px;border:1px solid rgba(25,230,255,.18);border-radius:24px;background:linear-gradient(145deg,rgba(9,17,37,.96),rgba(2,6,16,.98));box-shadow:0 30px 100px rgba(0,0,0,.48);text-align:center}
-.lock-icon{font-size:42px;filter:drop-shadow(0 0 18px rgba(25,230,255,.5))}
+.lock-card{width:min(560px,100%);padding:38px;border:1px solid rgba(25,230,255,.18);border-radius:24px;background:linear-gradient(145deg,rgba(9,17,37,.96),rgba(2,6,16,.98));box-shadow:0 30px 100px rgba(0,0,0,.48);text-align:center}
+.lock-icon{font-size:44px;filter:drop-shadow(0 0 18px rgba(25,230,255,.5))}
 .lock-card h1{margin:17px 0 10px;font:900 28px Orbitron;background:linear-gradient(90deg,var(--g),var(--a),var(--b),var(--c));-webkit-background-clip:text;color:transparent}
 .lock-card p{color:var(--muted);line-height:1.7;font-size:13px}
-.topbar{display:flex;justify-content:space-between;gap:18px;align-items:end;padding:23px;border:1px solid rgba(25,230,255,.14);border-radius:22px;background:linear-gradient(145deg,rgba(9,18,40,.95),rgba(3,7,18,.98));box-shadow:0 20px 70px rgba(0,0,0,.38)}
-.ey{color:var(--a);font:800 9px "JetBrains Mono";letter-spacing:.2em}.title{margin:8px 0;font:900 clamp(28px,4vw,48px) Orbitron;background:linear-gradient(90deg,var(--g),var(--a),var(--b),var(--c));-webkit-background-clip:text;color:transparent}.sub{max-width:900px;color:var(--muted);font-size:12px;line-height:1.65}.admin-badge{padding:10px 13px;border-radius:11px;border:1px solid rgba(35,247,163,.18);background:rgba(35,247,163,.04);color:#9fffd4;font:800 8px "JetBrains Mono";white-space:nowrap}
-.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:11px;margin-top:15px}
-.metric{padding:17px;border:1px solid var(--line);border-radius:17px;background:linear-gradient(145deg,rgba(10,18,38,.9),rgba(4,9,20,.96));position:relative;overflow:hidden}
-.metric:after{content:"";position:absolute;inset:auto -25% -65% 25%;height:120px;background:radial-gradient(circle,rgba(25,230,255,.09),transparent 68%)}
-.metric .k{font:800 7px "JetBrains Mono";letter-spacing:.14em;color:#62708e}.metric .v{margin-top:8px;font:900 24px "JetBrains Mono";color:#eef3ff}.metric .hint{margin-top:5px;color:#65728e;font-size:8px}
-.workspace{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:15px;margin-top:15px}
-.panel{padding:20px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,rgba(8,15,31,.94),rgba(3,7,17,.98));box-shadow:0 20px 70px rgba(0,0,0,.3)}
-.panel-head{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:13px}.panel-head h2{margin:0;font:800 14px Orbitron;letter-spacing:.06em}.panel-head span{color:#65728e;font:800 7px "JetBrains Mono";letter-spacing:.12em}
-.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:11px}.search{flex:1;min-width:180px}.input,.select,.search{min-height:40px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:#050b18;color:var(--text);outline:none;font:700 10px "JetBrains Mono"}.input:focus,.select:focus,.search:focus{border-color:rgba(25,230,255,.38);box-shadow:0 0 0 3px rgba(25,230,255,.06)}
-.table-wrap{overflow:auto;border:1px solid rgba(255,255,255,.06);border-radius:14px}.table{width:100%;border-collapse:collapse;min-width:840px}.table th{padding:11px;text-align:left;color:#63718d;font:800 7px "JetBrains Mono";letter-spacing:.12em;border-bottom:1px solid rgba(255,255,255,.07);background:#07101f}.table td{padding:12px 11px;color:#aab5ca;font-size:9px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}.table tr:last-child td{border-bottom:0}.user-name{font-weight:800;color:#eef3ff}.email{color:#8090ad;margin-top:3px}.pill{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:7px;font:800 7px "JetBrains Mono";letter-spacing:.05em;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}.dot{width:6px;height:6px;border-radius:50%}.pill.ok{color:#9fffd4;border-color:rgba(35,247,163,.16);background:rgba(35,247,163,.04)}.pill.bad{color:#ff9baa;border-color:rgba(255,77,109,.18);background:rgba(255,77,109,.045)}.pill.wait{color:#ffd681;border-color:rgba(255,181,46,.18);background:rgba(255,181,46,.045)}.bots{display:flex;gap:5px;flex-wrap:wrap}.bot-chip{padding:4px 6px;border-radius:6px;background:rgba(25,230,255,.045);border:1px solid rgba(25,230,255,.11);color:#9aeefe;font:700 6px "JetBrains Mono"}
-.action-row{display:flex;gap:6px;flex-wrap:wrap}.btn{min-height:34px;padding:0 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:#07101f;color:#dfe7f5;font:800 7px "JetBrains Mono";cursor:pointer}.btn:hover{border-color:rgba(25,230,255,.3)}.btn.green{color:#a9ffdc;border-color:rgba(35,247,163,.18);background:rgba(35,247,163,.04)}.btn.red{color:#ff9baa;border-color:rgba(255,77,109,.18);background:rgba(255,77,109,.045)}.btn.gold{color:#ffe18a;border-color:rgba(246,185,59,.2);background:rgba(246,185,59,.045)}
-.queue{display:grid;gap:10px}.payment-card{padding:14px;border:1px solid rgba(255,255,255,.07);border-radius:15px;background:linear-gradient(145deg,rgba(11,20,41,.86),rgba(4,9,20,.96))}.payment-top{display:flex;justify-content:space-between;gap:10px;align-items:start}.customer{font-weight:800;color:#edf3ff;font-size:10px}.micro{margin-top:4px;color:#667590;font-size:8px}.code{font:900 13px "JetBrains Mono";color:#ffe18a;letter-spacing:.08em}.pay-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:11px}.kv{padding:8px;border:1px solid rgba(255,255,255,.05);border-radius:9px;background:rgba(255,255,255,.018)}.kv .k{font:800 6px "JetBrains Mono";color:#586682}.kv .v{margin-top:4px;color:#dbe4f3;font-size:8px;word-break:break-word}.payment-card.pending{box-shadow:0 0 35px rgba(255,181,46,.04);border-color:rgba(255,181,46,.12)}.payment-card.approved{border-color:rgba(35,247,163,.12)}.payment-card.rejected{border-color:rgba(255,77,109,.12)}
-.activity{max-height:520px;overflow:auto;display:grid;gap:7px}.event{padding:10px;border-left:2px solid rgba(25,230,255,.28);background:rgba(255,255,255,.018);border-radius:8px}.event-top{display:flex;justify-content:space-between;gap:10px;color:#aeb8cb;font:800 7px "JetBrains Mono"}.event-name{color:var(--a)}.event-meta{margin-top:4px;color:#667590;font-size:7px;line-height:1.5;word-break:break-word}
-.toast{position:fixed;right:20px;bottom:20px;z-index:20;max-width:420px;padding:13px 15px;border-radius:12px;border:1px solid rgba(25,230,255,.22);background:rgba(3,8,18,.96);color:#edf3ff;font:800 9px "JetBrains Mono";box-shadow:0 15px 45px rgba(0,0,0,.4);display:none}.toast.show{display:block}.toast.ok{border-color:rgba(35,247,163,.22);box-shadow:0 0 30px rgba(35,247,163,.07)}.toast.err{border-color:rgba(255,77,109,.22);box-shadow:0 0 30px rgba(255,77,109,.06)}
-@media(max-width:1200px){.metrics{grid-template-columns:repeat(3,1fr)}.workspace{grid-template-columns:1fr}.pay-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:700px){.admin-shell{width:calc(100% - 16px);padding-top:16px}.topbar{align-items:start;flex-direction:column}.metrics{grid-template-columns:repeat(2,1fr)}.pay-grid{grid-template-columns:1fr}.panel{padding:14px}}
-@media(max-width:480px){.metrics{grid-template-columns:1fr}.title{font-size:25px}}
+.topbar{display:flex;justify-content:space-between;gap:18px;align-items:end;padding:22px;border:1px solid rgba(25,230,255,.15);border-radius:22px;background:linear-gradient(145deg,rgba(9,18,40,.95),rgba(3,7,18,.98));box-shadow:0 20px 70px rgba(0,0,0,.38);position:relative;overflow:hidden}
+.topbar:before{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent,rgba(25,230,255,.045),transparent);transform:translateX(-100%);animation:scan 6s linear infinite}
+@keyframes scan{to{transform:translateX(100%)}}
+.ey{color:var(--a);font:800 8px "JetBrains Mono";letter-spacing:.2em}.title{margin:8px 0;font:900 clamp(26px,4vw,46px) Orbitron;background:linear-gradient(90deg,var(--g),var(--a),var(--b),var(--c));-webkit-background-clip:text;color:transparent;position:relative}.sub{max-width:880px;color:var(--muted);font-size:11px;line-height:1.65;position:relative}.admin-badge{padding:10px 13px;border-radius:11px;border:1px solid rgba(35,247,163,.18);background:rgba(35,247,163,.04);color:#9fffd4;font:800 8px "JetBrains Mono";white-space:nowrap;position:relative}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.btn{min-height:34px;padding:0 11px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:#07101f;color:#dfe7f5;font:800 7px "JetBrains Mono";cursor:pointer}.btn:hover{border-color:rgba(25,230,255,.3);transform:translateY(-1px)}.btn.green{color:#a9ffdc;border-color:rgba(35,247,163,.18);background:rgba(35,247,163,.04)}.btn.red{color:#ff9baa;border-color:rgba(255,77,109,.18);background:rgba(255,77,109,.045)}.btn.gold{color:#ffe18a;border-color:rgba(246,185,59,.2);background:rgba(246,185,59,.045)}.btn.cyan{color:#9aeefe;border-color:rgba(25,230,255,.18);background:rgba(25,230,255,.04)}.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.metrics{display:grid;grid-template-columns:repeat(8,1fr);gap:9px;margin-top:13px}.metric{min-width:0;padding:14px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,rgba(10,18,38,.9),rgba(4,9,20,.96));position:relative;overflow:hidden}.metric:after{content:"";position:absolute;inset:auto -25% -65% 25%;height:100px;background:radial-gradient(circle,rgba(25,230,255,.09),transparent 68%)}.metric .k{font:800 6.5px "JetBrains Mono";letter-spacing:.11em;color:#62708e}.metric .v{margin-top:8px;font:900 21px "JetBrains Mono";color:#eef3ff}.metric .hint{margin-top:5px;color:#65728e;font-size:7px}
+.tabbar{display:flex;gap:7px;flex-wrap:wrap;margin:13px 0 10px;padding:7px;border:1px solid rgba(255,255,255,.07);border-radius:15px;background:rgba(4,10,23,.78);position:sticky;top:8px;z-index:50;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}.tab{min-height:38px;padding:0 12px;border:1px solid rgba(255,255,255,.06);border-radius:9px;background:rgba(255,255,255,.02);color:#71809b;font:800 7px "JetBrains Mono";cursor:pointer}.tab:hover{color:#fff;border-color:rgba(25,230,255,.2)}.tab.active{color:#06111a;border-color:transparent;background:linear-gradient(90deg,var(--g),#ffd982,var(--a))}
+.tab-panel{display:none}.tab-panel.active{display:block}
+.section-head{display:flex;justify-content:space-between;align-items:end;gap:12px;margin:0 0 11px}.section-head h2{margin:0;font:800 15px Orbitron;letter-spacing:.05em}.section-head p{margin:4px 0 0;color:#65728e;font-size:8px}.section-tag{color:#63718d;font:800 7px "JetBrains Mono";letter-spacing:.12em}
+.grid-2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr);gap:13px}.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.panel{padding:18px;border:1px solid var(--line);border-radius:19px;background:linear-gradient(145deg,rgba(8,15,31,.94),rgba(3,7,17,.98));box-shadow:0 20px 70px rgba(0,0,0,.25);margin-bottom:13px}.panel.accent{border-color:rgba(25,230,255,.14)}.panel.warn{border-color:rgba(255,181,46,.16)}.panel.danger{border-color:rgba(255,77,109,.18)}
+.panel-head{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:12px}.panel-head h3{margin:0;font:800 12px Orbitron;letter-spacing:.06em}.panel-head span{color:#65728e;font:800 7px "JetBrains Mono";letter-spacing:.12em}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.input,.select,.search{min-height:39px;padding:0 11px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:#050b18;color:var(--text);outline:none;font:700 9px "JetBrains Mono"}.search{flex:1;min-width:190px}.input:focus,.select:focus,.search:focus{border-color:rgba(25,230,255,.38);box-shadow:0 0 0 3px rgba(25,230,255,.06)}
+.table-wrap{overflow:auto;border:1px solid rgba(255,255,255,.06);border-radius:13px}.table{width:100%;border-collapse:collapse;min-width:880px}.table th{padding:10px;text-align:left;color:#63718d;font:800 6.5px "JetBrains Mono";letter-spacing:.11em;border-bottom:1px solid rgba(255,255,255,.07);background:#07101f}.table td{padding:11px 10px;color:#aab5ca;font-size:8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}.table tr:last-child td{border-bottom:0}.user-name{font-weight:800;color:#eef3ff}.email{color:#8090ad;margin-top:3px}.micro{color:#667590;font-size:7px;line-height:1.5}.pill{display:inline-flex;align-items:center;gap:5px;padding:5px 7px;border-radius:7px;font:800 6.5px "JetBrains Mono";letter-spacing:.04em;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}.pill.ok{color:#9fffd4;border-color:rgba(35,247,163,.16);background:rgba(35,247,163,.04)}.pill.bad{color:#ff9baa;border-color:rgba(255,77,109,.18);background:rgba(255,77,109,.045)}.pill.wait{color:#ffd681;border-color:rgba(255,181,46,.18);background:rgba(255,181,46,.045)}.pill.info{color:#9aeefe;border-color:rgba(25,230,255,.14);background:rgba(25,230,255,.035)}.dot{width:6px;height:6px;border-radius:50%}.bots,.chips{display:flex;gap:5px;flex-wrap:wrap}.bot-chip,.chip{padding:4px 6px;border-radius:6px;background:rgba(25,230,255,.045);border:1px solid rgba(25,230,255,.11);color:#9aeefe;font:700 6px "JetBrains Mono"}
+.action-row{display:flex;gap:6px;flex-wrap:wrap}.queue{display:grid;gap:9px;max-height:680px;overflow:auto}.payment-card{padding:13px;border:1px solid rgba(255,255,255,.07);border-radius:14px;background:linear-gradient(145deg,rgba(11,20,41,.86),rgba(4,9,20,.96))}.payment-card.pending{border-color:rgba(255,181,46,.14);box-shadow:0 0 35px rgba(255,181,46,.04)}.payment-card.approved{border-color:rgba(35,247,163,.12)}.payment-card.rejected{border-color:rgba(255,77,109,.12)}.payment-top{display:flex;justify-content:space-between;gap:10px;align-items:start}.customer{font-weight:800;color:#edf3ff;font-size:9px}.code{margin-top:9px;font:900 12px "JetBrains Mono";color:#ffe18a;letter-spacing:.08em}.pay-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}.kv{padding:8px;border:1px solid rgba(255,255,255,.05);border-radius:8px;background:rgba(255,255,255,.018)}.kv .k{font:800 5.8px "JetBrains Mono";color:#586682}.kv .v{margin-top:4px;color:#dbe4f3;font-size:7.5px;word-break:break-word}
+.cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.bot-card{padding:14px;border:1px solid rgba(25,230,255,.10);border-radius:15px;background:linear-gradient(145deg,rgba(8,18,38,.9),rgba(3,7,17,.98));position:relative;overflow:hidden}.bot-card:after{content:"";position:absolute;inset:auto -30% -65% 20%;height:120px;background:radial-gradient(circle,rgba(155,92,255,.10),transparent 68%)}.bot-card h4{margin:0;color:#edf3ff;font:900 10px Orbitron}.bot-card .mode{margin-top:5px;color:#70809e;font:700 6.5px "JetBrains Mono";letter-spacing:.08em}.bot-card .stat{margin-top:11px;display:flex;justify-content:space-between;gap:8px;color:#8190ac;font-size:7px}.bot-card .value{color:#eef3ff;font:800 7px "JetBrains Mono"}.bot-card .risk{margin-top:10px;color:#65728e;font-size:7px;line-height:1.6;position:relative}
+.status-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.status-card{padding:13px;border:1px solid rgba(255,255,255,.06);border-radius:13px;background:rgba(255,255,255,.018)}.status-card .k{color:#60708d;font:800 6px "JetBrains Mono";letter-spacing:.12em}.status-card .v{margin-top:7px;color:#eef3ff;font:900 14px "JetBrains Mono"}.status-card .s{margin-top:4px;color:#687894;font-size:7px}
+.plan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.plan{padding:15px;border:1px solid rgba(255,255,255,.07);border-radius:15px;background:linear-gradient(145deg,rgba(10,17,36,.9),rgba(3,8,18,.98))}.plan .plan-name{font:900 12px Orbitron;color:#f6b93b}.plan .price{margin-top:9px;font:900 23px "JetBrains Mono";color:#eef3ff}.plan .price small{font-size:7px;color:#667590}.plan .meta{margin-top:7px;color:#71809b;font-size:7px;line-height:1.55}.plan .feature{margin-top:4px;color:#9ba8bd;font-size:7px}.plan .feature:before{content:"✓ ";color:#23f7a3}
+.switch{display:flex;align-items:center;gap:8px;color:#8b98ad;font:800 7px "JetBrains Mono"}.switch input{appearance:none;width:36px;height:19px;border-radius:999px;background:#111c32;border:1px solid rgba(255,255,255,.1);position:relative;cursor:pointer}.switch input:before{content:"";position:absolute;width:13px;height:13px;left:2px;top:2px;border-radius:50%;background:#667590;transition:.18s}.switch input:checked{background:rgba(255,77,109,.16);border-color:rgba(255,77,109,.3)}.switch input:checked:before{transform:translateX(17px);background:#ff4d6d;box-shadow:0 0 12px rgba(255,77,109,.5)}
+.activity{max-height:650px;overflow:auto;display:grid;gap:7px}.event{padding:10px;border-left:2px solid rgba(25,230,255,.28);background:rgba(255,255,255,.018);border-radius:8px}.event-top{display:flex;justify-content:space-between;gap:10px;color:#aeb8cb;font:800 7px "JetBrains Mono"}.event-name{color:var(--a)}.event-meta{margin-top:4px;color:#667590;font-size:7px;line-height:1.5;word-break:break-word}
+.empty{padding:25px;text-align:center;color:#64728d;font-size:8px;border:1px dashed rgba(255,255,255,.08);border-radius:12px}.muted{color:#697794!important}.hero-note{padding:13px 15px;border:1px solid rgba(25,230,255,.11);border-left:2px solid var(--a);border-radius:12px;background:rgba(25,230,255,.025);color:#8090ad;font-size:8px;line-height:1.65}.danger-note{border-left-color:var(--bad);border-color:rgba(255,77,109,.13);background:rgba(255,77,109,.025)}
+.toast{position:fixed;right:20px;bottom:20px;z-index:2147483001;max-width:430px;padding:13px 15px;border-radius:12px;border:1px solid rgba(25,230,255,.22);background:rgba(3,8,18,.96);color:#edf3ff;font:800 9px "JetBrains Mono";box-shadow:0 15px 45px rgba(0,0,0,.4);display:none}.toast.show{display:block}.toast.ok{border-color:rgba(35,247,163,.22)}.toast.err{border-color:rgba(255,77,109,.22)}
+@media(max-width:1300px){.metrics{grid-template-columns:repeat(4,1fr)}.cards{grid-template-columns:repeat(3,1fr)}.grid-2{grid-template-columns:1fr}}
+@media(max-width:900px){.plan-grid{grid-template-columns:1fr}.status-grid{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:1fr 1fr}.pay-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.admin-shell{width:calc(100% - 16px);padding-top:16px}.topbar{align-items:start;flex-direction:column}.header-actions{justify-content:flex-start}.metrics{grid-template-columns:repeat(2,1fr)}.cards{grid-template-columns:1fr 1fr}.tabbar{position:static}.grid-3,.status-grid,.pay-grid{grid-template-columns:1fr}.panel{padding:14px}}
+@media(max-width:480px){.metrics{grid-template-columns:1fr}.cards{grid-template-columns:1fr}.title{font-size:25px}}
 </style>
 </head>
 <body>
 <div data-kingbot-navigation></div>
+
 <div id="lock" class="admin-shell lock-screen">
   <section class="lock-card">
     <div class="lock-icon">🛡️</div>
-    <h1>ADMIN SECURITY GATE</h1>
+    <h1>SUPER ADMIN SECURITY GATE</h1>
     <p id="lockMsg">Verifying administrator credentials and secure platform access…</p>
   </section>
 </div>
@@ -55,38 +67,123 @@ body{background:
 <main id="app" class="admin-shell" hidden>
   <section class="topbar">
     <div>
-      <div class="ey">KINGBOT FINTECH / ADMIN OPERATIONS OS</div>
-      <h1 class="title">COMMAND CENTER</h1>
-      <p class="sub">Internal operations workspace for platform activity, customer access, subscriptions, M-Pesa payment verification, bot entitlements, and audit intelligence.</p>
+      <div class="ey">KINGBOT FINTECH / GIBSONFX TECH</div>
+      <h1 class="title">SUPER ADMIN OS</h1>
+      <p class="sub">Central operations command center for customer accounts, payments, subscriptions, bot runtimes, broker connectivity, risk controls, AI readiness, execution telemetry, and audit intelligence.</p>
     </div>
-    <div id="adminBadge" class="admin-badge">ADMIN VERIFIED</div>
+    <div>
+      <div class="header-actions">
+        <button id="refreshBtn" class="btn cyan">↻ REFRESH SYSTEM</button>
+        <button id="globalKillBtn" class="btn red">⚠ EMERGENCY STOP ALL</button>
+      </div>
+      <div id="adminBadge" class="admin-badge" style="margin-top:8px">ADMIN VERIFIED</div>
+    </div>
   </section>
 
   <section id="metrics" class="metrics"></section>
 
-  <section class="workspace">
+  <nav class="tabbar" aria-label="Super Admin sections">
+    <button class="tab active" data-tab="overview">01 · OVERVIEW</button>
+    <button class="tab" data-tab="users">02 · USERS</button>
+    <button class="tab" data-tab="payments">03 · PAYMENTS</button>
+    <button class="tab" data-tab="subscriptions">04 · SUBSCRIPTIONS</button>
+    <button class="tab" data-tab="bots">05 · BOTS & RUNTIME</button>
+    <button class="tab" data-tab="brokers">06 · BROKERS</button>
+    <button class="tab" data-tab="risk">07 · RISK</button>
+    <button class="tab" data-tab="ai">08 · AI & SECURITY</button>
+    <button class="tab" data-tab="audit">09 · AUDIT</button>
+  </nav>
+
+  <section class="tab-panel active" data-tab-panel="overview">
+    <div class="section-head"><div><h2>COMMAND OVERVIEW</h2><p>Live operational state from the KINGBOT backend.</p></div><span class="section-tag" id="lastSync">SYNC —</span></div>
+    <div class="status-grid" id="overviewStatus"></div>
+    <div class="grid-2" style="margin-top:12px">
+      <section class="panel accent">
+        <div class="panel-head"><div><h3>EXECUTION TELEMETRY</h3><span>LAST 300 JOURNAL EVENTS</span></div></div>
+        <div id="overviewExecutions" class="queue"></div>
+      </section>
+      <aside class="panel warn">
+        <div class="panel-head"><div><h3>OPERATIONAL SAFETY</h3><span>ADMIN CONTROL</span></div></div>
+        <div class="hero-note danger-note"><b style="color:#ff9baa">EMERGENCY STOP ALL</b><br>Activating the global kill switch immediately marks all stored bot risk profiles as locked and stops currently recorded RUNNING runtimes. Disabling the switch does not restart any bot.</div>
+        <div style="margin-top:12px" class="action-row">
+          <button id="overviewKillBtn" class="btn red">ACTIVATE GLOBAL KILL SWITCH</button>
+          <button id="overviewRefreshBtn" class="btn cyan">SYNC NOW</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="tab-panel" data-tab-panel="users">
+    <div class="section-head"><div><h2>USER CONTROL CENTER</h2><p>Customer identity, account state, subscription and bot access.</p></div><span id="userCount" class="section-tag">—</span></div>
     <section class="panel">
-      <div class="panel-head"><div><span>01 / USER REGISTRY</span><h2>USERS & ACCESS CONTROL</h2></div><span id="userCount">—</span></div>
       <div class="toolbar">
         <input id="userSearch" class="search" placeholder="Search name, email or phone…">
         <select id="userFilter" class="select"><option value="all">ALL USERS</option><option value="active">ACTIVE</option><option value="blocked">BLOCKED</option><option value="subscribed">SUBSCRIBED</option><option value="waiting">WAITING PAYMENT</option></select>
       </div>
-      <div class="table-wrap">
-        <table class="table"><thead><tr><th>USER</th><th>ACCOUNT</th><th>SUBSCRIPTION</th><th>BOT ACCESS</th><th>PAYMENT</th><th>CONTROL</th></tr></thead><tbody id="usersBody"></tbody></table>
-      </div>
+      <div class="table-wrap"><table class="table"><thead><tr><th>USER</th><th>ACCOUNT</th><th>SUBSCRIPTION</th><th>BOT ACCESS</th><th>PAYMENT</th><th>CONTROL</th></tr></thead><tbody id="usersBody"></tbody></table></div>
     </section>
-
-    <aside class="panel">
-      <div class="panel-head"><div><span>02 / PAYMENT OPS</span><h2>M-PESA VERIFICATION QUEUE</h2></div><span id="paymentCount">—</span></div>
-      <div id="payments" class="queue"></div>
-    </aside>
   </section>
 
-  <section class="panel" style="margin-top:15px">
-    <div class="panel-head"><div><span>03 / SYSTEM INTELLIGENCE</span><h2>ACTIVITY & AUDIT STREAM</h2></div><span>LAST 250 EVENTS</span></div>
-    <div id="activity" class="activity"></div>
+  <section class="tab-panel" data-tab-panel="payments">
+    <div class="section-head"><div><h2>PAYMENT OPERATIONS</h2><p>M-Pesa verification and subscription access decisions.</p></div><span id="paymentCount" class="section-tag">—</span></div>
+    <div class="grid-2">
+      <section class="panel">
+        <div class="panel-head"><div><h3>VERIFICATION QUEUE</h3><span>PENDING + REVIEWED</span></div></div>
+        <div id="payments" class="queue"></div>
+      </section>
+      <aside class="panel">
+        <div class="panel-head"><div><h3>PAYMENT POLICY</h3><span>CONTROLLED ACCESS</span></div></div>
+        <div class="hero-note">Approval creates the active subscription and grants its configured bot entitlements. Rejection must include a reason. M-Pesa transaction codes are unique and cannot be reused.</div>
+        <div class="status-grid" id="paymentSummary" style="margin-top:11px"></div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="tab-panel" data-tab-panel="subscriptions">
+    <div class="section-head"><div><h2>SUBSCRIPTIONS & ENTITLEMENTS</h2><p>Commercial plans and real customer bot access.</p></div><span class="section-tag" id="entitlementCount">—</span></div>
+    <section class="panel"><div class="panel-head"><div><h3>PLAN CATALOG</h3><span>LIVE BACKEND CONFIGURATION</span></div></div><div id="plans" class="plan-grid"></div></section>
+    <section class="panel"><div class="panel-head"><div><h3>ENTITLEMENT REGISTRY</h3><span>LAST 300 GRANTS</span></div></div><div class="table-wrap"><table class="table"><thead><tr><th>USER</th><th>EMAIL</th><th>BOT</th><th>PLAN</th><th>STATE</th><th>EXPIRES</th><th>GRANTED</th></tr></thead><tbody id="entitlementsBody"></tbody></table></div></section>
+  </section>
+
+  <section class="tab-panel" data-tab-panel="bots">
+    <div class="section-head"><div><h2>BOTS & RUNTIME OPERATIONS</h2><p>Real runtime state and safety settings reported by the backend.</p></div><span class="section-tag" id="runtimeCount">—</span></div>
+    <section class="panel"><div class="cards" id="botCards"></div></section>
+    <section class="panel"><div class="panel-head"><div><h3>RUNTIME REGISTRY</h3><span>ACTIVE / ERROR / STOPPED</span></div></div><div class="table-wrap"><table class="table"><thead><tr><th>USER</th><th>BOT</th><th>STATE</th><th>MODE</th><th>SYMBOL</th><th>LAST SIGNAL</th><th>LAST RUN</th><th>CONTROL</th></tr></thead><tbody id="runtimeBody"></tbody></table></div></section>
+  </section>
+
+  <section class="tab-panel" data-tab-panel="brokers">
+    <div class="section-head"><div><h2>BROKER CONNECTIVITY</h2><p>Connection mappings and server-side connection state. Credentials are never displayed.</p></div><span class="section-tag" id="brokerCount">—</span></div>
+    <div class="grid-2">
+      <section class="panel"><div class="panel-head"><div><h3>BROKER ACCOUNTS</h3><span>SAFE METADATA ONLY</span></div></div><div class="table-wrap"><table class="table"><thead><tr><th>USER</th><th>PROVIDER</th><th>ACCOUNT</th><th>MODE</th><th>ENABLED</th><th>CONNECTED</th><th>UPDATED</th><th>CONTROL</th></tr></thead><tbody id="brokersBody"></tbody></table></div></section>
+      <aside class="panel accent"><div class="panel-head"><div><h3>CONNECTIVITY POLICY</h3><span>SECURE BROKER LAYER</span></div></div><div class="hero-note">Broker credentials remain encrypted server-side. The Admin page exposes only provider, account identifier, execution mode, enabled state and connection status. Disconnecting a user closes the current server-side connection; it does not delete the stored encrypted mapping.</div></aside>
+    </div>
+  </section>
+
+  <section class="tab-panel" data-tab-panel="risk">
+    <div class="section-head"><div><h2>RISK CONTROL CENTER</h2><p>Per-bot risk ceilings, execution mode, kill switches and safety state.</p></div><span class="section-tag" id="riskCount">—</span></div>
+    <section class="panel danger"><div class="panel-head"><div><h3>GLOBAL RISK LOCK</h3><span>EMERGENCY CONTROL</span></div></div><div class="hero-note danger-note">Use the global kill switch to lock all stored bot risk profiles and stop currently running runtimes. This is an emergency protection mechanism, not an automated restart system.</div><div style="margin-top:12px" class="action-row"><button id="riskKillOn" class="btn red">ACTIVATE ALL</button><button id="riskKillOff" class="btn gold">CLEAR GLOBAL LOCK</button></div></section>
+    <section class="panel"><div class="panel-head"><div><h3>PER-BOT RISK REGISTRY</h3><span>LIVE DATABASE VALUES</span></div></div><div class="table-wrap"><table class="table"><thead><tr><th>USER</th><th>BOT</th><th>MODE</th><th>RISK / TRADE</th><th>DAILY DD</th><th>TOTAL DD</th><th>MAX POS</th><th>KILL</th><th>UPDATED</th><th>CONTROL</th></tr></thead><tbody id="riskBody"></tbody></table></div></section>
+  </section>
+
+  <section class="tab-panel" data-tab-panel="ai">
+    <div class="section-head"><div><h2>AI & SECURITY CENTER</h2><p>AI service readiness, access policy and authentication posture.</p></div><span class="section-tag">SERVER VERIFIED</span></div>
+    <div class="status-grid" id="aiStatus"></div>
+    <div class="grid-3" style="margin-top:12px">
+      <section class="panel accent"><div class="panel-head"><div><h3>AI ACCESS POLICY</h3><span>DECISION SUPPORT</span></div></div><div class="hero-note">KINGBOT Intelligence is currently gated to active Pro or Institutional subscriptions. Account-specific answers use server-generated broker/runtime/risk context and should not invent account values.</div></section>
+      <section class="panel"><div class="panel-head"><div><h3>AUTHENTICATION</h3><span>IDENTITY LAYER</span></div></div><div class="hero-note">Firebase Authentication verifies identity and email status. Admin authorization is then checked by the KINGBOT backend against configured administrator email access.</div></section>
+      <section class="panel warn"><div class="panel-head"><div><h3>SECRETS</h3><span>PROTECTED</span></div></div><div class="hero-note">Gemini, Firebase Admin, broker tokens and encryption keys are backend environment secrets and are intentionally never rendered in this console.</div></section>
+    </div>
+  </section>
+
+  <section class="tab-panel" data-tab-panel="audit">
+    <div class="section-head"><div><h2>AUDIT & EXECUTION JOURNAL</h2><p>Traceability for customer, payment, runtime, risk and administrative operations.</p></div><span class="section-tag">LAST 250 AUDIT / 300 EXECUTION</span></div>
+    <div class="grid-2">
+      <section class="panel"><div class="panel-head"><div><h3>AUDIT STREAM</h3><span>LAST 250 EVENTS</span></div></div><div id="activity" class="activity"></div></section>
+      <section class="panel"><div class="panel-head"><div><h3>EXECUTION JOURNAL</h3><span>LAST 300 EVENTS</span></div></div><div id="auditExecutions" class="queue"></div></section>
+    </div>
   </section>
 </main>
+
 <div id="toast" class="toast"></div>
 
 <script src="system/session.js"></script>
@@ -95,177 +192,64 @@ body{background:
 <script>
 (function(){
 "use strict";
-const lock=document.getElementById("lock"),app=document.getElementById("app"),lockMsg=document.getElementById("lockMsg");
-const metricsEl=document.getElementById("metrics"),usersBody=document.getElementById("usersBody"),paymentsEl=document.getElementById("payments"),activityEl=document.getElementById("activity");
-const userSearch=document.getElementById("userSearch"),userFilter=document.getElementById("userFilter"),toast=document.getElementById("toast");
-let users=[],payments=[],activity=[];
-
-function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
+const $=id=>document.getElementById(id);
+const lock=$("lock"),app=$("app"),lockMsg=$("lockMsg"),metricsEl=$("metrics"),toast=$("toast");
+let users=[],payments=[],activity=[],entitlements=[],runtimes=[],risks=[],brokers=[],executions=[],plans=[],health={};
+const BOT_META={
+ strategic:{name:"KINGBOT STRATEGIC",mode:"MULTI-STRATEGY"},
+ flipper:{name:"KINGBOT FLIPPER",mode:"HIGH-SPEED FLIPPING"},
+ breakout:{name:"KINGBOT BREAKOUT",mode:"BREAKOUT & MOMENTUM"},
+ "smc-pro":{name:"KINGBOT SMC PRO",mode:"SMART MONEY CONCEPTS"},
+ "ladder-flip":{name:"KINGBOT LADDER FLIP V8",mode:"ADAPTIVE LADDER"}
+};
+function esc(v){return String(v??"").replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
+function fmtDate(v){if(!v)return"—";const d=new Date(v);return Number.isNaN(d.getTime())?"—":d.toLocaleString()}
 function money(v){return Number(v||0).toLocaleString("en-US",{maximumFractionDigits:2})}
 function toastMsg(msg,kind){toast.textContent=msg;toast.className="toast show "+(kind||"");setTimeout(()=>toast.className="toast",3500)}
 async function api(path,options={}){return window.KINGBOT_API.request(path,options)}
-function paymentPill(status){
- const s=String(status||"").toLowerCase();
- if(s==="approved")return '<span class="pill ok"><i class="dot" style="background:#23f7a3"></i>APPROVED</span>';
- if(s==="rejected")return '<span class="pill bad"><i class="dot" style="background:#ff4d6d"></i>DENIED</span>';
- return '<span class="pill wait"><i class="dot" style="background:#ffb52e"></i>WAITING</span>';
-}
-function botList(ent){
- return Array.isArray(ent)?ent.filter(x=>x.active!==false).map(x=>'<span class="bot-chip">'+esc(String(x.botId||"").toUpperCase())+'</span>').join(""):'';
-}
-function renderMetrics(m){
- const items=[
-  ["TOTAL USERS",m.totalUsers,"registered accounts"],
-  ["VERIFIED",m.verifiedUsers,"email verified"],
-  ["ACTIVE SUBS",m.activeSubscriptions,"currently entitled"],
-  ["PENDING M-PESA",m.pendingPayments,"awaiting review"],
-  ["RUNNING BOTS",m.runningBots,"live runtimes"],
-  ["APPROVED KES",money(m.approvedRevenueKes),"approved payment volume"]
- ];
- metricsEl.innerHTML=items.map(x=>'<article class="metric"><div class="k">'+x[0]+'</div><div class="v">'+esc(x[1])+'</div><div class="hint">'+x[2]+'</div></article>').join("");
-}
-function renderUsers(){
- const q=userSearch.value.trim().toLowerCase(),f=userFilter.value;
- const rows=users.filter(u=>{
-  const text=[u.first_name,u.last_name,u.email,u.phone].join(" ").toLowerCase();
-  const active=String(u.subscription_status)==="active"&&u.expires_at&&new Date(u.expires_at)>new Date();
-  const waiting=u.latest_payment_status==="pending";
-  return (!q||text.includes(q))&&(f==="all"||(f==="active"&&!u.admin_blocked)||(f==="blocked"&&u.admin_blocked)||(f==="subscribed"&&active)||(f==="waiting"&&waiting));
- });
- document.getElementById("userCount").textContent=rows.length+" / "+users.length;
- usersBody.innerHTML=rows.length?rows.map(u=>{
-  const active=String(u.subscription_status)==="active"&&u.expires_at&&new Date(u.expires_at)>new Date();
-  const account=u.admin_blocked?'<span class="pill bad">BLOCKED</span>':'<span class="pill ok">ENABLED</span>';
-  const verified=u.email_verified?'<span class="pill ok">VERIFIED</span>':'<span class="pill wait">UNVERIFIED</span>';
-  const sub=active?'<div class="user-name">'+esc(String(u.plan_id||"").toUpperCase())+'</div><div class="email">expires '+esc(new Date(u.expires_at).toLocaleDateString())+'</div>':'<span class="pill bad">NO ACTIVE SUB</span>';
-  const pay=paymentPill(u.latest_payment_status)+(u.latest_mpesa_code?'<div class="email">'+esc(u.latest_mpesa_code)+'</div>':"");
-  const controls='<div class="action-row"><button class="btn '+(u.admin_blocked?"green":"red")+'" data-user="'+esc(u.id)+'" data-action="'+(u.admin_blocked?"enable":"disable")+'">'+(u.admin_blocked?"ENABLE":"DISABLE")+'</button>'+(active?'<button class="btn gold" data-user="'+esc(u.id)+'" data-action="grant">+ BOT</button><button class="btn red" data-user="'+esc(u.id)+'" data-action="revoke">− BOT</button>':"")+'</div>';
-  return '<tr><td><div class="user-name">'+esc((u.first_name||"")+" "+(u.last_name||""))+'</div><div class="email">'+esc(u.email)+'</div></td><td>'+account+'<div style="margin-top:5px">'+verified+'</div></td><td>'+sub+'</td><td><div class="bots">'+botList(u.entitlements)+'</div></td><td>'+pay+'</td><td>'+controls+'</td></tr>';
- }).join(""):'<tr><td colspan="6"><div class="email">No matching users.</div></td></tr>';
-}
-function renderPayments(){
- const pending=payments.filter(p=>p.status==="pending");
- document.getElementById("paymentCount").textContent=pending.length+" pending / "+payments.length+" total";
- paymentsEl.innerHTML=payments.length?payments.slice(0,80).map(p=>{
-  const st=String(p.status||"pending").toLowerCase();
-  const actions=st==="pending"?'<div class="action-row" style="margin-top:11px"><button class="btn green" data-pay="'+esc(p.id)+'" data-pay-action="approve">✓ APPROVE & GRANT</button><button class="btn red" data-pay="'+esc(p.id)+'" data-pay-action="reject">× DENY PAYMENT</button></div>':'<div class="micro" style="margin-top:9px">Reviewed by '+esc(p.reviewed_by||"admin")+'</div>';
-  return '<article class="payment-card '+st+'"><div class="payment-top"><div><div class="customer">'+esc((p.first_name||"")+" "+(p.last_name||""))+'</div><div class="micro">'+esc(p.email||"")+'</div></div><div>'+paymentPill(st)+'</div></div><div style="margin-top:10px" class="code">'+esc(p.mpesa_code)+'</div><div class="pay-grid"><div class="kv"><div class="k">M-PESA NAME</div><div class="v">'+esc(p.payer_name||"—")+'</div></div><div class="kv"><div class="k">M-PESA PHONE</div><div class="v">'+esc(p.payer_phone||"—")+'</div></div><div class="kv"><div class="k">PLAN</div><div class="v">'+esc(String(p.plan_id||"").toUpperCase())+'</div></div><div class="kv"><div class="k">KES</div><div class="v">'+esc(money(p.amount_kes))+'</div></div><div class="kv"><div class="k">BOT</div><div class="v">'+esc(String(p.selected_bot_id||"PLAN DEFAULT").toUpperCase())+'</div></div><div class="kv"><div class="k">SUBMITTED</div><div class="v">'+esc(new Date(p.submitted_at).toLocaleString())+'</div></div></div>'+actions+'</article>';
- }).join(""):'<div class="email">No payment submissions.</div>';
-}
-function renderActivity(){
- activityEl.innerHTML=activity.length?activity.map(e=>{
-  let meta="";
-  try{meta=JSON.stringify(e.metadata||{});}catch{}
-  return '<article class="event"><div class="event-top"><span class="event-name">'+esc(e.event_type)+'</span><span>'+esc(new Date(e.created_at).toLocaleString())+'</span></div><div class="event-meta">'+esc(e.email||"system")+' · '+esc(meta)+'</div></article>';
- }).join(""):'<div class="email">No activity recorded.</div>';
-}
-async function loadAll(){
- try{
-  const [o,u,p,a]=await Promise.all([api("/api/subscription/admin/overview"),api("/api/subscription/admin/users"),api("/api/subscription/admin/payments"),api("/api/subscription/admin/activity")]);
-  const od=await o.json().catch(()=>({}));
-  if(!o.ok){
-    const err=new Error(od.error||"Administrator access required.");
-    err.status=o.status;
-    throw err;
-  }
-  const ud=await u.json().catch(()=>({})),pd=await p.json().catch(()=>({})),ad=await a.json().catch(()=>({}));
-  if(!u.ok||!p.ok||!a.ok){
-    const failed=u.ok?p.ok?a:a.ok?u:p;
-    const fd=failed===u?ud:failed===p?pd:ad;
-    const err=new Error(fd.error||"Admin data unavailable.");
-    err.status=failed.status;
-    throw err;
-  }
-  users=Array.isArray(ud.users)?ud.users:[]; payments=Array.isArray(pd.payments)?pd.payments:[]; activity=Array.isArray(ad.activity)?ad.activity:[];
-  renderMetrics(od.metrics||{});renderUsers();renderPayments();renderActivity();
-  document.getElementById("adminBadge").textContent="ADMIN VERIFIED · "+(od.adminEmail||"");
- }catch(e){
-  lockMsg.textContent=e.message||"Administrator access denied.";
-  throw e;
- }
-}
-async function mutate(url,body,msg){
- try{
-  const r=await api(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
-  const d=await r.json().catch(()=>({})); if(!r.ok||!d.ok)throw new Error(d.error||"Operation failed.");
-  toastMsg(msg,"ok"); await loadAll();
- }catch(e){toastMsg(e.message||"Operation failed.","err")}
-}
-
-usersBody.addEventListener("click",async e=>{
- const b=e.target.closest("button");if(!b)return;
- const id=b.dataset.user,action=b.dataset.action;
- if(action==="disable")return mutate("/api/subscription/admin/users/"+encodeURIComponent(id)+"/status",{blocked:true},"User access disabled.");
- if(action==="enable")return mutate("/api/subscription/admin/users/"+encodeURIComponent(id)+"/status",{blocked:false},"User access restored.");
- if(action==="grant"){
-  const bot=prompt("Bot ID to grant: strategic, flipper, breakout, smc-pro, ladder-flip");if(!bot)return;
-  return mutate("/api/subscription/admin/users/"+encodeURIComponent(id)+"/grant-bot",{botId:bot},"Bot entitlement granted.");
- }
- if(action==="revoke"){
-  const bot=prompt("Bot ID to revoke: strategic, flipper, breakout, smc-pro, ladder-flip");if(!bot)return;
-  return mutate("/api/subscription/admin/users/"+encodeURIComponent(id)+"/revoke-bot",{botId:bot},"Bot entitlement revoked.");
- }
-});
-paymentsEl.addEventListener("click",async e=>{
- const b=e.target.closest("button");if(!b)return;
- const id=b.dataset.pay,action=b.dataset.payAction;
- const note=prompt(action==="approve"?"Optional approval note:":"Reason for denial:"); if(action==="reject"&&!note)return;
- if(!confirm(action==="approve"?"Approve this M-Pesa payment and grant the plan entitlements?":"Deny this payment submission?"))return;
- await mutate("/api/subscription/admin/payments/"+encodeURIComponent(id)+"/"+action,{note:note||""},action==="approve"?"Payment approved and access granted.":"Payment denied.");
-});
-userSearch.addEventListener("input",renderUsers);userFilter.addEventListener("change",renderUsers);
-async function preserveAdminReturn(target){
- const returnUrl=window.location.pathname+window.location.search+window.location.hash;
- const encoded="access-stable.html?return="+encodeURIComponent(returnUrl)+"#signin";
- window.location.replace(encoded);
-}
-
-async function ensureAdminSession(){
- if(!window.KINGBOT_SESSION){
-   try{await import(new URL("system/session.js",window.location.href).href);}catch{}
- }
- if(!window.KINGBOT_SESSION){
-   throw new Error("Secure session manager did not load.");
- }
- const session=await window.KINGBOT_SESSION.check({force:true});
- if(!session.authenticated){
-   await preserveAdminReturn();
-   return false;
- }
- if(!session.user?.verified){
-   const returnUrl=window.location.pathname+window.location.search+window.location.hash;
-   window.location.replace("verify.html?return="+encodeURIComponent(returnUrl));
-   return false;
- }
- return true;
-}
-
-(async()=>{
- try{
-  const ready=await ensureAdminSession();
-  if(!ready)return;
-
-  const gate=await api("/api/subscription/admin/overview");
-  const gd=await gate.json().catch(()=>({}));
-  if(!gate.ok||gd.ok===false){
-   const err=new Error(gd.error||"Administrator access required.");
-   err.status=gate.status;
-   throw err;
-  }
-
-  lock.hidden=true;
-  app.hidden=false;
-  document.getElementById("adminBadge").textContent="ADMIN VERIFIED · "+(gd.adminEmail||"");
-  await loadAll();
-  setInterval(()=>loadAll().catch(()=>{}),30000);
- }catch(e){
-  const message=e.message||"Administrator access denied.";
-  lockMsg.textContent=message;
-  if(Number(e.status)===401){
-    setTimeout(()=>preserveAdminReturn(),500);
-  }
- }
-})();
+async function json(path,options={}){const r=await api(path,options);const d=await r.json().catch(()=>({}));if(!r.ok||d.ok===false){const e=new Error(d.error||d.message||("Backend HTTP "+r.status));e.status=r.status;throw e}return d}
+function paymentPill(status){const s=String(status||"").toLowerCase();if(s==="approved")return '<span class="pill ok"><i class="dot" style="background:#23f7a3"></i>APPROVED</span>';if(s==="rejected")return '<span class="pill bad"><i class="dot" style="background:#ff4d6d"></i>DENIED</span>';return '<span class="pill wait"><i class="dot" style="background:#ffb52e"></i>WAITING</span>'}
+function statePill(state){const s=String(state||"").toUpperCase();if(s==="RUNNING")return '<span class="pill ok">● RUNNING</span>';if(s==="ERROR")return '<span class="pill bad">● ERROR</span>';if(s==="PAUSED")return '<span class="pill wait">● PAUSED</span>';return '<span class="pill info">● STOPPED</span>'}
+function renderMetrics(m){metricsEl.innerHTML=[
+ ["TOTAL USERS",m.totalUsers,"registered"],
+ ["VERIFIED",m.verifiedUsers,"email verified"],
+ ["ACTIVE SUBS",m.activeSubscriptions,"entitled"],
+ ["PENDING M-PESA",m.pendingPayments,"awaiting review"],
+ ["APPROVED",m.approvedPayments,"payments"],
+ ["REJECTED",m.rejectedPayments,"payments"],
+ ["RUNNING BOTS",m.runningBots,"live runtimes"],
+ ["APPROVED KES",money(m.approvedRevenueKes),"payment volume"]
+].map(x=>'<article class="metric"><div class="k">'+x[0]+'</div><div class="v">'+esc(x[1])+'</div><div class="hint">'+x[2]+'</div></article>').join("")}
+function renderUsers(){const q=$("userSearch").value.trim().toLowerCase(),f=$("userFilter").value;const rows=users.filter(u=>{const t=[u.first_name,u.last_name,u.email,u.phone].join(" ").toLowerCase();const active=String(u.subscription_status)==="active"&&u.expires_at&&new Date(u.expires_at)>new Date();const waiting=u.latest_payment_status==="pending";return(!q||t.includes(q))&&(f==="all"||(f==="active"&&!u.admin_blocked)||(f==="blocked"&&u.admin_blocked)||(f==="subscribed"&&active)||(f==="waiting"&&waiting))});$("userCount").textContent=rows.length+" / "+users.length;$("usersBody").innerHTML=rows.length?rows.map(u=>{const active=String(u.subscription_status)==="active"&&u.expires_at&&new Date(u.expires_at)>new Date();const account=u.admin_blocked?'<span class="pill bad">BLOCKED</span>':'<span class="pill ok">ENABLED</span>';const verified=u.email_verified?'<span class="pill ok">VERIFIED</span>':'<span class="pill wait">UNVERIFIED</span>';const sub=active?'<div class="user-name">'+esc(String(u.plan_id||"").toUpperCase())+'</div><div class="email">expires '+esc(new Date(u.expires_at).toLocaleDateString())+'</div>':'<span class="pill bad">NO ACTIVE SUB</span>';const pay=paymentPill(u.latest_payment_status)+(u.latest_mpesa_code?'<div class="email">'+esc(u.latest_mpesa_code)+'</div>':"");const controls='<div class="action-row"><button class="btn '+(u.admin_blocked?"green":"red")+'" data-user="'+esc(u.id)+'" data-action="'+(u.admin_blocked?"enable":"disable")+'">'+(u.admin_blocked?"ENABLE":"DISABLE")+'</button>'+(active?'<button class="btn gold" data-user="'+esc(u.id)+'" data-action="grant">+ BOT</button><button class="btn red" data-user="'+esc(u.id)+'" data-action="revoke">− BOT</button>':"")+'</div>';return '<tr><td><div class="user-name">'+esc((u.first_name||"")+" "+(u.last_name||""))+'</div><div class="email">'+esc(u.email)+'</div><div class="micro">'+esc(u.phone||"")+'</div></td><td>'+account+'<div style="margin-top:5px">'+verified+'</div></td><td>'+sub+'</td><td><div class="bots">'+(Array.isArray(u.entitlements)?u.entitlements.filter(x=>x.active!==false).map(x=>'<span class="bot-chip">'+esc(String(x.botId||"").toUpperCase())+'</span>').join(""):"")+'</div></td><td>'+pay+'</td><td>'+controls+'</td></tr>'}).join(""):'<tr><td colspan="6"><div class="empty">No matching users.</div></td></tr>'}
+function renderPayments(){const pending=payments.filter(p=>p.status==="pending");$("paymentCount").textContent=pending.length+" pending / "+payments.length+" total";$("payments").innerHTML=payments.length?payments.slice(0,100).map(p=>{const st=String(p.status||"pending").toLowerCase();const actions=st==="pending"?'<div class="action-row" style="margin-top:10px"><button class="btn green" data-pay="'+esc(p.id)+'" data-pay-action="approve">✓ APPROVE & GRANT</button><button class="btn red" data-pay="'+esc(p.id)+'" data-pay-action="reject">× DENY PAYMENT</button></div>':'<div class="micro" style="margin-top:8px">Reviewed by '+esc(p.reviewed_by||"admin")+' · '+esc(p.reviewer_note||"No note")+'</div>';return '<article class="payment-card '+st+'"><div class="payment-top"><div><div class="customer">'+esc((p.first_name||"")+" "+(p.last_name||""))+'</div><div class="micro">'+esc(p.email||"")+'</div></div>'+paymentPill(st)+'</div><div class="code">'+esc(p.mpesa_code)+'</div><div class="pay-grid"><div class="kv"><div class="k">M-PESA NAME</div><div class="v">'+esc(p.payer_name||"—")+'</div></div><div class="kv"><div class="k">M-PESA PHONE</div><div class="v">'+esc(p.payer_phone||"—")+'</div></div><div class="kv"><div class="k">PLAN</div><div class="v">'+esc(String(p.plan_id||"").toUpperCase())+'</div></div><div class="kv"><div class="k">KES</div><div class="v">'+esc(money(p.amount_kes))+'</div></div><div class="kv"><div class="k">BOT</div><div class="v">'+esc(String(p.selected_bot_id||"PLAN DEFAULT").toUpperCase())+'</div></div><div class="kv"><div class="k">SUBMITTED</div><div class="v">'+esc(fmtDate(p.submitted_at))+'</div></div></div>'+actions+'</article>'}).join(""):'<div class="empty">No payment submissions.</div>';$("paymentSummary").innerHTML=[["PENDING",pending.length],["APPROVED",payments.filter(p=>p.status==="approved").length],["DENIED",payments.filter(p=>p.status==="rejected").length],["TOTAL",payments.length]].map(x=>'<div class="status-card"><div class="k">'+x[0]+'</div><div class="v">'+esc(x[1])+'</div><div class="s">payment records</div></div>').join("")}
+function renderActivity(){$("activity").innerHTML=activity.length?activity.map(e=>{let meta="";try{meta=JSON.stringify(e.metadata||{})}catch{}return '<article class="event"><div class="event-top"><span class="event-name">'+esc(e.event_type)+'</span><span>'+esc(fmtDate(e.created_at))+'</span></div><div class="event-meta">'+esc(e.email||"system")+' · '+esc(meta)+'</div></article>'}).join(""):'<div class="empty">No audit events recorded.</div>'}
+function renderPlans(){$("plans").innerHTML=plans.length?plans.map(p=>'<article class="plan"><div class="plan-name">'+esc(p.name||p.id)+'</div><div class="price">$'+esc(p.priceUsd)+' <small>/ '+esc(p.billing||"monthly")+'</small></div><div class="meta">Bot limit: '+esc(p.botLimit)+' · Selection: '+(p.requiresBotSelection?"required":"automatic")+'</div><div class="feature">Bots: '+esc((p.bots||[]).join(", "))+'</div>'+(p.features||[]).map(f=>'<div class="feature">'+esc(f)+'</div>').join("")+'</article>').join(""):'<div class="empty">Plan catalog unavailable.</div>'}
+function renderEntitlements(){$("entitlementCount").textContent=entitlements.length+" records";$("entitlementsBody").innerHTML=entitlements.length?entitlements.map(e=>'<tr><td><div class="user-name">'+esc(((e.first_name||"")+" "+(e.last_name||"")).trim()||"—")+'</div></td><td>'+esc(e.email||"—")+'</td><td><span class="bot-chip">'+esc(String(e.bot_id||"").toUpperCase())+'</span></td><td>'+esc(String(e.plan_id||"").toUpperCase())+'</td><td>'+(e.active&&e.status==="active"?'<span class="pill ok">ACTIVE</span>':'<span class="pill bad">INACTIVE</span>')+'</td><td>'+esc(fmtDate(e.expires_at))+'</td><td>'+esc(fmtDate(e.granted_at))+'</td></tr>').join(""):'<tr><td colspan="7"><div class="empty">No entitlement records.</div></td></tr>'}
+function renderBotCards(){const ids=Object.keys(BOT_META);$("botCards").innerHTML=ids.map(id=>{const rr=runtimes.filter(r=>r.bot_id===id);const running=rr.filter(r=>r.state==="RUNNING").length;const errors=rr.filter(r=>r.state==="ERROR").length;const kills=risks.filter(r=>r.bot_id===id&&r.kill_switch).length;return '<article class="bot-card"><h4>'+esc(BOT_META[id].name)+'</h4><div class="mode">'+esc(BOT_META[id].mode)+'</div><div class="stat"><span>RUNTIMES</span><span class="value">'+rr.length+'</span></div><div class="stat"><span>RUNNING</span><span class="value">'+running+'</span></div><div class="stat"><span>ERROR</span><span class="value">'+errors+'</span></div><div class="stat"><span>KILL LOCKS</span><span class="value">'+kills+'</span></div><div class="risk">Live state comes from the runtime/risk registries; no simulated bot health is displayed.</div></article>'}).join("")}
+function renderRuntimes(){$("runtimeCount").textContent=runtimes.length+" runtime records";$("runtimeBody").innerHTML=runtimes.length?runtimes.map(r=>{const signal=typeof r.last_signal==="string"?r.last_signal:(r.last_signal?JSON.stringify(r.last_signal):"—");return '<tr><td><div class="user-name">'+esc((r.first_name||"")+" "+(r.last_name||""))+'</div><div class="email">'+esc(r.email)+'</div></td><td>'+esc(String(r.bot_id||"").toUpperCase())+'</td><td>'+statePill(r.state)+(r.last_error?'<div class="micro" style="color:#ff9baa;margin-top:4px">'+esc(r.last_error)+'</div>':"")+'</td><td>'+esc(r.execution_mode||"—")+'</td><td>'+esc(r.symbol||"—")+' <span class="micro">'+esc(r.timeframe||"")+'</span></td><td class="micro">'+esc(signal)+'</td><td>'+esc(fmtDate(r.last_run_at))+'</td><td>'+(r.state==="RUNNING"?'<button class="btn red" data-runtime-user="'+esc(r.user_id)+'" data-runtime-bot="'+esc(r.bot_id)+'">STOP</button>':'<span class="muted">—</span>')+'</td></tr>'}).join(""):'<tr><td colspan="8"><div class="empty">No runtime records.</div></td></tr>'}
+function renderBrokers(){$("brokerCount").textContent=brokers.length+" mapped broker accounts";$("brokersBody").innerHTML=brokers.length?brokers.map(b=>'<tr><td><div class="user-name">'+esc((b.first_name||"")+" "+(b.last_name||""))+'</div><div class="email">'+esc(b.email||"")+'</div></td><td>'+esc(String(b.provider||"").toUpperCase())+'</td><td>'+esc(b.account_id||"—")+'</td><td>'+esc(b.execution_mode||"—")+'</td><td>'+(b.enabled?'<span class="pill ok">ENABLED</span>':'<span class="pill bad">DISABLED</span>')+'</td><td>'+(b.connected?'<span class="pill ok">CONNECTED</span>':'<span class="pill info">NOT CONNECTED</span>')+(b.statusReason?'<div class="micro">'+esc(b.statusReason)+'</div>':"")+'</td><td>'+esc(fmtDate(b.updated_at))+'</td><td><button class="btn gold" data-broker-user="'+esc(b.user_id)+'">DISCONNECT</button></td></tr>').join(""):'<tr><td colspan="8"><div class="empty">No broker account mappings.</div></td></tr>'}
+function renderRisk(){$("riskCount").textContent=risks.length+" risk profiles";$("riskBody").innerHTML=risks.length?risks.map(r=>'<tr><td><div class="user-name">'+esc((r.first_name||"")+" "+(r.last_name||""))+'</div><div class="email">'+esc(r.email||"")+'</div></td><td>'+esc(String(r.bot_id||"").toUpperCase())+'</td><td>'+esc(r.execution_mode||"—")+'</td><td>'+esc(r.max_risk_per_trade_pct)+'%</td><td>'+esc(r.daily_drawdown_pct)+'%</td><td>'+esc(r.total_drawdown_pct)+'%</td><td>'+esc(r.max_positions)+'</td><td>'+(r.kill_switch?'<span class="pill bad">LOCKED</span>':'<span class="pill ok">CLEAR</span>')+'</td><td>'+esc(fmtDate(r.updated_at))+'</td><td><label class="switch"><input type="checkbox" data-risk-user="'+esc(r.user_id)+'" data-risk-bot="'+esc(r.bot_id)+'" '+(r.kill_switch?"checked":"")+'> KILL</label></td></tr>').join(""):'<tr><td colspan="10"><div class="empty">No risk profiles stored yet.</div></td></tr>'}
+function renderExecutions(target){const el=$(target);el.innerHTML=executions.length?executions.slice(0,100).map(e=>'<article class="payment-card '+(String(e.status||"").toLowerCase()==="rejected"?"rejected":"")+'"><div class="payment-top"><div><div class="customer">'+esc(e.email||"")+'</div><div class="micro">'+esc(String(e.bot_id||"").toUpperCase())+' · '+esc(e.execution_mode||"")+'</div></div><span class="pill '+(e.status==="SUBMITTED"?"ok":e.status==="REJECTED"?"bad":"wait")+'">'+esc(e.status||"—")+'</span></div><div class="code">'+esc(String(e.side||"").toUpperCase())+' '+esc(e.symbol||"")+' · '+esc(e.volume||"—")+'</div><div class="micro" style="margin-top:7px">'+esc(fmtDate(e.created_at))+(e.error_message?" · "+esc(e.error_message):"")+'</div></article>').join(""):'<div class="empty">No execution journal entries.</div>'}
+function renderOverview(){const running=runtimes.filter(r=>r.state==="RUNNING").length;const errs=runtimes.filter(r=>r.state==="ERROR").length;const connected=brokers.filter(b=>b.connected).length;const aiReady=health.aiReady===true;$("overviewStatus").innerHTML=[["RUNTIME RUNNING",running,"real runtime records"],["RUNTIME ERRORS",errs,"reported errors"],["BROKER CONNECTED",connected,"server connections"],["AI PROVIDER",aiReady?"READY":"NOT READY","backend health"],["PENDING PAYMENTS",payments.filter(p=>p.status==="pending").length,"manual review"],["KILL LOCKS",risks.filter(r=>r.kill_switch).length,"active bot locks"],["EXECUTIONS",executions.length,"journal records"],["LAST SYNC",$("lastSync").dataset.value||"—","browser time"]].map(x=>'<div class="status-card"><div class="k">'+x[0]+'</div><div class="v">'+esc(x[1])+'</div><div class="s">'+esc(x[2])+'</div></div>').join("");}
+async function loadAll(showToast=false){try{const results=await Promise.all([
+ json("/api/subscription/admin/overview"),json("/api/subscription/admin/users"),json("/api/subscription/admin/payments"),json("/api/subscription/admin/activity"),
+ json("/api/subscription/admin/entitlements"),json("/api/subscription/admin/runtime"),json("/api/subscription/admin/risk"),json("/api/subscription/admin/brokers"),json("/api/subscription/admin/executions"),json("/api/subscription/plans"),
+ json("/api/health")
+]);const [ov,us,pa,ac,en,ru,ri,br,ex,pl,he]=results;users=us.users||[];payments=pa.payments||[];activity=ac.activity||[];entitlements=en.entitlements||[];runtimes=ru.runtimes||[];risks=ri.risk||[];brokers=br.brokers||[];executions=ex.executions||[];plans=pl.plans||[];health=he||{};renderMetrics(ov.metrics||{});$("adminBadge").textContent="ADMIN VERIFIED · "+(ov.adminEmail||"");$("lastSync").dataset.value=new Date().toLocaleTimeString();$("lastSync").textContent="SYNC "+$("lastSync").dataset.value;renderUsers();renderPayments();renderPlans();renderEntitlements();renderBotCards();renderRuntimes();renderBrokers();renderRisk();renderActivity();renderExecutions("overviewExecutions");renderExecutions("auditExecutions");renderOverview();if(showToast)toastMsg("Super Admin OS synchronized.","ok")}catch(e){console.error("[KINGBOT ADMIN]",e);if(Number(e.status)===401){lockMsg.textContent="Administrator session expired. Re-authentication required.";return}toastMsg(e.message||"Admin data refresh failed.","err")}}
+async function adminPost(path,body={},okMessage="Operation completed."){try{const d=await json(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});toastMsg(d.message||okMessage,"ok");await loadAll(false);return d}catch(e){toastMsg(e.message||"Operation failed.","err");throw e}}
+async function preserveAdminReturn(){const ret=window.location.pathname+window.location.search+window.location.hash;location.replace("access-stable.html?return="+encodeURIComponent(ret)+"#signin")}
+async function ensureAdminSession(){if(!window.KINGBOT_SESSION){try{await import(new URL("system/session.js",location.href).href)}catch{}}if(!window.KINGBOT_SESSION)throw new Error("Secure session manager did not load.");const s=await window.KINGBOT_SESSION.check({force:true});if(!s.authenticated){await preserveAdminReturn();return false}if(!s.user?.verified){location.replace("verify.html?return="+encodeURIComponent(window.location.pathname+window.location.search+window.location.hash));return false}return true}
+document.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===btn));document.querySelectorAll(".tab-panel").forEach(x=>x.classList.toggle("active",x.dataset.tabPanel===btn.dataset.tab))}));
+$("refreshBtn").addEventListener("click",()=>loadAll(true));$("overviewRefreshBtn").addEventListener("click",()=>loadAll(true));
+async function emergencyStop(){if(!confirm("Activate the global KINGBOT emergency stop? This will lock all stored bot risk profiles and stop currently recorded RUNNING runtimes."))return;await adminPost("/api/subscription/admin/risk/kill-switch",{active:true},"Global kill switch activated.");}
+$("globalKillBtn").addEventListener("click",emergencyStop);$("overviewKillBtn").addEventListener("click",emergencyStop);$("riskKillOn").addEventListener("click",emergencyStop);$("riskKillOff").addEventListener("click",async()=>{if(!confirm("Clear the global risk lock? Clearing the lock does not restart any stopped bot."))return;await adminPost("/api/subscription/admin/risk/kill-switch",{active:false},"Global risk lock cleared.");});
+$("userSearch").addEventListener("input",renderUsers);$("userFilter").addEventListener("change",renderUsers);
+$("usersBody").addEventListener("click",async e=>{const b=e.target.closest("button");if(!b)return;const id=b.dataset.user,action=b.dataset.action;if(action==="disable")return adminPost("/api/subscription/admin/users/"+encodeURIComponent(id)+"/status",{blocked:true},"User access disabled.");if(action==="enable")return adminPost("/api/subscription/admin/users/"+encodeURIComponent(id)+"/status",{blocked:false},"User access restored.");if(action==="grant"){const bot=prompt("Bot ID: strategic, flipper, breakout, smc-pro, ladder-flip");if(!bot)return;return adminPost("/api/subscription/admin/users/"+encodeURIComponent(id)+"/grant-bot",{botId:bot},"Bot entitlement granted.");}if(action==="revoke"){const bot=prompt("Bot ID: strategic, flipper, breakout, smc-pro, ladder-flip");if(!bot)return;return adminPost("/api/subscription/admin/users/"+encodeURIComponent(id)+"/revoke-bot",{botId:bot},"Bot entitlement revoked.");}});
+$("payments").addEventListener("click",async e=>{const b=e.target.closest("button");if(!b)return;const id=b.dataset.pay,action=b.dataset.payAction;const note=prompt(action==="approve"?"Optional approval note:":"Reason for denial:");if(action==="reject"&&!note)return;if(!confirm(action==="approve"?"Approve this M-Pesa payment and grant the plan entitlements?":"Deny this payment submission?"))return;await adminPost("/api/subscription/admin/payments/"+encodeURIComponent(id)+"/"+action,{note:note||""},action==="approve"?"Payment approved and access granted.":"Payment denied.");});
+$("runtimeBody").addEventListener("click",async e=>{const b=e.target.closest("[data-runtime-user]");if(!b)return;if(!confirm("Stop this running bot runtime now?"))return;await adminPost("/api/subscription/admin/runtime/"+encodeURIComponent(b.dataset.runtimeUser)+"/"+encodeURIComponent(b.dataset.runtimeBot)+"/stop",{},"Runtime stopped by administrator.");});
+$("brokersBody").addEventListener("click",async e=>{const b=e.target.closest("[data-broker-user]");if(!b)return;if(!confirm("Disconnect this user's current broker session? Stored encrypted credentials will not be deleted."))return;await adminPost("/api/subscription/admin/brokers/"+encodeURIComponent(b.dataset.brokerUser)+"/disconnect",{},"Broker session disconnected.");});
+$("riskBody").addEventListener("change",async e=>{const input=e.target.closest("[data-risk-user]");if(!input)return;const active=input.checked;try{await adminPost("/api/subscription/admin/risk/kill-switch",{active,userId:input.dataset.riskUser,botId:input.dataset.riskBot},active?"Bot risk lock activated.":"Bot risk lock cleared.");}catch{await loadAll(false)}});
+(async()=>{try{const ready=await ensureAdminSession();if(!ready)return;const gate=await json("/api/subscription/admin/overview");lock.hidden=true;app.hidden=false;$("adminBadge").textContent="ADMIN VERIFIED · "+(gate.adminEmail||"");await loadAll(false);setInterval(()=>loadAll(false),30000)}catch(e){lockMsg.textContent=e.message||"Administrator access denied.";if(Number(e.status)===401)setTimeout(()=>preserveAdminReturn(),500)}})();
 })();
 </script>
 </body>
