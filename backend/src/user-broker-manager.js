@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import MetaApi from "metaapi.cloud-sdk/esm-node";
 import { ExnessTraderClient } from "./exness-trader-client.js";
+import { OandaTraderClient } from "./oanda-trader-client.js";
 
 const ALGORITHM="aes-256-gcm";
 
@@ -79,6 +80,12 @@ export class UserBrokerManager {
       if(!secret)return {ok:false,error:"EXNESS_PRIVATE_KEY_REQUIRED"};
       if(host && !/^https:\/\//i.test(host))return {ok:false,error:"EXNESS_BASE_URL_MUST_USE_HTTPS"};
       secretValue=JSON.stringify({apiKey:key,secretKey:secret,baseUrl:host||undefined});
+    }else if(String(provider).toLowerCase()==="oanda"){
+      const token=String(accountToken||"").trim();
+      if(!token)return {ok:false,error:"OANDA_API_TOKEN_REQUIRED"};
+      const host=String(baseUrl||"").trim();
+      if(host && !/^https:\/\//i.test(host))return {ok:false,error:"OANDA_BASE_URL_MUST_USE_HTTPS"};
+      secretValue=JSON.stringify({apiToken:token,baseUrl:host||undefined});
     }
     if(!id)return {ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"};
     if(!secretValue)return {ok:false,error:isExness?"EXNESS_CREDENTIALS_REQUIRED":"BROKER_ACCOUNT_TOKEN_REQUIRED"};
@@ -126,6 +133,30 @@ export class UserBrokerManager {
       }catch(error){
         console.error("[KINGBOT EXNESS] connect failed:",error?.message||error);
         return {connected:false,mode:"NOT_CONNECTED",reason:error?.message||"EXNESS_CONNECTION_FAILED"};
+      }
+    }
+
+    if(mapping.provider==="oanda"){
+      try{
+        const parsed=JSON.parse(credential);
+        if(!entry){
+          const api=new OandaTraderClient({
+            apiToken:parsed.apiToken,
+            accountId:mapping.account_id,
+            executionMode:mode,
+            baseUrl:parsed.baseUrl
+          });
+          const accountInfo=await api.ensureReady();
+          entry={api,accountId:mapping.account_id,executionMode:mode,provider:"oanda",connectedAt:Date.now(),accountInfo};
+          this.connections.set(key,entry);
+        }else{
+          entry.accountInfo=await entry.api.getAccountSummary();
+        }
+        entry.executionMode=mode;
+        return {connected:true,mode,broker:"oanda",accountId:mapping.account_id,account:entry.accountInfo};
+      }catch(error){
+        console.error("[KINGBOT OANDA] connect failed:",error?.message||error);
+        return {connected:false,mode:"NOT_CONNECTED",reason:error?.message||"OANDA_CONNECTION_FAILED"};
       }
     }
 
@@ -209,18 +240,33 @@ export class UserBrokerManager {
         }
       };
     }
+    if(entry.provider==="oanda"){
+      const info=await entry.api.getAccountSummary();
+      return {connected:true,data:{
+        ...info,
+        balance:info.balance,
+        equity:info.NAV,
+        margin:info.marginUsed,
+        freeMargin:info.marginAvailable,
+        marginLevel:Number(info.marginUsed)>0 ? Number(info.NAV)/Number(info.marginUsed)*100 : null,
+        tradeAllowed:true,
+        provider:"oanda"
+      }};
+    }
     return {connected:true,data:await entry.connection.getAccountInformation()};
   }
 
   async getPositions(userId){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="exness")throw new Error("EXNESS_POSITIONS_USE_SERVER_EVENTS");
+    if(entry.provider==="oanda")return {connected:true,data:await entry.api.getPositions()};
     return {connected:true,data:await entry.connection.getPositions()};
   }
 
   async getOrders(userId){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="exness")throw new Error("EXNESS_OPEN_ORDERS_USE_SERVER_EVENTS");
+    if(entry.provider==="oanda")return {connected:true,data:await entry.api.getOrders()};
     return {connected:true,data:await entry.connection.getOrders()};
   }
 
@@ -237,6 +283,9 @@ export class UserBrokerManager {
         }
       };
     }
+    if(entry.provider==="oanda"){
+      return {connected:true,data:await entry.api.getTrades({state:"CLOSE"})};
+    }
     const [orders,deals]=await Promise.all([entry.connection.getHistoryOrdersByTimeRange(start,end),entry.connection.getDealsByTimeRange(start,end)]);
     return {connected:true,data:{orders,deals}};
   }
@@ -244,12 +293,14 @@ export class UserBrokerManager {
   async getSymbolSpecification(symbol,userId){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="exness")return {connected:true,data:await entry.api.getInstrumentConditions(String(symbol).trim().toUpperCase())};
+    if(entry.provider==="oanda")return {connected:true,data:await entry.api.getInstrumentSpecification(String(symbol).trim().toUpperCase())};
     return {connected:true,data:await entry.connection.getSymbolSpecification(String(symbol).trim().toUpperCase())};
   }
 
   async getHistoricalCandles(symbol,timeframe,userId,limit=100){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="exness")throw new Error("EXNESS_CANDLES_ADAPTER_PENDING");
+    if(entry.provider==="oanda")return {connected:true,data:await entry.api.getHistoricalCandles(String(symbol).trim().toUpperCase(),String(timeframe),limit)};
     const connection=entry.connection;
     const count=Math.max(10,Math.min(1000,Number(limit)||100));
     const end=new Date();
@@ -263,13 +314,20 @@ export class UserBrokerManager {
     const entry=await this.connectionFor(userId);
     if(entry.provider==="exness"){
       const quote=await entry.api.getQuote(String(symbol).trim().toUpperCase());
-      return {connected:true,data:{...quote,time:quote.timestamp||quote.time||new Date().toISOString()}};
+      return {connected:true,data:{...quote,time:quote.timestamp||quote.time||new Date().toISOString(),lossTickValue:quote.lossTickValue}};
+    }
+    if(entry.provider==="oanda"){
+      const quote=await entry.api.getQuote(String(symbol).trim().toUpperCase());
+      return {connected:true,data:{...quote,lossTickValue:1}};
     }
     return {connected:true,data:await entry.connection.getSymbolPrice(String(symbol).trim().toUpperCase())};
   }
 
   async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId}){
     const entry=await this.connectionFor(userId);
+    if(entry.provider==="oanda"){
+      return await entry.api.placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId});
+    }
     if(entry.provider==="exness"){
       return await entry.api.openPosition({
         instrument:symbol,
