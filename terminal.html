@@ -2330,7 +2330,31 @@ async function checkBackend() {
     if($("accountConnectionNote")) $("accountConnectionNote").textContent=note;
   };
 
-  // First verify the saved broker mapping. Full balance/equity telemetry follows.
+  // Read the persisted broker identity first. This never opens a broker socket.
+  try{
+    const identity=await fetchApi("/api/broker/identity",{timeoutMs:5000});
+    $("accountBroker").textContent=String(identity.broker||"—").toUpperCase();
+    $("accountIdDisplay").textContent=identity.accountId||"—";
+    $("accountMode").textContent=String(identity.executionMode||"—").toUpperCase();
+    if(identity.configured){
+      backendConnected=true;
+      setConnection("ACCOUNT CONNECTED","#23f7a3","Connected broker identity verified from KINGBOT secure storage. Live balance and execution telemetry is loading separately.");
+      $("heroBrokerBadge").textContent="● "+String(identity.broker||"BROKER").toUpperCase()+" · ACCOUNT "+String(identity.accountId||"—");
+      $("heroBrokerBadge").className="hero-badge public";
+      $("terminalBrokerName").textContent=String(identity.broker||"—").toUpperCase();
+      $("terminalAccountId").textContent=identity.accountId||"—";
+      $("terminalExecutionMode").textContent=String(identity.executionMode||"—").toUpperCase();
+    }else{
+      backendConnected=false;
+      setConnection("NOT CONNECTED","#ff7a18","No broker account is currently bound to this KINGBOT account.");
+      $("heroBrokerBadge").textContent="● NO VERIFIED ACCOUNT";
+      $("heroBrokerBadge").className="hero-badge offline";
+    }
+  }catch(error){
+    logActivity(`Broker identity check: ${error.message}`);
+  }
+
+  // Full connection status may rehydrate a broker session, but it no longer blocks identity display.
   try{
     const status=await fetchApi("/api/connection",{timeoutMs:7000});
     if(status.configured || status.connected){
@@ -2389,7 +2413,7 @@ async function checkBackend() {
         $("heroBrokerBadge").textContent="● "+String(data.broker||"BROKER").toUpperCase()+" · ACCOUNT CONNECTED";
         $("heroBrokerBadge").className="hero-badge public";
       }else if(data.configured){
-        $("accountConnectionValue").textContent="RECONNECTING…";
+        $("accountConnectionValue").textContent="ACCOUNT SAVED · RECONNECTING…";
         $("accountConnectionValue").style.color="#ffc84a";
         $("accountConnectionNote").textContent="Your verified broker authorization is saved. KINGBOT is restoring the secure broker session.";
         $("heroBrokerBadge").textContent="● VERIFIED ACCOUNT SAVED · RECONNECTING…";
@@ -2402,6 +2426,7 @@ async function checkBackend() {
         $("heroBrokerBadge").className="hero-badge offline";
       }
     }catch{
+      if(backendConnected) return backendConnected;
       backendConnected=false;
       $("accountConnectionValue").textContent="STATUS UNAVAILABLE";
       $("accountConnectionValue").style.color="#ffc84a";
@@ -2727,8 +2752,8 @@ function formatCompact(value) {
     "Public market-data layer starting"
   );
 
-  // Account synchronization is independent from public market data.
-  // Do not let a slow market endpoint block broker-account visibility.
+  // Broker identity is independent from public market data.
+  // Do not let a broker wake-up or chart request block account visibility.
   const accountBoot=checkBackend().catch(error=>{
     logActivity(`Account bootstrap deferred: ${error.message}`);
   });
