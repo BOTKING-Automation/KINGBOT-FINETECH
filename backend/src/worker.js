@@ -149,7 +149,7 @@ async function execute(row){
     const tickValue=Number(side==="BUY"?quote.lossTickValue:quote.lossTickValue);
     if(![tickSize,minVolume,maxVolume,volumeStep,point,stopsLevel,tickValue].every(Number.isFinite)||tickSize<=0||minVolume<=0||maxVolume<minVolume||volumeStep<=0||tickValue<=0)throw new Error("BROKER_SIZING_DATA_UNAVAILABLE");
 
-    const tradePlan=getTradePlan(botId,{
+    tradePlan=getTradePlan(botId,{
       symbol:config.symbol,
       timeframe:config.timeframe,
       price:(bid+ask)/2,
