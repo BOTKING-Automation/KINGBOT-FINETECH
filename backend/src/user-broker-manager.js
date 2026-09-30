@@ -258,7 +258,8 @@ export class UserBrokerManager {
     for(const [key,entry] of this.connections){
       if(key.startsWith(String(userId)+":")){
         try{
-          if(entry.provider!=="exness" && entry.connection?.close)await entry.connection.close();
+          if(entry.provider==="deriv" && entry.api?.disconnect)await entry.api.disconnect();
+          else if(entry.provider!=="exness" && entry.connection?.close)await entry.connection.close();
         }finally{this.connections.delete(key);}
       }
     }
