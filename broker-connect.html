@@ -356,11 +356,24 @@ async function startDerivOAuth(){
 }
 function setStatus(t){$("flowStatus").textContent=t}
 function renderAccounts(list){
-  $("accountList").innerHTML=list.map((a,i)=>'<div class="account-item'+(i===0?" active":"")+' data-account="'+String(a.id).replace(/"/g,"&quot;")+'"><div><b>'+String(a.label||a.id)+'</b><span>'+String(a.mode||"AUTHORIZED")+'</span></div><span>SELECT</span></div>').join("");
-  selectedAccount=list[0]?.id||null;
+  const items=Array.isArray(list)?list:[];
+  $("accountList").innerHTML=items.map((a,i)=>{
+    const id=String(a.id||a.accountId||"");
+    const type=String(a.accountType||"").toLowerCase();
+    const mode=type==="real"?"LIVE · REAL":"PAPER · DEMO";
+    const balance=a.balance==null?"—":Number(a.balance).toLocaleString(undefined,{maximumFractionDigits:2});
+    const label=type==="real"?"DERIV REAL ACCOUNT":"DERIV DEMO ACCOUNT";
+    return '<div class="account-item'+(i===0?" active":"")+'" data-account="'+id.replace(/"/g,"&quot;")+'" data-account-type="'+type.replace(/"/g,"&quot;")+'"><div><b>'+label+'</b><span>'+id+' · '+mode+' · '+String(a.currency||"USD")+' · Balance '+balance+'</span></div><span>SELECT</span></div>';
+  }).join("");
+  selectedAccount=items[0]?.id||null;
   $("authorizeBtn").disabled=!selectedAccount;
+  $("authorizeBtn").textContent=selectedAccount?"CONNECT SELECTED ACCOUNT":"SELECT AN ACCOUNT";
   document.querySelectorAll(".account-item").forEach(el=>el.addEventListener("click",()=>{
-    document.querySelectorAll(".account-item").forEach(x=>x.classList.remove("active"));el.classList.add("active");selectedAccount=el.dataset.account;$("authorizeBtn").disabled=false;
+    document.querySelectorAll(".account-item").forEach(x=>x.classList.remove("active"));
+    el.classList.add("active");
+    selectedAccount=el.dataset.account;
+    $("authorizeBtn").disabled=false;
+    $("authorizeBtn").textContent="CONNECT SELECTED ACCOUNT";
   }));
 }
 document.querySelectorAll("[data-open]").forEach(btn=>btn.addEventListener("click",()=>selectBroker(btn.dataset.open)));
@@ -408,16 +421,35 @@ $("verifyBtn").addEventListener("click",async()=>{
 $("authorizeBtn").addEventListener("click",async()=>{
   if(!selectedAccount||!selected)return;
   setStep(4);
-  const btn=$("authorizeBtn");btn.disabled=true;btn.textContent="AUTHORIZING…";
+  const btn=$("authorizeBtn");btn.disabled=true;btn.textContent="CONNECTING…";
   try{
     const t=await firebaseToken();
+    if(selected==="deriv"){
+      const connection=window.__KINGBOT_DERIV_PENDING;
+      const el=document.querySelector('.account-item.active');
+      const accountType=String(el?.dataset.accountType||"").toLowerCase();
+      if(!connection||!accountType)throw new Error("Deriv authorization session is missing. Start the OAuth flow again.");
+      const r=await fetch(API_BASE+"/broker/deriv/oauth/connect",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},
+        body:JSON.stringify({connection,accountId:selectedAccount,accountType})
+      });
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok||!d.connected)throw new Error(d.reason||d.error||"Deriv account connection failed.");
+      verified=true;
+      $("flowCopy").innerHTML="<strong>STEP 4 · DERIV CONNECTION COMPLETE</strong><br>Authorization, account ownership and broker connection were verified. KINGBOT is now bound to the selected Deriv account.";
+      setStatus("DERIV CONNECTED ✓ · "+(accountType==="real"?"LIVE / REAL":"DEMO / PAPER")+" · "+selectedAccount);
+      btn.textContent="CONNECTED ✓";
+      window.__KINGBOT_DERIV_PENDING=null;
+      return;
+    }
     const r=await fetch(API_BASE+"/connection",{headers:{Authorization:"Bearer "+t}});
     const d=await r.json().catch(()=>({}));
     if(!r.ok||!d.connected)throw new Error("Verified broker connection is not active.");
     setStatus("KINGBOT is authorized for the selected broker connection. You can continue to Bot Workspace.");
     $("flowCopy").innerHTML="<strong>STEP 4 · KINGBOT AUTHORIZATION COMPLETE</strong><br>Broker connection verified. Bot execution can use the authorized account through the secure backend gateway.";
     btn.textContent="AUTHORIZED ✓";
-  }catch(e){setStep(3);btn.disabled=false;btn.textContent="AUTHORIZE KINGBOT";setStatus(e.message||"Authorization failed.")}
+  }catch(e){setStep(3);btn.disabled=false;btn.textContent=selected==="deriv"?"CONNECT SELECTED ACCOUNT":"AUTHORIZE KINGBOT";setStatus(e.message||"Authorization failed.")}
 });
 
 
@@ -444,21 +476,48 @@ function applyExecutionMode(){
 modeButtons.forEach(btn=>btn.addEventListener("click",()=>{selectedExecution=btn.dataset.exec||"PAPER";applyExecutionMode()}));
 applyExecutionMode();
 
-(function handleDerivReturn(){
+(async function handleDerivReturn(){
   const params=new URLSearchParams(window.location.search);
   const status=params.get("deriv");
   if(!status)return;
   selectBroker("deriv");
-  if(status==="connected"){
-    verified=true; selectedAccount=params.get("account")||null; setStep(4);
-    $("flowCopy").innerHTML="<strong>STEP 4 · DERIV CONNECTION VERIFIED</strong><br>Deriv OAuth authorization completed. KINGBOT is connected to the authorized "+(selectedAccount||"trading")+" account in "+(params.get("mode")||"PAPER")+" mode.";
-    $("flowStatus").textContent="Deriv connection is active. You can continue to Bot Workspace.";
+  if(status==="authorized"){
+    const connection=params.get("connection")||"";
+    if(!connection){
+      setStatus("Deriv authorization returned without a connection reference. Please try again.");
+      return;
+    }
+    window.__KINGBOT_DERIV_PENDING=connection;
+    verified=false;
+    setStep(3);
     $("brokerLogin").style.display="none";
     $("nextStep").style.display="none";
     $("credentials").classList.remove("show");
     $("accountSelect").classList.add("show");
-    $("accountList").innerHTML='<div class="account-item active"><div><b>'+String(selectedAccount||"DERIV ACCOUNT")+'</b><span>'+String(params.get("mode")||"PAPER")+'</span></div><span>CONNECTED ✓</span></div>';
-    $("authorizeBtn").disabled=false; $("authorizeBtn").textContent="CONNECTED ✓";
+    $("flowCopy").innerHTML="<strong>STEP 3 · AUTHORIZATION VERIFIED</strong><br>Deriv approved KINGBOT. Choose the exact Demo or Real trading account you want KINGBOT to manage.";
+    setStatus("Loading your authorized Deriv accounts…");
+    try{
+      const t=await firebaseToken();
+      const r=await fetch(API_BASE+"/broker/deriv/oauth/accounts?connection="+encodeURIComponent(connection),{headers:{Authorization:"Bearer "+t}});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok||!Array.isArray(d.accounts))throw new Error(d.reason||d.error||"Unable to load authorized Deriv accounts.");
+      if(!d.accounts.length)throw new Error("No active Deriv Options trading accounts were returned.");
+      renderAccounts(d.accounts);
+      setStatus("Authorization verified. Select one authorized Deriv account.");
+    }catch(e){
+      window.__KINGBOT_DERIV_PENDING=null;
+      setStatus(e.message||"Unable to load Deriv accounts.");
+      $("accountList").innerHTML='<div class="flow-copy"><strong>ACCOUNT DISCOVERY FAILED</strong><br>'+String(e.message||"Try the Deriv OAuth flow again.").replace(/[<>&"]/g,m=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[m]))+'</div>';
+      $("authorizeBtn").disabled=true;
+    }
+  }else if(status==="connected"){
+    verified=true;
+    setStep(4);
+    $("flowCopy").innerHTML="<strong>STEP 4 · DERIV CONNECTION COMPLETE</strong><br>Deriv is already connected to the authorized KINGBOT account.";
+    setStatus("Deriv connection is active.");
+    $("brokerLogin").style.display="none";
+    $("nextStep").style.display="none";
+    $("credentials").classList.remove("show");
   }else{
     setStatus(params.get("message")||"Deriv authorization was not completed.");
   }
