@@ -32,18 +32,67 @@ function installStyle(){
 }
 
 function start(){
-  /*
-    The neural startup animation is a one-time experience
-    for the current browser session. Once completed, page
-    navigation must never replay it until the session ends.
 
-    The authentication handoff happens only after the initial
-    animation completes, so the user sees the complete neural
-    startup before reaching Sign In / Create Account.
+  const homeEntry =
+    window.location.pathname === "/" ||
+    /\/index\.html$/i.test(window.location.pathname);
+
+  /*
+    Customer entry contract:
+      FIRST VISIT   → neural loader → sign in/verify → home
+      LATER VISIT   → no loader → auth check → home or sign in/verify
+
+    The one-time loader marker must never disable the authentication
+    handoff. It only controls whether the visual animation is shown.
   */
+  const handoffHome=async()=>{
+    if(!homeEntry) return;
+
+    try{
+      const session=window.KINGBOT_SESSION;
+
+      if(!session){
+        window.setTimeout(handoffHome,100);
+        return;
+      }
+
+      const state=await session.check({force:true});
+
+      if(state?.authenticated && state?.user?.verified){
+        return;
+      }
+
+      if(state?.authenticated && !state?.user?.verified){
+        window.location.replace(
+          "verify.html?return="+
+          encodeURIComponent("index.html")
+        );
+        return;
+      }
+
+      window.location.replace(
+        "access-stable.html?return="+
+        encodeURIComponent("index.html")+
+        "#signin"
+      );
+    }catch(error){
+      console.warn(
+        "[KINGBOT BOOT] Auth handoff check failed:",
+        error?.message || error
+      );
+
+      window.location.replace(
+        "access-stable.html?return="+
+        encodeURIComponent("index.html")+
+        "#signin"
+      );
+    }
+  };
+
   try{
     if(sessionStorage.getItem("KINGBOT_NEURAL_BOOT_SEEN")==="1"){
       window.dispatchEvent(new CustomEvent("kingbot:boot-complete"));
+      handoffHome();
       return;
     }
   }catch(e){}
@@ -76,54 +125,7 @@ function start(){
       frame.remove();
       document.documentElement.classList.remove("kb-boot-lock");
 
-      /*
-        The customer root entry is intentionally:
-        LOADER → SIGN IN → VERIFICATION → HOME.
-
-        A verified Firebase session may enter Home directly;
-        an unauthenticated visitor is sent to the secure
-        access page. The return target is always same-site.
-      */
-      const homeEntry =
-        window.location.pathname === "/" ||
-        /\/index\.html$/i.test(window.location.pathname);
-
-      if(!homeEntry) return;
-
-      try{
-        const session=window.KINGBOT_SESSION;
-        if(!session) return;
-
-        const state=await session.check({force:true});
-
-        if(state?.authenticated && state?.user?.verified){
-          return;
-        }
-
-        if(state?.authenticated && !state?.user?.verified){
-          window.location.replace(
-            "verify.html?return="+
-            encodeURIComponent("index.html")
-          );
-          return;
-        }
-
-        window.location.replace(
-          "access-stable.html?return="+
-          encodeURIComponent("index.html")+
-          "#signin"
-        );
-      }catch(error){
-        console.warn(
-          "[KINGBOT BOOT] Auth handoff check failed:",
-          error?.message || error
-        );
-        window.location.replace(
-          "access-stable.html?return="+
-          encodeURIComponent("index.html")+
-          "#signin"
-        );
-      }
+      await handoffHome();
     },460);
   };
 
