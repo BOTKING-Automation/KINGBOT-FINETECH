@@ -28,6 +28,18 @@ function installStyle(){
 }
 
 function start(){
+  /*
+    The neural startup animation is a one-time experience
+    for the current browser session. Once completed, page
+    navigation must never replay it until the session ends.
+  */
+  try{
+    if(sessionStorage.getItem("KINGBOT_NEURAL_BOOT_SEEN")==="1"){
+      window.dispatchEvent(new CustomEvent("kingbot:boot-complete"));
+      return;
+    }
+  }catch(e){}
+
   installStyle();
   document.documentElement.classList.add("kb-boot-lock");
 
@@ -44,6 +56,11 @@ function start(){
     if(finished) return;
     finished=true;
     window.removeEventListener("message",onMessage);
+
+    try{
+      sessionStorage.setItem("KINGBOT_NEURAL_BOOT_SEEN","1");
+    }catch(e){}
+
     frame.classList.add("kb-boot-hide");
     window.dispatchEvent(new CustomEvent("kingbot:boot-complete"));
     window.setTimeout(()=>{
