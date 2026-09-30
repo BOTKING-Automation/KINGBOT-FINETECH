@@ -486,6 +486,106 @@
     .arch p{margin:0;color:var(--muted);font-size:9px;line-height:1.55}
     .arch-status{display:inline-block;margin-top:10px;color:var(--muted);font:800 7px "JetBrains Mono"}
 
+
+    .orb-logo{
+      width:82px;height:82px;
+      object-fit:contain;
+      display:block;
+      border-radius:22px;
+      padding:9px;
+      background:radial-gradient(circle,rgba(28,232,255,.11),rgba(5,8,23,.62));
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow:0 0 32px rgba(28,232,255,.16),0 0 65px rgba(166,108,255,.12);
+      filter:drop-shadow(0 0 12px rgba(28,232,255,.35)) saturate(1.12);
+      animation:logoFloat 4.8s ease-in-out infinite;
+      z-index:2;
+    }
+    .orb-core{
+      position:absolute;
+      bottom:12px;
+      right:12px;
+      min-width:34px;height:34px;
+      display:grid;place-items:center;
+      padding:0 7px;
+      border-radius:12px;
+      border:1px solid rgba(28,232,255,.32);
+      background:rgba(3,6,18,.88);
+      backdrop-filter:blur(12px);
+      font-size:11px;
+      letter-spacing:.08em;
+      z-index:4;
+    }
+    @keyframes logoFloat{50%{transform:translateY(-3px) scale(1.02)}}
+
+    .chat-shell{margin-top:12px}
+    .chat-scroll{
+      min-height:260px;max-height:520px;overflow:auto;
+      padding:4px 2px 6px;
+      scroll-behavior:smooth;
+    }
+    .chat-empty{
+      min-height:230px;
+      display:grid;place-items:center;
+      text-align:center;
+      color:var(--muted);
+      font:800 9px/1.6 "JetBrains Mono";
+      letter-spacing:.05em;
+    }
+    .chat-message{
+      display:flex;
+      margin:0 0 12px;
+    }
+    .chat-message.user{justify-content:flex-end}
+    .chat-message.assistant{justify-content:flex-start}
+    .chat-bubble{
+      width:min(86%,760px);
+      padding:12px 14px;
+      border:1px solid var(--line);
+      border-radius:15px;
+      background:rgba(255,255,255,.028);
+      box-shadow:0 12px 30px rgba(0,0,0,.16);
+    }
+    .chat-message.user .chat-bubble{
+      border-color:rgba(28,232,255,.22);
+      background:linear-gradient(145deg,rgba(28,232,255,.07),rgba(93,131,255,.05));
+    }
+    .chat-message.assistant .chat-bubble{
+      border-color:rgba(255,209,90,.16);
+      background:linear-gradient(145deg,rgba(255,209,90,.04),rgba(166,108,255,.035));
+    }
+    .chat-role{
+      color:var(--muted);
+      font:800 8px "JetBrains Mono";
+      letter-spacing:.08em;
+    }
+    .chat-message.user .chat-role{color:var(--cyan)}
+    .chat-message.assistant .chat-role{color:var(--gold)}
+    .chat-body{
+      margin-top:7px;
+      white-space:pre-wrap;
+      word-break:break-word;
+      color:#e7edf9;
+      font-size:12px;
+      line-height:1.72;
+    }
+    .chat-typing{
+      display:inline-flex;align-items:center;gap:4px;
+      padding:5px 0 2px;
+    }
+    .chat-typing i{
+      width:5px;height:5px;border-radius:50%;
+      background:var(--cyan);
+      box-shadow:0 0 9px rgba(28,232,255,.48);
+      animation:typing 1.05s infinite ease-in-out;
+    }
+    .chat-typing i:nth-child(2){animation-delay:.13s}
+    .chat-typing i:nth-child(3){animation-delay:.26s}
+    @keyframes typing{0%,80%,100%{opacity:.28;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+    .composer-hint{
+      margin-top:7px;color:var(--muted);
+      font:700 8px "JetBrains Mono";
+    }
+
     .history{max-height:380px;overflow:auto;padding:12px 15px}
     .history-empty{padding:42px 12px;text-align:center;color:var(--muted);font:800 9px "JetBrains Mono"}
     .history-item{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.055)}
@@ -594,7 +694,7 @@
 
       <aside class="glass hero-side">
         <div class="orb-stage">
-          <div class="orb" aria-hidden="true"><div class="orb-core">AI</div></div>
+          <div class="orb" aria-label="KINGBOT Intelligence core"><img class="orb-logo" src="assets/images/kingbot-fintech-logo.png" alt="KINGBOT FINTECH logo"><div class="orb-core">AI</div></div>
         </div>
         <h2 id="coreStateLabel">CHECKING AI CORE</h2>
         <p id="coreStateSub">Establishing a secure connection to the intelligence service.</p>
@@ -633,15 +733,18 @@
               <p>Request → authentication → verified broker/runtime context → AI reasoning → response. No browser-side account values are treated as authoritative.</p>
             </div>
 
-            <div class="response-wrap">
-              <div class="response-meta"><span>AI OUTPUT</span><span>REAL RESPONSE ONLY</span></div>
-              <div id="consoleResponse">awaiting your command...</div>
+            <div class="response-wrap chat-shell">
+              <div class="response-meta"><span>LIVE AI CHAT</span><span id="chatState">READY</span></div>
+              <div id="chatScroll" class="chat-scroll" aria-live="polite">
+                <div id="chatEmpty" class="chat-empty">KINGBOT INTELLIGENCE IS READY.<br>Ask your first question.</div>
+              </div>
             </div>
 
             <form class="composer" id="commandForm">
-              <textarea id="commandInput" class="command-input" rows="2" maxlength="4000" autocomplete="off" placeholder="Ask KINGBOT: explain why my bot is waiting, review my verified risk state, or analyze XAUUSD when a broker quote is available."></textarea>
-              <button id="runQuery" class="btn btn-primary" type="submit">RUN ANALYSIS</button>
+              <textarea id="commandInput" class="command-input" rows="2" maxlength="4000" autocomplete="off" placeholder="Ask KINGBOT anything about the platform, your verified runtime, risk controls, or market context…"></textarea>
+              <button id="runQuery" class="btn btn-primary" type="submit">SEND ↗</button>
             </form>
+            <div class="composer-hint">ENTER TO SEND · SHIFT+ENTER FOR NEW LINE · CONVERSATION CONTEXT IS KEPT FOR THIS SESSION</div>
           </div>
         </article>
 
@@ -810,7 +913,7 @@
       <div class="section-head">
         <div>
           <div class="section-title">AI SESSION</div>
-          <div class="section-sub">Your conversation history for this browser session.</div>
+          <div class="section-sub">Conversation history for this browser session. The live chat above uses the same session context.</div>
         </div>
         <button class="btn" id="clearHistory" type="button">CLEAR SESSION</button>
       </div>
