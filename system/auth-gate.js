@@ -296,13 +296,40 @@ IMPORTANT:
 
       if (this.getPageName() === "index.html") {
 
-        const auth = await this.checkAuthentication();
+        const params = new URLSearchParams(window.location.search);
+        const startupComplete = params.get("kb-startup") === "complete";
 
-        if (auth.authenticated && auth.verified) {
-          this.grantAccess(auth.user);
+        if (startupComplete) {
+          const auth = await this.checkAuthentication();
+
+          if (auth.authenticated && auth.verified) {
+            this.grantAccess(auth.user);
+
+            /*
+            Keep the URL clean after the one-time startup handoff.
+            */
+            window.history.replaceState(
+              {},
+              document.title,
+              "index.html"
+            );
+
+            return;
+          }
+
+          /*
+          Startup completion tokens are not an auth bypass.
+          Re-enter the canonical loader path if the session is no longer valid.
+          */
+          window.location.replace("loader.html");
           return;
         }
 
+        /*
+        Every customer entry into Home starts through the same
+        canonical neural loader. The loader performs the single
+        authenticated/unverified/guest decision.
+        */
         window.location.replace("loader.html");
         return;
       }
