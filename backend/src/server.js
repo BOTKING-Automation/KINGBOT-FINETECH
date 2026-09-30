@@ -32,7 +32,7 @@ app.use(cors({ origin: allowedOrigin || true, credentials: true, methods: ["GET"
 
 const authLimiter = rateLimit({ windowMs: 15*60*1000, limit: 12, standardHeaders: "draft-8", legacyHeaders: false });
 app.use("/api/auth", createAuthRouter({ pool, sessionTtlHours: Number(process.env.SESSION_TTL_HOURS || 24), limiter: authLimiter }));
-app.use("/api/subscription", createSubscriptionRouter({ pool }));
+app.use("/api/subscription", createSubscriptionRouter({ pool, broker }));
 app.use("/api/bots", createBotEngineRouter({ pool }));
 app.use("/api/runtime", createBotRuntimeRouter({ pool, broker }));
 
