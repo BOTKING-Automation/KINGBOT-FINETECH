@@ -3039,41 +3039,6 @@ overscroll-behavior:none;}
     }
 
 
-    function randomSpark(change) {
-
-      const points = [];
-
-      let value = 50;
-
-      for (
-        let i = 0;
-        i < 22;
-        i++
-      ) {
-
-        value +=
-          (Math.random() - .5) * 13;
-
-        value +=
-          Number(change || 0) / 25;
-
-        value =
-          Math.max(
-            5,
-            Math.min(95, value)
-          );
-
-        points.push(
-          value
-        );
-
-      }
-
-      return points;
-
-    }
-
-
     function sparkline(
       values,
       positive
@@ -3444,11 +3409,6 @@ overscroll-behavior:none;}
                 ticker.lowPrice
               ),
 
-            spark:
-              randomSpark(
-                change
-              ),
-
             updated:
               Date.now()
 
@@ -3607,15 +3567,7 @@ overscroll-behavior:none;}
                   change,
 
                   updated:
-                    Date.now(),
-
-                  spark:
-                    state.data[
-                      market.id
-                    ]?.spark ||
-                    randomSpark(
-                      change
-                    )
+                    Date.now()
 
                 };
 
