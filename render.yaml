@@ -25,7 +25,7 @@ services:
     plan: free
     repo: https://github.com/BOTKING-Automation/KINGBOT-FINETECH
     branch: main
-    rootDir: backend
+    rootDir: ""
     buildCommand: npm install --omit=dev
     startCommand: npm run worker
     envVars:
