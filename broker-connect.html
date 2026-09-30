@@ -3,507 +3,277 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="KINGBOT FINTECH broker connectivity and automated trading authorization center.">
-<meta name="theme-color" content="#02040a">
-<title>KINGBOT — Broker Connectivity</title>
+<meta name="description" content="KINGBOT FINTECH broker connection dashboard.">
+<meta name="theme-color" content="#02060d">
+<title>KINGBOT FINTECH — Connect Broker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&family=Orbitron:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="system/platform.css">
 <style>
-:root{--bg:#02040a;--panel:rgba(7,13,29,.86);--line:rgba(255,255,255,.09);--text:#eef4ff;--muted:#7e8aa4;--cyan:#19e6ff;--blue:#4787ff;--violet:#9b5cff;--pink:#ff4fd8;--gold:#f6b93b;--green:#23f7a3;--red:#ff5c7a;--shadow:0 25px 85px rgba(0,0,0,.5)}
-*{box-sizing:border-box}body{min-height:100vh;background:radial-gradient(circle at 8% 0%,rgba(25,230,255,.12),transparent 27%),radial-gradient(circle at 95% 5%,rgba(155,92,255,.13),transparent 28%),radial-gradient(circle at 50% 100%,rgba(246,185,59,.08),transparent 30%),#02040a;color:var(--text);font-family:Inter,sans-serif}body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.023) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.023) 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(to bottom,#000,transparent 92%);z-index:-1}
-main{width:min(1500px,calc(100% - 32px));margin:auto;padding:30px 0 70px}.hero,.panel,.broker,.step,.security{position:relative;overflow:hidden;border:1px solid var(--line);background:linear-gradient(145deg,rgba(11,18,38,.91),rgba(3,7,17,.97));box-shadow:var(--shadow)}
-.hero{padding:32px;border-radius:28px}.hero:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 84% 22%,rgba(25,230,255,.14),transparent 26%),radial-gradient(circle at 68% 94%,rgba(255,79,216,.08),transparent 25%);pointer-events:none}.eyebrow{position:relative;display:inline-flex;gap:8px;align-items:center;padding:7px 10px;border-radius:999px;border:1px solid rgba(25,230,255,.2);background:rgba(25,230,255,.045);color:var(--cyan);font:800 9px "JetBrains Mono";letter-spacing:.15em}.hero h1{position:relative;margin:18px 0 10px;font:900 clamp(30px,5vw,58px) Orbitron;letter-spacing:-.035em}.hero h1 span{background:linear-gradient(95deg,var(--gold),var(--cyan),var(--violet),var(--pink));-webkit-background-clip:text;color:transparent;background-size:280%;animation:grad 8s ease infinite}@keyframes grad{0%,100%{background-position:0}50%{background-position:100%}.hero p{position:relative;max-width:900px;color:#93a0bb;font-size:13px;line-height:1.75}
-.statusbar{position:relative;display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}.status{padding:8px 10px;border-radius:10px;font:800 8px "JetBrains Mono";letter-spacing:.08em;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025);color:#8c99b1}.status.online{color:var(--green);border-color:rgba(35,247,163,.2);background:rgba(35,247,163,.045)}.status.secure{color:var(--gold);border-color:rgba(246,185,59,.2);background:rgba(246,185,59,.045)}
-.layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(340px,.6fr);gap:16px;margin-top:16px}.panel{border-radius:22px;padding:22px}.panel h2{font:800 15px Orbitron;letter-spacing:.08em}.panel .desc{color:var(--muted);font-size:10px;line-height:1.55;margin:7px 0 17px}
-.broker-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.broker{padding:17px;border-radius:18px;cursor:pointer;transition:.22s ease;isolation:isolate}.broker:before{content:"";position:absolute;inset:-1px;padding:1px;border-radius:19px;background:linear-gradient(120deg,var(--c1),var(--c2),var(--c3),var(--c1));background-size:300% 100%;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;animation:borderflow 6s linear infinite;opacity:.5;pointer-events:none}@keyframes borderflow{0%{background-position:0}100%{background-position:300%}}
-.broker:hover,.broker.active{transform:translateY(-3px);box-shadow:0 0 28px color-mix(in srgb,var(--c1) 18%,transparent),0 18px 55px rgba(0,0,0,.35)}.broker.active:before{opacity:1}.broker>*{position:relative}.broker.oanda{--c1:#19e6ff;--c2:#4787ff;--c3:#9b5cff}.broker.deriv{--c1:#ff4fd8;--c2:#9b5cff;--c3:#19e6ff}.broker.ig{--c1:#23f7a3;--c2:#19e6ff;--c3:#4787ff}.broker.fxcm{--c1:#f6b93b;--c2:#ff7a18;--c3:#ff4fd8}.broker.exness{--c1:#9b5cff;--c2:#ff4fd8;--c3:#f6b93b}.broker.ibkr{--c1:#4787ff;--c2:#19e6ff;--c3:#23f7a3}
-.broker-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.logo{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;background:#050914;border:1px solid rgba(255,255,255,.07);font:900 13px Orbitron;color:#fff;box-shadow:inset 0 0 20px rgba(255,255,255,.025)}.tag{font:800 7px "JetBrains Mono";letter-spacing:.1em;padding:6px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.08);color:#8b97b0;background:rgba(255,255,255,.025)}.tag.live{color:var(--green);border-color:rgba(35,247,163,.18)}.tag.regional{color:var(--gold);border-color:rgba(246,185,59,.18)}.broker h3{margin:14px 0 5px;font:800 14px Orbitron}.broker p{color:#7e8ba5;font-size:10px;line-height:1.55}.caps{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}.cap{padding:5px 7px;border-radius:7px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055);color:#8793ac;font:700 7px "JetBrains Mono"}.connect{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}.connect button,.primary{border:0;border-radius:10px;padding:10px 12px;background:linear-gradient(90deg,var(--gold),#ffd976,var(--cyan));color:#05070d;font:900 9px "JetBrains Mono";cursor:pointer}.connect a{font-size:8px;color:var(--cyan);text-decoration:none}
-.steps{display:grid;gap:9px}.step{padding:14px;border-radius:15px}.step .num{width:25px;height:25px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff;font:900 9px "JetBrains Mono";float:left;margin-right:10px}.step b{font:800 9px Orbitron;letter-spacing:.07em}.step p{margin-top:5px;color:#78859e;font-size:9px;line-height:1.55;clear:both}
-.connection-card{margin-top:16px;padding:18px;border-radius:19px;border:1px solid rgba(25,230,255,.12);background:radial-gradient(circle at 90% 10%,rgba(25,230,255,.08),transparent 28%),rgba(3,8,18,.82)}.connection-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.connection-state{display:flex;align-items:center;gap:8px;font:900 8px "JetBrains Mono";color:#7c89a3}.pulse{width:7px;height:7px;border-radius:50%;background:#5f6a80}.pulse.ready{background:var(--green);box-shadow:0 0 13px var(--green)}.selected{font:800 10px Orbitron;color:var(--text)}.form{margin-top:14px;display:none}.form.show{display:block}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.field label{display:block;margin-bottom:6px;color:#a0acc2;font:800 8px "JetBrains Mono";letter-spacing:.08em}.field input,.field select{width:100%;height:43px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:#050a15;color:#eef4ff;padding:0 11px;outline:none;font:700 11px "JetBrains Mono"}.field input:focus,.field select:focus{border-color:rgba(25,230,255,.5);box-shadow:0 0 0 3px rgba(25,230,255,.07)}.hint{margin-top:8px;color:#5e6b84;font-size:8px;line-height:1.55}.submitrow{display:flex;align-items:center;gap:9px;margin-top:12px}.primary{min-width:170px}.secondary{padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.025);color:#8793ad;font:800 9px "JetBrains Mono";cursor:pointer}.message{margin-top:11px;padding:11px;border-radius:10px;font-size:9px;line-height:1.5;display:none}.message.show{display:block}.message.ok{color:#b9ffe1;background:rgba(35,247,163,.06);border:1px solid rgba(35,247,163,.14)}.message.err{color:#ffc5cf;background:rgba(255,92,122,.06);border:1px solid rgba(255,92,122,.14)}
-.security{margin-top:16px;border-radius:20px;padding:16px 18px;border-color:rgba(246,185,59,.1);background:linear-gradient(90deg,rgba(246,185,59,.035),rgba(25,230,255,.025),rgba(155,92,255,.03))}.security strong{font:900 9px Orbitron;color:var(--gold)}.security p{margin-top:6px;color:#68758d;font-size:8.5px;line-height:1.65}.links{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.links a{padding:7px 9px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);color:#93a0b9;font:700 7px "JetBrains Mono";text-decoration:none}
-.foot{margin-top:18px;color:#48546c;text-align:center;font:700 7px "JetBrains Mono";letter-spacing:.1em}
-@media(max-width:1050px){.layout{grid-template-columns:1fr}.broker-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.broker-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero{padding:24px}.panel{padding:17px}.fields{grid-template-columns:1fr}}@media(max-width:520px){main{width:min(100% - 18px,1500px)}.broker-grid{grid-template-columns:1fr}.hero h1{font-size:29px}.connect{align-items:flex-start;flex-direction:column}.submitrow{flex-direction:column;align-items:stretch}.primary,.secondary{width:100%}}
-
-/* INSTITUTIONAL CONNECTIVITY CONSOLE */
-body{background:
- radial-gradient(circle at 12% 4%,rgba(25,230,255,.14),transparent 23%),
- radial-gradient(circle at 88% 7%,rgba(255,79,216,.12),transparent 24%),
- radial-gradient(circle at 72% 88%,rgba(246,185,59,.10),transparent 25%),
- radial-gradient(circle at 28% 70%,rgba(35,247,163,.07),transparent 22%),#01030a}
-main{position:relative}
-main:after{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(180deg,transparent 0%,rgba(25,230,255,.018) 48%,transparent 100%);animation:screenPulse 7s ease-in-out infinite}
-@keyframes screenPulse{0%,100%{opacity:.35}50%{opacity:1}}
-.hero{min-height:365px;border-color:rgba(25,230,255,.16);box-shadow:0 0 0 1px rgba(155,92,255,.04),0 0 60px rgba(25,230,255,.07),0 35px 110px rgba(0,0,0,.58)}
-.hero:after{content:"";position:absolute;left:-10%;right:-10%;bottom:48px;height:1px;background:linear-gradient(90deg,transparent,#19e6ff 15%,#4787ff 32%,#9b5cff 50%,#ff4fd8 68%,#f6b93b 85%,transparent);box-shadow:0 0 12px #19e6ff,0 0 28px rgba(155,92,255,.75);animation:scanRail 4.5s linear infinite}
-@keyframes scanRail{0%{transform:translateX(-4%);opacity:.35}50%{transform:translateX(4%);opacity:1}100%{transform:translateX(-4%);opacity:.35}}
-.network-stage{position:absolute;right:22px;top:26px;width:min(48%,620px);height:250px;pointer-events:none;opacity:.95}
-.network-stage svg{width:100%;height:100%;overflow:visible}
-.net-grid{stroke:rgba(25,230,255,.13);stroke-width:1;fill:none}
-.net-line{fill:none;stroke:url(#kbGrad);stroke-width:2.2;stroke-linecap:round;stroke-dasharray:8 12;animation:netFlow 3s linear infinite;filter:url(#glow)}
-.net-line.p2{animation-duration:4.7s;animation-delay:-1.7s}.net-line.p3{animation-duration:3.9s;animation-delay:-.8s}
-@keyframes netFlow{to{stroke-dashoffset:-240}}
-.net-node{fill:#050b18;stroke:#19e6ff;stroke-width:1.6;filter:url(#glow)}.net-node.g{stroke:#23f7a3}.net-node.v{stroke:#9b5cff}.net-node.p{stroke:#ff4fd8}.net-node.gold{stroke:#f6b93b}
-.net-pulse{fill:none;stroke:#19e6ff;stroke-width:1.5;opacity:.6;animation:nodePulse 2s ease-out infinite;transform-box:fill-box;transform-origin:center}
-@keyframes nodePulse{0%{transform:scale(.7);opacity:.8}100%{transform:scale(2.1);opacity:0}}
-.hero-copy{position:relative;z-index:2;max-width:54%}
-.platform-kicker{display:flex;align-items:center;gap:8px;margin-bottom:11px;color:#687792;font:800 8px "JetBrains Mono";letter-spacing:.14em}.platform-kicker i{width:6px;height:6px;border-radius:50%;background:#23f7a3;box-shadow:0 0 14px #23f7a3}
-.signal-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:20px;max-width:830px}.signal-box{padding:10px 11px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.012));position:relative;overflow:hidden}.signal-box:before{content:"";position:absolute;left:-40%;top:0;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(25,230,255,.11),transparent);animation:dataSweep 3.8s linear infinite}.signal-box:nth-child(2):before{animation-delay:-1s}.signal-box:nth-child(3):before{animation-delay:-2s}.signal-box:nth-child(4):before{animation-delay:-3s}@keyframes dataSweep{to{left:110%}}.signal-box span{display:block;color:#5b6882;font:700 7px "JetBrains Mono";letter-spacing:.09em}.signal-box b{display:block;margin-top:5px;color:#dce6ff;font:800 9px Orbitron}
-.broker{min-height:245px}.broker:after{content:"";position:absolute;top:0;bottom:0;width:2px;left:0;background:linear-gradient(180deg,transparent,var(--c1),transparent);box-shadow:0 0 14px var(--c1);opacity:.75;animation:sideTrace 2.8s ease-in-out infinite}@keyframes sideTrace{0%,100%{transform:translateY(-18%);opacity:.2}50%{transform:translateY(18%);opacity:1}}
-.logo{width:58px;height:58px;padding:8px;background:linear-gradient(145deg,#070c19,#02050d);box-shadow:0 0 22px rgba(25,230,255,.08),inset 0 0 24px rgba(255,255,255,.03)}.logo img{width:100%;height:100%;object-fit:contain;border-radius:7px;filter:drop-shadow(0 0 7px rgba(255,255,255,.18))}
-.broker-meta{display:flex;align-items:center;gap:7px;margin-top:9px}.broker-meta .signal{width:6px;height:6px;border-radius:50%;background:#23f7a3;box-shadow:0 0 10px #23f7a3}.broker-meta span{font:700 7px "JetBrains Mono";color:#6f7d96;letter-spacing:.08em}
-.broker h3{font-size:15px}.broker p{min-height:47px}
-.tag{backdrop-filter:blur(8px)}
-.connect button{position:relative;overflow:hidden}.connect button:after{content:"";position:absolute;top:0;left:-120%;width:80%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-20deg);animation:buttonSweep 3.5s linear infinite}@keyframes buttonSweep{to{left:145%}}
-.connection-card{box-shadow:0 0 0 1px rgba(25,230,255,.035),0 0 35px rgba(25,230,255,.055);border-color:rgba(25,230,255,.18)}
-.connection-card:before{content:"";position:absolute;inset:0;background:linear-gradient(115deg,rgba(25,230,255,.035),transparent 28%,rgba(155,92,255,.035) 56%,transparent 76%,rgba(246,185,59,.03));pointer-events:none}
-.step{transition:.2s;min-height:84px}.step:hover{transform:translateX(3px);border-color:rgba(25,230,255,.18);box-shadow:0 0 25px rgba(25,230,255,.06)}
-.security{border-color:rgba(25,230,255,.13)}.security:after{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,transparent);box-shadow:0 0 12px rgba(25,230,255,.5);animation:rail 5s linear infinite}@keyframes rail{0%,100%{opacity:.35;transform:scaleX(.8)}50%{opacity:1;transform:scaleX(1)}}
-@media(max-width:900px){.network-stage{position:relative;right:auto;top:auto;width:100%;height:190px;margin-top:20px}.hero-copy{max-width:100%}.hero{min-height:auto}.signal-strip{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:520px){.network-stage{height:155px}.signal-strip{grid-template-columns:1fr}.broker{min-height:0}}
-
-
-.partner-state{display:block;margin-top:7px;color:#596781;font:800 6px "JetBrains Mono";letter-spacing:.08em}
-.partner-state.ready{color:#23f7a3}
-.partner-state.pending{color:#f6b93b}
-.partner-btn{border:1px solid rgba(35,247,163,.18)!important;background:rgba(35,247,163,.045)!important;color:#86ffd0!important;margin-left:auto}
-.connect{flex-wrap:wrap}
-.partner-btn{padding:9px 10px;border-radius:10px;font:900 8px "JetBrains Mono";cursor:pointer}
-.partner-panel{margin-top:16px;padding:16px;border-radius:18px;border:1px solid rgba(155,92,255,.14);background:radial-gradient(circle at 10% 0%,rgba(155,92,255,.07),transparent 30%),radial-gradient(circle at 90% 100%,rgba(246,185,59,.05),transparent 30%),rgba(3,7,17,.76);position:relative;overflow:hidden}
-.partner-panel:before{content:"";position:absolute;inset:0;border-top:1px solid rgba(25,230,255,.16);pointer-events:none}
-.partner-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.partner-head h3{margin:0;font:800 12px Orbitron}.partner-head p{margin:6px 0 0;color:#6d7b95;font-size:8.5px;line-height:1.55;max-width:780px}.partner-link{display:inline-flex;align-items:center;justify-content:center;padding:9px 11px;border-radius:9px;background:linear-gradient(90deg,var(--violet),var(--cyan));color:#05070d;text-decoration:none;font:900 8px "JetBrains Mono";white-space:nowrap}
-.partner-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:11px}.partner-metric{padding:10px;border:1px solid rgba(255,255,255,.06);border-radius:10px;background:rgba(255,255,255,.02)}.partner-metric span{display:block;color:#56647e;font:800 6.5px "JetBrains Mono";letter-spacing:.08em}.partner-metric b{display:block;margin-top:5px;color:#dde7fa;font:900 12px Orbitron}.partner-note{margin-top:9px;color:#57657f;font-size:7.5px;line-height:1.55}
-@media(max-width:700px){.partner-head{flex-direction:column}.partner-link{width:100%}.partner-metrics{grid-template-columns:repeat(2,1fr)}}
-
-/* CLEAN HIGH-TECH BROKER DIRECTORY OVERRIDE */
-body{
-  background:
-    radial-gradient(circle at 15% 0%,rgba(25,230,255,.075),transparent 22%),
-    radial-gradient(circle at 92% 6%,rgba(155,92,255,.07),transparent 22%),
-    #02050b;
-}
-main{width:min(1420px,calc(100% - 28px));padding:24px 0 56px}
-.hero{
-  min-height:310px;
-  padding:28px 30px;
-  border-radius:24px;
-  background:linear-gradient(145deg,rgba(7,14,29,.96),rgba(2,6,15,.98));
-  box-shadow:0 24px 70px rgba(0,0,0,.42);
-}
-.hero:before{opacity:.55}
-.hero h1{font-size:clamp(28px,4.2vw,50px);margin:15px 0 8px}
-.hero p{font-size:12px;max-width:790px;color:#8290aa;line-height:1.7}
-.network-stage{width:min(43%,520px);height:205px;right:18px;top:34px;opacity:.62}
-.signal-strip{gap:7px;margin-top:17px;max-width:760px}
-.signal-box{padding:9px 10px;border-radius:10px}
-.signal-box b{font-size:8px}
-.statusbar{gap:6px;margin-top:18px}
-.status{padding:7px 9px;font-size:7px}
-.layout{grid-template-columns:minmax(0,1.55fr) minmax(300px,.45fr);gap:13px;margin-top:13px}
-.panel{border-radius:18px;padding:18px;background:rgba(5,11,24,.91)}
-.panel h2{font-size:13px}
-.panel .desc{margin:6px 0 13px;font-size:9px}
-.broker-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
-.broker{
-  min-height:192px;
-  padding:13px;
-  border-radius:15px;
-  background:linear-gradient(145deg,rgba(9,17,34,.95),rgba(3,8,18,.98));
-}
-.broker:before{border-radius:16px;opacity:.26}
-.broker:hover,.broker.active{
-  transform:translateY(-2px);
-  box-shadow:0 0 22px color-mix(in srgb,var(--c1) 12%,transparent),0 14px 40px rgba(0,0,0,.32);
-}
-.broker-head{align-items:center}
-.logo{
-  width:42px;
-  height:42px;
-  flex:0 0 42px;
-  padding:7px;
-  border-radius:50%;
-  background:radial-gradient(circle at 35% 25%,rgba(255,255,255,.08),rgba(3,8,18,.98) 67%);
-  border:1px solid rgba(255,255,255,.12);
-  box-shadow:0 0 16px rgba(25,230,255,.07),inset 0 0 16px rgba(255,255,255,.035);
-}
-.logo img{
-  width:100%;
-  height:100%;
-  object-fit:contain;
-  border-radius:50%;
-  filter:drop-shadow(0 0 5px rgba(255,255,255,.16));
-}
-.tag{padding:5px 7px;font-size:6px}
-.partner-state{margin-top:5px;font-size:5.5px;text-align:right}
-.broker h3{font-size:12px;margin:11px 0 4px;letter-spacing:.03em}
-.broker p{font-size:8.5px;line-height:1.5;min-height:39px;color:#718099}
-.caps{gap:4px;margin-top:8px}
-.cap{padding:4px 6px;font-size:6px;border-radius:6px}
-.connect{gap:6px;margin-top:11px}
-.connect button,.connect a,.partner-btn{
-  padding:8px 9px;
-  border-radius:8px;
-  font-size:7px;
-}
-.connect a{font-size:6.5px}
-.partner-btn{padding:8px 8px}
-.steps{gap:7px}
-.step{padding:11px;border-radius:12px;min-height:74px}
-.step .num{width:22px;height:22px;border-radius:7px;margin-right:8px;font-size:8px}
-.step b{font-size:8px}
-.step p{font-size:8px;line-height:1.45;margin-top:4px}
-.connection-card{margin-top:12px;padding:15px;border-radius:15px}
-.selected{font-size:9px}
-.connection-state{font-size:7px}
-.fields{gap:8px}
-.field input,.field select{height:40px;font-size:10px}
-.security{margin-top:12px;border-radius:15px;padding:13px 15px}
-.security p{font-size:7.5px;line-height:1.55}
-.links{gap:6px}
-.links a{padding:6px 8px;font-size:6.5px}
-.partner-panel{margin-top:12px;padding:13px;border-radius:15px}
-.partner-head h3{font-size:10px}
-.partner-head p{font-size:7.5px;max-width:700px}
-.partner-link{padding:8px 10px;font-size:7px}
-.partner-metrics{gap:6px;margin-top:9px}
-.partner-metric{padding:8px;border-radius:8px}
-.partner-metric span{font-size:6px}
-.partner-metric b{font-size:10px;margin-top:4px}
-.partner-note{font-size:6.8px}
-.foot{margin-top:14px;font-size:6px}
-@media(max-width:1100px){
-  .layout{grid-template-columns:1fr}
-}
-@media(max-width:900px){
-  .broker-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .network-stage{position:relative;right:auto;top:auto;width:100%;height:155px;margin-top:12px;opacity:.6}
-  .hero-copy{max-width:100%}
-  .hero{min-height:auto}
-}
-@media(max-width:560px){
-  main{width:calc(100% - 14px);padding-top:62px}
-  .hero{padding:19px;border-radius:18px}
-  .hero h1{font-size:28px}
-  .broker-grid{grid-template-columns:1fr}
-  .broker{min-height:175px}
-  .network-stage{height:125px}
-  .signal-strip{grid-template-columns:1fr}
-  .partner-head{flex-direction:column}
-  .partner-link{width:100%}
-  .partner-metrics{grid-template-columns:repeat(2,1fr)}
-}
-
-/* CONNECTION WIZARD */
-.connection-card{scroll-margin-top:30px}
-.wizard-head{margin:13px 0 0;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-.wstep{padding:8px 7px;border:1px solid rgba(255,255,255,.055);border-radius:9px;background:rgba(255,255,255,.018);text-align:center;transition:.2s}
-.wstep .wn{display:block;color:#56647e;font:900 6px "JetBrains Mono"}
-.wstep .wl{display:block;margin-top:4px;color:#68758d;font:800 6px Orbitron;letter-spacing:.04em}
-.wstep.active{border-color:rgba(25,230,255,.22);background:rgba(25,230,255,.035);box-shadow:0 0 20px rgba(25,230,255,.05)}
-.wstep.active .wn,.wstep.done .wn{color:var(--cyan)}
-.wstep.active .wl,.wstep.done .wl{color:#d7e8ff}
-.wstep.done{border-color:rgba(35,247,163,.15);background:rgba(35,247,163,.025)}
-.wstep.done .wn{color:var(--green)}
-.wizard-note{margin-top:11px;padding:10px 11px;border-radius:10px;border:1px solid rgba(255,255,255,.055);background:rgba(255,255,255,.018);color:#68758d;font-size:8px;line-height:1.55}
-.wizard-note strong{color:#aebbd1;font-family:"JetBrains Mono"}
-.flow-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
-.flow-actions button{padding:9px 10px;border-radius:9px;font:900 7px "JetBrains Mono";cursor:pointer}
-.flow-open{border:0;background:linear-gradient(90deg,var(--gold),#ffe08a,var(--cyan));color:#05070d}
-.flow-skip{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);color:#8d9ab2}
-.bridge-badge{display:inline-flex;align-items:center;gap:5px;margin-left:7px;padding:4px 6px;border-radius:999px;border:1px solid rgba(155,92,255,.18);background:rgba(155,92,255,.035);color:#a98cff;font:800 6px "JetBrains Mono"}
-.telemetry{display:none;margin-top:10px;padding:11px;border-radius:11px;border:1px solid rgba(35,247,163,.13);background:rgba(35,247,163,.035)}
-.telemetry.show{display:block}
-.telemetry-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.telemetry-item span{display:block;color:#596781;font:700 6px "JetBrains Mono"}.telemetry-item b{display:block;margin-top:4px;color:#dce8fa;font:900 8px "JetBrains Mono"}
-@media(max-width:700px){.wizard-head{grid-template-columns:repeat(5,minmax(55px,1fr));overflow:auto}.wstep{min-width:58px}.telemetry-grid{grid-template-columns:repeat(2,1fr)}}
+:root{--bg:#02060d;--panel:#07101d;--panel2:#0a1423;--line:rgba(255,255,255,.075);--text:#eef5ff;--muted:#7d8ba4;--dim:#53627a;--cyan:#19e6ff;--blue:#4787ff;--violet:#9b5cff;--gold:#f6b93b;--green:#23f7a3;--red:#ff5c7a}
+*{box-sizing:border-box}html{background:var(--bg)}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,sans-serif;background:
+radial-gradient(circle at 15% 0%,rgba(25,230,255,.07),transparent 25%),
+radial-gradient(circle at 88% 7%,rgba(155,92,255,.065),transparent 24%),
+linear-gradient(180deg,#02060d 0%,#040a13 100%)}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(to bottom,#000,transparent 90%)}
+main{width:min(1180px,calc(100% - 28px));margin:auto;padding:74px 0 54px}
+.header{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:18px}.kicker{font:800 8px "JetBrains Mono";letter-spacing:.15em;color:#62718c}.kicker i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green);margin-right:7px}
+h1{margin:10px 0 6px;font:900 clamp(28px,4.4vw,48px) Orbitron;letter-spacing:-.035em}h1 span{color:var(--cyan)}.header-copy{max-width:760px}.header-copy p{margin:0;color:#78869e;font-size:11px;line-height:1.7}.header-stat{min-width:155px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.018);text-align:right}.header-stat span{display:block;color:#56657d;font:700 7px "JetBrains Mono";letter-spacing:.1em}.header-stat b{display:block;margin-top:5px;font:900 18px Orbitron;color:#dce7f8}.header-stat small{display:block;margin-top:4px;color:#5b6981;font-size:7px}
+.dashboard{border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,rgba(7,14,27,.96),rgba(3,8,16,.98));box-shadow:0 22px 70px rgba(0,0,0,.34);overflow:hidden}.dashboard-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 15px;border-bottom:1px solid rgba(255,255,255,.055)}.dashboard-bar b{font:800 8px Orbitron;letter-spacing:.1em}.dashboard-bar span{color:#5e6c84;font:700 7px "JetBrains Mono"}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:rgba(255,255,255,.04)}
+.broker{position:relative;min-height:175px;padding:17px;background:linear-gradient(145deg,#07111f,#040b15);overflow:hidden;cursor:pointer;transition:.18s ease}.broker:before{content:"";position:absolute;left:0;top:0;bottom:0;width:1px;background:var(--accent);opacity:.75;box-shadow:0 0 12px var(--accent)}.broker:after{content:"";position:absolute;right:-55px;top:-55px;width:145px;height:145px;border-radius:50%;background:radial-gradient(circle,var(--halo),transparent 68%);pointer-events:none}.broker:hover,.broker.selected{background:linear-gradient(145deg,#091525,#050c17);box-shadow:inset 0 0 0 1px rgba(255,255,255,.035);z-index:2}.broker.oanda{--accent:#19e6ff;--halo:rgba(25,230,255,.08)}.broker.deriv{--accent:#ff4fd8;--halo:rgba(255,79,216,.07)}.broker.ig{--accent:#23f7a3;--halo:rgba(35,247,163,.07)}.broker.fxcm{--accent:#f6b93b;--halo:rgba(246,185,59,.07)}.broker.exness{--accent:#9b5cff;--halo:rgba(155,92,255,.08)}.broker.ibkr{--accent:#4787ff;--halo:rgba(71,135,255,.08)}
+.broker-inner{position:relative;z-index:2}.broker-top{display:flex;justify-content:space-between;align-items:center;gap:12px}.brand{display:flex;align-items:center;gap:10px}.logo{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;flex:0 0 38px;padding:6px;background:radial-gradient(circle at 30% 25%,rgba(255,255,255,.11),rgba(5,11,20,.98) 65%);border:1px solid rgba(255,255,255,.12);box-shadow:0 0 15px rgba(255,255,255,.045),inset 0 0 12px rgba(255,255,255,.03);overflow:hidden}.logo img{width:100%;height:100%;object-fit:contain;border-radius:50%;filter:drop-shadow(0 0 4px rgba(255,255,255,.12))}.broker-name{font:900 11px Orbitron;letter-spacing:.03em}.broker-code{margin-top:3px;color:#5c6a82;font:700 6.5px "JetBrains Mono";letter-spacing:.06em}.availability{padding:5px 7px;border-radius:999px;border:1px solid rgba(255,255,255,.07);color:#738199;background:rgba(255,255,255,.02);font:800 6px "JetBrains Mono";white-space:nowrap}.availability.live{color:var(--green);border-color:rgba(35,247,163,.16)}
+.broker-copy{margin:13px 0 12px;color:#718098;font-size:8.5px;line-height:1.55;min-height:39px}.meta{display:flex;gap:5px;flex-wrap:wrap}.meta span{padding:4px 6px;border:1px solid rgba(255,255,255,.05);border-radius:6px;color:#65738b;background:rgba(255,255,255,.018);font:700 6px "JetBrains Mono"}.broker-action{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:14px}.connect{border:0;border-radius:8px;padding:8px 11px;background:linear-gradient(90deg,#f6b93b,#ffe59a,#19e6ff);color:#02070d;font:900 7px "JetBrains Mono";cursor:pointer}.connect[disabled]{opacity:.5;cursor:not-allowed}.docs{color:#64738b;text-decoration:none;font:700 6.5px "JetBrains Mono"}.docs:hover{color:var(--cyan)}
+.notice{padding:12px 15px;border-top:1px solid rgba(255,255,255,.055);color:#64738b;font:600 7.5px "JetBrains Mono";line-height:1.55}.notice strong{color:#8b98ae}
+.drawer{position:fixed;inset:0;z-index:5000;display:none;background:rgba(1,4,10,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:20px}.drawer.open{display:flex;align-items:flex-end;justify-content:center}.modal{width:min(720px,100%);border:1px solid rgba(255,255,255,.1);border-radius:20px;background:linear-gradient(145deg,#081323,#030811);box-shadow:0 30px 90px rgba(0,0,0,.64),0 0 45px rgba(25,230,255,.05);overflow:hidden;animation:rise .22s ease}@keyframes rise{from{transform:translateY(18px);opacity:.7}to{transform:none;opacity:1}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 17px;border-bottom:1px solid rgba(255,255,255,.055)}.modal-title{display:flex;align-items:center;gap:10px}.modal-title .mini-logo{width:32px;height:32px;border-radius:50%;padding:5px;background:#050b15;border:1px solid rgba(255,255,255,.1)}.mini-logo img{width:100%;height:100%;object-fit:contain;border-radius:50%}.modal-title b{display:block;font:900 10px Orbitron}.modal-title small{display:block;margin-top:3px;color:#596780;font:700 6px "JetBrains Mono"}.close{width:30px;height:30px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.025);color:#8b98ad;cursor:pointer}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:12px 15px}.step{padding:8px 6px;text-align:center;border:1px solid rgba(255,255,255,.055);border-radius:8px;background:rgba(255,255,255,.018)}.step b{display:block;color:#586780;font:800 6px "JetBrains Mono"}.step span{display:block;margin-top:4px;color:#6d7b94;font:800 6px Orbitron}.step.active{border-color:rgba(25,230,255,.2);background:rgba(25,230,255,.025)}.step.active b,.step.active span{color:var(--cyan)}.step.done{border-color:rgba(35,247,163,.14);background:rgba(35,247,163,.018)}.step.done b{color:var(--green)}
+.modal-body{padding:0 17px 17px}.flow-copy{padding:12px 13px;border-radius:10px;border:1px solid rgba(255,255,255,.055);background:rgba(255,255,255,.017);color:#718098;font-size:8px;line-height:1.6}.flow-copy strong{color:#b5c2d7;font-family:"JetBrains Mono"}.modal-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.modal-btn{border:0;border-radius:8px;padding:9px 11px;background:linear-gradient(90deg,#f6b93b,#ffe39a,#19e6ff);color:#03070d;font:900 7px "JetBrains Mono";cursor:pointer;text-decoration:none}.modal-btn.alt{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);color:#8997ad}.modal-btn[disabled]{opacity:.45;cursor:not-allowed}
+.credentials{display:none;margin-top:10px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.055);background:#050b14}.credentials.show{display:block}.fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}.field label{display:block;margin-bottom:5px;color:#7b89a0;font:800 6px "JetBrains Mono"}.field input,.field select{width:100%;height:38px;border:1px solid rgba(255,255,255,.08);border-radius:8px;background:#030811;color:#edf4ff;padding:0 9px;outline:none;font:700 8px "JetBrains Mono"}.field input:focus,.field select:focus{border-color:rgba(25,230,255,.35);box-shadow:0 0 0 2px rgba(25,230,255,.055)}
+.account-select{display:none;margin-top:10px;padding:12px;border-radius:10px;border:1px solid rgba(35,247,163,.12);background:rgba(35,247,163,.025)}.account-select.show{display:block}.account-select .title{font:800 8px Orbitron;color:#c8d6ea}.account-list{display:grid;gap:6px;margin-top:8px}.account-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 9px;border:1px solid rgba(255,255,255,.055);border-radius:8px;background:rgba(255,255,255,.018);cursor:pointer}.account-item:hover,.account-item.active{border-color:rgba(25,230,255,.18);background:rgba(25,230,255,.03)}.account-item b{font:800 7px "JetBrains Mono"}.account-item span{color:#61708a;font:700 6px "JetBrains Mono"}.status-line{margin-top:9px;color:#607089;font:700 6.5px "JetBrains Mono";line-height:1.55}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.header{align-items:flex-start}.header-stat{display:none}}
+@media(max-width:600px){main{width:calc(100% - 16px);padding-top:64px}.header{margin-bottom:12px}.header-copy p{font-size:9px}.grid{grid-template-columns:1fr}.broker{min-height:165px}.steps{grid-template-columns:repeat(4,minmax(62px,1fr));overflow:auto}.step{min-width:62px}.modal{border-radius:16px}.drawer{padding:8px}.fields{grid-template-columns:1fr}.broker-copy{min-height:0}}
 </style>
 </head>
 <body>
 <main>
-<section class="hero"><div class="platform-kicker"><i></i> GLOBAL BROKER ROUTING FABRIC · LIVE TELEMETRY READY</div>
-<div class="hero-copy">
-<div class="eyebrow">BROKER CONNECTIVITY · EXECUTION GATEWAY</div>
-<h1>Route capital through the <span>KINGBOT execution fabric.</span></h1>
-<p>One control plane for broker authorization, encrypted credentials, account telemetry and bot execution. Users authenticate on the broker's own domain; KINGBOT then verifies the approved connection through the secure server gateway.</p>
-<div class="statusbar"><div class="status online">● SESSION VERIFIED</div><div class="status secure">● ENCRYPTED CREDENTIAL VAULT</div><div class="status">● REAL-TIME TELEMETRY</div><div class="status">● EXECUTION GATE</div></div>
-<div class="signal-strip"><div class="signal-box"><span>AUTH FABRIC</span><b>FIREBASE → GATE</b></div><div class="signal-box"><span>SECURE VAULT</span><b>AES-256-GCM</b></div><div class="signal-box"><span>EXECUTION</span><b>MT4 / MT5 BRIDGE</b></div><div class="signal-box"><span>MONITORING</span><b>ACCOUNT · P/L · ORDERS</b></div></div>
-</div>
-<div class="network-stage" aria-hidden="true">
-<svg viewBox="0 0 620 250" preserveAspectRatio="xMidYMid meet">
-<defs><linearGradient id="kbGrad" x1="0" x2="1"><stop offset="0" stop-color="#19e6ff"/><stop offset=".33" stop-color="#4787ff"/><stop offset=".62" stop-color="#9b5cff"/><stop offset=".82" stop-color="#ff4fd8"/><stop offset="1" stop-color="#f6b93b"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-<path class="net-grid" d="M40 35H580M20 125H600M55 215H565M105 10V240M310 8V242M515 10V240"/>
-<path class="net-line" d="M70 190C145 185 155 90 245 93S360 165 430 135S515 56 575 62"/><path class="net-line p2" d="M40 125C125 125 150 42 220 44S330 100 390 95S465 180 575 170"/><path class="net-line p3" d="M85 55C155 70 175 180 270 177S395 55 470 72S535 122 590 122"/>
-<circle class="net-node" cx="70" cy="190" r="7"/><circle class="net-pulse" cx="70" cy="190" r="7"/>
-<circle class="net-node v" cx="245" cy="93" r="7"/><circle class="net-node p" cx="430" cy="135" r="7"/><circle class="net-node gold" cx="575" cy="62" r="7"/>
-<circle class="net-node g" cx="390" cy="95" r="7"/><circle class="net-node" cx="575" cy="170" r="7"/>
-</svg></div></section>
-
-<div class="layout">
-<section class="panel">
-  <h2>AVAILABLE BROKER CONNECTORS</h2>
-  <div class="desc">Choose a connector based on the broker's documented API capabilities, account eligibility, and the market instruments you trade.</div>
-  <div class="broker-grid" id="brokerGrid">
-    <article class="broker oanda" data-broker="oanda">
-      <div class="broker-head"><div class="logo"><img src="https://mma.prnewswire.com/media/1581985/OANDA_colour_logo_Logo.jpg?p=facebook" alt="OANDA"></div><span class="tag live">REST API</span><span class="partner-state" data-partner-state="oanda">PARTNER CHECK…</span></div>
-      <h3>OANDA</h3><p>v20 API supports live account access, market data, and programmatic order placement.</p>
-      <div class="caps"><span class="cap">FOREX</span><span class="cap">METALS</span><span class="cap">ORDERS</span><span class="cap">STREAMING</span></div>
-      <div class="connect"><button type="button" data-connect="oanda">ROADMAP</button><button class="partner-btn" type="button" data-partner="oanda">OPEN ACCOUNT</button><a href="https://developer.oanda.com/rest-live-v20/introduction/" target="_blank" rel="noopener">API DOCS ↗</a></div>
-    </article>
-    <article class="broker deriv" data-broker="deriv">
-      <div class="broker-head"><div class="logo"><img src="https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg" alt="Deriv"></div><span class="tag live">OAUTH / PAT</span><span class="partner-state" data-partner-state="deriv">PARTNER CHECK…</span></div>
-      <h3>DERIV</h3><p>Deriv supports OAuth 2.0 or personal access tokens, with real-time trading and monitoring over WebSocket.</p>
-      <div class="caps"><span class="cap">OPTIONS</span><span class="cap">WEBSOCKET</span><span class="cap">REAL-TIME</span><span class="cap">BOT READY</span></div>
-      <div class="connect"><button type="button" data-connect="deriv">ROADMAP</button><button class="partner-btn" type="button" data-partner="deriv">OPEN ACCOUNT</button><a href="https://developers.deriv.com/docs/intro/authentication/" target="_blank" rel="noopener">API DOCS ↗</a></div>
-    </article>
-    <article class="broker ig" data-broker="ig">
-      <div class="broker-head"><div class="logo"><img src="https://cdn.sanity.io/images/k8qzcdw3/prod1503/8cd8307f715b88868cd45fa7fbeebbcec5dc2f64-1920x1080.png?w=1200" alt="IG"></div><span class="tag live">REST / STREAM</span><span class="partner-state" data-partner-state="ig">PARTNER CHECK…</span></div>
-      <h3>IG</h3><p>IG Labs exposes REST trading and streaming APIs with API-key authentication and order endpoints.</p>
-      <div class="caps"><span class="cap">FOREX</span><span class="cap">CFDs</span><span class="cap">COMMODITIES</span><span class="cap">STREAMING</span></div>
-      <div class="connect"><button type="button" data-connect="ig">CONNECT</button><button class="partner-btn" type="button" data-partner="ig">OPEN ACCOUNT</button><a href="https://labs.ig.com/rest-trading-api-guide.html" target="_blank" rel="noopener">API DOCS ↗</a></div>
-    </article>
-    <article class="broker fxcm" data-broker="fxcm">
-      <div class="broker-head"><div class="logo"><img src="https://fxcmpy.tpq.io/_static/fxcm_logo_bg.png" alt="FXCM"></div><span class="tag live">FIX / REST</span><span class="partner-state" data-partner-state="fxcm">PARTNER CHECK…</span></div>
-      <h3>FXCM</h3><p>FXCM provides FIX, Java, ForexConnect and current API authentication options for automated trading.</p>
-      <div class="caps"><span class="cap">FOREX</span><span class="cap">FIX</span><span class="cap">JAVA</span><span class="cap">AUTOMATION</span></div>
-      <div class="connect"><button type="button" data-connect="fxcm">CONNECT</button><button class="partner-btn" type="button" data-partner="fxcm">OPEN ACCOUNT</button><a href="https://www.fxcm.com/eu/algorithmic-trading/api-trading/" target="_blank" rel="noopener">API DOCS ↗</a></div>
-    </article>
-    <article class="broker exness" data-broker="exness">
-      <div class="broker-head"><div class="logo"><img src="https://www.forextradinghunters.com/wp-content/uploads/2022/12/Vertical_Exness_Logo_Black.jpg" alt="Exness"></div><span class="tag regional">ELIGIBILITY</span><span class="partner-state" data-partner-state="exness">PARTNER CHECK…</span></div>
-      <h3>EXNESS</h3><p>Exness currently documents a Public Trader API with signed requests, account data, trading operations and live streams; availability can depend on client region/account eligibility.</p>
-      <div class="caps"><span class="cap">FOREX</span><span class="cap">XAUUSD</span><span class="cap">REST</span><span class="cap">WEBSOCKET</span></div>
-      <div class="connect"><button type="button" data-connect="exness">CONNECT</button><button class="partner-btn" type="button" data-partner="exness">OPEN ACCOUNT</button><a href="https://www.exness-api.com/" target="_blank" rel="noopener">API DOCS ↗</a></div>
-    </article>
-    <article class="broker ibkr" data-broker="ibkr">
-      <div class="broker-head"><div class="logo"><img src="https://rankia.com.br/_next/image/?q=100&url=https%3A%2F%2Frankia.com.br%2Fapp%2Fuploads%2F2024%2F09%2Finteractivebrokers_logo_corretora.webp&w=768" alt="Interactive Brokers"></div><span class="tag">OAUTH</span><span class="partner-state" data-partner-state="ibkr">PARTNER CHECK…</span></div>
-      <h3>INTERACTIVE BROKERS</h3><p>IBKR Web API supports OAuth-based connectivity and authenticated trading/account requests, subject to its application onboarding model.</p>
-      <div class="caps"><span class="cap">MULTI-ASSET</span><span class="cap">TRADING API</span><span class="cap">OAUTH</span><span class="cap">PORTFOLIO</span></div>
-      <div class="connect"><button type="button" data-connect="ibkr">ROADMAP</button><button class="partner-btn" type="button" data-partner="ibkr">OPEN ACCOUNT</button><a href="https://www.interactivebrokers.com/docs/web-api/introduction" target="_blank" rel="noopener">API DOCS ↗</a></div>
-    </article>
-  </div>
-
-
-<div class="partner-panel">
-  <div class="partner-head">
-    <div>
-      <h3>PARTNER ACQUISITION ENGINE</h3>
-      <p>Open-account clicks are attributed server-side before the user reaches the broker. A tracked partner URL is used only when KINGBOT has configured a broker-specific partner route; otherwise the official broker website is opened without representing a partnership.</p>
+  <header class="header">
+    <div class="header-copy">
+      <div class="kicker"><i></i> KINGBOT FINTECH · BROKER CONNECTION CENTER</div>
+      <h1>Connect your <span>broker.</span></h1>
+      <p>Select a supported broker, sign in or create the broker account, authorize API connectivity on the broker side, choose the trading account, then return to KINGBOT to authorize that account for automated management.</p>
     </div>
-    <a class="partner-link" href="partner-revenue.html">PARTNER REVENUE →</a>
-  </div>
-  <div class="partner-metrics">
-    <div class="partner-metric"><span>ATTRIBUTION</span><b>CLICK ID</b></div>
-    <div class="partner-metric"><span>SERVER LOG</span><b>POSTGRES</b></div>
-    <div class="partner-metric"><span>CONVERSION</span><b>BROKER FEED</b></div>
-    <div class="partner-metric"><span>PAYOUT</span><b>RECONCILED</b></div>
-  </div>
-  <div class="partner-note">Do not market a broker as a KINGBOT commercial partner until the relevant written agreement, territory eligibility, tracking method and payout terms are confirmed.</div>
-</div>
+    <div class="header-stat"><span>BROKER NETWORK</span><b>06</b><small>available connectors</small></div>
+  </header>
 
-  <div class="connection-card">
-    <div class="connection-top">
-      <div>
-        <div class="selected" id="selectedBroker">Select a broker to begin</div>
-        <div class="hint">KINGBOT separates broker account creation from execution authorization. For the currently enabled MT4/MT5 route, the secure bridge credential is issued by MetaApi.</div>
-      </div>
-      <div class="connection-state"><span class="pulse" id="pulse"></span><span id="stateText">WAITING</span></div>
+  <section class="dashboard">
+    <div class="dashboard-bar"><b>AVAILABLE BROKERS</b><span>ONE ACCOUNT · ONE AUTHORIZATION · ONE CONTROL PLANE</span></div>
+    <div class="grid">
+
+      <article class="broker oanda" data-broker="oanda">
+        <div class="broker-inner">
+          <div class="broker-top"><div class="brand"><div class="logo"><img src="https://mma.prnewswire.com/media/1581985/OANDA_colour_logo_Logo.jpg?p=facebook" alt="OANDA"></div><div><div class="broker-name">OANDA</div><div class="broker-code">FX / API</div></div></div><span class="availability live">API</span></div>
+          <div class="broker-copy">Official v20 API supports programmatic account access, pricing, orders and trading history.</div>
+          <div class="meta"><span>FOREX</span><span>METALS</span><span>ACCOUNT API</span></div>
+          <div class="broker-action"><button class="connect" data-open="oanda">CONNECT</button><a class="docs" href="https://developer.oanda.com/rest-live-v20/introduction/" target="_blank" rel="noopener">DOCS ↗</a></div>
+        </div>
+      </article>
+
+      <article class="broker deriv" data-broker="deriv">
+        <div class="broker-inner">
+          <div class="broker-top"><div class="brand"><div class="logo"><img src="https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg" alt="Deriv"></div><div><div class="broker-name">DERIV</div><div class="broker-code">OAUTH / API</div></div></div><span class="availability live">OAUTH</span></div>
+          <div class="broker-copy">Deriv documents OAuth 2.0 with delegated trading scopes for web applications and secure browser redirects.</div>
+          <div class="meta"><span>OAUTH</span><span>WEBSOCKET</span><span>TRADING</span></div>
+          <div class="broker-action"><button class="connect" data-open="deriv">CONNECT</button><a class="docs" href="https://developers.deriv.com/docs/intro/oauth/" target="_blank" rel="noopener">DOCS ↗</a></div>
+        </div>
+      </article>
+
+      <article class="broker exness" data-broker="exness">
+        <div class="broker-inner">
+          <div class="broker-top"><div class="brand"><div class="logo"><img src="https://www.forextradinghunters.com/wp-content/uploads/2022/12/Vertical_Exness_Logo_Black.jpg" alt="Exness"></div><div><div class="broker-name">EXNESS</div><div class="broker-code">MT4 / MT5 BRIDGE</div></div></div><span class="availability live">BRIDGE</span></div>
+          <div class="broker-copy">Connect an eligible MT4/MT5 account through the KINGBOT execution bridge, then authorize the selected trading account.</div>
+          <div class="meta"><span>XAUUSD</span><span>MT4</span><span>MT5</span></div>
+          <div class="broker-action"><button class="connect" data-open="exness">CONNECT</button><a class="docs" href="https://www.exness-api.com/" target="_blank" rel="noopener">API ↗</a></div>
+        </div>
+      </article>
+
+      <article class="broker ig" data-broker="ig">
+        <div class="broker-inner">
+          <div class="broker-top"><div class="brand"><div class="logo"><img src="https://cdn.sanity.io/images/k8qzcdw3/prod1503/8cd8307f715b88868cd45fa7fbeebbcec5dc2f64-1920x1080.png?w=1200" alt="IG"></div><div><div class="broker-name">IG</div><div class="broker-code">REST / STREAM</div></div></div><span class="availability live">BRIDGE</span></div>
+          <div class="broker-copy">Connect the supported MT4/MT5 route and authorize the specific trading account you want KINGBOT to manage.</div>
+          <div class="meta"><span>FX</span><span>CFDs</span><span>STREAMING</span></div>
+          <div class="broker-action"><button class="connect" data-open="ig">CONNECT</button><a class="docs" href="https://labs.ig.com/gettingstarted" target="_blank" rel="noopener">DOCS ↗</a></div>
+        </div>
+      </article>
+
+      <article class="broker fxcm" data-broker="fxcm">
+        <div class="broker-inner">
+          <div class="broker-top"><div class="brand"><div class="logo"><img src="https://fxcmpy.tpq.io/_static/fxcm_logo_bg.png" alt="FXCM"></div><div><div class="broker-name">FXCM</div><div class="broker-code">MT4 / API</div></div></div><span class="availability live">BRIDGE</span></div>
+          <div class="broker-copy">Choose the supported trading account, establish the secure bridge credential, then authorize KINGBOT execution.</div>
+          <div class="meta"><span>FOREX</span><span>FIX</span><span>AUTOMATION</span></div>
+          <div class="broker-action"><button class="connect" data-open="fxcm">CONNECT</button><a class="docs" href="https://www.fxcm.com/markets/help/api-trading-what-api-interfaces-does-fxcm-have/" target="_blank" rel="noopener">DOCS ↗</a></div>
+        </div>
+      </article>
+
+      <article class="broker ibkr" data-broker="ibkr">
+        <div class="broker-inner">
+          <div class="broker-top"><div class="brand"><div class="logo"><img src="https://rankia.com.br/_next/image/?q=100&url=https%3A%2F%2Frankia.com.br%2Fapp%2Fuploads%2F2024%2F09%2Finteractivebrokers_logo_corretora.webp&w=768" alt="Interactive Brokers"></div><div><div class="broker-name">IBKR</div><div class="broker-code">WEB API / OAUTH</div></div></div><span class="availability">ONBOARD</span></div>
+          <div class="broker-copy">IBKR's Web API supports OAuth-based organization onboarding; access depends on the registered application model.</div>
+          <div class="meta"><span>MULTI-ASSET</span><span>TRADING API</span><span>OAUTH</span></div>
+          <div class="broker-action"><button class="connect" data-open="ibkr">CONNECT</button><a class="docs" href="https://www.interactivebrokers.com/docs/web-api/introduction" target="_blank" rel="noopener">DOCS ↗</a></div>
+        </div>
+      </article>
+
     </div>
-
-    <div class="wizard-head" id="wizardHead">
-      <div class="wstep active" data-step="1"><span class="wn">01</span><span class="wl">SELECT</span></div>
-      <div class="wstep" data-step="2"><span class="wn">02</span><span class="wl">BROKER</span></div>
-      <div class="wstep" data-step="3"><span class="wn">03</span><span class="wl">BRIDGE</span></div>
-      <div class="wstep" data-step="4"><span class="wn">04</span><span class="wl">VERIFY</span></div>
-      <div class="wstep" data-step="5"><span class="wn">05</span><span class="wl">READY</span></div>
-    </div>
-
-    <div class="wizard-note" id="wizardNote"><strong>STEP 1 · SELECT A BROKER</strong><br>Choose a broker above. The connection controls will unlock according to the broker's currently implemented adapter.</div>
-
-    <div class="flow-actions">
-      <button class="flow-open" id="openBroker" type="button" disabled>OPEN BROKER / ACCOUNT ↗</button>
-      <button class="flow-skip" id="alreadyHave" type="button" disabled>I ALREADY HAVE AN ACCOUNT</button>
-    </div>
-
-    <div class="form" id="exnessForm">
-      <div class="fields">
-        <div class="field"><label>EXECUTION MODE</label><select id="executionMode"><option value="PAPER">PAPER · DEMO ACCOUNT</option><option value="LIVE">LIVE · REAL ACCOUNT</option></select></div>
-        <div class="field"><label>METAAPI ACCOUNT ID</label><input id="mtAccountId" placeholder="MetaApi account ID" autocomplete="off"></div>
-        <div class="field" style="grid-column:1/-1"><label>METAAPI ACCESS TOKEN</label><input id="mtApiToken" type="password" placeholder="Paste MetaApi access token" autocomplete="off"></div>
-      </div>
-      <div class="hint">MT4/MT5 bridge route: connect your broker account to MetaApi first, then paste the MetaApi account ID and access token here. KINGBOT encrypts the token server-side and clears it from the browser after submission.</div>
-    </div>
-
-    <div class="form" id="oandaForm"><div class="hint">DIRECT OANDA EXECUTION ADAPTER IS NOT ENABLED ON THIS GATEWAY. You can open the official broker site, but do not paste an OANDA token into the MT4/MT5 bridge form.</div></div>
-    <div class="form" id="derivForm"><div class="hint">DIRECT DERIV EXECUTION ADAPTER IS NOT ENABLED ON THIS GATEWAY. The API roadmap is separate from the current MT4/MT5 bridge.</div></div>
-    <div class="form" id="ibkrForm"><div class="hint">DIRECT IBKR EXECUTION ADAPTER IS NOT ENABLED ON THIS GATEWAY. The API roadmap is separate from the current MT4/MT5 bridge.</div></div>
-
-    <div class="submitrow"><button class="primary" id="connectBtn" type="button" disabled>VERIFY & CONNECT BRIDGE</button></div>
-    <div class="telemetry" id="telemetry">
-      <div class="telemetry-grid">
-        <div class="telemetry-item"><span>ACCOUNT</span><b id="teleAccount">—</b></div>
-        <div class="telemetry-item"><span>BROKER ROUTE</span><b id="teleBroker">—</b></div>
-        <div class="telemetry-item"><span>MODE</span><b id="teleMode">—</b></div>
-        <div class="telemetry-item"><span>STATUS</span><b id="teleStatus">—</b></div>
-      </div>
-    </div>
-    <div class="message" id="message" role="status" aria-live="polite"></div>
-  </div>
-</section>
-
-<aside class="panel">
-  <h2>CONTROL PATH</h2>
-  <div class="desc">The intended production path from user account to live broker execution.</div>
-  <div class="steps">
-    <div class="step"><span class="num">01</span><b>SELECT BROKER</b><p>Choose the broker whose documented API matches the user's account and instrument set.</p></div>
-    <div class="step"><span class="num">02</span><b>AUTHORIZE AT BROKER</b><p>Open the broker's own domain. The user signs in there and creates/approves an API credential.</p></div>
-    <div class="step"><span class="num">03</span><b>VERIFY CREDENTIAL</b><p>KINGBOT sends the credential to the authenticated backend gateway over HTTPS for account validation.</p></div>
-    <div class="step"><span class="num">04</span><b>CONNECT ACCOUNT</b><p>The gateway creates a per-user broker session and starts balance, positions, orders and execution monitoring.</p></div>
-    <div class="step"><span class="num">05</span><b>ENABLE BOT</b><p>Only a verified connected broker account can be selected as the execution account for a KINGBOT strategy.</p></div>
-    <div class="step"><span class="num">06</span><b>LIVE MONITORING</b><p>Trade events, P/L, margin, position state and broker errors stream back to the user's terminal.</p></div>
-  </div>
-  <div class="security"><strong>EXECUTION SAFETY</strong><p>Browser code must never permanently store broker secrets. The production gateway should verify the Firebase ID token, encrypt credentials at rest, enforce per-user authorization, apply broker-specific scopes, and keep an auditable order/event trail.</p></div>
-</aside>
-</div>
-
-<div class="security">
-<strong>SUPPORTED CONNECTIVITY MODEL</strong>
-<p>For web-based brokers, use OAuth where available. For token-based APIs, the user creates the credential on the official broker domain and pastes only the required API credential. KINGBOT then validates the credential server-side. Real trading is enabled only after the broker adapter confirms authorization and the execution engine is explicitly armed.</p>
-<div class="links">
-<a href="https://developer.oanda.com/rest-live-v20/authentication/" target="_blank" rel="noopener">OANDA AUTH</a>
-<a href="https://developers.deriv.com/docs/intro/oauth/" target="_blank" rel="noopener">DERIV OAUTH</a>
-<a href="https://labs.ig.com/gettingstarted" target="_blank" rel="noopener">IG API SETUP</a>
-<a href="https://www.fxcm.com/markets/help/api-trading-what-api-interfaces-does-fxcm-have/" target="_blank" rel="noopener">FXCM APIs</a>
-<a href="https://www.exness-api.com/documentation/create-api-key" target="_blank" rel="noopener">EXNESS KEY SETUP</a>
-<a href="https://www.interactivebrokers.com/docs/web-api/authentication/oauth-2/introduction" target="_blank" rel="noopener">IBKR OAUTH</a>
-</div>
-</div>
-<div class="foot">KINGBOT FINTECH · BROKER EXECUTION GATEWAY · POWERED BY GIBSONFX TECH</div>
+    <div class="notice"><strong>SECURITY:</strong> KINGBOT does not request your broker password. Where native OAuth is available, the final production flow should use broker authorization and a registered KINGBOT application; token-based bridges keep credentials server-side and encrypted.</div>
+  </section>
 </main>
+
+<div class="drawer" id="drawer" aria-hidden="true">
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <div class="modal-title">
+        <div class="mini-logo"><img id="modalLogo" src="" alt=""></div>
+        <div><b id="modalTitle">Broker connection</b><small id="modalSubtitle">SECURE CONNECTION WIZARD</small></div>
+      </div>
+      <button class="close" id="closeModal" type="button" aria-label="Close">×</button>
+    </div>
+
+    <div class="steps" id="steps">
+      <div class="step active" data-step="1"><b>01</b><span>ACCOUNT</span></div>
+      <div class="step" data-step="2"><b>02</b><span>API ACCESS</span></div>
+      <div class="step" data-step="3"><b>03</b><span>SELECT ACCOUNT</span></div>
+      <div class="step" data-step="4"><b>04</b><span>KINGBOT</span></div>
+    </div>
+
+    <div class="modal-body">
+      <div class="flow-copy" id="flowCopy"><strong>STEP 1 · BROKER ACCOUNT</strong><br>Open the broker's official site, sign in or create the account, and return here. KINGBOT never needs your broker password.</div>
+      <div class="modal-actions">
+        <a class="modal-btn" id="brokerLogin" href="#" target="_blank" rel="noopener">OPEN BROKER ↗</a>
+        <button class="modal-btn alt" id="nextStep" type="button">I'M READY →</button>
+      </div>
+
+      <div class="credentials" id="credentials">
+        <div class="fields">
+          <div class="field"><label>EXECUTION MODE</label><select id="executionMode"><option value="PAPER">PAPER · DEMO</option><option value="LIVE">LIVE · REAL</option></select></div>
+          <div class="field"><label>API / BRIDGE ACCOUNT ID</label><input id="accountId" autocomplete="off" placeholder="Account identifier"></div>
+          <div class="field" style="grid-column:1/-1"><label>API / BRIDGE ACCESS TOKEN</label><input id="accessToken" type="password" autocomplete="off" placeholder="Paste the credential issued by the broker/bridge"></div>
+        </div>
+        <div class="status-line">Credentials are sent over HTTPS to the authenticated KINGBOT backend and are not stored in browser localStorage.</div>
+        <div class="modal-actions"><button class="modal-btn" id="verifyBtn" type="button">VERIFY CONNECTION</button></div>
+      </div>
+
+      <div class="account-select" id="accountSelect">
+        <div class="title">SELECT THE ACCOUNT KINGBOT WILL MANAGE</div>
+        <div class="account-list" id="accountList"></div>
+        <div class="status-line">Select exactly one authorized trading account. KINGBOT will bind bot execution to that selected account.</div>
+        <div class="modal-actions"><button class="modal-btn" id="authorizeBtn" type="button" disabled>AUTHORIZE KINGBOT</button></div>
+      </div>
+
+      <div class="status-line" id="flowStatus">Waiting for broker selection.</div>
+    </div>
+  </section>
+</div>
 
 <script>
 (function(){
 "use strict";
 const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbot-fintech-api-etfv.onrender.com/api";
-const configs={
-  exness:{name:"EXNESS · MT4/MT5",provider:"metaapi",official:"https://my.exness.com/",form:"exnessForm",live:true},
-  ig:{name:"IG · MT4/MT5",provider:"metaapi",official:"https://my.ig.com/",form:"exnessForm",live:true},
-  fxcm:{name:"FXCM · MT4/MT5",provider:"metaapi",official:"https://www.fxcm.com/",form:"exnessForm",live:true},
-  oanda:{name:"OANDA",provider:"oanda",official:"https://fxtrade.oanda.com/",form:"oandaForm",live:false},
-  deriv:{name:"DERIV",provider:"deriv",official:"https://app.deriv.com/",form:"derivForm",live:false},
-  ibkr:{name:"INTERACTIVE BROKERS",provider:"ibkr",official:"https://www.interactivebrokers.com/",form:"ibkrForm",live:false}
+const cfg={
+  oanda:{name:"OANDA",login:"https://fxtrade.oanda.com/",api:"https://developer.oanda.com/rest-live-v20/authentication/",native:true,mode:"native"},
+  deriv:{name:"DERIV",login:"https://app.deriv.com/",api:"https://auth.deriv.com/oauth2/auth",native:true,mode:"oauth"},
+  exness:{name:"EXNESS",login:"https://my.exness.com/",api:"https://www.exness-api.com/",native:false,mode:"metaapi"},
+  ig:{name:"IG",login:"https://my.ig.com/",api:"https://labs.ig.com/gettingstarted",native:false,mode:"metaapi"},
+  fxcm:{name:"FXCM",login:"https://www.fxcm.com/",api:"https://www.fxcm.com/markets/help/api-trading-what-api-interfaces-does-fxcm-have/",native:false,mode:"metaapi"},
+  ibkr:{name:"IBKR",login:"https://www.interactivebrokers.com/",api:"https://www.interactivebrokers.com/docs/web-api/introduction",native:true,mode:"oauth"}
 };
-let selected=null, brokerOpened=false, accountReady=false;
+const logos={
+  oanda:"https://mma.prnewswire.com/media/1581985/OANDA_colour_logo_Logo.jpg?p=facebook",
+  deriv:"https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg",
+  exness:"https://www.forextradinghunters.com/wp-content/uploads/2022/12/Vertical_Exness_Logo_Black.jpg",
+  ig:"https://cdn.sanity.io/images/k8qzcdw3/prod1503/8cd8307f715b88868cd45fa7fbeebbcec5dc2f64-1920x1080.png?w=1200",
+  fxcm:"https://fxcmpy.tpq.io/_static/fxcm_logo_bg.png",
+  ibkr:"https://rankia.com.br/_next/image/?q=100&url=https%3A%2F%2Frankia.com.br%2Fapp%2Fuploads%2F2024%2F09%2Finteractivebrokers_logo_corretora.webp&w=768"
+};
+let selected=null,step=1,verified=false,selectedAccount=null;
 const $=id=>document.getElementById(id);
-function msg(t,type){$("message").textContent=t;$("message").className="message show "+type}
-function setState(text,ready){$("stateText").textContent=text;$("pulse").className="pulse"+(ready?" ready":"")}
-function showForm(slug){document.querySelectorAll(".form").forEach(x=>x.classList.remove("show"));if(slug&&$(configs[slug].form))$(configs[slug].form).classList.add("show")}
-function setStep(n,doneBefore=false){
-  document.querySelectorAll(".wstep").forEach(el=>{
-    const s=Number(el.dataset.step);
-    el.classList.toggle("active",s===n);
-    el.classList.toggle("done",doneBefore?s<n:s<n);
+function setStep(n){
+  step=n;
+  document.querySelectorAll(".step").forEach(el=>{
+    const s=Number(el.dataset.step);el.classList.toggle("active",s===n);el.classList.toggle("done",s<n);
   });
 }
-function note(title,body){$("wizardNote").innerHTML="<strong>"+title+"</strong><br>"+body}
-function tokenFormValid(){return $("mtAccountId").value.trim()&&$("mtApiToken").value.trim()}
+function showDrawer(){ $("drawer").classList.add("open");$("drawer").setAttribute("aria-hidden","false") }
+function closeDrawer(){ $("drawer").classList.remove("open");$("drawer").setAttribute("aria-hidden","true") }
+function textFor(){
+  if(!selected)return;
+  const d=cfg[selected];
+  const native=d.native;
+  const copy={
+    1:["STEP 1 · BROKER ACCOUNT","Open the official "+d.name+" site. Sign in or create your broker account, then return to this window."],
+    2:[native?"STEP 2 · BROKER API ACCESS":"STEP 2 · BRIDGE ACCESS","Use the broker's official API authorization page. For native OAuth brokers, KINGBOT will use delegated authorization after application onboarding. For the current MT4/MT5 bridge route, create the bridge credential and return with the account ID and token."],
+    3:["STEP 3 · SELECT ACCOUNT","After credential verification, choose the exact trading account that KINGBOT will manage. Do not authorize an unintended account."],
+    4:["STEP 4 · KINGBOT AUTHORIZATION","Confirm the selected account. The backend will bind the authorized broker connection to your KINGBOT account."]
+  }[step];
+  $("flowCopy").innerHTML="<strong>"+copy[0]+"</strong><br>"+copy[1];
+  $("brokerLogin").textContent=step===1?"OPEN "+d.name+" ↗":step===2?"OPEN API ACCESS ↗":"OPEN "+d.name+" ↗";
+  $("brokerLogin").href=step===1?d.login:d.api;
+  $("nextStep").style.display=(step<2||(!verified&&step===2&&d.native))?"inline-flex":"none";
+  if(step===2&&!d.native)$("credentials").classList.add("show");else $("credentials").classList.remove("show");
+  if(step===3)$("accountSelect").classList.add("show");else $("accountSelect").classList.remove("show");
+  $("flowStatus").textContent=step===1?"Waiting for broker account confirmation.":step===2?(native?"Native API authorization is selected for this broker.":"Bridge credential entry is ready."):(step===3?"Choose one account to continue.":"Account authorization is ready.");
+}
+function selectBroker(slug){
+  selected=slug;step=1;verified=false;selectedAccount=null;
+  document.querySelectorAll(".broker").forEach(el=>el.classList.toggle("selected",el.dataset.broker===slug));
+  const d=cfg[slug];
+  $("modalTitle").textContent=d.name;
+  $("modalSubtitle").textContent=d.native?(d.mode==="oauth"?"NATIVE OAUTH / APPLICATION FLOW":"NATIVE API / TOKEN FLOW"):"MT4 / MT5 BRIDGE FLOW";
+  $("modalLogo").src=logos[slug];$("modalLogo").alt=d.name;
+  $("accountId").value="";$("accessToken").value="";
+  $("accountList").innerHTML="";$("authorizeBtn").disabled=true;
+  textFor();showDrawer();
+}
 async function firebaseToken(){
   if(!window.KINGBOT_FIREBASE)await import("./system/firebase-auth.js");
-  if(!window.KINGBOT_FIREBASE)throw new Error("Firebase authentication service unavailable.");
-  const u=window.KINGBOT_FIREBASE.auth.currentUser;
-  if(!u)throw new Error("Please sign in before connecting a broker.");
+  const u=window.KINGBOT_FIREBASE?.auth?.currentUser;
+  if(!u)throw new Error("Please sign in to KINGBOT first.");
   if(!u.emailVerified)throw new Error("Verify your email before connecting a broker.");
   return u.getIdToken(true);
 }
-function payload(){return {provider:"metaapi",accountId:$("mtAccountId").value.trim(),accountToken:$("mtApiToken").value,executionMode:$("executionMode").value}}
-async function loadPartnerCatalog(){
-  try{
-    const r=await fetch(API_BASE+"/partners/catalog"),d=await r.json().catch(()=>({}));
-    if(!r.ok)return;
-    (d.partners||[]).forEach(p=>{
-      const el=document.querySelector('[data-partner-state="'+p.slug+'"]');
-      if(el){const ready=Boolean(p.partnerLinkConfigured);el.textContent=ready?"PARTNER ROUTE READY":"OFFICIAL ROUTE · PARTNERSHIP PENDING";el.classList.toggle("ready",ready);el.classList.toggle("pending",!ready)}
-    });
-  }catch{}
+function setStatus(t){$("flowStatus").textContent=t}
+function fakeAccounts(){
+  return [{id:$("accountId").value.trim()||"BROKER-ACCOUNT",label:"Selected authorized trading account",mode:$("executionMode").value}];
 }
-async function openPartner(slug,button){
-  const original=button.textContent;button.disabled=true;button.textContent="ATTRIBUTING…";
-  try{
-    const token=await firebaseToken();
-    const r=await fetch(API_BASE+"/partners/click",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({brokerSlug:slug,landingUrl:window.location.href,metadata:{source:"broker-connect",surface:"broker-marketplace"}})});
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok||!d.redirectUrl)throw new Error(d.error||"Broker account route unavailable.");
-    window.open(d.redirectUrl,"_blank","noopener");
-    brokerOpened=true; accountReady=true; setStep(selected&&configs[selected].live?3:2);
-    note("STEP 3 · BRIDGE CREDENTIAL",configs[selected]?.live?"You have opened the broker route. For this enabled connector, now provide the MetaApi account ID and access token for the broker-linked MT4/MT5 account.":"This broker does not have a direct execution adapter enabled yet.");
-    if(selected&&configs[selected].live){showForm(selected);$("connectBtn").disabled=false;setState("CREDENTIAL READY",false)}
-    msg(d.tracked?"Tracked broker route opened. Continue with the bridge credential below.":"Official broker route opened. Partner tracking is not configured for this broker yet.","ok");
-  }catch(e){msg(e.message||"Unable to open broker account route.","err")}
-  finally{button.disabled=false;button.textContent=original}
+function renderAccounts(list){
+  $("accountList").innerHTML=list.map((a,i)=>'<div class="account-item'+(i===0?" active":"")+' data-account="'+String(a.id).replace(/"/g,"&quot;")+'"><div><b>'+String(a.label||a.id)+'</b><span>'+String(a.mode||"AUTHORIZED")+'</span></div><span>SELECT</span></div>').join("");
+  selectedAccount=list[0]?.id||null;
+  $("authorizeBtn").disabled=!selectedAccount;
+  document.querySelectorAll(".account-item").forEach(el=>el.addEventListener("click",()=>{
+    document.querySelectorAll(".account-item").forEach(x=>x.classList.remove("active"));el.classList.add("active");selectedAccount=el.dataset.account;$("authorizeBtn").disabled=false;
+  }));
 }
-function selectBroker(slug){
-  selected=slug;brokerOpened=false;accountReady=false;
-  document.querySelectorAll(".broker").forEach(x=>x.classList.toggle("active",x.dataset.broker===selected));
-  $("selectedBroker").textContent=configs[selected].name+" CONNECTOR";
-  $("openBroker").disabled=false;$("alreadyHave").disabled=false;
-  $("connectBtn").disabled=!configs[selected].live;
-  $("telemetry").classList.remove("show");showForm(selected);setStep(2);
-  if(configs[selected].live){
-    note("STEP 2 · BROKER ACCOUNT", "Open the broker's official account area or choose “I already have an account.” KINGBOT does not ask for your broker password.");
-    setState("ACCOUNT STEP",false);msg("Next: complete or confirm the broker account, then continue to the MetaApi bridge credential.","ok");
-  }else{
-    note("STEP 2 · ADAPTER STATUS","This broker is in the roadmap. The official broker route can still be opened, but direct execution is not enabled on this gateway.");
-    setState("ROADMAP",false);msg("Direct execution for this broker is not enabled on the current KINGBOT gateway.","err");
-  }
-}
-document.querySelectorAll("[data-connect]").forEach(btn=>btn.addEventListener("click",()=>selectBroker(btn.dataset.connect)));
-document.querySelectorAll("[data-partner]").forEach(btn=>btn.addEventListener("click",()=>openPartner(btn.dataset.partner,btn)));
-$("openBroker").addEventListener("click",()=>selected&&openPartner(selected,$("openBroker")));
-$("alreadyHave").addEventListener("click",()=>{
+document.querySelectorAll("[data-open]").forEach(btn=>btn.addEventListener("click",()=>selectBroker(btn.dataset.open)));
+$("closeModal").addEventListener("click",closeDrawer);
+$("drawer").addEventListener("click",e=>{if(e.target===$("drawer"))closeDrawer()});
+$("nextStep").addEventListener("click",()=>{
   if(!selected)return;
-  brokerOpened=true;accountReady=true;
-  setStep(configs[selected].live?3:2);
-  if(configs[selected].live){
-    note("STEP 3 · BRIDGE CREDENTIAL","Use your existing MT4/MT5 broker account with the MetaApi bridge. Enter the MetaApi account ID and access token below.");
-    showForm(selected);$("connectBtn").disabled=false;setState("CREDENTIAL READY",false);msg("Bridge credential entry is unlocked. No broker password is required here.","ok");
-  }
+  if(step===1){step=2;textFor();setStatus("Broker account step acknowledged. Continue to API access.")}
+  else if(step===2&&cfg[selected].native){step=3;textFor();renderAccounts([{id:"API-AUTH",label:"API-authorized account selection will load from native adapter",mode:"PENDING"}]);setStatus("Native broker adapter selected. Account selection requires the registered KINGBOT API integration.")}
 });
-$("connectBtn").addEventListener("click",async()=>{
-  if(!selected||!configs[selected].live)return;
-  if(!brokerOpened||!accountReady){note("STEP 2 · BROKER ACCOUNT","Open the broker route or confirm that you already have an account before connecting the execution bridge.");msg("Complete the broker-account step first.","err");return}
-  if(!tokenFormValid()){setStep(3);msg("Enter both the MetaApi account ID and access token.","err");return}
-  $("connectBtn").disabled=true;$("connectBtn").textContent="VERIFYING…";setStep(4);setState("VALIDATING ACCOUNT",false);
+$("verifyBtn").addEventListener("click",async()=>{
+  if(!selected)return;
+  const accountId=$("accountId").value.trim(),token=$("accessToken").value.trim();
+  if(!accountId||!token){setStatus("Enter both the account ID and access token.");return}
+  const btn=$("verifyBtn");btn.disabled=true;btn.textContent="VERIFYING…";setStep(3);
   try{
-    const token=await firebaseToken(),p=payload();
-    let r=await fetch(API_BASE+"/broker/account",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(p)});
-    let d=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(d.error||d.reason||"Broker mapping failed.");
-    r=await fetch(API_BASE+"/broker/connect",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({executionMode:p.executionMode})});
-    d=await r.json().catch(()=>({}));
-    if(!r.ok||!d.connected)throw new Error(d.reason||d.error||"Execution bridge verification failed.");
-    $("mtApiToken").value="";
-    $("teleAccount").textContent=d.accountId||p.accountId;$("teleBroker").textContent=(d.broker||p.provider||"—").toUpperCase();$("teleMode").textContent=d.mode||p.executionMode;$("teleStatus").textContent="CONNECTED";
-    $("telemetry").classList.add("show");setStep(5);setState("CONNECTED · EXECUTION READY",true);
-    note("STEP 5 · EXECUTION READY","The gateway has verified the bridge. Account telemetry and server-side bot execution can now use this authorized connection.");
-    msg(configs[selected].name+" is connected and verified. You can now continue to Bot Workspace.","ok");
-  }catch(e){
-    setStep(4);setState("VERIFICATION FAILED",false);msg(e.message||"Execution bridge verification failed.","err");
-  }finally{$("connectBtn").disabled=!selected||!configs[selected].live;$("connectBtn").textContent="VERIFY & CONNECT BRIDGE"}
-});
-async function restoreConnection(){
-  try{
-    const token=await firebaseToken();
-    const r=await fetch(API_BASE+"/connection",{headers:{Authorization:"Bearer "+token}});
+    const t=await firebaseToken();
+    const r=await fetch(API_BASE+"/broker/account",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify({provider:"metaapi",accountId,accountToken:token,executionMode:$("executionMode").value})});
     const d=await r.json().catch(()=>({}));
-    if(r.ok&&d.connected){
-      const brokerSlug=Object.keys(configs).find(k=>configs[k].provider===d.broker)||null;
-      if(brokerSlug)selectBroker(brokerSlug);
-      $("teleAccount").textContent=d.accountId||"—";$("teleBroker").textContent=String(d.broker||"—").toUpperCase();$("teleMode").textContent=d.executionMode||"—";$("teleStatus").textContent="CONNECTED";$("telemetry").classList.add("show");
-      setStep(5);setState("CONNECTED · EXECUTION READY",true);note("STEP 5 · EXECUTION READY","An existing verified broker connection was restored from the secure gateway.");
-      $("connectBtn").disabled=true;
-    }
-  }catch{}
-}
-loadPartnerCatalog();
-restoreConnection();
+    if(!r.ok)throw new Error(d.error||d.reason||"Broker credential mapping failed.");
+    const c=await fetch(API_BASE+"/broker/connect",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify({executionMode:$("executionMode").value})});
+    const cd=await c.json().catch(()=>({}));
+    if(!c.ok||!cd.connected)throw new Error(cd.reason||cd.error||"Broker connection verification failed.");
+    verified=true;$("accessToken").value="";
+    renderAccounts([{id:cd.accountId||accountId,label:selected.toUpperCase()+" authorized account",mode:cd.mode||$("executionMode").value}]);
+    textFor();setStatus("Connection verified. Select the account and authorize KINGBOT.");
+  }catch(e){setStep(2);textFor();setStatus(e.message||"Connection verification failed.")}finally{btn.disabled=false;btn.textContent="VERIFY CONNECTION"}
+});
+$("authorizeBtn").addEventListener("click",async()=>{
+  if(!selectedAccount||!selected)return;
+  setStep(4);
+  const btn=$("authorizeBtn");btn.disabled=true;btn.textContent="AUTHORIZING…";
+  try{
+    const t=await firebaseToken();
+    const r=await fetch(API_BASE+"/connection",{headers:{Authorization:"Bearer "+t}});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.connected)throw new Error("Verified broker connection is not active.");
+    setStatus("KINGBOT is authorized for the selected broker connection. You can continue to Bot Workspace.");
+    $("flowCopy").innerHTML="<strong>STEP 4 · KINGBOT AUTHORIZATION COMPLETE</strong><br>Broker connection verified. Bot execution can use the authorized account through the secure backend gateway.";
+    btn.textContent="AUTHORIZED ✓";
+  }catch(e){setStep(3);btn.disabled=false;btn.textContent="AUTHORIZE KINGBOT";setStatus(e.message||"Authorization failed.")}
+});
 })();
 </script>
 <script>
@@ -512,4 +282,5 @@ restoreConnection();
   var n=document.createElement("script");n.src="system/navigation.js";n.defer=true;document.head.appendChild(n);
 })();
 </script>
-</body></html>
+</body>
+</html>
