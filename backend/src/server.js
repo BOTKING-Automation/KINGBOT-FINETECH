@@ -176,7 +176,7 @@ app.get("/api/broker/deriv/oauth/start", async (req,res)=>{
 app.get("/api/broker/deriv/oauth/callback", async (req,res)=>{
   const state=String(req.query?.state||"").trim();
   const code=String(req.query?.code||"").trim();
-  if(!state)return derivReturnUrl()==="/" ? res.status(400).json({ok:false,error:"DERIV_OAUTH_STATE_REQUIRED"}) : derivReturnError(res,"DERIV_OAUTH_STATE_REQUIRED");
+  if(!state)return derivReturnError(res,"DERIV_OAUTH_STATE_REQUIRED");
   if(req.query?.error)return derivReturnError(res,String(req.query?.error_description||req.query?.error));
   if(!code)return derivReturnError(res,"DERIV_OAUTH_CODE_REQUIRED");
 
@@ -210,37 +210,85 @@ app.get("/api/broker/deriv/oauth/callback", async (req,res)=>{
     const accountData=await accountResponse.json().catch(()=>({}));
     if(!accountResponse.ok)throw new Error(accountData?.errors?.[0]?.message||"DERIV_ACCOUNT_LIST_FAILED");
 
-    const accounts=Array.isArray(accountData?.data)?accountData.data:(accountData?.data?[accountData.data]:[]);
-    const wantedType=saved.execution_mode==="PAPER"?"demo":"real";
-    const candidates=accounts.filter(account=>String(account?.account_type||"").toLowerCase()===wantedType&&String(account?.status||"active").toLowerCase()==="active");
-    const account=candidates[0];
-    if(!account?.account_id)throw new Error(saved.execution_mode==="PAPER"?"NO_DERIV_DEMO_ACCOUNT":"NO_DERIV_REAL_ACCOUNT");
+    const rawAccounts=Array.isArray(accountData?.data)?accountData.data:(accountData?.data?[accountData.data]:[]);
+    const accounts=rawAccounts
+      .map(account=>({
+        accountId:String(account?.account_id||"").trim(),
+        accountType:String(account?.account_type||"").toLowerCase(),
+        status:String(account?.status||"").toLowerCase(),
+        currency:String(account?.currency||"").trim().slice(0,12),
+        balance:Number.isFinite(Number(account?.balance))?Number(account.balance):null,
+        group:String(account?.group||"").trim().slice(0,40)
+      }))
+      .filter(account=>account.accountId && ["demo","real"].includes(account.accountType));
 
-    await broker.saveMapping({
-      userId:saved.user_id,
-      provider:"deriv",
-      accountId:String(account.account_id),
-      executionMode:saved.execution_mode,
-      accountToken:JSON.stringify({
-        accessToken:tokenData.access_token,
-        refreshToken:tokenData.refresh_token||undefined,
-        expiresAt:Date.now()+Number(tokenData.expires_in||3600)*1000,
-        accountType:wantedType
-      }),
-      derivAccountType:wantedType
-    });
+    if(!accounts.length)throw new Error("NO_DERIV_TRADING_ACCOUNTS");
 
-    const result=await broker.connect(saved.user_id,saved.execution_mode);
-    if(!result.connected)throw new Error(result.reason||"DERIV_CONNECTION_FAILED");
-
+    const pending=await broker.finalizeDerivOAuthState({state,tokenPayload:tokenData,accounts});
     const target=new URL(derivReturnUrl());
-    target.searchParams.set("deriv","connected");
-    target.searchParams.set("account",String(account.account_id));
-    target.searchParams.set("mode",String(saved.execution_mode));
+    target.searchParams.set("deriv","authorized");
+    target.searchParams.set("connection",String(pending.pending_id));
     return res.redirect(target.toString());
   }catch(error){
     console.error("[KINGBOT DERIV] oauth callback failed:",error?.message||error);
     return derivReturnError(res,error?.message||"DERIV_OAUTH_CALLBACK_FAILED");
+  }
+});
+
+app.get("/api/broker/deriv/oauth/accounts", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  const connection=String(req.query?.connection||"").trim();
+  if(!connection)return res.status(400).json({ok:false,error:"DERIV_OAUTH_CONNECTION_REQUIRED"});
+  try{
+    const pending=await broker.getDerivOAuthPending({userId:user.id,pendingId:connection});
+    if(!pending)return res.status(404).json({ok:false,error:"DERIV_OAUTH_CONNECTION_EXPIRED"});
+    const accounts=pending.accounts.map(account=>({
+      id:account.accountId,
+      accountId:account.accountId,
+      accountType:account.accountType,
+      mode:account.accountType==="real"?"LIVE":"PAPER",
+      label:account.accountType==="real"?"DERIV REAL ACCOUNT":"DERIV DEMO ACCOUNT",
+      currency:account.currency||"USD",
+      balance:account.balance,
+      status:account.status||"active",
+      group:account.group||null
+    }));
+    res.json({ok:true,accounts,expiresAt:pending.expires_at});
+  }catch(error){
+    res.status(503).json({ok:false,error:"DERIV_ACCOUNT_DISCOVERY_FAILED",reason:error?.message||"DERIV_ACCOUNT_DISCOVERY_FAILED"});
+  }
+});
+
+app.post("/api/broker/deriv/oauth/connect", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  const connection=String(req.body?.connection||"").trim();
+  const accountId=String(req.body?.accountId||"").trim();
+  const accountType=String(req.body?.accountType||"").trim().toLowerCase();
+  if(!connection||!accountId||!["demo","real"].includes(accountType)){
+    return res.status(400).json({ok:false,error:"DERIV_ACCOUNT_SELECTION_REQUIRED"});
+  }
+  try{
+    const pending=await broker.getDerivOAuthPending({userId:user.id,pendingId:connection});
+    if(!pending)return res.status(404).json({ok:false,error:"DERIV_OAUTH_CONNECTION_EXPIRED"});
+    const authorized=pending.accounts.find(account=>account.accountId===accountId&&account.accountType===accountType&&account.status==="active");
+    if(!authorized)return res.status(403).json({ok:false,error:"DERIV_ACCOUNT_NOT_AUTHORIZED"});
+    const executionMode=accountType==="real"?"LIVE":"PAPER";
+    const mapping=await broker.saveMapping({
+      userId:user.id,
+      provider:"deriv",
+      accountId,
+      executionMode,
+      accountToken:JSON.stringify(pending.token),
+      derivAccountType:accountType
+    });
+    if(!mapping?.ok)throw new Error(mapping?.error||"DERIV_ACCOUNT_MAPPING_FAILED");
+    const result=await broker.connect(user.id,executionMode);
+    if(!result.connected)throw new Error(result.reason||"DERIV_CONNECTION_FAILED");
+    await broker.consumeDerivOAuthPending({userId:user.id,pendingId:connection});
+    res.status(201).json({ok:true,connected:true,broker:"deriv",accountId,accountType,mode:executionMode,account:result.account||null});
+  }catch(error){
+    console.error("[KINGBOT DERIV] oauth account connect failed:",error?.message||error);
+    res.status(502).json({ok:false,error:"DERIV_ACCOUNT_CONNECTION_FAILED",reason:error?.message||"DERIV_ACCOUNT_CONNECTION_FAILED"});
   }
 });
 
