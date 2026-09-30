@@ -58,7 +58,7 @@ export class UserBrokerManager {
     return q.rowCount?q.rows[0]:null;
   }
 
-  async saveMapping({userId,provider="metaapi",accountId,accountToken,executionMode="PAPER",apiKey,privateKey,baseUrl}={}){
+  async saveMapping({userId,provider="metaapi",accountId,accountToken,executionMode="PAPER",apiKey,secretKey,baseUrl}={}){
     if(!this.pool||!userId)return {ok:false,error:"USER_CONTEXT_REQUIRED"};
     const mode=String(executionMode).toUpperCase();
     if(!["PAPER","LIVE"].includes(mode))return {ok:false,error:"INVALID_EXECUTION_MODE"};
@@ -67,12 +67,12 @@ export class UserBrokerManager {
     let secretValue=String(accountToken||"").trim();
     if(isExness){
       const key=String(apiKey||"").trim();
-      const secret=String(privateKey||"").trim();
+      const secret=String(secretKey||"").trim();
       const host=String(baseUrl||"").trim();
       if(!key)return {ok:false,error:"EXNESS_API_KEY_REQUIRED"};
       if(!secret)return {ok:false,error:"EXNESS_PRIVATE_KEY_REQUIRED"};
       if(host && !/^https:\/\//i.test(host))return {ok:false,error:"EXNESS_BASE_URL_MUST_USE_HTTPS"};
-      secretValue=JSON.stringify({apiKey:key,privateKey:secret,baseUrl:host||undefined});
+      secretValue=JSON.stringify({apiKey:key,secretKey:secret,baseUrl:host||undefined});
     }
     if(!id)return {ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"};
     if(!secretValue)return {ok:false,error:isExness?"EXNESS_CREDENTIALS_REQUIRED":"BROKER_ACCOUNT_TOKEN_REQUIRED"};
@@ -101,7 +101,7 @@ export class UserBrokerManager {
         if(!entry){
           const api=new ExnessTraderClient({
             apiKey:parsed.apiKey,
-            privateKey:parsed.privateKey,
+            secretKey:parsed.secretKey,
             accountId:mapping.account_id,
             baseUrl:parsed.baseUrl
           });
