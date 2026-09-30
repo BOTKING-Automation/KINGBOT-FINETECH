@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { Router } from "express";
 import { resolveFirebaseUser } from "./auth.js";
+import { isAdminEmail } from "./admin-access.js";
 
 const PLANS = {
   starter: { id:"starter", name:"Basic", priceUsd:130, billing:"monthly", botLimit:1, selectableBots:["strategic","breakout"], bots:["strategic","breakout"], requiresBotSelection:true, features:["Choose 1 of 2 entry bots","Strategic or Breakout","Core risk controls","Equity tracking"] },
@@ -46,8 +47,7 @@ export async function requireUser(pool, req, res) {
 }
 async function requireAdmin(pool, req, res) {
   const u = await requireUser(pool,req,res); if (!u) return null;
-  const admins = String(process.env.KINGBOT_ADMIN_EMAILS || process.env.ADMIN_EMAIL || "").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
-  if (!admins.includes(String(u.email).toLowerCase())) { res.status(403).json({ok:false,error:"Administrator access required."}); return null; }
+  if (!isAdminEmail(u.email)) { res.status(403).json({ok:false,error:"Administrator access required."}); return null; }
   return u;
 }
 export function createSubscriptionRouter({pool,broker}) {
@@ -64,6 +64,7 @@ export function createSubscriptionRouter({pool,broker}) {
       const p=await pool.query("SELECT id,plan_id,status,mpesa_code,amount_kes,payer_phone,payer_name,submitted_at,reviewed_at,reviewer_note,selected_bot_id FROM kingbot_payments WHERE user_id=$1 ORDER BY submitted_at DESC LIMIT 20",[u.id]);
       res.json({
         ok:true,
+        isAdmin:isAdminEmail(u.email),
         subscription:s.rows[0]||null,
         entitlements:e.rows.map(x=>({botId:x.bot_id,botName:BOT_NAMES[x.bot_id]||x.bot_id})),
         payments:p.rows,
@@ -113,8 +114,8 @@ export function createSubscriptionRouter({pool,broker}) {
     const u=await requireUser(pool,req,res); if(!u)return;
     const bot=String(req.params.botId||"").trim().toLowerCase();
     if(!BOT_NAMES[bot]) return res.status(404).json({ok:false,error:"Unknown bot engine."});
-    const q=await pool.query("SELECT 1 FROM kingbot_bot_entitlements e JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 AND e.bot_id=$2 AND e.active=TRUE AND s.status='active' AND (s.expires_at IS NULL OR s.expires_at>NOW()) LIMIT 1",[u.id,bot]);
-    res.json({ok:true,botId:bot,botName:BOT_NAMES[bot],allowed:Boolean(q.rowCount)});
+    const allowed=isAdminEmail(u.email) ? true : Boolean((await pool.query("SELECT 1 FROM kingbot_bot_entitlements e JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 AND e.bot_id=$2 AND e.active=TRUE AND s.status='active' AND (s.expires_at IS NULL OR s.expires_at>NOW()) LIMIT 1",[u.id,bot])).rowCount);
+    res.json({ok:true,isAdmin:isAdminEmail(u.email),botId:bot,botName:BOT_NAMES[bot],allowed});
   });
 
   router.get("/admin/payments",async(req,res)=>{
