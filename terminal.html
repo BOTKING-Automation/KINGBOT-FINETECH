@@ -1185,6 +1185,7 @@ overscroll-behavior:none;}
         <div class="section-title">ACCOUNT COMMAND METRICS</div>
         <div class="section-desc">
           Live broker telemetry is authoritative and refreshes automatically while connected.
+          The account identity below is read from the secured KINGBOT broker connection.
         </div>
       </div>
 
@@ -2290,6 +2291,36 @@ async function checkBackend() {
   let accountLoaded=false;
 
   await waitForKingbotApi(5000);
+
+  // Protected broker endpoints require the real Firebase identity.
+  // Wait for Firebase restoration before sending the first request.
+  try{
+    if(window.KINGBOT_SESSION?.check){
+      const auth=await window.KINGBOT_SESSION.check({force:true});
+      if(!auth.authenticated){
+        if($("accountConnectionValue")) $("accountConnectionValue").textContent="SIGN IN REQUIRED";
+        if($("accountConnectionValue")) $("accountConnectionValue").style.color="#ff7a18";
+        if($("accountConnectionNote")) $("accountConnectionNote").textContent="Sign in with the verified KINGBOT account to load the connected broker account.";
+        if($("heroBrokerBadge")) {
+          $("heroBrokerBadge").textContent="● AUTHENTICATION REQUIRED";
+          $("heroBrokerBadge").className="hero-badge offline";
+        }
+        return false;
+      }
+      if(auth.user?.verified!==true){
+        if($("accountConnectionValue")) $("accountConnectionValue").textContent="VERIFICATION REQUIRED";
+        if($("accountConnectionValue")) $("accountConnectionValue").style.color="#ffc84a";
+        if($("accountConnectionNote")) $("accountConnectionNote").textContent="Complete email verification before broker account telemetry can be displayed.";
+        if($("heroBrokerBadge")) {
+          $("heroBrokerBadge").textContent="● ACCOUNT VERIFICATION REQUIRED";
+          $("heroBrokerBadge").className="hero-badge";
+        }
+        return false;
+      }
+    }
+  }catch(error){
+    logActivity(`Authentication readiness check: ${error.message}`);
+  }
 
   const setConnection=(state,color,note)=>{
     if($("accountConnectionValue")){
