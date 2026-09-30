@@ -240,7 +240,7 @@ $("drawer").addEventListener("click",e=>{if(e.target===$("drawer"))closeDrawer()
 $("nextStep").addEventListener("click",()=>{
   if(!selected)return;
   if(step===1){step=2;textFor();setStatus("Broker account step acknowledged. Continue to API access.")}
-  else if(step===2&&cfg[selected].native){step=3;textFor();renderAccounts([{id:"API-AUTH",label:"API-authorized account selection will load from native adapter",mode:"PENDING"}]);setStatus("Native broker adapter selected. Account selection requires the registered KINGBOT API integration.")}
+  else if(step===2&&cfg[selected].native){step=3;textFor();$("accountList").innerHTML='<div class="flow-copy"><strong>NATIVE ACCOUNT SELECTION</strong><br>The broker must return its authorized account list through KINGBOT\'s registered OAuth/API adapter. No account is assumed or displayed until that callback is verified.</div>';$("authorizeBtn").disabled=true;setStatus("Native adapter callback required before an account can be selected.")}
 });
 $("verifyBtn").addEventListener("click",async()=>{
   if(!selected)return;
@@ -256,7 +256,7 @@ $("verifyBtn").addEventListener("click",async()=>{
     const cd=await c.json().catch(()=>({}));
     if(!c.ok||!cd.connected)throw new Error(cd.reason||cd.error||"Broker connection verification failed.");
     verified=true;$("accessToken").value="";
-    renderAccounts([{id:cd.accountId||accountId,label:selected.toUpperCase()+" authorized account",mode:cd.mode||$("executionMode").value}]);
+    renderAccounts([{id:cd.accountId||accountId,label:selected.toUpperCase()+" verified account",mode:cd.mode||$("executionMode").value}]);
     textFor();setStatus("Connection verified. Select the account and authorize KINGBOT.");
   }catch(e){setStep(2);textFor();setStatus(e.message||"Connection verification failed.")}finally{btn.disabled=false;btn.textContent="VERIFY CONNECTION"}
 });
