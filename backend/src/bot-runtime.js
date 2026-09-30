@@ -1,12 +1,14 @@
 import { Router } from "express";
 import crypto from "node:crypto";
 import { requireUser } from "./subscriptions.js";
+import { isAdminEmail } from "./admin-access.js";
 import { evaluateBot, getBotDefinitions } from "./bot-engines.js";
 import { authorizeOrder } from "./risk-engine.js";
 
 const RUN_STATES = new Set(["STOPPED","RUNNING","PAUSED","ERROR"]);
 
-async function entitlement(pool,userId,botId){
+async function entitlement(pool,userId,botId,userEmail){
+  if(isAdminEmail(userEmail))return true;
   if(!pool)return false;
   const q=await pool.query("SELECT 1 FROM kingbot_bot_entitlements e JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 AND e.bot_id=$2 AND e.active=TRUE AND s.status='active' AND (s.expires_at IS NULL OR s.expires_at>NOW()) LIMIT 1",[userId,botId]);
   return q.rowCount>0;
@@ -37,7 +39,7 @@ export function createBotRuntimeRouter({pool,broker}){
   router.get("/:botId",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
-    if(!(await entitlement(pool,user.id,b.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
+    if(!(await entitlement(pool,user.id,b.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id);
     res.json({ok:true,botId:b.id,state:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||"1m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null});
   });
@@ -45,7 +47,7 @@ export function createBotRuntimeRouter({pool,broker}){
   router.post("/:botId/start",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
-    if(!(await entitlement(pool,user.id,b.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
+    if(!(await entitlement(pool,user.id,b.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const s=await settings(pool,user.id,b.id);
     if(s.killSwitch)return res.status(409).json({ok:false,error:"KILL_SWITCH_ACTIVE"});
     if(!["PAPER","LIVE"].includes(s.executionMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
@@ -61,7 +63,7 @@ export function createBotRuntimeRouter({pool,broker}){
   router.post("/:botId/stop",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
-    if(!(await entitlement(pool,user.id,b.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
+    if(!(await entitlement(pool,user.id,b.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     await pool.query("INSERT INTO kingbot_bot_runtime(user_id,bot_id,state,updated_at) VALUES($1,$2,'STOPPED',NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET state='STOPPED',updated_at=NOW()",[user.id,b.id]);
     await audit(pool,user.id,"BOT_RUNTIME_STOPPED",{botId:b.id});
     res.json({ok:true,botId:b.id,state:"STOPPED"});
@@ -70,7 +72,7 @@ export function createBotRuntimeRouter({pool,broker}){
   router.post("/:botId/config",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
-    if(!(await entitlement(pool,user.id,b.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
+    if(!(await entitlement(pool,user.id,b.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const symbol=String(req.body?.symbol||"").trim().toUpperCase();
     const timeframe=String(req.body?.timeframe||"1m").trim();
     if(!/^[A-Z0-9._-]{3,30}$/.test(symbol))return res.status(400).json({ok:false,error:"INVALID_SYMBOL"});
@@ -86,7 +88,7 @@ export function createBotRuntimeRouter({pool,broker}){
     return res.status(409).json({ok:false,error:"WORKER_EXECUTION_ONLY",message:"Autonomous orders are produced only by the worker from broker-verified market data. No order was submitted."});
     const user=await requireUser(pool,req,res);if(!user)return;
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
-    if(!(await entitlement(pool,user.id,b.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
+    if(!(await entitlement(pool,user.id,b.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id);
     if(!r||r.state!=="RUNNING")return res.status(409).json({ok:false,error:"BOT_NOT_RUNNING"});
     if(s.killSwitch)return res.status(409).json({ok:false,error:"KILL_SWITCH_ACTIVE"});
