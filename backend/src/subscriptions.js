@@ -61,7 +61,7 @@ export function createSubscriptionRouter({pool}) {
       await expireStaleSubscriptions(pool);
       const s=await pool.query("SELECT id,plan_id,status,started_at,expires_at,approved_at FROM kingbot_subscriptions WHERE user_id=$1 AND status='active' AND expires_at>NOW() ORDER BY expires_at DESC LIMIT 1",[u.id]);
       const e=await pool.query("SELECT e.bot_id FROM kingbot_bot_entitlements e JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 AND e.active=TRUE AND s.status='active' AND s.expires_at>NOW() ORDER BY e.bot_id",[u.id]);
-      const p=await pool.query("SELECT id,plan_id,status,mpesa_code,amount_kes,submitted_at,reviewed_at,reviewer_note,selected_bot_id FROM kingbot_payments WHERE user_id=$1 ORDER BY submitted_at DESC LIMIT 20",[u.id]);
+      const p=await pool.query("SELECT id,plan_id,status,mpesa_code,amount_kes,payer_phone,payer_name,submitted_at,reviewed_at,reviewer_note,selected_bot_id FROM kingbot_payments WHERE user_id=$1 ORDER BY submitted_at DESC LIMIT 20",[u.id]);
       res.json({
         ok:true,
         subscription:s.rows[0]||null,
@@ -75,17 +75,19 @@ export function createSubscriptionRouter({pool}) {
 
   router.post("/payments",async(req,res)=>{
     const u=await requireUser(pool,req,res); if(!u)return;
-    const p=planId(req.body?.planId), code=mpesaCode(req.body?.mpesaCode), amount=Number(req.body?.amountKes), phone=String(req.body?.payerPhone||"").trim(), selectedBot=normalizeBotId(req.body?.selectedBotId);
+    const p=planId(req.body?.planId), code=mpesaCode(req.body?.mpesaCode), amount=Number(req.body?.amountKes), phone=String(req.body?.payerPhone||"").trim(), payerName=String(req.body?.payerName||"").trim().replace(/\s+/g," "), selectedBot=normalizeBotId(req.body?.selectedBotId);
     if(!PLANS[p])return res.status(400).json({ok:false,error:"Invalid subscription plan."});
     if(PLANS[p].requiresBotSelection && !PLANS[p].selectableBots.includes(selectedBot))return res.status(400).json({ok:false,error:"Basic requires selecting either Strategic or Breakout."});
     if(!PLANS[p].requiresBotSelection && selectedBot && !PLANS[p].bots.includes(selectedBot))return res.status(400).json({ok:false,error:"The selected bot is not included in this plan."});
     if(!/^[A-Z0-9]{6,30}$/.test(code))return res.status(400).json({ok:false,error:"Enter a valid M-Pesa transaction code."});
     if(!Number.isFinite(amount)||amount<=0||amount>100000000)return res.status(400).json({ok:false,error:"Enter the exact amount paid in KES."});
-    if(phone&&!/^\+?[0-9]{9,15}$/.test(phone.replace(/[\s-]/g,"")))return res.status(400).json({ok:false,error:"Enter a valid payer phone number."});
+    if(!phone||!/^\+?[0-9]{9,15}$/.test(phone.replace(/[\s-]/g,"")))return res.status(400).json({ok:false,error:"Enter the M-Pesa phone number used for payment."});
+    if(!payerName||payerName.length<2)return res.status(400).json({ok:false,error:"Enter the M-Pesa account name used for payment."});
+    if(payerName.length>120)return res.status(400).json({ok:false,error:"M-Pesa account name is too long."});
     try {
       const d=await pool.query("SELECT id FROM kingbot_payments WHERE mpesa_code=$1",[code]);
       if(d.rowCount)return res.status(409).json({ok:false,error:"That M-Pesa transaction code has already been submitted."});
-      const q=await pool.query("INSERT INTO kingbot_payments(user_id,plan_id,amount_kes,mpesa_code,payer_phone,selected_bot_id,status) VALUES($1,$2,$3,$4,$5,$6,'pending') RETURNING id,plan_id,amount_kes,mpesa_code,status,submitted_at",[u.id,p,amount,code,phone||null,selectedBot||null]);
+      const q=await pool.query("INSERT INTO kingbot_payments(user_id,plan_id,amount_kes,mpesa_code,payer_phone,payer_name,selected_bot_id,status) VALUES($1,$2,$3,$4,$5,$6,$7,'pending') RETURNING id,plan_id,amount_kes,mpesa_code,payer_phone,payer_name,status,submitted_at",[u.id,p,amount,code,phone,payerName,selectedBot||null]);
       await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'PAYMENT_SUBMITTED',$2::jsonb)",[u.id,JSON.stringify({paymentId:q.rows[0].id,planId:p,mpesaCode:code,selectedBotId:selectedBot||null})]);
       res.status(201).json({ok:true,payment:q.rows[0],message:"Payment submitted for manual verification. Access remains locked until an administrator approves it."});
     } catch(err){console.error("[KINGBOT BILLING]",err?.message||err);res.status(500).json({ok:false,error:"Payment submission failed."});}
@@ -102,7 +104,7 @@ export function createSubscriptionRouter({pool}) {
   router.get("/admin/payments",async(req,res)=>{
     const a=await requireAdmin(pool,req,res);if(!a)return;
     try {
-      const q=await pool.query("SELECT p.id,p.user_id,u.first_name,u.last_name,u.email,u.phone,p.plan_id,p.amount_kes,p.mpesa_code,p.payer_phone,p.selected_bot_id,p.status,p.submitted_at,p.reviewed_at,p.reviewed_by,p.reviewer_note FROM kingbot_payments p JOIN kingbot_users u ON u.id=p.user_id ORDER BY CASE WHEN p.status='pending' THEN 0 ELSE 1 END,p.submitted_at DESC LIMIT 200");
+      const q=await pool.query("SELECT p.id,p.user_id,u.first_name,u.last_name,u.email,u.phone,p.plan_id,p.amount_kes,p.mpesa_code,p.payer_phone,p.payer_name,p.selected_bot_id,p.status,p.submitted_at,p.reviewed_at,p.reviewed_by,p.reviewer_note FROM kingbot_payments p JOIN kingbot_users u ON u.id=p.user_id ORDER BY CASE WHEN p.status='pending' THEN 0 ELSE 1 END,p.submitted_at DESC LIMIT 200");
       res.json({ok:true,payments:q.rows});
     }catch(err){console.error("[KINGBOT ADMIN]",err?.message||err);res.status(500).json({ok:false,error:"Payment queue unavailable."});}
   });
@@ -252,8 +254,9 @@ export function createSubscriptionRouter({pool}) {
 }
 export async function ensureSubscriptionSchema(pool){
   if(!pool)return;
-  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_payments (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, plan_id TEXT NOT NULL, amount_kes NUMERIC(14,2) NOT NULL, mpesa_code TEXT UNIQUE NOT NULL, payer_phone TEXT, selected_bot_id TEXT, status TEXT NOT NULL DEFAULT 'pending', submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), reviewed_at TIMESTAMPTZ, reviewed_by TEXT, reviewer_note TEXT)");
+  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_payments (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, plan_id TEXT NOT NULL, amount_kes NUMERIC(14,2) NOT NULL, mpesa_code TEXT UNIQUE NOT NULL, payer_phone TEXT, payer_name TEXT, selected_bot_id TEXT, status TEXT NOT NULL DEFAULT 'pending', submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), reviewed_at TIMESTAMPTZ, reviewed_by TEXT, reviewer_note TEXT)");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS selected_bot_id TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS payer_name TEXT");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_subscriptions (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, plan_id TEXT NOT NULL, status TEXT NOT NULL, started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), expires_at TIMESTAMPTZ, approved_at TIMESTAMPTZ, approved_by TEXT, payment_id UUID REFERENCES kingbot_payments(id))");
   await pool.query("UPDATE kingbot_subscriptions SET expires_at=started_at+INTERVAL '1 month' WHERE status='active' AND expires_at IS NULL");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_entitlements (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, bot_id TEXT NOT NULL, subscription_id UUID REFERENCES kingbot_subscriptions(id) ON DELETE CASCADE, active BOOLEAN NOT NULL DEFAULT TRUE, granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id,bot_id,subscription_id))");
