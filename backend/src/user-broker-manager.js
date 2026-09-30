@@ -138,6 +138,24 @@ export class UserBrokerManager {
     }
   }
 
+  async getStoredIdentity(userId){
+    const mapping=await this.getMapping(userId);
+    if(!mapping)return {
+      configured:false,
+      connected:false,
+      broker:null,
+      accountId:null,
+      executionMode:"NOT_CONNECTED"
+    };
+    return {
+      configured:true,
+      connected:true,
+      broker:mapping.provider||null,
+      accountId:mapping.account_id||null,
+      executionMode:mapping.execution_mode||"PAPER"
+    };
+  }
+
   async getStatus(userId){
     const mapping=await this.getMapping(userId);
     const connected=Boolean(mapping) ? await this.isConnected(userId) : false;
