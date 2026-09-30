@@ -18,7 +18,7 @@ import { createBotRuntimeRouter, ensureBotRuntimeSchema } from "./bot-runtime.js
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT || 10000);
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const API_KEY = process.env.GEMINI_API_KEY || "";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const pool = DATABASE_URL ? new pg.Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false } }) : null;
