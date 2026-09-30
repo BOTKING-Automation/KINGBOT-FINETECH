@@ -1075,8 +1075,9 @@ overscroll-behavior:none;}
 
 <body>
 
-<div data-kingbot-navigation></div>  
+<div data-kingbot-navigation></div>
 
+<script src="system/session.js"></script>
 
 <main>
 
@@ -2177,8 +2178,18 @@ document.querySelectorAll(".chart-btn")
    BACKEND API
 ========================================================= */
 
+async function waitForKingbotApi(timeoutMs=5000){
+  const started=Date.now();
+  while(!window.KINGBOT_API && Date.now()-started<timeoutMs){
+    await new Promise(resolve=>setTimeout(resolve,50));
+  }
+  if(!window.KINGBOT_API) throw new Error("KINGBOT_API_NOT_READY");
+  return window.KINGBOT_API;
+}
+
 async function fetchApi(path, options = {}) {
-  const response = await window.KINGBOT_API.request(path, options);
+  const api=await waitForKingbotApi();
+  const response = await api.request(path, options);
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) {
     throw new Error(data.error || data.reason || data.message || `Backend HTTP ${response.status}`);
@@ -2192,6 +2203,8 @@ async function fetchApi(path, options = {}) {
 
 async function checkBackend() {
   let accountLoaded=false;
+
+  await waitForKingbotApi(5000);
 
   // Account telemetry is the authoritative source for Terminal connection state.
   try{
@@ -2576,6 +2589,10 @@ function formatCompact(value) {
 
   await checkBackend();
 
+  // Firebase can finish restoring the signed-in user milliseconds after the first render.
+  // Recheck once shortly after startup without changing any broker connection state.
+  setTimeout(async()=>{try{await checkBackend();}catch{}},1200);
+
   clearInterval(window.__KINGBOT_ACCOUNT_REFRESH);
   window.__KINGBOT_ACCOUNT_REFRESH=setInterval(async()=>{
     if(backendConnected){
@@ -2587,10 +2604,11 @@ function formatCompact(value) {
 
 })();
 </script>
-<script src="system/session.js"></script>
-<script src="system/auth-gate.js"></script>
-<script src="system/access-control.js"></script>
-<script src="system/navigation.js"></script>
+
   
 </body>
 </html>
+
+<script src="system/auth-gate.js"></script>
+<script src="system/access-control.js"></script>
+<script src="system/navigation.js"></script>
