@@ -7,7 +7,16 @@
 <meta name="theme-color" content="#050a18">
 <meta name="color-scheme" content="dark">
 <style>html{background:#02040a;color:#eef2ff;}</style>
-<script>document.documentElement.classList.add("kb-index-pending");</script>
+<script>
+(function(){
+  "use strict";
+  const params=new URLSearchParams(window.location.search);
+  const startupComplete=params.get("kb-startup")==="complete";
+  if(!startupComplete){
+    window.location.replace("loader.html");
+  }
+})();
+</script>
 <meta name="description" content="KINGBOT FINTECH — Intelligent trading infrastructure, market intelligence, automated trading systems and professional analytics.">
 
 <title>KINGBOT FINTECH — Intelligent Trading Infrastructure</title>
