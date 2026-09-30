@@ -50,13 +50,13 @@ main{width:min(1500px,calc(100% - 32px));margin:auto;padding:30px 0 70px}.hero,.
       <div class="broker-head"><div class="logo">OA</div><span class="tag live">REST API</span></div>
       <h3>OANDA</h3><p>v20 API supports live account access, market data, and programmatic order placement.</p>
       <div class="caps"><span class="cap">FOREX</span><span class="cap">METALS</span><span class="cap">ORDERS</span><span class="cap">STREAMING</span></div>
-      <div class="connect"><button type="button" data-connect="oanda">CONNECT</button><a href="https://developer.oanda.com/rest-live-v20/introduction/" target="_blank" rel="noopener">API DOCS ↗</a></div>
+      <div class="connect"><button type="button" data-connect="oanda">ROADMAP</button><a href="https://developer.oanda.com/rest-live-v20/introduction/" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
     <article class="broker deriv" data-broker="deriv">
       <div class="broker-head"><div class="logo">DV</div><span class="tag live">OAUTH / PAT</span></div>
       <h3>DERIV</h3><p>Deriv supports OAuth 2.0 or personal access tokens, with real-time trading and monitoring over WebSocket.</p>
       <div class="caps"><span class="cap">OPTIONS</span><span class="cap">WEBSOCKET</span><span class="cap">REAL-TIME</span><span class="cap">BOT READY</span></div>
-      <div class="connect"><button type="button" data-connect="deriv">CONNECT</button><a href="https://developers.deriv.com/docs/intro/authentication/" target="_blank" rel="noopener">API DOCS ↗</a></div>
+      <div class="connect"><button type="button" data-connect="deriv">ROADMAP</button><a href="https://developers.deriv.com/docs/intro/authentication/" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
     <article class="broker ig" data-broker="ig">
       <div class="broker-head"><div class="logo">IG</div><span class="tag live">REST / STREAM</span></div>
@@ -80,61 +80,26 @@ main{width:min(1500px,calc(100% - 32px));margin:auto;padding:30px 0 70px}.hero,.
       <div class="broker-head"><div class="logo">IB</div><span class="tag">OAUTH</span></div>
       <h3>INTERACTIVE BROKERS</h3><p>IBKR Web API supports OAuth-based connectivity and authenticated trading/account requests, subject to its application onboarding model.</p>
       <div class="caps"><span class="cap">MULTI-ASSET</span><span class="cap">TRADING API</span><span class="cap">OAUTH</span><span class="cap">PORTFOLIO</span></div>
-      <div class="connect"><button type="button" data-connect="ibkr">CONNECT</button><a href="https://www.interactivebrokers.com/docs/web-api/introduction" target="_blank" rel="noopener">API DOCS ↗</a></div>
+      <div class="connect"><button type="button" data-connect="ibkr">ROADMAP</button><a href="https://www.interactivebrokers.com/docs/web-api/introduction" target="_blank" rel="noopener">API DOCS ↗</a></div>
     </article>
   </div>
 
   <div class="connection-card">
     <div class="connection-top"><div><div class="selected" id="selectedBroker">Select a broker to continue</div><div class="hint">The account stays at the broker. KINGBOT only receives the authorization credential required for API access.</div></div><div class="connection-state"><span class="pulse" id="pulse"></span><span id="stateText">WAITING</span></div></div>
 
-    <div class="form" id="oandaForm">
-      <div class="fields">
-        <div class="field"><label>ENVIRONMENT</label><select id="oandaEnv"><option value="live">LIVE ACCOUNT</option><option value="demo">DEMO ACCOUNT</option></select></div>
-        <div class="field"><label>ACCOUNT ID</label><input id="oandaAccountId" placeholder="101-..." autocomplete="off"></div>
-        <div class="field" style="grid-column:1/-1"><label>OANDA PERSONAL ACCESS TOKEN</label><input id="oandaToken" type="password" placeholder="Paste token from Manage API Access" autocomplete="off"></div>
-      </div>
-      <div class="hint">Create/revoke this token from OANDA's official Account Management page. Do not paste an OANDA account password here.</div>
-    </div>
-
-    <div class="form" id="derivForm">
-      <div class="fields">
-        <div class="field" style="grid-column:1/-1"><label>DERIV PERSONAL ACCESS TOKEN</label><input id="derivToken" type="password" placeholder="Paste a token with the required trading scope" autocomplete="off"></div>
-      </div>
-      <div class="hint">Deriv also supports OAuth 2.0. A production OAuth connector should be configured with KINGBOT's registered Deriv app ID and callback before using fully redirected consent.</div>
-    </div>
-
-    <div class="form" id="igForm">
-      <div class="fields">
-        <div class="field"><label>ACCOUNT ID</label><input id="igAccountId" placeholder="IG account ID" autocomplete="off"></div>
-        <div class="field"><label>API KEY</label><input id="igApiKey" type="password" placeholder="IG API key" autocomplete="off"></div>
-      </div>
-      <div class="hint">IG API authentication can also use session/OAuth tokens. Do not provide your normal IG password to KINGBOT.</div>
-    </div>
-
-    <div class="form" id="fxcmForm">
-      <div class="fields">
-        <div class="field" style="grid-column:1/-1"><label>FXCM API / JWT TOKEN</label><input id="fxcmToken" type="password" placeholder="Paste API/JWT/OAuth token" autocomplete="off"></div>
-      </div>
-      <div class="hint">FXCM exposes multiple API connection methods. KINGBOT should use the token-based adapter configured for your account.</div>
-    </div>
-
     <div class="form" id="exnessForm">
       <div class="fields">
-        <div class="field"><label>ACCOUNT ID</label><input id="exnessAccountId" placeholder="Trading account ID" autocomplete="off"></div>
-        <div class="field"><label>API KEY</label><input id="exnessApiKey" type="password" placeholder="Public API key" autocomplete="off"></div>
-        <div class="field" style="grid-column:1/-1"><label>SECRET KEY</label><input id="exnessSecret" type="password" placeholder="Secret shown when the API key is created" autocomplete="off"></div>
+        <div class="field"><label>EXECUTION MODE</label><select id="executionMode"><option value="PAPER">PAPER · DEMO ACCOUNT</option><option value="LIVE">LIVE · REAL ACCOUNT</option></select></div>
+        <div class="field"><label>METAPI ACCOUNT ID</label><input id="mtAccountId" placeholder="MetaApi account ID" autocomplete="off"></div>
+        <div class="field" style="grid-column:1/-1"><label>METAPI API TOKEN</label><input id="mtApiToken" type="password" placeholder="Paste MetaApi access token" autocomplete="off"></div>
       </div>
-      <div class="hint">Exness uses signed requests. Secrets must stay server-side; KINGBOT never writes them to browser storage.</div>
+      <div class="hint">For the enabled MT4/MT5 bridge, the broker account is onboarded through MetaApi. KINGBOT encrypts the MetaApi token server-side and never stores it in browser localStorage.</div>
     </div>
-
-    <div class="form" id="ibkrForm">
-      <div class="fields">
-        <div class="field"><label>CLIENT ID</label><input id="ibkrClientId" placeholder="IBKR API application client ID" autocomplete="off"></div>
-        <div class="field"><label>CLIENT KEY ID</label><input id="ibkrClientKeyId" placeholder="Registered key ID" autocomplete="off"></div>
-      </div>
-      <div class="hint">IBKR's current OAuth model is application-registration based and is not equivalent to simply pasting a retail account password.</div>
-    </div>
-
+    <div class="form" id="igForm"></div>
+    <div class="form" id="fxcmForm"></div>
+    <div class="form" id="oandaForm"><div class="hint">DIRECT OANDA EXECUTION ADAPTER: NOT ENABLED ON THIS GATEWAY YET.</div></div>
+    <div class="form" id="derivForm"><div class="hint">DIRECT DERIV EXECUTION ADAPTER: NOT ENABLED ON THIS GATEWAY YET.</div></div>
+    <div class="form" id="ibkrForm"><div class="hint">DIRECT IBKR EXECUTION ADAPTER: NOT ENABLED ON THIS GATEWAY YET.</div></div>
     <div class="submitrow"><button class="primary" id="connectBtn" type="button" disabled>VERIFY BROKER CONNECTION</button><button class="secondary" id="openBroker" type="button" disabled>OPEN OFFICIAL BROKER</button></div>
     <div class="message" id="message" role="status" aria-live="polite"></div>
   </div>
@@ -175,76 +140,64 @@ main{width:min(1500px,calc(100% - 32px));margin:auto;padding:30px 0 70px}.hero,.
 "use strict";
 const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbot-fintech-api-etfv.onrender.com/api";
 const configs={
-  oanda:{name:"OANDA",official:"https://fxtrade.oanda.com/",form:"oandaForm"},
-  deriv:{name:"DERIV",official:"https://app.deriv.com/",form:"derivForm"},
-  ig:{name:"IG",official:"https://my.ig.com/",form:"igForm"},
-  fxcm:{name:"FXCM",official:"https://www.fxcm.com/",form:"fxcmForm"},
-  exness:{name:"EXNESS",official:"https://my.exness.com/",form:"exnessForm"},
-  ibkr:{name:"INTERACTIVE BROKERS",official:"https://www.interactivebrokers.com/",form:"ibkrForm"}
+  exness:{name:"EXNESS · MT4/MT5",provider:"metaapi",official:"https://my.exness.com/",form:"exnessForm",live:true},
+  ig:{name:"IG · MT4/MT5",provider:"metaapi",official:"https://my.ig.com/",form:"igForm",live:true},
+  fxcm:{name:"FXCM · MT4/MT5",provider:"metaapi",official:"https://www.fxcm.com/",form:"fxcmForm",live:true},
+  oanda:{name:"OANDA",provider:"oanda",official:"https://fxtrade.oanda.com/",form:"oandaForm",live:false},
+  deriv:{name:"DERIV",provider:"deriv",official:"https://app.deriv.com/",form:"derivForm",live:false},
+  ibkr:{name:"INTERACTIVE BROKERS",provider:"ibkr",official:"https://www.interactivebrokers.com/",form:"ibkrForm",live:false}
 };
 let selected=null;
 const $=id=>document.getElementById(id);
 function msg(t,type){$("message").textContent=t;$("message").className="message show "+type}
 function setState(text,ready){$("stateText").textContent=text;$("pulse").className="pulse"+(ready?" ready":"")}
-function showForm(slug){
-  document.querySelectorAll(".form").forEach(x=>x.classList.remove("show"));
-  if(slug) $(configs[slug].form).classList.add("show");
+function showForm(slug){document.querySelectorAll(".form").forEach(x=>x.classList.remove("show"));if(slug&&$(configs[slug].form))$(configs[slug].form).classList.add("show")}
+function tokenFormValid(slug){
+  if(slug==="exness"||slug==="ig"||slug==="fxcm")return $("mtAccountId").value.trim()&&$("mtApiToken").value.trim();
+  return false;
 }
 async function firebaseToken(){
-  if(!window.KINGBOT_FIREBASE) await import("./system/firebase-auth.js");
-  if(!window.KINGBOT_FIREBASE) throw new Error("Firebase authentication service unavailable.");
+  if(!window.KINGBOT_FIREBASE)await import("./system/firebase-auth.js");
+  if(!window.KINGBOT_FIREBASE)throw new Error("Firebase authentication service unavailable.");
   const u=window.KINGBOT_FIREBASE.auth.currentUser;
-  if(!u) throw new Error("Please sign in before connecting a broker.");
+  if(!u)throw new Error("Please sign in before connecting a broker.");
   await u.getIdToken(true);
-  if(!u.emailVerified) throw new Error("Verify your email before connecting a broker.");
+  if(!u.emailVerified)throw new Error("Verify your email before connecting a broker.");
   return u.getIdToken();
 }
-function payload(slug){
-  const out={broker:slug};
-  if(slug==="oanda") Object.assign(out,{environment:$("oandaEnv").value,accountId:$("oandaAccountId").value.trim(),token:$("oandaToken").value});
-  if(slug==="deriv") Object.assign(out,{token:$("derivToken").value});
-  if(slug==="ig") Object.assign(out,{accountId:$("igAccountId").value.trim(),apiKey:$("igApiKey").value});
-  if(slug==="fxcm") Object.assign(out,{token:$("fxcmToken").value});
-  if(slug==="exness") Object.assign(out,{accountId:$("exnessAccountId").value.trim(),apiKey:$("exnessApiKey").value,secret:$("exnessSecret").value});
-  if(slug==="ibkr") Object.assign(out,{clientId:$("ibkrClientId").value.trim(),clientKeyId:$("ibkrClientKeyId").value.trim()});
-  return out;
-}
-function valid(p){
-  if(p.broker==="oanda") return p.accountId&&p.token;
-  if(p.broker==="deriv") return p.token;
-  if(p.broker==="ig") return p.accountId&&p.apiKey;
-  if(p.broker==="fxcm") return p.token;
-  if(p.broker==="exness") return p.accountId&&p.apiKey&&p.secret;
-  if(p.broker==="ibkr") return p.clientId&&p.clientKeyId;
-  return false;
+function payload(){
+  return {provider:"metaapi",accountId:$("mtAccountId").value.trim(),accountToken:$("mtApiToken").value,executionMode:$("executionMode").value};
 }
 document.querySelectorAll("[data-connect]").forEach(btn=>btn.addEventListener("click",()=>{
   selected=btn.dataset.connect;
   document.querySelectorAll(".broker").forEach(x=>x.classList.toggle("active",x.dataset.broker===selected));
   $("selectedBroker").textContent=configs[selected].name+" CONNECTOR";
-  $("connectBtn").disabled=false;$("openBroker").disabled=false;
-  showForm(selected);setState("READY FOR AUTHORIZATION",true);msg("Use the official broker button first if you need to create or authorize your API credential.","ok");
+  $("connectBtn").disabled=!configs[selected].live;
+  $("openBroker").disabled=false;
+  showForm(selected);setState(configs[selected].live?"READY FOR AUTHORIZATION":"ADAPTER NOT ENABLED",configs[selected].live);
+  if(configs[selected].live)msg("Use the official broker account first, then provide the MetaApi account ID and API token used for this MT4/MT5 bridge.","ok");
+  else msg("This broker is shown in the connectivity roadmap, but its direct API adapter is not enabled on the current execution gateway.","err");
 }));
-$("openBroker").addEventListener("click",()=>{if(selected) window.open(configs[selected].official,"_blank","noopener")});
+$("openBroker").addEventListener("click",()=>{if(selected)window.open(configs[selected].official,"_blank","noopener")});
 $("connectBtn").addEventListener("click",async()=>{
-  if(!selected)return;
-  const p=payload(selected);
-  if(!valid(p)){msg("Complete the required credential fields for "+configs[selected].name+".","err");return}
-  $("connectBtn").disabled=true;$("connectBtn").textContent="VERIFYING…";setState("VERIFYING SECURELY",false);msg("Sending credential to the broker gateway…","ok");
+  if(!selected||!configs[selected].live)return;
+  if(!tokenFormValid(selected)){msg("Enter the MetaApi account ID and API token for the selected MT4/MT5 connection.","err");return}
+  $("connectBtn").disabled=true;$("connectBtn").textContent="SECURING…";setState("SAVING ENCRYPTED CREDENTIAL",false);
   try{
-    const token=await firebaseToken();
-    const r=await fetch(API_BASE+"/brokers/connect",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(p)});
-    const data=await r.json().catch(()=>({}));
-    if(!r.ok) throw new Error(data.error||"Broker connection failed.");
-    setState("CONNECTED",true);
-    msg((data.brokerName||configs[selected].name)+" account verified. "+(data.message||"Connection is ready for monitoring and bot authorization."),"ok");
+    const token=await firebaseToken(),p=payload();
+    let r=await fetch(API_BASE+"/broker/account",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(p)});
+    let d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||d.reason||"Broker account mapping failed.");
+    $("mtApiToken").value="";
+    r=await fetch(API_BASE+"/broker/connect",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({executionMode:p.executionMode})});
+    d=await r.json().catch(()=>({}));if(!r.ok||!d.connected)throw new Error(d.reason||d.error||"Broker authorization failed.");
+    setState("CONNECTED · EXECUTION READY",true);
+    msg(configs[selected].name+" is connected. Account telemetry and server-side bot execution can now use this authorized connection.","ok");
   }catch(e){
-    setState("CONNECTION ERROR",false);
-    msg(e.message||"Broker connection failed. The secure gateway may not yet be enabled on the server.","err");
-  }finally{$("connectBtn").disabled=false;$("connectBtn").textContent="VERIFY BROKER CONNECTION"}
+    setState("CONNECTION FAILED",false);msg(e.message||"Broker connection failed.","err");
+  }finally{$("connectBtn").disabled=!selected||!configs[selected].live;$("connectBtn").textContent="VERIFY & CONNECT BROKER"}
 });
 })();
-</script>
+</script>>
 <script>
 (function(){
   var s=document.createElement("script");s.src="system/auth-gate.js";s.defer=true;document.head.appendChild(s);
