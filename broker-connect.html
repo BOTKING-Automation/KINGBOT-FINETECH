@@ -253,8 +253,8 @@ function textFor(){
   $("flowCopy").innerHTML="<strong>"+copy[0]+"</strong><br>"+copy[1];
   $("brokerLogin").textContent=step===1?"OPEN "+d.name+" ↗":step===2?"OPEN API ACCESS ↗":"OPEN "+d.name+" ↗";
   $("brokerLogin").href=step===1?(selected==="exness" && partnerOpened ? $("brokerLogin").href : d.login):d.api;
-  $("nextStep").style.display=(step<2||(!verified&&step===2&&d.native))?"inline-flex":"none";
-  if(step===2 && !d.native){
+  $("nextStep").style.display=(step<2||(!verified&&step===2&&d.native&&!['oanda'].includes(selected)))?"inline-flex":"none";
+  if(step===2 && (!d.native || selected==='oanda')){
     $("credentials").classList.add("show");
     if(selected==="exness"){
       $("credentialHelp").textContent="Create the Exness API key in Key Management, select the trading account that this key can access, copy the API key and secret once, and paste them here. The host is optional because KINGBOT can resolve the Exness access point.";
