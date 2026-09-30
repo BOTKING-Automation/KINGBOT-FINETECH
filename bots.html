@@ -84,6 +84,26 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 <h2>Engine Status</h2><p class="desc">Authoritative state only. No simulated account values are displayed here.</p>
 <div class="status-card"><div class="status-line"><strong>RISK PROFILE</strong><span class="pill" id="riskPill">NOT LOADED</span></div><div class="metric-grid"><div class="metric"><b>MAX RISK</b><span id="mRisk">—</span></div><div class="metric"><b>DAILY DD</b><span id="mDaily">—</span></div><div class="metric"><b>TOTAL DD</b><span id="mTotal">—</span></div><div class="metric"><b>POSITIONS</b><span id="mPositions">—</span></div></div></div>
 <div class="status-card"><div class="status-line"><strong>BOT ENGINE</strong><span class="pill" id="enginePill">UNKNOWN</span></div><div class="metric-grid"><div class="metric"><b>MODE</b><span id="mMode">—</span></div><div class="metric"><b>RUNTIME</b><span id="mRuntime">—</span></div><div class="metric"><b>SYMBOL</b><span id="mSymbol">—</span></div><div class="metric"><b>TIMEFRAME</b><span id="mTimeframe">—</span></div></div><div class="strategy-list" id="strategies"></div></div>
+<div class="status-card">
+  <div class="status-line"><strong>STRATEGY EXECUTION PROFILE</strong><span class="pill" id="strategyPill">AUTO</span></div>
+  <div class="metric-grid">
+    <div class="metric"><b>SIGNAL THRESHOLD</b><span id="mThreshold">—</span></div>
+    <div class="metric"><b>STOP LOSS</b><span id="mSL">—</span></div>
+    <div class="metric"><b>TAKE PROFIT</b><span id="mTP">—</span></div>
+    <div class="metric"><b>RISK / REWARD</b><span id="mRR">—</span></div>
+    <div class="metric"><b>TRAIL TRIGGER</b><span id="mTrail">—</span></div>
+    <div class="metric"><b>MAX HOLD</b><span id="mHold">—</span></div>
+  </div>
+  <div class="strategy-list" id="strategyTags"></div>
+</div>
+<div class="status-card">
+  <div class="status-line"><strong>AI SUPERVISOR</strong><span class="pill" id="aiMonitorPill">STANDBY</span></div>
+  <div class="metric-grid">
+    <div class="metric"><b>LAST SIGNAL</b><span id="mSignal">—</span></div>
+    <div class="metric"><b>DECISION SCORE</b><span id="mScore">—</span></div>
+  </div>
+  <div id="aiMonitorNote" class="telemetry-note" style="margin-top:12px">AI supervision runs asynchronously so execution speed is not gated by the AI request.</div>
+</div>
 <div class="telemetry-note"><strong>REAL EXECUTION RULE:</strong> saving settings does not create trades. PAPER/LIVE authorization requires a connected broker, verified market/account telemetry, entitlement, and every risk gate to pass. Until then the platform must remain explicitly disconnected.</div>
 </aside>
 </div>
@@ -122,12 +142,34 @@ function renderBots(){
   selectBot(x.dataset.id);
 }));
 }
+function renderStrategy(){
+ const p=selected?.tradePlan||{};
+ $("mThreshold").textContent=selected?.signalThreshold?selected.signalThreshold+"%":"—";
+ $("mSL").textContent=p.slAtr?p.slAtr+" ATR":"—";
+ $("mTP").textContent=p.tpAtr?p.tpAtr+" ATR":"—";
+ $("mRR").textContent=p.slAtr&&p.tpAtr?(p.tpAtr/p.slAtr).toFixed(2)+"R":"—";
+ $("mTrail").textContent=p.trailingTriggerR?p.trailingTriggerR+"R":"—";
+ $("mHold").textContent=p.maxHoldBars?p.maxHoldBars+" bars":"—";
+ $("strategyPill").textContent=selected?.mode?"ADAPTIVE":"AUTO";
+ $("strategyTags").innerHTML=(selected?.strategies||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join("");
+}
+function renderAiMonitor(lastSignal){
+ let x=lastSignal;
+ if(typeof x==="string"){try{x=JSON.parse(x)}catch{x=null}}
+ const ai=x?.aiMonitor||null;
+ $("mSignal").textContent=x?.signal||"—";
+ $("mScore").textContent=Number.isFinite(Number(x?.score))?Number(x.score).toFixed(1):"—";
+ $("aiMonitorPill").textContent=ai?.status||"STANDBY";
+ $("aiMonitorNote").textContent=ai?.note||"AI supervision runs asynchronously so execution speed is not gated by the AI request.";
+}
 function putSettings(s,mode,kill){
  fields.executionMode.value=mode||"PAPER";fields.maxRisk.value=s.maxRiskPerTradePct;fields.dailyDd.value=s.dailyDrawdownPct;fields.totalDd.value=s.totalDrawdownPct;fields.maxPositions.value=s.maxPositions;fields.spreadRatio.value=s.maxSpreadAtrRatio;fields.staleMs.value=s.staleDataMs;fields.lossStreak.value=s.maxConsecutiveLosses;fields.autoPause.checked=Boolean(s.autoPauseOnLossStreak);fields.killSwitch.checked=Boolean(kill);
  $("mRisk").textContent=s.maxRiskPerTradePct+"%";$("mDaily").textContent=s.dailyDrawdownPct+"%";$("mTotal").textContent=s.totalDrawdownPct+"%";$("mPositions").textContent=s.maxPositions;
  $("mMode").textContent=mode||"NOT_CONNECTED";$("mRuntime").textContent=selected?.runtime||"STOPPED";$("mSymbol").textContent=selected?.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected?.timeframe||"—";
  $("riskPill").textContent=fields.killSwitch.checked?"KILL SWITCH":"CONFIGURED";$("enginePill").textContent=selected?.entitled?"ENTITLED":"LOCKED";
  $("symbol").value=selected?.symbol||"";$("timeframe").value=selected?.timeframe||"1m";$("strategies").innerHTML=(selected?.strategies||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join("");
+ renderStrategy();
+ renderAiMonitor(selected?.lastSignal);
 }
 async function api(path,options={}){
  const r=await window.KINGBOT_API.request(path,options);
@@ -135,7 +177,7 @@ async function api(path,options={}){
  if(!r.ok||data?.ok===false)throw new Error(data.error||data.reason||data.message||("HTTP "+r.status));
  return data;
 }
-async function refreshRuntime(){if(!selected)return;try{const r=await api("/runtime/"+encodeURIComponent(selected.id));selected.runtime=r.state||"STOPPED";selected.executionMode=r.executionMode||selected.executionMode;selected.symbol=r.symbol||selected.symbol||"";selected.timeframe=r.timeframe||selected.timeframe||"1m";$("mRuntime").textContent=selected.runtime;$("mMode").textContent=selected.executionMode||"NOT_CONNECTED";$("mSymbol").textContent=selected.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected.timeframe||"—";$("enginePill").textContent=selected.runtime}catch{}}
+async function refreshRuntime(){if(!selected)return;try{const r=await api("/runtime/"+encodeURIComponent(selected.id));selected.runtime=r.state||"STOPPED";selected.executionMode=r.executionMode||selected.executionMode;selected.symbol=r.symbol||selected.symbol||"";selected.timeframe=r.timeframe||selected.timeframe||"1m";selected.lastSignal=r.lastSignal||null;$("mRuntime").textContent=selected.runtime;$("mMode").textContent=selected.executionMode||"NOT_CONNECTED";$("mSymbol").textContent=selected.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected.timeframe||"—";$("enginePill").textContent=selected.runtime;renderAiMonitor(selected.lastSignal)}catch{}}
 setInterval(refreshRuntime,5000);
 async function selectBot(id){
  selected=bots.find(x=>x.id===id);
@@ -155,7 +197,7 @@ async function selectBot(id){
  const imageMap={"strategic":"assets/images/bots/strategic.png","flipper":"assets/images/bots/flipper.png","breakout":"assets/images/bots/breakout.png","smc-pro":"assets/images/bots/smc-pro.png","ladder-flip":"assets/images/bots/ladder-flip.png"};
  const roleMap={"strategic":"MULTI-STRATEGY ENGINE","flipper":"HIGH-SPEED FLIPPING","breakout":"BREAKOUT & MOMENTUM","smc-pro":"SMART MONEY CONCEPTS","ladder-flip":"ADAPTIVE LADDER SYSTEM"};
  $("detailImage").src=imageMap[selected.id]||"assets/images/hero-bot.png";$("detailImage").alt=selected.name;$("detailCode").textContent="BOT ENGINE // "+(selected.entitled?"ENTITLED":"LOCKED");$("detailRole").textContent=roleMap[selected.id]||selected.mode;$("botTitle").textContent=selected.name;$("botDesc").textContent=selected.strategies.join(" · ");
- try{const [d,r]=await Promise.all([api("/bots/"+encodeURIComponent(id)+"/risk"),api("/runtime/"+encodeURIComponent(id))]);selected.runtime=r.state||"STOPPED";selected.executionMode=r.executionMode;selected.symbol=r.symbol||"";selected.timeframe=r.timeframe||"1m";putSettings(d.settings,d.executionMode||"NOT_CONNECTED",d.killSwitch);msg("Authoritative bot configuration loaded.","ok")}catch(e){msg(e.message,"error")}
+ try{const [d,r]=await Promise.all([api("/bots/"+encodeURIComponent(id)+"/risk"),api("/runtime/"+encodeURIComponent(id))]);selected.runtime=r.state||"STOPPED";selected.executionMode=r.executionMode;selected.symbol=r.symbol||"";selected.timeframe=r.timeframe||"1m";selected.lastSignal=r.lastSignal||null;putSettings(d.settings,d.executionMode||"NOT_CONNECTED",d.killSwitch);msg("Authoritative bot configuration loaded.","ok")}catch(e){msg(e.message,"error")}
 }
 async function load(){
  setTelemetry("BACKEND TELEMETRY","LOADING VERIFIED BOT STATE…");
