@@ -249,4 +249,15 @@ export function createBotEngineRouter({ pool }) {
 export async function ensureBotEngineSchema(pool){
  if(!pool)return;
  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_risk_settings (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, bot_id TEXT NOT NULL, daily_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 5, total_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 10, max_risk_per_trade_pct NUMERIC(6,2) NOT NULL DEFAULT 1, max_positions INTEGER NOT NULL DEFAULT 3, max_spread_atr_ratio NUMERIC(6,3) NOT NULL DEFAULT 0.25, stale_data_ms INTEGER NOT NULL DEFAULT 5000, max_consecutive_losses INTEGER NOT NULL DEFAULT 3, auto_pause_on_loss_streak BOOLEAN NOT NULL DEFAULT TRUE, execution_mode TEXT NOT NULL DEFAULT 'PAPER', kill_switch BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id,bot_id))");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS daily_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 5");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS total_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 10");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS max_risk_per_trade_pct NUMERIC(6,2) NOT NULL DEFAULT 1");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS max_positions INTEGER NOT NULL DEFAULT 3");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS max_spread_atr_ratio NUMERIC(6,3) NOT NULL DEFAULT 0.25");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS stale_data_ms INTEGER NOT NULL DEFAULT 5000");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS max_consecutive_losses INTEGER NOT NULL DEFAULT 3");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS auto_pause_on_loss_streak BOOLEAN NOT NULL DEFAULT TRUE");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS execution_mode TEXT NOT NULL DEFAULT 'PAPER'");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS kill_switch BOOLEAN NOT NULL DEFAULT FALSE");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
 }
