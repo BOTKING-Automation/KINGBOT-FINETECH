@@ -235,9 +235,17 @@ No fake trading permissions.
         -------------------------------------------------
         */
 
+        const administrator = data.isAdmin === true;
         this.state.permissions = {
           ...this.config.defaultPermissions,
-          ...(() => { const active=Boolean(data.subscription); const pro=["pro","institutional"].includes(String(data.subscription?.plan_id||"")); const entitlements=Array.isArray(data.entitlements)?data.entitlements:[]; return {platform:true,markets:true,terminal:active,analytics:active,ai:active&&pro,bots:active&&entitlements.length>0,broker:active,trading:active,withdrawals:false,billing:true,admin:false}; })()
+          ...(() => {
+            const active=Boolean(data.subscription);
+            const pro=["pro","institutional"].includes(String(data.subscription?.plan_id||""));
+            const entitlements=Array.isArray(data.entitlements)?data.entitlements:[];
+            return administrator
+              ? {platform:true,markets:true,terminal:true,analytics:true,ai:true,bots:true,broker:true,trading:true,withdrawals:false,billing:true,admin:true}
+              : {platform:true,markets:true,terminal:active,analytics:active,ai:active&&pro,bots:active&&entitlements.length>0,broker:active,trading:active,withdrawals:false,billing:true,admin:false};
+          })()
         };
 
         this.state.subscription =
