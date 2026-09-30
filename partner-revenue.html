@@ -110,8 +110,12 @@ $("refreshBtn").addEventListener("click",load);$("days").addEventListener("chang
 </script>
 <script>
 (function(){
-  var s=document.createElement("script");s.src="system/auth-gate.js";s.defer=true;document.head.appendChild(s);
-  var n=document.createElement("script");n.src="system/navigation.js";n.defer=true;document.head.appendChild(n);
+  ["system/session.js","system/auth-gate.js","system/access-control.js","system/navigation.js"].forEach(function(src){
+    var s=document.createElement("script");
+    s.src=src;
+    s.defer=true;
+    document.head.appendChild(s);
+  });
 })();
 </script>
 </body>
