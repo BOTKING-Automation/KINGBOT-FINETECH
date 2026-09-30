@@ -126,7 +126,7 @@ function derivEnv(name){
   return String(process.env[name]||"").trim();
 }
 function base64url(buffer){
-  return Buffer.from(buffer).toString("base64").replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/,"");
+  return Buffer.from(buffer).toString("base64").replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
 function createPkce(){
   const verifier=base64url(crypto.randomBytes(48));
@@ -150,7 +150,7 @@ app.get("/api/broker/deriv/oauth/start", async (req,res)=>{
   if(!clientId||!redirectUri){
     return res.status(503).json({ok:false,error:"DERIV_OAUTH_NOT_CONFIGURED"});
   }
-  if(!/^https:\\/\\//i.test(redirectUri)){
+  if(!/^https:\/\//i.test(redirectUri)){
     return res.status(503).json({ok:false,error:"DERIV_OAUTH_REDIRECT_URI_MUST_USE_HTTPS"});
   }
   const mode=String(req.query?.executionMode||"PAPER").toUpperCase();
