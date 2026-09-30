@@ -81,6 +81,8 @@ No fake trading permissions.
 
       verified: false,
 
+      isAdmin: false,
+
       subscription: null,
 
       permissions: {},
@@ -127,6 +129,8 @@ No fake trading permissions.
 
         this.state.authenticated =
           session.authenticated === true;
+
+        this.state.isAdmin = false;
 
         this.state.verified =
           Boolean(
@@ -236,6 +240,7 @@ No fake trading permissions.
         */
 
         const administrator = data.isAdmin === true;
+        this.state.isAdmin = administrator;
         this.state.permissions = {
           ...this.config.defaultPermissions,
           ...(() => {
@@ -309,6 +314,7 @@ No fake trading permissions.
         loading: this.state.loading,
         authenticated: this.state.authenticated,
         verified: this.state.verified,
+        isAdmin: this.state.isAdmin,
         subscription: this.state.subscription,
         permissions: {
           ...this.state.permissions
@@ -492,7 +498,7 @@ No fake trading permissions.
 
     hasSubscription() {
 
-      return Boolean(
+      return this.state.isAdmin === true || Boolean(
         this.state.subscription &&
         this.state.subscription.active === true
       );
@@ -500,6 +506,10 @@ No fake trading permissions.
     },
 
     getSubscriptionPlan() {
+
+      if (this.state.isAdmin) {
+        return "admin";
+      }
 
       if (!this.state.subscription) {
         return null;
