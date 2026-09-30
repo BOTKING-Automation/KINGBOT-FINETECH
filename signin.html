@@ -120,6 +120,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
         await import("./system/firebase-auth.js");
       }
 
+      await window.KINGBOT_FIREBASE.waitForAuthReady(10000).catch(()=>null);
       const result=await window.KINGBOT_FIREBASE.signIn({
         email:email,
         password:password,
@@ -132,6 +133,8 @@ button:disabled{opacity:.55;cursor:not-allowed}
         return;
       }
 
+      await window.KINGBOT_FIREBASE.waitForAuthReady(10000);
+      await window.KINGBOT_FIREBASE.getToken(true);
       show("Authentication verified. Opening KINGBOT…","success");
       window.setTimeout(function(){
         window.location.replace(getDestination());
