@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireUser } from "./subscriptions.js";
+import { isAdminEmail } from "./admin-access.js";
 import { evaluateRisk, authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
 
 const BOT_DEFINITIONS = {
@@ -155,7 +156,8 @@ export function evaluateBot(botId, snapshot) {
   };
 }
 
-async function hasEntitlement(pool, userId, botId) {
+async function hasEntitlement(pool, userId, botId, userEmail) {
+  if (isAdminEmail(userEmail)) return true;
   if (!pool) return false;
   const q = await pool.query(
     "SELECT 1 FROM kingbot_bot_entitlements e JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 AND e.bot_id=$2 AND e.active=TRUE AND s.status='active' AND (s.expires_at IS NULL OR s.expires_at>NOW()) LIMIT 1",
@@ -187,7 +189,7 @@ export function createBotEngineRouter({ pool }) {
     if (!user) return;
     const bots = await Promise.all(Object.values(BOT_DEFINITIONS).map(async bot => ({
       ...bot,
-      entitled: await hasEntitlement(pool, user.id, bot.id),
+      entitled: await hasEntitlement(pool, user.id, bot.id, user.email),
       runtime: "STOPPED",
       executionMode: "NOT_CONNECTED"
     })));
@@ -199,7 +201,7 @@ export function createBotEngineRouter({ pool }) {
     if (!user) return;
     const bot = BOT_DEFINITIONS[req.params.botId];
     if (!bot) return res.status(404).json({ ok: false, error: "BOT_NOT_FOUND" });
-    const entitled = await hasEntitlement(pool, user.id, bot.id);
+    const entitled = await hasEntitlement(pool, user.id, bot.id, user.email);
     res.json({ ok: true, bot: { ...bot, entitled, runtime: "STOPPED", executionMode: "NOT_CONNECTED", riskSettings: (await getRiskSettings(pool,user.id,bot.id)) || defaultRisk(bot) } });
   });
 
@@ -208,7 +210,7 @@ export function createBotEngineRouter({ pool }) {
     if (!user) return;
     const botId = req.params.botId;
     if (!BOT_DEFINITIONS[botId]) return res.status(404).json({ ok: false, error: "BOT_NOT_FOUND" });
-    if (!(await hasEntitlement(pool, user.id, botId))) {
+    if (!(await hasEntitlement(pool, user.id, botId, user.email))) {
       return res.status(403).json({ ok: false, allowed: false, reason: "BOT_NOT_INCLUDED_IN_SUBSCRIPTION" });
     }
     const saved=(await getRiskSettings(pool,user.id,botId)) || defaultRisk(BOT_DEFINITIONS[botId]);
@@ -221,7 +223,7 @@ export function createBotEngineRouter({ pool }) {
   router.get("/:botId/risk", async (req,res)=>{
     const user=await requireUser(pool,req,res); if(!user)return;
     const bot=BOT_DEFINITIONS[req.params.botId]; if(!bot)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
-    if(!(await hasEntitlement(pool,user.id,bot.id)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
+    if(!(await hasEntitlement(pool,user.id,bot.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const current=(await getRiskSettings(pool,user.id,bot.id))||defaultRisk(bot);
     res.json({ok:true,botId:bot.id,settings:current,defaults:defaultRisk(bot),executionMode:current.executionMode||"PAPER",killSwitch:Boolean(current.killSwitch)});
   });
