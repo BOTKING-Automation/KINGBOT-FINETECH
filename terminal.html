@@ -1219,7 +1219,7 @@ overscroll-behavior:none;}
 
     <div class="hero-badges">
       <div class="hero-badge public">● PUBLIC MARKET DATA ACTIVE</div>
-      <div class="hero-badge offline" id="heroBrokerBadge">● BROKER ACCOUNT NOT CONNECTED</div>
+      <div class="hero-badge" id="heroBrokerBadge">● VERIFYING VERIFIED ACCOUNT…</div>
       <div class="hero-badge">◆ 5 BOT SYSTEMS</div>
       <div class="hero-badge">◆ RISK ENGINE READY</div>
       <div class="hero-badge">◆ API BACKEND READY</div>
@@ -1346,61 +1346,27 @@ overscroll-behavior:none;}
 
       <!-- RIGHT SIDE -->
       <div class="stack">
-
-        <!-- BROKER -->
+        <!-- VERIFIED ACCOUNT -->
         <div class="card connection">
-
-          <div class="section-title">BROKER CONNECTION</div>
-
-          <div class="connection-state">
+          <div class="section-title">VERIFIED ACCOUNT</div>
+          <div class="connection-state" id="accountConnectionState">
             <div class="state-label">CURRENT STATE</div>
-            <div class="state-value" id="brokerState">
-              NOT CONNECTED
-            </div>
+            <div class="state-value" id="accountConnectionValue">VERIFYING…</div>
           </div>
-
-          <p>
-             Connect your own MetaApi-linked MT4/MT5 account. Your broker credential
-             is sent over HTTPS and stored encrypted on the KINGBOT backend. It is
-             never displayed back to the browser.
-           </p>
-
-           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
-             <label style="display:block;">
-               <span class="state-label">METAAPI ACCOUNT ID</span>
-               <input id="metaApiAccountId" type="text" autocomplete="off" placeholder="Your MetaApi account ID"
-                 style="width:100%;margin-top:6px;padding:11px;border-radius:10px;border:1px solid rgba(25,230,255,.25);background:rgba(4,12,28,.7);color:#fff;">
-             </label>
-             <label style="display:block;">
-               <span class="state-label">METAAPI API TOKEN</span>
-               <input id="metaApiAccountToken" type="password" autocomplete="new-password" placeholder="Your MetaApi API token"
-                 style="width:100%;margin-top:6px;padding:11px;border-radius:10px;border:1px solid rgba(155,92,255,.25);background:rgba(4,12,28,.7);color:#fff;">
-             </label>
-             <label style="display:block;">
-               <span class="state-label">EXECUTION MODE</span>
-               <select id="brokerExecutionMode" style="width:100%;margin-top:6px;padding:11px;border-radius:10px;border:1px solid rgba(25,230,255,.25);background:rgba(4,12,28,.7);color:#fff;">
-                 <option value="PAPER">PAPER · DEMO ACCOUNT</option>
-                 <option value="LIVE">LIVE · REAL ACCOUNT</option>
-               </select>
-             </label>
-           </div>
-
-           <div style="margin-top:8px;font-size:12px;opacity:.72;">
-             Use a MetaApi <strong>MetaApi API token</strong> for this specific trading account.
-             Do not paste your platform-wide MetaApi API token here.
-           </div>
-
-          <div style="margin-top:14px;display:flex;gap:8px;">
-            <button class="btn" id="connectBroker">
-              CONNECT BROKER
-            </button>
-
-            <button class="btn secondary" id="disconnectBroker" disabled>
-              DISCONNECT
-            </button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
+            <div><div class="state-label">BROKER</div><div class="metric-note" id="terminalBrokerName">—</div></div>
+            <div><div class="state-label">ACCOUNT ID</div><div class="metric-note" id="terminalAccountId">—</div></div>
+            <div><div class="state-label">ACCOUNT TYPE</div><div class="metric-note" id="terminalAccountType">—</div></div>
+            <div><div class="state-label">EXECUTION</div><div class="metric-note" id="terminalExecutionMode">—</div></div>
           </div>
-
+          <p id="accountConnectionNote">
+            Broker connectivity is managed exclusively from the Broker Connect page.
+          </p>
+          <a class="btn secondary" href="broker-connect.html" style="display:inline-flex;margin-top:13px;align-items:center;justify-content:center;">
+            VIEW BROKER ACCOUNT →
+          </a>
         </div>
+
 
         <!-- ORDER BOOK -->
         <div class="card orderbook">
@@ -2663,179 +2629,80 @@ async function fetchApi(path, options = {}) {
 ========================================================= */
 
 async function checkBackend() {
+  let accountLoaded=false;
 
-  try {
+  // Account telemetry is the authoritative source for Terminal connection state.
+  try{
+    const data=await fetchApi("/api/account");
+    const account=data.account||data.data||data;
+    backendConnected=true;
+    accountLoaded=true;
 
-    const data =
-      await fetchApi("/api/connection");
+    $("accountConnectionValue").textContent="CONNECTED";
+    $("accountConnectionValue").style.color="#23f7a3";
+    $("accountConnectionState").style.borderColor="rgba(35,247,163,.22)";
+    $("accountConnectionState").style.background="rgba(35,247,163,.045)";
+    $("accountConnectionNote").textContent="Verified broker account is active. Connection controls remain on Broker Connect.";
 
-    backendConnected =
-      Boolean(data.connected);
+    $("heroBrokerBadge").textContent="● "+String(account.broker||"BROKER").toUpperCase()+" · ACCOUNT CONNECTED";
+    $("heroBrokerBadge").className="hero-badge public";
+    $("terminalBrokerName").textContent=String(account.broker||"—").toUpperCase();
+    $("terminalAccountId").textContent=account.accountId||"—";
+    $("terminalAccountType").textContent=String(account.accountType||"—").toUpperCase();
+    $("terminalExecutionMode").textContent=String(account.executionMode||"—").toUpperCase();
 
-    updateBackendState(
-      backendConnected
-        ? "CONNECTED"
-        : "NOT CONNECTED"
-    );
+    renderAccountOverview(account);
+  }catch{
+    // Fall back to the connection endpoint so a saved mapping can be shown as
+    // reconnecting without falsely destroying the user's broker authorization.
+    try{
+      const data=await fetchApi("/api/connection");
+      backendConnected=Boolean(data.connected);
 
-    if (backendConnected) {
-      try { await loadAccount(); } catch {}
-      try { await loadPositions(); } catch {}
-      try { await loadOrders(); } catch {}
-    }
+      $("terminalBrokerName").textContent=String(data.broker||"—").toUpperCase();
+      $("terminalAccountId").textContent=data.accountId||"—";
+      $("terminalExecutionMode").textContent=String(data.executionMode||"—").toUpperCase();
+      $("terminalAccountType").textContent="—";
 
-    // The control plane remains usable even when the broker is disconnected.
-    try { await loadBots(); } catch {}
-    try { await loadRisk(); } catch {}
-    try { await loadRuntimeState(); } catch {}
-
-  } catch {
-
-    backendConnected = false;
-
-    updateBackendState(
-      "NOT CONNECTED"
-    );
-  }
-}
-
-function updateBackendState(state) {
-
-  $("brokerState").textContent =
-    state;
-
-  if (state === "CONNECTED") {
-
-    $("brokerState").style.color =
-      "#23f7a3";
-
-    $("connectBroker").disabled =
-      true;
-
-    $("disconnectBroker").disabled =
-      false;
-
-  } else {
-
-    $("brokerState").style.color =
-      "#ff7a18";
-
-    $("connectBroker").disabled =
-      false;
-
-    $("disconnectBroker").disabled =
-      true;
-  }
-}
-
-/* =========================================================
-   BROKER CONNECT
-========================================================= */
-
-$("connectBroker").addEventListener(
-  "click",
-  async () => {
-
-    toast(
-      "BROKER LAYER",
-      "Attempting backend connection..."
-    );
-
-    try {
-      const accountId = document.getElementById("metaApiAccountId")?.value.trim();
-      const accountToken = document.getElementById("metaApiAccountToken")?.value.trim();
-      const executionMode = document.getElementById("brokerExecutionMode")?.value || "PAPER";
-      if (!accountId || !accountToken) {
-        throw new Error("Enter your MetaApi account ID and account token first.");
+      if(data.connected){
+        $("accountConnectionValue").textContent="CONNECTED";
+        $("accountConnectionValue").style.color="#23f7a3";
+        $("accountConnectionNote").textContent="Verified broker account is active. Connection controls remain on Broker Connect.";
+        $("heroBrokerBadge").textContent="● "+String(data.broker||"BROKER").toUpperCase()+" · ACCOUNT CONNECTED";
+        $("heroBrokerBadge").className="hero-badge public";
+      }else if(data.configured){
+        $("accountConnectionValue").textContent="RECONNECTING…";
+        $("accountConnectionValue").style.color="#ffc84a";
+        $("accountConnectionNote").textContent="Your verified broker authorization is saved. KINGBOT is restoring the secure broker session.";
+        $("heroBrokerBadge").textContent="● VERIFIED ACCOUNT SAVED · RECONNECTING…";
+        $("heroBrokerBadge").className="hero-badge";
+      }else{
+        $("accountConnectionValue").textContent="NOT CONNECTED";
+        $("accountConnectionValue").style.color="#ff7a18";
+        $("accountConnectionNote").textContent="No verified broker account is active. Connect one from Broker Connect.";
+        $("heroBrokerBadge").textContent="● NO VERIFIED ACCOUNT";
+        $("heroBrokerBadge").className="hero-badge offline";
       }
-      if (executionMode === "LIVE" && !window.confirm("Connect a real-money trading account? Bot risk limits still apply.")) {
-        return;
-      }
-
-      await fetchApi(
-        "/api/broker/account",
-        {
-          method: "POST",
-          body: JSON.stringify({ accountId, accountToken, executionMode })
-        }
-      );
-
-      await fetchApi(
-        "/api/broker/connect",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            executionMode
-          })
-        }
-      );
-
-      document.getElementById("metaApiAccountToken").value = "";
-      await checkBackend();
-
-      toast(
-        "BROKER",
-        "Backend connection request completed."
-      );
-
-      logActivity(
-        "Broker connection request sent to backend"
-      );
-
-    } catch (error) {
-
-      toast(
-        "BROKER CONNECTION FAILED",
-        error.message || "The broker connection could not be completed."
-      );
-
-      logActivity(
-        `Broker connection failed: ${error.message || "unknown backend error"}`
-      );
+    }catch{
+      backendConnected=false;
+      $("accountConnectionValue").textContent="STATUS UNAVAILABLE";
+      $("accountConnectionValue").style.color="#ffc84a";
+      $("accountConnectionNote").textContent="KINGBOT could not verify broker telemetry at this moment. No broker connection was changed.";
+      $("heroBrokerBadge").textContent="● ACCOUNT STATUS UNAVAILABLE";
+      $("heroBrokerBadge").className="hero-badge offline";
     }
-
   }
-);
 
-/* =========================================================
-   BROKER DISCONNECT
-========================================================= */
-
-$("disconnectBroker").addEventListener(
-  "click",
-  async () => {
-
-    try {
-
-      await fetchApi(
-        "/api/broker/disconnect",
-        {
-          method: "POST",
-          body: JSON.stringify({})
-        }
-      );
-
-      backendConnected = false;
-
-      updateBackendState(
-        "NOT CONNECTED"
-      );
-
-      toast(
-        "BROKER",
-        "Broker disconnected."
-      );
-
-    } catch {
-
-      toast(
-        "ERROR",
-        "Backend disconnect endpoint unavailable."
-      );
-    }
-
+  if(backendConnected){
+    try{ if(!accountLoaded) await loadAccount(); }catch{}
+    try{ await loadPositions(); }catch{}
+    try{ await loadOrders(); }catch{}
   }
-);
+
+  try{await loadBots();}catch{}
+  try{await loadRisk();}catch{}
+  try{await loadRuntimeState();}catch{}
+}
 
 /* =========================================================
    ACCOUNT
@@ -2868,6 +2735,10 @@ function renderAccountOverview(account){
   $("accountType").textContent=String(account.accountType||"—").toUpperCase();
   $("accountCurrency").textContent=currency||"—";
   $("accountMode").textContent=String(account.executionMode||"—").toUpperCase();
+  if($("terminalBrokerName"))$("terminalBrokerName").textContent=String(account.broker||"—").toUpperCase();
+  if($("terminalAccountId"))$("terminalAccountId").textContent=account.accountId||"—";
+  if($("terminalAccountType"))$("terminalAccountType").textContent=String(account.accountType||"—").toUpperCase();
+  if($("terminalExecutionMode"))$("terminalExecutionMode").textContent=String(account.executionMode||"—").toUpperCase();
   $("accountTradingStatus").textContent=(account.tradingEnabled?"ENABLED":"DISABLED")+" · "+String(account.accountStatus||"ACTIVE").toUpperCase();
   $("accountTradingStatus").style.color=account.tradingEnabled?"#23f7a3":"#ff4d6d";
 
