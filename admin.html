@@ -162,15 +162,25 @@ function renderActivity(){
 async function loadAll(){
  try{
   const [o,u,p,a]=await Promise.all([api("/api/subscription/admin/overview"),api("/api/subscription/admin/users"),api("/api/subscription/admin/payments"),api("/api/subscription/admin/activity")]);
-  const od=await o.json().catch(()=>({})); if(!o.ok) throw new Error(od.error||"Administrator access required.");
+  const od=await o.json().catch(()=>({}));
+  if(!o.ok){
+    const err=new Error(od.error||"Administrator access required.");
+    err.status=o.status;
+    throw err;
+  }
   const ud=await u.json().catch(()=>({})),pd=await p.json().catch(()=>({})),ad=await a.json().catch(()=>({}));
-  if(!u.ok||!p.ok||!a.ok) throw new Error(ud.error||pd.error||ad.error||"Admin data unavailable.");
+  if(!u.ok||!p.ok||!a.ok){
+    const failed=u.ok?p.ok?a:a.ok?u:p;
+    const fd=failed===u?ud:failed===p?pd:ad;
+    const err=new Error(fd.error||"Admin data unavailable.");
+    err.status=failed.status;
+    throw err;
+  }
   users=Array.isArray(ud.users)?ud.users:[]; payments=Array.isArray(pd.payments)?pd.payments:[]; activity=Array.isArray(ad.activity)?ad.activity:[];
   renderMetrics(od.metrics||{});renderUsers();renderPayments();renderActivity();
   document.getElementById("adminBadge").textContent="ADMIN VERIFIED · "+(od.adminEmail||"");
  }catch(e){
   lockMsg.textContent=e.message||"Administrator access denied.";
-  setTimeout(()=>{location.href="access-stable.html#signin"},1800);
   throw e;
  }
 }
@@ -204,15 +214,56 @@ paymentsEl.addEventListener("click",async e=>{
  await mutate("/api/subscription/admin/payments/"+encodeURIComponent(id)+"/"+action,{note:note||""},action==="approve"?"Payment approved and access granted.":"Payment denied.");
 });
 userSearch.addEventListener("input",renderUsers);userFilter.addEventListener("change",renderUsers);
+async function preserveAdminReturn(target){
+ const returnUrl=window.location.pathname+window.location.search+window.location.hash;
+ const encoded="access-stable.html?return="+encodeURIComponent(returnUrl)+"#signin";
+ window.location.replace(encoded);
+}
+
+async function ensureAdminSession(){
+ if(!window.KINGBOT_SESSION){
+   try{await import(new URL("system/session.js",window.location.href).href);}catch{}
+ }
+ if(!window.KINGBOT_SESSION){
+   throw new Error("Secure session manager did not load.");
+ }
+ const session=await window.KINGBOT_SESSION.check({force:true});
+ if(!session.authenticated){
+   await preserveAdminReturn();
+   return false;
+ }
+ if(!session.user?.verified){
+   const returnUrl=window.location.pathname+window.location.search+window.location.hash;
+   window.location.replace("verify.html?return="+encodeURIComponent(returnUrl));
+   return false;
+ }
+ return true;
+}
+
 (async()=>{
  try{
-  const gate=await api("/api/subscription/admin/overview"); const gd=await gate.json().catch(()=>({}));
-  if(!gate.ok||!gd.ok)throw new Error(gd.error||"Administrator access required.");
-  lock.hidden=true;app.hidden=false;document.getElementById("adminBadge").textContent="ADMIN VERIFIED · "+(gd.adminEmail||"");
-  await loadAll(); setInterval(()=>loadAll().catch(()=>{}),30000);
+  const ready=await ensureAdminSession();
+  if(!ready)return;
+
+  const gate=await api("/api/subscription/admin/overview");
+  const gd=await gate.json().catch(()=>({}));
+  if(!gate.ok||gd.ok===false){
+   const err=new Error(gd.error||"Administrator access required.");
+   err.status=gate.status;
+   throw err;
+  }
+
+  lock.hidden=true;
+  app.hidden=false;
+  document.getElementById("adminBadge").textContent="ADMIN VERIFIED · "+(gd.adminEmail||"");
+  await loadAll();
+  setInterval(()=>loadAll().catch(()=>{}),30000);
  }catch(e){
-  lockMsg.textContent=e.message||"Administrator access denied.";
-  setTimeout(()=>{location.href="access-stable.html#signin"},1800);
+  const message=e.message||"Administrator access denied.";
+  lockMsg.textContent=message;
+  if(Number(e.status)===401){
+    setTimeout(()=>preserveAdminReturn(),500);
+  }
  }
 })();
 })();
