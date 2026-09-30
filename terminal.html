@@ -2305,7 +2305,9 @@ async function checkBackend() {
     const identity=await fetchApi("/api/broker/identity",{timeoutMs:5000});
     $("accountBroker").textContent=String(identity.broker||"—").toUpperCase();
     $("accountIdDisplay").textContent=identity.accountId||"—";
+    $("accountType").textContent=String(identity.accountType||"—").toUpperCase();
     $("accountMode").textContent=String(identity.executionMode||"—").toUpperCase();
+    $("accountCurrency").textContent="—";
     if(identity.configured){
       backendConnected=true;
       setConnection("ACCOUNT CONNECTED","#23f7a3","Connected broker identity verified from KINGBOT secure storage. Live balance and execution telemetry is loading separately.");
