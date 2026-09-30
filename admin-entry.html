@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>KINGBOT FINTECH — Admin Control</title>
+<style>
+html,body{margin:0;min-height:100%;background:#02050d;color:#edf3ff;font-family:Inter,Arial,sans-serif}
+body{display:grid;place-items:center;padding:24px;box-sizing:border-box}
+.card{width:min(620px,100%);padding:36px;border:1px solid rgba(25,230,255,.2);border-radius:22px;background:linear-gradient(145deg,rgba(8,15,31,.97),rgba(2,6,16,.99));box-shadow:0 30px 100px rgba(0,0,0,.55);text-align:center}
+h1{margin:12px 0;font:900 30px Arial,sans-serif;letter-spacing:.04em;background:linear-gradient(90deg,#f6b93b,#19e6ff,#9b5cff,#ff4fd8);-webkit-background-clip:text;color:transparent}
+p{color:#8190ad;font-size:13px;line-height:1.7}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border-radius:10px;border:1px solid rgba(25,230,255,.24);background:#07101f;color:#9aeefe;font-weight:800;cursor:pointer;text-decoration:none}
+.status{margin-top:14px;padding:12px;border-radius:10px;background:rgba(255,255,255,.03);color:#8d9ab4;font-size:12px}
+input{width:100%;height:44px;margin-top:8px;padding:0 11px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:#050b18;color:#fff;box-sizing:border-box}
+label{display:block;text-align:left;margin-top:12px;color:#71809d;font-size:10px;font-weight:800;letter-spacing:.1em}
+#login{margin-top:14px;width:100%}
+.error{color:#ff9baa!important}
+</style>
+</head>
+<body>
+<main class="card">
+<div style="color:#19e6ff;font-size:10px;font-weight:800;letter-spacing:.18em">KINGBOT FINTECH / GIBSONFX TECH</div>
+<h1>ADMIN CONTROL CENTER</h1>
+<p>This is the isolated administrator entry point. It does not load the global platform authentication gate.</p>
+<div id="status" class="status">Initializing secure administrator identity…</div>
+<form id="form" hidden>
+<label for="email">ADMIN EMAIL</label>
+<input id="email" type="email" value="kingbotofficial001@gmail.com" autocomplete="username" required>
+<label for="password">PASSWORD</label>
+<input id="password" type="password" autocomplete="current-password" required>
+<button id="login" class="btn" type="submit">SECURE ADMIN SIGN IN</button>
+</form>
+</main>
+<script type="module">
+import "./system/firebase-auth.js";
+const status=document.getElementById("status"),form=document.getElementById("form");
+function go(){location.replace("admin.html?isolated=1")}
+async function open(){
+ const fb=window.KINGBOT_FIREBASE;
+ if(!fb?.auth){status.textContent="Firebase Authentication failed to load.";status.className="status error";form.hidden=false;return}
+ let user=fb.auth.currentUser;
+ if(!user){
+   user=await new Promise(resolve=>{
+     let done=false,off=null;
+     const finish=u=>{if(done)return;done=true;try{off?.()}catch{};resolve(u||null)};
+     try{off=fb.onChange(finish);if(fb.auth.currentUser)finish(fb.auth.currentUser);setTimeout(()=>finish(fb.auth.currentUser||null),7000)}
+     catch{finish(fb.auth.currentUser||null)}
+   });
+ }
+ if(user){
+   await fb.refresh().catch(()=>{});
+   user=fb.auth.currentUser;
+ }
+ if(user?.emailVerified){status.textContent="Verified Firebase session detected. Opening Super Admin OS…";go();return}
+ status.textContent="Sign in with the verified administrator account to continue.";
+ form.hidden=false;
+}
+form.addEventListener("submit",async e=>{
+ e.preventDefault();
+ const b=document.getElementById("login"),email=document.getElementById("email").value.trim(),password=document.getElementById("password").value;
+ b.disabled=true;b.textContent="AUTHENTICATING…";status.textContent="Authenticating administrator identity…";status.className="status";
+ try{
+   const result=await window.KINGBOT_FIREBASE.signIn({email,password,remember:true});
+   if(!result?.verified)throw new Error("Administrator email is not verified in Firebase.");
+   await window.KINGBOT_FIREBASE.refresh();
+   if(!window.KINGBOT_FIREBASE.auth.currentUser?.emailVerified)throw new Error("Administrator email is not verified in Firebase.");
+   status.textContent="Administrator verified. Opening Super Admin OS…";go();
+ }catch(err){
+   status.textContent=String(err?.message||"Administrator sign-in failed.");status.className="status error";b.disabled=false;b.textContent="SECURE ADMIN SIGN IN";
+ }
+});
+open();
+</script>
+</body>
+</html>
