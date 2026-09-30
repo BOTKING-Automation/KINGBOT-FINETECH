@@ -10,6 +10,7 @@ const API_BASE="https://kingbot-fintech-api-etfv.onrender.com/api";
 const API_ORIGIN=API_BASE.replace(/\/api\/?$/i,"");
 const state={checked:false,checking:false,authenticated:false,user:null,error:null,checkedAt:0};
 let activeCheck=null;
+let activeCheck=null;
 async function firebaseClient(){
  if(window.KINGBOT_FIREBASE)return window.KINGBOT_FIREBASE;
  try{await import(new URL("system/firebase-auth.js",window.location.href).href);}catch{}
@@ -49,6 +50,7 @@ const session={
  config:{apiBase:API_BASE,sessionEndpoint:API_BASE+"/auth/session",logoutEndpoint:API_BASE+"/auth/logout",cacheDuration:15000},
  async check(options={}){
   const force=Boolean(options.force);
+  if(activeCheck)return activeCheck;
   if(activeCheck&&!force)return activeCheck;
   if(activeCheck&&force)return activeCheck;
   if(!force&&state.checked&&Date.now()-state.checkedAt<this.config.cacheDuration)return this.getState();
