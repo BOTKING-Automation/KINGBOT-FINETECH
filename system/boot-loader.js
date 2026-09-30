@@ -150,7 +150,7 @@ function start(){
   frame.setAttribute("aria-label","KINGBOT FINTECH neural startup");
   const isAdminEntry=/\/admin-entry\.html$/i.test(window.location.pathname);
   frame.src="loader.html?embed=1&duration=3000&surface="+(isAdminEntry?"admin":"home")+"&v=6";
-  document.body.appendChild(frame);
+  (document.body||document.documentElement).appendChild(frame);
 
   let finished=false;
 
@@ -204,9 +204,5 @@ function start(){
   const releaseMs=isAdminEntry?4200:5200;
   window.setTimeout(finish,releaseMs);
 }
-if(document.readyState==="loading"){
-  document.addEventListener("DOMContentLoaded",start,{once:true});
-}else{
-  start();
-}
+start();
 })(window,document);
