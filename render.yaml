@@ -19,7 +19,7 @@ services:
       - key: BROKER_CREDENTIALS_KEY
         sync: false
 
-  - type: web
+  - type: worker
     name: kingbot-fintech-worker
     runtime: node
     plan: free
