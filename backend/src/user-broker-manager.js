@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import MetaApi from "metaapi.cloud-sdk/esm-node";
+import { ExnessTraderClient } from "./exness-trader-client.js";
 
 const ALGORITHM="aes-256-gcm";
 
@@ -15,6 +16,12 @@ function encryptSecret(value){
   const ciphertext=Buffer.concat([cipher.update(String(value),"utf8"),cipher.final()]);
   return {ciphertext:ciphertext.toString("base64"),iv:iv.toString("base64"),tag:cipher.getAuthTag().toString("base64")};
 }
+function qtyString(value){
+  const n=Number(value);
+  if(!Number.isFinite(n)||n<=0)throw new Error("INVALID_ORDER_VOLUME");
+  return String(value);
+}
+
 function decryptSecret(row){
   const decipher=crypto.createDecipheriv(ALGORITHM,masterKey(),Buffer.from(row.credential_iv,"base64"));
   decipher.setAuthTag(Buffer.from(row.credential_tag,"base64"));
@@ -51,16 +58,26 @@ export class UserBrokerManager {
     return q.rowCount?q.rows[0]:null;
   }
 
-  async saveMapping({userId,provider="metaapi",accountId,accountToken,executionMode="PAPER"}={}){
+  async saveMapping({userId,provider="metaapi",accountId,accountToken,executionMode="PAPER",apiKey,privateKey,baseUrl}={}){
     if(!this.pool||!userId)return {ok:false,error:"USER_CONTEXT_REQUIRED"};
     const mode=String(executionMode).toUpperCase();
     if(!["PAPER","LIVE"].includes(mode))return {ok:false,error:"INVALID_EXECUTION_MODE"};
     const id=String(accountId||"").trim();
-    const token=String(accountToken||"").trim();
+    const isExness=String(provider).toLowerCase()==="exness";
+    let secretValue=String(accountToken||"").trim();
+    if(isExness){
+      const key=String(apiKey||"").trim();
+      const secret=String(privateKey||"").trim();
+      const host=String(baseUrl||"").trim();
+      if(!key)return {ok:false,error:"EXNESS_API_KEY_REQUIRED"};
+      if(!secret)return {ok:false,error:"EXNESS_PRIVATE_KEY_REQUIRED"};
+      if(host && !/^https:\/\//i.test(host))return {ok:false,error:"EXNESS_BASE_URL_MUST_USE_HTTPS"};
+      secretValue=JSON.stringify({apiKey:key,privateKey:secret,baseUrl:host||undefined});
+    }
     if(!id)return {ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"};
-    if(!token)return {ok:false,error:"BROKER_ACCOUNT_TOKEN_REQUIRED"};
-    if(token.length>4096)return {ok:false,error:"BROKER_ACCOUNT_TOKEN_TOO_LONG"};
-    const encrypted=encryptSecret(token);
+    if(!secretValue)return {ok:false,error:isExness?"EXNESS_CREDENTIALS_REQUIRED":"BROKER_ACCOUNT_TOKEN_REQUIRED"};
+    if(secretValue.length>12000)return {ok:false,error:"BROKER_CREDENTIAL_TOO_LONG"};
+    const encrypted=encryptSecret(secretValue);
     const q=await this.pool.query("INSERT INTO kingbot_broker_accounts(user_id,provider,account_id,credential_ciphertext,credential_iv,credential_tag,execution_mode,enabled,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,TRUE,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET credential_ciphertext=EXCLUDED.credential_ciphertext,credential_iv=EXCLUDED.credential_iv,credential_tag=EXCLUDED.credential_tag,execution_mode=EXCLUDED.execution_mode,enabled=TRUE,updated_at=NOW() RETURNING id,user_id,provider,account_id,execution_mode,enabled",[userId,String(provider).toLowerCase(),id,encrypted.ciphertext,encrypted.iv,encrypted.tag,mode]);
     await this.disconnect(userId);
     return {ok:true,account:q.rows[0]};
@@ -72,11 +89,41 @@ export class UserBrokerManager {
     if(!mapping)return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_ACCOUNT_NOT_CONFIGURED"};
     const mode=String(executionMode||mapping.execution_mode).toUpperCase();
     if(!["PAPER","LIVE"].includes(mode))return {connected:false,mode:"NOT_CONNECTED",reason:"INVALID_EXECUTION_MODE"};
-    let accountToken;
-    try{accountToken=decryptSecret(mapping);}
+    let credential;
+    try{credential=decryptSecret(mapping);}
     catch(error){return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_CREDENTIAL_DECRYPTION_FAILED"};}
     const key=userId+":"+mapping.provider+":"+mapping.account_id;
     let entry=this.connections.get(key);
+
+    if(mapping.provider==="exness"){
+      try{
+        const parsed=JSON.parse(credential);
+        if(!entry){
+          const api=new ExnessTraderClient({
+            apiKey:parsed.apiKey,
+            privateKey:parsed.privateKey,
+            accountId:mapping.account_id,
+            baseUrl:parsed.baseUrl
+          });
+          await api.ensureReady();
+          const accountInfo=await api.getAccountInformation();
+          entry={api,accountInfo,accountId:mapping.account_id,executionMode:mode,provider:"exness",connectedAt:Date.now()};
+          this.connections.set(key,entry);
+        }else{
+          entry.accountInfo=await entry.api.getAccountInformation();
+        }
+        const info=entry.accountInfo||{};
+        if(info.trade_mode==="trading_disabled")return {connected:false,mode:"NOT_CONNECTED",reason:"EXNESS_TRADING_DISABLED"};
+        if(mode==="LIVE"&&info.account_status==="close_only")return {connected:false,mode:"NOT_CONNECTED",reason:"EXNESS_ACCOUNT_CLOSE_ONLY"};
+        entry.executionMode=mode;
+        return {connected:true,mode,broker:"exness",accountId:mapping.account_id,account:info};
+      }catch(error){
+        console.error("[KINGBOT EXNESS] connect failed:",error?.message||error);
+        return {connected:false,mode:"NOT_CONNECTED",reason:error?.message||"EXNESS_CONNECTION_FAILED"};
+      }
+    }
+
+    const accountToken=credential;
     if(!entry){
       try{
         const api=new MetaApi(accountToken);
@@ -85,7 +132,7 @@ export class UserBrokerManager {
         const connection=account.getRPCConnection();
         await connection.connect();
         await connection.waitSynchronized();
-        entry={api,account,connection,accountId:mapping.account_id,executionMode:mode};
+        entry={api,account,connection,accountId:mapping.account_id,executionMode:mode,provider:mapping.provider};
         this.connections.set(key,entry);
       }catch(error){
         return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_CONNECTION_FAILED"};
@@ -127,28 +174,54 @@ export class UserBrokerManager {
     const key=userId+":"+mapping.provider+":"+mapping.account_id;
     const entry=this.connections.get(key);
     if(!entry)throw new Error("BROKER_NOT_CONNECTED");
-    return entry.connection;
+    return entry;
   }
 
-  async getAccount(userId){return {connected:true,data:await (await this.connectionFor(userId)).getAccountInformation()};}
-  async getPositions(userId){return {connected:true,data:await (await this.connectionFor(userId)).getPositions()};}
-  async getOrders(userId){return {connected:true,data:await (await this.connectionFor(userId)).getOrders()};}
+  async getAccount(userId){
+    const entry=await this.connectionFor(userId);
+    if(entry.provider==="exness")return {connected:true,data:await entry.api.getAccountInformation()};
+    return {connected:true,data:await entry.connection.getAccountInformation()};
+  }
+
+  async getPositions(userId){
+    const entry=await this.connectionFor(userId);
+    if(entry.provider==="exness")throw new Error("EXNESS_POSITIONS_USE_SERVER_EVENTS");
+    return {connected:true,data:await entry.connection.getPositions()};
+  }
+
+  async getOrders(userId){
+    const entry=await this.connectionFor(userId);
+    if(entry.provider==="exness")throw new Error("EXNESS_OPEN_ORDERS_USE_SERVER_EVENTS");
+    return {connected:true,data:await entry.connection.getOrders()};
+  }
 
   async getTrades({startTime,endTime,userId}={}){
-    const connection=await this.connectionFor(userId);
+    const entry=await this.connectionFor(userId);
     const end=endTime?new Date(endTime):new Date();
     const start=startTime?new Date(startTime):new Date(end.getTime()-24*60*60*1000);
-    const [orders,deals]=await Promise.all([connection.getHistoryOrdersByTimeRange(start,end),connection.getDealsByTimeRange(start,end)]);
+    if(entry.provider==="exness"){
+      return {
+        connected:true,
+        data:{
+          orders:await entry.api.getHistoricalOrders({from:start.toISOString(),to:end.toISOString(),limit:200}),
+          deals:await entry.api.getHistoricalDeals({from:start.toISOString(),to:end.toISOString(),limit:200})
+        }
+      };
+    }
+    const [orders,deals]=await Promise.all([entry.connection.getHistoryOrdersByTimeRange(start,end),entry.connection.getDealsByTimeRange(start,end)]);
     return {connected:true,data:{orders,deals}};
   }
 
   async getSymbolSpecification(symbol,userId){
-    const connection=await this.connectionFor(userId);
-    return {connected:true,data:await connection.getSymbolSpecification(String(symbol).trim().toUpperCase())};
+    const entry=await this.connectionFor(userId);
+    if(entry.provider==="exness")return {connected:true,data:await entry.api.getInstrumentConditions(String(symbol).trim().toUpperCase())};
+    return {connected:true,data:await entry.connection.getSymbolSpecification(String(symbol).trim().toUpperCase())};
   }
 
   async getHistoricalCandles(symbol,timeframe,userId,limit=100){
-    const connection=await this.connectionFor(userId);
+    const entry=await this.connectionFor(userId);
+    if(entry.provider==="exness")throw new Error("EXNESS_CANDLES_ADAPTER_PENDING");
+    const connection=entry.connection;
     const count=Math.max(10,Math.min(1000,Number(limit)||100));
     const end=new Date();
     const minutes={"1m":1,"2m":2,"3m":3,"4m":4,"5m":5,"6m":6,"10m":10,"12m":12,"15m":15,"20m":20,"30m":30,"1h":60,"2h":120,"3h":180,"4h":240,"6h":360,"8h":480,"12h":720,"1d":1440,"1w":10080,"1mn":43200};
@@ -158,12 +231,25 @@ export class UserBrokerManager {
   }
 
   async getQuote(symbol,userId){
-    const connection=await this.connectionFor(userId);
-    return {connected:true,data:await connection.getSymbolPrice(String(symbol).trim().toUpperCase())};
+    const entry=await this.connectionFor(userId);
+    if(entry.provider==="exness")return {connected:true,data:await entry.api.getQuote(String(symbol).trim().toUpperCase())};
+    return {connected:true,data:await entry.connection.getSymbolPrice(String(symbol).trim().toUpperCase())};
   }
 
   async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId}){
-    const connection=await this.connectionFor(userId);
+    const entry=await this.connectionFor(userId);
+    if(entry.provider==="exness"){
+      return await entry.api.openPosition({
+        instrument:symbol,
+        side:String(side).toLowerCase(),
+        volume:qtyString(volume),
+        stopLossPrice:stopLoss,
+        takeProfitPrice:takeProfit,
+        comment,
+        clientRequestId:clientId
+      });
+    }
+    const connection=entry.connection;
     const qty=Number(volume);
     if(!Number.isFinite(qty)||qty<=0)throw new Error("INVALID_ORDER_VOLUME");
     const s=String(symbol||"").trim().toUpperCase();
