@@ -1,5 +1,7 @@
 import "dotenv/config";
 import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { UserBrokerManager } from "./user-broker-manager.js";
 import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
@@ -234,7 +236,14 @@ async function cycle(){
   }
 }
 
-async function main(){
+export async function startWorker(){
+  if(!pool){
+    if(String(process.env.WORKER_STANDBY||"").trim()==="1"){
+      console.log("[KINGBOT WORKER] standby mode: database is owned by the primary API service");
+      return;
+    }
+    throw new Error("DATABASE_URL_REQUIRED");
+  }
   await ensureWorkerSchema();
   console.log("[KINGBOT WORKER] real broker execution loop started");
   const loop=async()=>{try{await cycle();}catch(error){console.error("[KINGBOT WORKER]",error?.message||error);}if(!stopping)timer=setTimeout(loop,WORKER_POLL_MS);};
@@ -243,4 +252,13 @@ async function main(){
 async function shutdown(){if(stopping)return;stopping=true;if(timer)clearTimeout(timer);try{if(pool)await pool.end();}finally{process.exit(0);}}
 process.on("SIGTERM",shutdown);
 process.on("SIGINT",shutdown);
-main().catch(error=>{console.error("[KINGBOT WORKER] startup failed",error?.message||error);process.exit(1);});
+const invokedDirectly = process.argv[1]
+  ? path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
+  : false;
+
+if(invokedDirectly){
+  startWorker().catch(error=>{
+    console.error("[KINGBOT WORKER] startup failed",error?.message||error);
+    process.exit(1);
+  });
+}
