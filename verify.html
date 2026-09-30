@@ -438,6 +438,7 @@ form.innerHTML='<button id="verifyButton" class="verify-button" type="button">CH
 const checkButton=document.getElementById("verifyButton");
 async function check(){
  try{
+  await window.KINGBOT_FIREBASE.waitForAuthReady(10000);
   const user=await window.KINGBOT_FIREBASE.refresh();
   if(!user){show("Please sign in first, then return here to verify your account.","error");return;}
   emailDisplay.textContent=user.email||"";emailDisplay.style.display="block";
