@@ -81,6 +81,7 @@ export class PartnerManager {
     await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_partner_events (id BIGSERIAL PRIMARY KEY, click_id UUID REFERENCES kingbot_partner_clicks(click_id) ON DELETE SET NULL, user_id UUID REFERENCES kingbot_users(id) ON DELETE SET NULL, broker_slug TEXT NOT NULL REFERENCES kingbot_broker_partners(broker_slug), event_type TEXT NOT NULL CHECK(event_type IN ('CLICK','SIGNUP','KYC','FUNDED','ACTIVE','COMMISSION','PAID','REVERSED')), external_reference TEXT, amount NUMERIC(20,8), currency TEXT NOT NULL DEFAULT 'USD', source TEXT NOT NULL DEFAULT 'partner_feed', occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), metadata JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
     await this.pool.query("CREATE INDEX IF NOT EXISTS idx_kingbot_partner_events_broker_occurred ON kingbot_partner_events(broker_slug,occurred_at DESC)");
     await this.pool.query("CREATE INDEX IF NOT EXISTS idx_kingbot_partner_events_type ON kingbot_partner_events(event_type,occurred_at DESC)");
+    await this.pool.query("CREATE UNIQUE INDEX IF NOT EXISTS ux_kingbot_partner_events_external_ref ON kingbot_partner_events(broker_slug,event_type,external_reference) WHERE external_reference IS NOT NULL");
 
     for(const [slug,d] of Object.entries(BROKER_DEFS)){
       await this.pool.query(
@@ -142,7 +143,7 @@ export class PartnerManager {
         [windowDays]
       ),
       this.pool.query(
-        "SELECT p.broker_slug,p.broker_name,p.partner_model,p.commission_basis,p.active,COUNT(DISTINCT c.click_id)::int AS clicks,COUNT(DISTINCT CASE WHEN e.event_type IN ('SIGNUP','KYC','FUNDED','ACTIVE') THEN COALESCE(e.user_id::text,e.click_id::text) END)::int AS qualified_referrals,COALESCE(SUM(CASE WHEN e.event_type='COMMISSION' THEN e.amount ELSE 0 END),0)::numeric AS gross_commission,COALESCE(SUM(CASE WHEN e.event_type='PAID' THEN e.amount ELSE 0 END),0)::numeric AS paid_commission FROM kingbot_broker_partners p LEFT JOIN kingbot_partner_clicks c ON c.broker_slug=p.broker_slug AND c.created_at>=NOW()-($1 * INTERVAL '1 day') LEFT JOIN kingbot_partner_events e ON e.broker_slug=p.broker_slug AND e.occurred_at>=NOW()-($1 * INTERVAL '1 day') GROUP BY p.broker_slug,p.broker_name,p.partner_model,p.commission_basis,p.active ORDER BY gross_commission DESC,clicks DESC",
+        "SELECT p.broker_slug,p.broker_name,p.partner_model,p.commission_basis,p.active,COALESCE(c.clicks,0)::int AS clicks,COALESCE(q.qualified_referrals,0)::int AS qualified_referrals,COALESCE(m.gross_commission,0)::numeric AS gross_commission,COALESCE(m.paid_commission,0)::numeric AS paid_commission FROM kingbot_broker_partners p LEFT JOIN (SELECT broker_slug,COUNT(*)::int AS clicks FROM kingbot_partner_clicks WHERE created_at>=NOW()-($1 * INTERVAL '1 day') GROUP BY broker_slug) c ON c.broker_slug=p.broker_slug LEFT JOIN (SELECT broker_slug,COUNT(DISTINCT COALESCE(user_id::text,click_id::text))::int AS qualified_referrals FROM kingbot_partner_events WHERE occurred_at>=NOW()-($1 * INTERVAL '1 day') AND event_type IN ('SIGNUP','KYC','FUNDED','ACTIVE') GROUP BY broker_slug) q ON q.broker_slug=p.broker_slug LEFT JOIN (SELECT broker_slug,COALESCE(SUM(CASE WHEN event_type='COMMISSION' THEN amount ELSE 0 END),0)::numeric AS gross_commission,COALESCE(SUM(CASE WHEN event_type='PAID' THEN amount ELSE 0 END),0)::numeric AS paid_commission FROM kingbot_partner_events WHERE occurred_at>=NOW()-($1 * INTERVAL '1 day') GROUP BY broker_slug) m ON m.broker_slug=p.broker_slug ORDER BY gross_commission DESC,clicks DESC",
         [windowDays]
       ),
       this.pool.query(
@@ -202,7 +203,7 @@ export class PartnerManager {
         const clickId=event?.clickId?String(event.clickId):null;
         const meta=event?.metadata && typeof event.metadata==="object" ? event.metadata : {};
         const q=await client.query(
-          "INSERT INTO kingbot_partner_events(click_id,user_id,broker_slug,event_type,external_reference,amount,currency,source,occurred_at,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING id,broker_slug,event_type,amount,currency,occurred_at",
+          "INSERT INTO kingbot_partner_events(click_id,user_id,broker_slug,event_type,external_reference,amount,currency,source,occurred_at,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) ON CONFLICT DO NOTHING RETURNING id,broker_slug,event_type,amount,currency,occurred_at",
           [clickId,userId,slug,type,event?.externalReference?String(event.externalReference).slice(0,150):null,amount,currency,String(event?.source||"partner_feed").slice(0,60),occurredAt.toISOString(),JSON.stringify(meta)]
         );
         inserted.push(q.rows[0]);
