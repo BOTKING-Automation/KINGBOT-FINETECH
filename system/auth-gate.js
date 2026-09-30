@@ -32,6 +32,7 @@ IMPORTANT:
 
     config: {
       protectedPages: [
+        "index.html",
         "terminal.html",
         "analytics.html",
         "ai.html",
