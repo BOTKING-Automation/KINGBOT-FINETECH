@@ -2,7 +2,8 @@ import "dotenv/config";
 import crypto from "node:crypto";
 import pg from "pg";
 import { UserBrokerManager } from "./user-broker-manager.js";
-import { evaluateBot, getBotDefinitions } from "./bot-engines.js";
+import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
+import { monitorBotDecision } from "./ai-bot-supervisor.js";
 import { authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
 import { ensureAuthSchema } from "./auth.js";
 import { ensureSubscriptionSchema, expireStaleSubscriptions } from "./subscriptions.js";
@@ -131,7 +132,7 @@ async function execute(row){
   const candles=(await broker.getHistoricalCandles(config.symbol,config.timeframe,userId,100)).data||[];
   const ind=indicators(candles);
   const spread=ask-bid;
-  const analysis=evaluateBot(botId,{symbol:config.symbol,timeframe:config.timeframe,price:(bid+ask)/2,spread,atr:ind.atr,volatility:ind.volatility,trend:ind.trend,momentum:ind.momentum,volume:ind.volume,structure:ind.structure,liquiditySweep:ind.liquiditySweep,orderBlock:ind.orderBlock,fairValueGap:ind.fairValueGap,displacement:ind.displacement,breakout:ind.breakout,retest:ind.retest});
+  const analysis=evaluateBot(botId,{symbol:config.symbol,timeframe:config.timeframe,price:(bid+ask)/2,entryPrice:(bid+ask)/2,spread,atr:ind.atr,volatility:ind.volatility,trend:ind.trend,momentum:ind.momentum,volume:ind.volume,structure:ind.structure,liquiditySweep:ind.liquiditySweep,orderBlock:ind.orderBlock,fairValueGap:ind.fairValueGap,displacement:ind.displacement,breakout:ind.breakout,retest:ind.retest});
   const positions=(await broker.getPositions(userId)).data||[];
   const riskStateQ=await pool.query("SELECT baseline_date,day_start_equity,peak_equity FROM kingbot_account_risk_state WHERE user_id=$1 AND provider=$2 AND account_id=$3",[userId,status.broker,status.accountId]);
   const today=new Date().toISOString().slice(0,10);
@@ -140,17 +141,29 @@ async function execute(row){
   await pool.query("INSERT INTO kingbot_account_risk_state(user_id,provider,account_id,baseline_date,day_start_equity,peak_equity,updated_at) VALUES($1,$2,$3,$4,$5,$6,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET baseline_date=EXCLUDED.baseline_date,day_start_equity=EXCLUDED.day_start_equity,peak_equity=EXCLUDED.peak_equity,updated_at=NOW()",[userId,status.broker,status.accountId,today,dayStart,peak]);
   const losses=await consecutiveLosses(userId);
   const risk=authorizeOrder({limits:s,executionMode:s.executionMode,killSwitch:s.killSwitch,equity:Number(account.equity),dayStartEquity:dayStart,peakEquity:peak,openPositions:positions.length,requestedRiskPct:s.maxRiskPerTradePct,spread,atr:ind.atr,dataAgeMs:Date.now()-quoteTime,consecutiveLosses:losses});
-  let action="NO_ACTION",order=null;
+  let action="NO_ACTION",order=null,tradePlan=null;
   if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed){
     const side=analysis.signal==="LONG_CANDIDATE"?"BUY":"SELL";
     const spec=(await broker.getSymbolSpecification(config.symbol,userId)).data||{};
     const tickSize=Number(spec.tickSize),minVolume=Number(spec.minVolume),maxVolume=Number(spec.maxVolume),volumeStep=Number(spec.volumeStep),point=Number(spec.point),stopsLevel=Number(spec.stopsLevel);
     const tickValue=Number(side==="BUY"?quote.lossTickValue:quote.lossTickValue);
     if(![tickSize,minVolume,maxVolume,volumeStep,point,stopsLevel,tickValue].every(Number.isFinite)||tickSize<=0||minVolume<=0||maxVolume<minVolume||volumeStep<=0||tickValue<=0)throw new Error("BROKER_SIZING_DATA_UNAVAILABLE");
-    const stopDistance=Math.max(ind.atr*1.5,stopsLevel*point*1.1);
+
+    const tradePlan=getTradePlan(botId,{
+      symbol:config.symbol,
+      timeframe:config.timeframe,
+      price:(bid+ask)/2,
+      entryPrice:side==="BUY"?ask:bid,
+      atr:ind.atr
+    },side);
+    if(!tradePlan.ok)throw new Error(tradePlan.reason||"TRADE_PLAN_UNAVAILABLE");
+
     const entry=side==="BUY"?ask:bid;
+    const brokerMinDistance=stopsLevel*point*1.1;
+    const stopDistance=Math.max(tradePlan.stopDistance,brokerMinDistance);
+    const takeProfitDistance=Math.max(tradePlan.takeProfitDistance,stopDistance*1.05);
     const stopLoss=side==="BUY"?entry-stopDistance:entry+stopDistance;
-    const takeProfit=side==="BUY"?entry+stopDistance*1.5:entry-stopDistance*1.5;
+    const takeProfit=side==="BUY"?entry+takeProfitDistance:entry-takeProfitDistance;
     const riskAmount=Number(account.equity)*(s.maxRiskPerTradePct/100);
     const rawVolume=riskAmount/((stopDistance/tickSize)*tickValue);
     const volume=Number((Math.floor(rawVolume/volumeStep)*volumeStep).toFixed(12));
@@ -168,8 +181,34 @@ async function execute(row){
       throw error;
     }
   }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!risk.allowed){action="RISK_BLOCKED";}
-  await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify({signal:analysis.signal,score:analysis.score,action,executionMode:s.executionMode})]);
-  await audit(userId,"BOT_WORKER_TICK",{botId,executionMode:s.executionMode,symbol:config.symbol,timeframe:config.timeframe,signal:analysis.signal,score:analysis.score,action});
+  const signalPayload={
+    signal:analysis.signal,
+    score:analysis.score,
+    threshold:analysis.threshold,
+    action,
+    executionMode:s.executionMode,
+    strategy:botId,
+    tradePlan:analysis.signal!=="NO_SIGNAL" ? (typeof tradePlan!=="undefined" ? tradePlan : null) : null,
+    riskAllowed:risk.allowed,
+    updatedAt:new Date().toISOString()
+  };
+  await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify(signalPayload)]);
+  await audit(userId,"BOT_WORKER_TICK",{botId,executionMode:s.executionMode,symbol:config.symbol,timeframe:config.timeframe,signal:analysis.signal,score:analysis.score,action,tradePlan:signalPayload.tradePlan});
+
+  if(analysis.ok && analysis.signal!=="NO_SIGNAL"){
+    void monitorBotDecision({
+      userId,
+      botId,
+      analysis,
+      market:{symbol:config.symbol,timeframe:config.timeframe,bid,ask,spread,atr:ind.atr,volatility:ind.volatility,trend:ind.trend,momentum:ind.momentum,structure:ind.structure},
+      risk,
+      tradePlan:signalPayload.tradePlan
+    }).then(aiMonitor=>{
+      if(!aiMonitor)return;
+      const merged={...signalPayload,aiMonitor,updatedAt:new Date().toISOString()};
+      return pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify(merged)]);
+    }).catch(error=>console.error("[KINGBOT AI SUPERVISOR] persistence failed:",error?.message||error));
+  }
 }
 
 async function cycle(){
