@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import WebSocket from "ws";
 
 const DEFAULT_BASE_URL = "https://api.exness.com";
 const PKCS8_ED25519_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
@@ -136,12 +137,99 @@ export class ExnessTraderClient{
     return this.request("GET","/v1/configuration/accounts/"+this.accountId+"/account");
   }
 
+
+  async websocketSnapshot(){
+    await this.ensureReady();
+    const path="/v1/server-events/accounts/"+this.accountId+"/ws/events";
+    const wsUrl=this.accessPoint.replace(/^https:/i,"wss:")+path;
+    const headers=this.buildHeaders("GET",path,"","");
+    return new Promise((resolve,reject)=>{
+      const ws=new WebSocket(wsUrl,{headers,handshakeTimeout:10000});
+      let settled=false;
+      const finish=(error,value)=>{
+        if(settled)return;
+        settled=true;
+        try{ws.close();}catch{}
+        if(error)reject(error);else resolve(value);
+      };
+      const timeout=setTimeout(()=>finish(new Error("EXNESS_SERVER_EVENTS_TIMEOUT")),12000);
+      ws.on("open",()=>{
+        ws.send(JSON.stringify({
+          id:"kingbot-snapshot-"+crypto.randomUUID(),
+          subscribe:{event:"transactions"}
+        }));
+      });
+      ws.on("message",buffer=>{
+        let message;
+        try{message=JSON.parse(buffer.toString("utf8"));}catch{return;}
+        if(message?.error_message) return finish(new Error(String(message.error_message)));
+        if(message?.event==="trading_state_snapshot" || message?.type==="trading_state_snapshot"){
+          clearTimeout(timeout);
+          finish(null,message);
+        }
+      });
+      ws.on("error",error=>{
+        clearTimeout(timeout);
+        finish(new Error(error?.message||"EXNESS_SERVER_EVENTS_FAILED"));
+      });
+      ws.on("close",()=>{
+        clearTimeout(timeout);
+        if(!settled)finish(new Error("EXNESS_SERVER_EVENTS_CLOSED"));
+      });
+    });
+  }
+
+  async getQuoteViaWebSocket(instrument){
+    await this.ensureReady();
+    const symbol=String(instrument||"").trim().toUpperCase();
+    if(!/^[A-Z0-9._-]{1,11}$/.test(symbol))throw new Error("INVALID_EXNESS_INSTRUMENT");
+    const path="/v1/server-events/accounts/"+this.accountId+"/ws/ticks";
+    const wsUrl=this.accessPoint.replace(/^https:/i,"wss:")+path;
+    const headers=this.buildHeaders("GET",path,"","");
+    return new Promise((resolve,reject)=>{
+      const ws=new WebSocket(wsUrl,{headers,handshakeTimeout:10000});
+      let settled=false;
+      const finish=(error,value)=>{
+        if(settled)return;
+        settled=true;
+        try{ws.close();}catch{}
+        if(error)reject(error);else resolve(value);
+      };
+      const timeout=setTimeout(()=>finish(new Error("EXNESS_TICK_TIMEOUT")),10000);
+      ws.on("open",()=>{
+        ws.send(JSON.stringify({
+          id:"kingbot-tick-"+crypto.randomUUID(),
+          subscribe:{event:"ticks",instruments:[symbol]}
+        }));
+      });
+      ws.on("message",buffer=>{
+        let message;
+        try{message=JSON.parse(buffer.toString("utf8"));}catch{return;}
+        if(message?.error_message)return finish(new Error(String(message.error_message)));
+        if(String(message?.instrument||"").toUpperCase()===symbol && Number.isFinite(Number(message?.bid)) && Number.isFinite(Number(message?.ask))){
+          clearTimeout(timeout);
+          finish(null,{instrument:symbol,bid:Number(message.bid),ask:Number(message.ask),timestamp:message.timestamp||new Date().toISOString()});
+        }
+      });
+      ws.on("error",error=>{
+        clearTimeout(timeout);
+        finish(new Error(error?.message||"EXNESS_TICK_STREAM_FAILED"));
+      });
+      ws.on("close",()=>{
+        clearTimeout(timeout);
+        if(!settled)finish(new Error("EXNESS_TICK_STREAM_CLOSED"));
+      });
+    });
+  }
+
   async getPositions(){
-    throw new Error("EXNESS_POSITIONS_USE_SERVER_EVENTS");
+    const snapshot=await this.websocketSnapshot();
+    return snapshot?.payload?.positions || snapshot?.positions || [];
   }
 
   async getOrders(){
-    throw new Error("EXNESS_OPEN_ORDERS_USE_SERVER_EVENTS");
+    const snapshot=await this.websocketSnapshot();
+    return snapshot?.payload?.orders || snapshot?.orders || [];
   }
 
   async getHistoricalOrders({from,to,cursor,limit=100}={}){
@@ -209,10 +297,6 @@ export class ExnessTraderClient{
   }
 
   async getQuote(instrument){
-    await this.ensureReady();
-    const symbol=String(instrument||"").trim().toUpperCase();
-    if(!/^[A-Z0-9._-]{1,11}$/.test(symbol))throw new Error("INVALID_EXNESS_INSTRUMENT");
-    const wsPath="/v1/server-events/accounts/"+this.accountId+"/ws/ticks";
-    throw new Error("EXNESS_QUOTE_USE_SERVER_EVENTS:"+wsPath+":"+symbol);
+    return this.getQuoteViaWebSocket(instrument);
   }
 }
