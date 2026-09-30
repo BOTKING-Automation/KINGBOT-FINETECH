@@ -2261,6 +2261,34 @@ async function waitForKingbotApi(timeoutMs=5000){
   return window.KINGBOT_API;
 }
 
+function getCachedBrokerIdentity(){
+  try{
+    const raw=localStorage.getItem("KINGBOT_BROKER_IDENTITY");
+    const value=raw?JSON.parse(raw):null;
+    if(value?.broker && value?.accountId)return value;
+  }catch{}
+  return null;
+}
+
+function renderCachedBrokerIdentity(){
+  const identity=getCachedBrokerIdentity();
+  if(!identity)return false;
+  $("accountBroker").textContent=String(identity.broker).toUpperCase();
+  $("accountIdDisplay").textContent=identity.accountId;
+  $("accountType").textContent=String(identity.accountType||"DEMO").toUpperCase();
+  $("accountMode").textContent=String(identity.executionMode||"PAPER").toUpperCase();
+  $("accountConnectionValue").textContent="ACCOUNT IDENTIFIED";
+  $("accountConnectionValue").style.color="#ffc84a";
+  $("accountConnectionNote").textContent="Last verified broker identity loaded locally. Live broker telemetry is being synchronized.";
+  $("heroBrokerBadge").textContent="● "+String(identity.broker).toUpperCase()+" · ACCOUNT "+identity.accountId;
+  $("heroBrokerBadge").className="hero-badge";
+  $("terminalBrokerName").textContent=String(identity.broker).toUpperCase();
+  $("terminalAccountId").textContent=identity.accountId;
+  $("terminalAccountType").textContent=String(identity.accountType||"DEMO").toUpperCase();
+  $("terminalExecutionMode").textContent=String(identity.executionMode||"PAPER").toUpperCase();
+  return true;
+}
+
 async function getTerminalAuthToken(timeoutMs=2500){
   let firebase=window.KINGBOT_FIREBASE||null;
   if(!firebase){
@@ -2449,6 +2477,7 @@ async function checkBackend() {
       }
     }catch{
       if(backendConnected) return backendConnected;
+      if(renderCachedBrokerIdentity()) return false;
       backendConnected=false;
       $("accountConnectionValue").textContent="STATUS UNAVAILABLE";
       $("accountConnectionValue").style.color="#ffc84a";
@@ -2765,6 +2794,8 @@ function formatCompact(value) {
   logActivity(
     "KINGBOT terminal initialized"
   );
+
+  renderCachedBrokerIdentity();
 
   logActivity(
     "Broker execution layer awaiting backend connection"
