@@ -361,8 +361,37 @@ IMPORTANT:
       ---------------------------------------------------
       */
 
-      const auth =
+      let auth =
         await this.checkAuthentication();
+
+      /*
+      ---------------------------------------------------
+      SESSION RESTORATION SAFETY
+      ---------------------------------------------------
+      Firebase can restore local persistence asynchronously
+      on a fresh protected-page load. Never redirect to Sign
+      In immediately after a null auth result. Give the
+      browser a short restoration window and re-check.
+      ---------------------------------------------------
+      */
+
+      if (!auth.authenticated) {
+
+        this.showAccessState(
+          "RESTORING SECURE SESSION…"
+        );
+
+        const restoreDeadline = Date.now() + 7000;
+
+        while (!auth.authenticated && Date.now() < restoreDeadline) {
+
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          auth = await this.checkAuthentication();
+
+        }
+
+      }
 
       /*
       ---------------------------------------------------
