@@ -162,7 +162,9 @@ export class UserBrokerManager {
   async disconnect(userId){
     for(const [key,entry] of this.connections){
       if(key.startsWith(String(userId)+":")){
-        try{await entry.connection.close();}finally{this.connections.delete(key);}
+        try{
+          if(entry.provider!=="exness" && entry.connection?.close)await entry.connection.close();
+        }finally{this.connections.delete(key);}
       }
     }
     return {connected:false,mode:"NOT_CONNECTED"};
@@ -179,7 +181,28 @@ export class UserBrokerManager {
 
   async getAccount(userId){
     const entry=await this.connectionFor(userId);
-    if(entry.provider==="exness")return {connected:true,data:await entry.api.getAccountInformation()};
+    if(entry.provider==="exness"){
+      const info=await entry.api.getAccountInformation();
+      let state={};
+      try{
+        const snapshot=await entry.api.websocketSnapshot();
+        state=snapshot?.payload?.account_state||snapshot?.account_state||{};
+        if(!state && snapshot?.payload?.accountState)state=snapshot.payload.accountState;
+      }catch{}
+      return {
+        connected:true,
+        data:{
+          ...info,
+          balance:state.balance??info.balance,
+          equity:state.equity??info.equity,
+          margin:state.used_margin??info.margin,
+          freeMargin:state.free_margin??info.free_margin,
+          marginLevel:state.margin_level??info.margin_level,
+          tradeAllowed:info.trade_mode==="enabled" && info.account_status==="active",
+          provider:"exness"
+        }
+      };
+    }
     return {connected:true,data:await entry.connection.getAccountInformation()};
   }
 
@@ -232,7 +255,10 @@ export class UserBrokerManager {
 
   async getQuote(symbol,userId){
     const entry=await this.connectionFor(userId);
-    if(entry.provider==="exness")return {connected:true,data:await entry.api.getQuote(String(symbol).trim().toUpperCase())};
+    if(entry.provider==="exness"){
+      const quote=await entry.api.getQuote(String(symbol).trim().toUpperCase());
+      return {connected:true,data:{...quote,time:quote.timestamp||quote.time||new Date().toISOString()}};
+    }
     return {connected:true,data:await entry.connection.getSymbolPrice(String(symbol).trim().toUpperCase())};
   }
 
