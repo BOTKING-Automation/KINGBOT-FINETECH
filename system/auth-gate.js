@@ -214,7 +214,53 @@ IMPORTANT:
     // MAIN ACCESS CONTROL
     // ---------------------------------------------------
 
+    async waitForBootComplete() {
+
+      if (
+        !document.documentElement.classList.contains(
+          "kb-boot-lock"
+        )
+      ) {
+        return;
+      }
+
+      await new Promise((resolve) => {
+
+        let done = false;
+
+        const finish = () => {
+
+          if (done) return;
+
+          done = true;
+
+          window.removeEventListener(
+            "kingbot:boot-complete",
+            finish
+          );
+
+          resolve();
+
+        };
+
+        window.addEventListener(
+          "kingbot:boot-complete",
+          finish,
+          { once: true }
+        );
+
+        window.setTimeout(
+          finish,
+          12000
+        );
+
+      });
+
+    },
+
     async enforce() {
+
+      await this.waitForBootComplete();
 
       /*
       ---------------------------------------------------
