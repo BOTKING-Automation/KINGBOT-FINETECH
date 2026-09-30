@@ -733,115 +733,6 @@ overscroll-behavior:none;}
       font-family: "JetBrains Mono";
       font-size: 9px;
     }
-
-    /* ================= BOTS ================= */
-
-    .bot-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 13px;
-    }
-
-    .bot-card {
-      min-height: 325px;
-      overflow: hidden;
-    }
-
-    .bot-image {
-      position: relative;
-      height: 155px;
-      overflow: hidden;
-      background:
-        radial-gradient(circle at 50% 45%, rgba(25,230,255,.12), transparent 38%),
-        linear-gradient(135deg, #090d1c, #11172b);
-    }
-
-    .bot-image img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .image-slot {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      text-align: center;
-      background:
-        radial-gradient(circle, rgba(25,230,255,.08), transparent 40%),
-        repeating-linear-gradient(
-          135deg,
-          rgba(255,255,255,.025) 0,
-          rgba(255,255,255,.025) 1px,
-          transparent 1px,
-          transparent 10px
-        );
-    }
-
-    .image-slot-inner {
-      padding: 18px;
-    }
-
-    .image-slot-code {
-      font-family: Orbitron;
-      font-size: 30px;
-      font-weight: 900;
-      background: linear-gradient(135deg, var(--cyan), var(--violet), var(--pink));
-      -webkit-background-clip: text;
-      color: transparent;
-    }
-
-    .image-slot-text {
-      margin-top: 8px;
-      color: #69758f;
-      font-size: 8px;
-      letter-spacing: .18em;
-    }
-
-    .bot-content {
-      padding: 15px;
-    }
-
-    .bot-name {
-      font-family: Orbitron;
-      font-size: 11px;
-      font-weight: 800;
-    }
-
-    .bot-desc {
-      min-height: 35px;
-      margin-top: 7px;
-      color: #748099;
-      font-size: 9px;
-      line-height: 1.5;
-    }
-
-    .bot-status {
-      display: inline-flex;
-      margin-top: 11px;
-      padding: 5px 7px;
-      border-radius: 6px;
-      color: #ffad7a;
-      background: rgba(255,122,24,.07);
-      border: 1px solid rgba(255,122,24,.12);
-      font-size: 8px;
-    }
-
-    .bot-controls {
-      display: flex;
-      gap: 7px;
-      margin-top: 12px;
-    }
-
-    .bot-controls .btn {
-      flex: 1;
-      padding: 8px;
-      font-size: 8px;
-    }
-
-    /* ================= BOT RUNTIME ================= */
     .runtime-grid {
       display:grid;
       grid-template-columns:repeat(5,minmax(0,1fr));
@@ -1096,10 +987,6 @@ overscroll-behavior:none;}
       .cards {
         grid-template-columns: repeat(3, 1fr);
       }
-
-      .bot-grid {
-        grid-template-columns: repeat(3, 1fr);
-      }
     }
 
     @media (max-width: 1000px) {
@@ -1150,10 +1037,6 @@ overscroll-behavior:none;}
 
       .cards {
         grid-template-columns: repeat(2, 1fr);
-      }
-
-      .bot-grid {
-        grid-template-columns: 1fr;
       }
 
       .chart-footer {
@@ -1211,16 +1094,14 @@ overscroll-behavior:none;}
     </h1>
 
     <p>
-      A centralized command environment for market intelligence, automated
-      trading systems, risk controls and broker connectivity.
-      Public market data is active now. Account and execution information
+      A focused command environment for verified account telemetry, live market data,
+      positions, orders and risk controls. Public market data is active now. Account and execution information
       appears only after a real backend connection is established.
     </p>
 
     <div class="hero-badges">
       <div class="hero-badge public">● PUBLIC MARKET DATA ACTIVE</div>
       <div class="hero-badge" id="heroBrokerBadge">● VERIFYING VERIFIED ACCOUNT…</div>
-      <div class="hero-badge">◆ 5 BOT SYSTEMS</div>
       <div class="hero-badge">◆ RISK ENGINE READY</div>
       <div class="hero-badge">◆ API BACKEND READY</div>
     </div>
@@ -1402,211 +1283,6 @@ overscroll-behavior:none;}
 
   </section>
 
-  <!-- BOT SYSTEMS -->
-  <section class="section">
-
-    <div class="section-head">
-      <div>
-        <div class="section-title">KINGBOT SYSTEMS</div>
-        <div class="section-desc">
-          Five specialized automated trading architectures.
-        </div>
-      </div>
-
-      <div class="section-tag mono">AUTOMATION / BOT_LAYER</div>
-    </div>
-
-    <div class="bot-grid">
-
-      <!-- STRATEGIC -->
-      <div class="card bot-card">
-
-        <div class="bot-image">
-          <img
-            src="assets/images/bots/strategic.png"
-            alt="KINGBOT Strategic"
-            loading="lazy"
-            onerror="imageFallback(this,'STR')"
-          />
-
-          <div class="image-slot" id="slot-strategic">
-            <div class="image-slot-inner">
-              <div class="image-slot-code">STR</div>
-              <div class="image-slot-text">
-                SYSTEM IMAGE SLOT
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="bot-content">
-          <div class="bot-name">KINGBOT STRATEGIC</div>
-          <div class="bot-desc">
-            Multi-strategy automated trading architecture.
-          </div>
-
-          <div class="bot-status">● OFFLINE / BACKEND REQUIRED</div>
-
-          <div class="bot-controls">
-            <button class="btn" disabled>START</button>
-            <button class="btn secondary" disabled>STOP</button>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- FLIPPER -->
-      <div class="card bot-card">
-
-        <div class="bot-image">
-          <img
-            src="assets/images/bots/flipper.png"
-            alt="KINGBOT Flipper"
-            loading="lazy"
-            onerror="imageFallback(this,'FLP')"
-          />
-
-          <div class="image-slot" id="slot-flipper">
-            <div class="image-slot-inner">
-              <div class="image-slot-code">FLP</div>
-              <div class="image-slot-text">
-                SYSTEM IMAGE SLOT
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="bot-content">
-          <div class="bot-name">KINGBOT FLIPPER</div>
-          <div class="bot-desc">
-            High-speed flipping and short-duration execution architecture.
-          </div>
-
-          <div class="bot-status">● OFFLINE / BACKEND REQUIRED</div>
-
-          <div class="bot-controls">
-            <button class="btn" disabled>START</button>
-            <button class="btn secondary" disabled>STOP</button>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- BREAKOUT -->
-      <div class="card bot-card">
-
-        <div class="bot-image">
-          <img
-            src="assets/images/bots/breakout.png"
-            alt="KINGBOT Breakout"
-            loading="lazy"
-            onerror="imageFallback(this,'BRK')"
-          />
-
-          <div class="image-slot" id="slot-breakout">
-            <div class="image-slot-inner">
-              <div class="image-slot-code">BRK</div>
-              <div class="image-slot-text">
-                SYSTEM IMAGE SLOT
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="bot-content">
-          <div class="bot-name">KINGBOT BREAKOUT</div>
-          <div class="bot-desc">
-            Breakout and momentum-based automation architecture.
-          </div>
-
-          <div class="bot-status">● OFFLINE / BACKEND REQUIRED</div>
-
-          <div class="bot-controls">
-            <button class="btn" disabled>START</button>
-            <button class="btn secondary" disabled>STOP</button>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- SMC -->
-      <div class="card bot-card">
-
-        <div class="bot-image">
-          <img
-            src="assets/images/bots/smc-pro.png"
-            alt="KINGBOT SMC PRO"
-            loading="lazy"
-            onerror="imageFallback(this,'SMC')"
-          />
-
-          <div class="image-slot" id="slot-smc">
-            <div class="image-slot-inner">
-              <div class="image-slot-code">SMC</div>
-              <div class="image-slot-text">
-                SYSTEM IMAGE SLOT
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="bot-content">
-          <div class="bot-name">KINGBOT SMC PRO</div>
-          <div class="bot-desc">
-            Smart Money Concepts automation and market-structure logic.
-          </div>
-
-          <div class="bot-status">● OFFLINE / BACKEND REQUIRED</div>
-
-          <div class="bot-controls">
-            <button class="btn" disabled>START</button>
-            <button class="btn secondary" disabled>STOP</button>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- LADDER -->
-      <div class="card bot-card">
-
-        <div class="bot-image">
-          <img
-            src="assets/images/bots/ladder-flip.png"
-            alt="KINGBOT Ladder Flip V8"
-            loading="lazy"
-            onerror="imageFallback(this,'L8')"
-          />
-
-          <div class="image-slot" id="slot-ladder">
-            <div class="image-slot-inner">
-              <div class="image-slot-code">L8</div>
-              <div class="image-slot-text">
-                SYSTEM IMAGE SLOT
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="bot-content">
-          <div class="bot-name">LADDER FLIP V8</div>
-          <div class="bot-desc">
-            Advanced ladder-based automated trading architecture.
-          </div>
-
-          <div class="bot-status">● OFFLINE / BACKEND REQUIRED</div>
-
-          <div class="bot-controls">
-            <button class="btn" disabled>START</button>
-            <button class="btn secondary" disabled>STOP</button>
-          </div>
-        </div>
-
-      </div>
-
-    </div>
-
-  </section>
-
   <!-- POSITIONS + RISK -->
   <section class="section">
 
@@ -1711,96 +1387,6 @@ overscroll-behavior:none;}
 
     </div>
 
-  </section>
-
-  <!-- BOT RUNTIME CONTROL -->
-  <section class="section">
-    <div class="section-head">
-      <div>
-        <div class="section-title">BOT RUNTIME CONTROL</div>
-        <div class="section-desc">Backend-authoritative lifecycle controls for each independent bot engine.</div>
-      </div>
-      <div class="section-tag">EXECUTION ORCHESTRATOR</div>
-    </div>
-
-    <div class="runtime-grid" id="runtimeGrid">
-      
-        <article class="runtime-card">
-          <div class="runtime-top">
-            <div>
-              <div class="runtime-code">STRATEGIC</div>
-              <div class="runtime-name">KINGBOT STRATEGIC</div>
-            </div>
-            <span class="runtime-state" data-runtime-bot="strategic">STOPPED / —</span>
-          </div>
-          <div class="runtime-mode">MULTI-STRATEGY</div>
-          <div class="runtime-actions">
-            <button class="btn runtime-start" data-runtime-action="start" data-bot-id="strategic">START</button>
-            <button class="btn secondary runtime-stop" data-runtime-action="stop" data-bot-id="strategic">STOP</button>
-          </div>
-        </article>
-      
-        <article class="runtime-card">
-          <div class="runtime-top">
-            <div>
-              <div class="runtime-code">FLIPPER</div>
-              <div class="runtime-name">KINGBOT FLIPPER</div>
-            </div>
-            <span class="runtime-state" data-runtime-bot="flipper">STOPPED / —</span>
-          </div>
-          <div class="runtime-mode">HIGH-SPEED FLIPPING</div>
-          <div class="runtime-actions">
-            <button class="btn runtime-start" data-runtime-action="start" data-bot-id="flipper">START</button>
-            <button class="btn secondary runtime-stop" data-runtime-action="stop" data-bot-id="flipper">STOP</button>
-          </div>
-        </article>
-      
-        <article class="runtime-card">
-          <div class="runtime-top">
-            <div>
-              <div class="runtime-code">BREAKOUT</div>
-              <div class="runtime-name">KINGBOT BREAKOUT</div>
-            </div>
-            <span class="runtime-state" data-runtime-bot="breakout">STOPPED / —</span>
-          </div>
-          <div class="runtime-mode">BREAKOUT & MOMENTUM</div>
-          <div class="runtime-actions">
-            <button class="btn runtime-start" data-runtime-action="start" data-bot-id="breakout">START</button>
-            <button class="btn secondary runtime-stop" data-runtime-action="stop" data-bot-id="breakout">STOP</button>
-          </div>
-        </article>
-      
-        <article class="runtime-card">
-          <div class="runtime-top">
-            <div>
-              <div class="runtime-code">SMC-PRO</div>
-              <div class="runtime-name">KINGBOT SMC PRO</div>
-            </div>
-            <span class="runtime-state" data-runtime-bot="smc-pro">STOPPED / —</span>
-          </div>
-          <div class="runtime-mode">SMART MONEY CONCEPTS</div>
-          <div class="runtime-actions">
-            <button class="btn runtime-start" data-runtime-action="start" data-bot-id="smc-pro">START</button>
-            <button class="btn secondary runtime-stop" data-runtime-action="stop" data-bot-id="smc-pro">STOP</button>
-          </div>
-        </article>
-      
-        <article class="runtime-card">
-          <div class="runtime-top">
-            <div>
-              <div class="runtime-code">LADDER-FLIP</div>
-              <div class="runtime-name">KINGBOT LADDER FLIP V8</div>
-            </div>
-            <span class="runtime-state" data-runtime-bot="ladder-flip">STOPPED / —</span>
-          </div>
-          <div class="runtime-mode">ADAPTIVE LADDER</div>
-          <div class="runtime-actions">
-            <button class="btn runtime-start" data-runtime-action="start" data-bot-id="ladder-flip">START</button>
-            <button class="btn secondary runtime-stop" data-runtime-action="stop" data-bot-id="ladder-flip">STOP</button>
-          </div>
-        </article>
-      
-    </div>
   </section>
 
   <!-- ORDERS / ACTIVITY -->
@@ -2031,30 +1617,6 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-/* =========================================================
-   IMAGE FALLBACK
-========================================================= */
-
-function imageFallback(img, code) {
-  img.style.display = "none";
-
-  const slotId = {
-    STR: "slot-strategic",
-    FLP: "slot-flipper",
-    BRK: "slot-breakout",
-    SMC: "slot-smc",
-    L8: "slot-ladder"
-  }[code];
-
-  if (slotId) {
-    const slot = $(slotId);
-    if (slot) slot.style.display = "grid";
-  }
-}
-
-document.querySelectorAll(".image-slot").forEach(slot => {
-  slot.style.display = "none";
-});
 
 /* =========================================================
    CHART
@@ -2698,10 +2260,7 @@ async function checkBackend() {
     try{ await loadPositions(); }catch{}
     try{ await loadOrders(); }catch{}
   }
-
-  try{await loadBots();}catch{}
   try{await loadRisk();}catch{}
-  try{await loadRuntimeState();}catch{}
 }
 
 /* =========================================================
@@ -2873,27 +2432,6 @@ async function loadOrders() {
 }
 
 /* =========================================================
-   BOTS
-========================================================= */
-
-async function loadBots() {
-
-  const data =
-    await fetchApi("/api/bots");
-
-  const bots =
-    Array.isArray(data)
-      ? data
-      : data.bots || [];
-
-  if (!bots.length) return;
-
-  logActivity(
-    `${bots.length} bot system records received from backend`
-  );
-}
-
-/* =========================================================
    RISK
 ========================================================= */
 
@@ -2905,13 +2443,7 @@ async function loadRisk() {
   const active = rows.filter(row => String(row.execution_mode || "").toUpperCase() === "LIVE");
   const blocked = rows.filter(row => Boolean(row.kill_switch));
 
-  if ($("drawdown")) {
-    $("drawdown").textContent = rows.length
-      ? `${rows.length} bot risk profiles`
-      : "—";
-  }
-
-  const riskLog = blocked.length
+    const riskLog = blocked.length
     ? `Risk telemetry: ${blocked.length} kill switch${blocked.length === 1 ? "" : "es"} active`
     : active.length
       ? `Risk telemetry: ${active.length} LIVE profile${active.length === 1 ? "" : "s"} configured`
@@ -3021,43 +2553,9 @@ function formatCompact(value) {
 }
 
 
-/* KINGBOT RUNTIME CONTROL */
-async function loadRuntimeState(){
-  try{
-    const d=await fetchApi("/api/runtime");
-    const map=new Map((d.bots||[]).map(x=>[x.botId,x]));
-    document.querySelectorAll("[data-runtime-bot]").forEach(el=>{const x=map.get(el.dataset.runtimeBot);if(x)el.textContent=x.runtime+" / "+x.executionMode;});
-    return d;
-  }catch{return null;}
-}
-async function controlBotRuntime(botId,action){
-  try{
-    const d=await fetchApi("/api/runtime/"+encodeURIComponent(botId)+"/"+action,{method:"POST",body:JSON.stringify({})});
-    toast("BOT RUNTIME",botId.toUpperCase()+" → "+(d.state||action).toUpperCase());
-    logActivity("Runtime "+action+" confirmed for "+botId);
-    await loadRuntimeState();
-    return d;
-  }catch(e){toast("RUNTIME BLOCKED",e.message||"Runtime request rejected.");logActivity("Runtime request rejected for "+botId);}
-}
-window.KINGBOT_RUNTIME={load:loadRuntimeState,control:controlBotRuntime};
-
 /* =========================================================
    STARTUP
 ========================================================= */
-
-document.querySelectorAll("[data-runtime-action]").forEach(btn=>{
-  btn.addEventListener("click",async()=>{
-    const botId=btn.dataset.botId;
-    const action=btn.dataset.runtimeAction;
-    btn.disabled=true;
-    try{
-      await controlBotRuntime(botId,action);
-    }finally{
-      btn.disabled=false;
-    }
-  });
-});
-
 (async function init() {
 
   logActivity(
