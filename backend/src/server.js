@@ -6,6 +6,7 @@ import { GoogleGenAI } from "@google/genai";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import crypto from "node:crypto";
 import { createAuthRouter, ensureAuthSchema } from "./auth.js";
 import { createSubscriptionRouter, ensureSubscriptionSchema } from "./subscriptions.js";
 import { createBotEngineRouter, ensureBotEngineSchema } from "./bot-engines.js";
@@ -118,6 +119,128 @@ app.post("/api/broker/account", async (req,res)=>{
     }));
   }catch(error){
     res.status(500).json({ok:false,error:"Broker account mapping failed.",reason:error?.message||"BROKER_ACCOUNT_MAPPING_FAILED"});
+  }
+});
+
+function derivEnv(name){
+  return String(process.env[name]||"").trim();
+}
+function base64url(buffer){
+  return Buffer.from(buffer).toString("base64").replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/,"");
+}
+function createPkce(){
+  const verifier=base64url(crypto.randomBytes(48));
+  const challenge=base64url(crypto.createHash("sha256").update(verifier).digest());
+  return {verifier,challenge};
+}
+function derivReturnUrl(){
+  return derivEnv("DERIV_FRONTEND_RETURN_URL") || derivEnv("FRONTEND_ORIGIN") || "/";
+}
+function derivRedirectError(res,message){
+  const target=new URL(derivReturnUrl());
+  target.searchParams.set("deriv","error");
+  target.searchParams.set("message",String(message||"DERIV_CONNECTION_FAILED").slice(0,180));
+  return res.redirect(target.toString());
+}
+
+app.get("/api/broker/deriv/oauth/start", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  const clientId=derivEnv("DERIV_OAUTH_CLIENT_ID");
+  const redirectUri=derivEnv("DERIV_OAUTH_REDIRECT_URI");
+  if(!clientId||!redirectUri){
+    return res.status(503).json({ok:false,error:"DERIV_OAUTH_NOT_CONFIGURED"});
+  }
+  if(!/^https:\\/\\//i.test(redirectUri)){
+    return res.status(503).json({ok:false,error:"DERIV_OAUTH_REDIRECT_URI_MUST_USE_HTTPS"});
+  }
+  const mode=String(req.query?.executionMode||"PAPER").toUpperCase();
+  if(!["PAPER","LIVE"].includes(mode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+  try{
+    const {verifier,challenge}=createPkce();
+    const saved=await broker.createDerivOAuthState({userId:user.id,codeVerifier:verifier,executionMode:mode});
+    const url=new URL("https://auth.deriv.com/oauth2/auth");
+    url.searchParams.set("response_type","code");
+    url.searchParams.set("client_id",clientId);
+    url.searchParams.set("redirect_uri",redirectUri);
+    url.searchParams.set("scope","trade");
+    url.searchParams.set("state",saved.state);
+    url.searchParams.set("code_challenge",challenge);
+    url.searchParams.set("code_challenge_method","S256");
+    res.json({ok:true,authorizationUrl:url.toString(),executionMode:mode});
+  }catch(error){
+    console.error("[KINGBOT DERIV] oauth start failed:",error?.message||error);
+    res.status(500).json({ok:false,error:"DERIV_OAUTH_START_FAILED"});
+  }
+});
+
+app.get("/api/broker/deriv/oauth/callback", async (req,res)=>{
+  const state=String(req.query?.state||"").trim();
+  const code=String(req.query?.code||"").trim();
+  if(!state)return derivReturnUrl()==="/" ? res.status(400).json({ok:false,error:"DERIV_OAUTH_STATE_REQUIRED"}) : derivReturnError(res,"DERIV_OAUTH_STATE_REQUIRED");
+  if(req.query?.error)return derivReturnError(res,String(req.query?.error_description||req.query?.error));
+  if(!code)return derivReturnError(res,"DERIV_OAUTH_CODE_REQUIRED");
+
+  const saved=await broker.consumeDerivOAuthState(state);
+  if(!saved)return derivReturnError(res,"DERIV_OAUTH_STATE_INVALID_OR_EXPIRED");
+
+  const clientId=derivEnv("DERIV_OAUTH_CLIENT_ID");
+  const redirectUri=derivEnv("DERIV_OAUTH_REDIRECT_URI");
+  if(!clientId||!redirectUri)return derivReturnError(res,"DERIV_OAUTH_NOT_CONFIGURED");
+
+  try{
+    const tokenResponse=await fetch("https://auth.deriv.com/oauth2/token",{
+      method:"POST",
+      headers:{"Content-Type":"application/x-www-form-urlencoded"},
+      body:new URLSearchParams({
+        grant_type:"authorization_code",
+        client_id:clientId,
+        code,
+        code_verifier:String(saved.code_verifier),
+        redirect_uri:redirectUri
+      })
+    });
+    const tokenData=await tokenResponse.json().catch(()=>({}));
+    if(!tokenResponse.ok||!tokenData.access_token){
+      throw new Error(tokenData?.error_description||tokenData?.error||"DERIV_TOKEN_EXCHANGE_FAILED");
+    }
+
+    const accountResponse=await fetch("https://api.derivws.com/trading/v1/options/accounts",{
+      headers:{Authorization:"Bearer "+tokenData.access_token}
+    });
+    const accountData=await accountResponse.json().catch(()=>({}));
+    if(!accountResponse.ok)throw new Error(accountData?.errors?.[0]?.message||"DERIV_ACCOUNT_LIST_FAILED");
+
+    const accounts=Array.isArray(accountData?.data)?accountData.data:(accountData?.data?[accountData.data]:[]);
+    const wantedType=saved.execution_mode==="PAPER"?"demo":"real";
+    const candidates=accounts.filter(account=>String(account?.account_type||"").toLowerCase()===wantedType&&String(account?.status||"active").toLowerCase()==="active");
+    const account=candidates[0];
+    if(!account?.account_id)throw new Error(saved.execution_mode==="PAPER"?"NO_DERIV_DEMO_ACCOUNT":"NO_DERIV_REAL_ACCOUNT");
+
+    await broker.saveMapping({
+      userId:saved.user_id,
+      provider:"deriv",
+      accountId:String(account.account_id),
+      executionMode:saved.execution_mode,
+      accountToken:JSON.stringify({
+        accessToken:tokenData.access_token,
+        refreshToken:tokenData.refresh_token||undefined,
+        expiresAt:Date.now()+Number(tokenData.expires_in||3600)*1000,
+        accountType:wantedType
+      }),
+      derivAccountType:wantedType
+    });
+
+    const result=await broker.connect(saved.user_id,saved.execution_mode);
+    if(!result.connected)throw new Error(result.reason||"DERIV_CONNECTION_FAILED");
+
+    const target=new URL(derivReturnUrl());
+    target.searchParams.set("deriv","connected");
+    target.searchParams.set("account",String(account.account_id));
+    target.searchParams.set("mode",String(saved.execution_mode));
+    return res.redirect(target.toString());
+  }catch(error){
+    console.error("[KINGBOT DERIV] oauth callback failed:",error?.message||error);
+    return derivReturnError(res,error?.message||"DERIV_OAUTH_CALLBACK_FAILED");
   }
 });
 
