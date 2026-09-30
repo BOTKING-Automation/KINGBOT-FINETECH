@@ -346,7 +346,6 @@ $("riskBody").addEventListener("change",async e=>{const input=e.target.closest("
     lockMsg.textContent="KINGBOT backend is not responding. Refresh in a moment or check the backend deployment.";
   }else{
     lockMsg.textContent=e.message||"Administrator access denied.";
-    if(Number(e.status)===401)setTimeout(()=>preserveAdminReturn(),500);
   }
  }
 })();
