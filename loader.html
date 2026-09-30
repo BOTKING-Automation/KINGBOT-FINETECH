@@ -2,18 +2,128 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>KINGBOT FINTECH — Startup</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KINGBOT FINTECH — Neural Startup</title>
 <style>
-html,body{margin:0;width:100%;height:100%;background:#02040a}
+:root{--cyan:#19e6ff;--violet:#9b5cff;--pink:#ff4fd8;--gold:#f6b93b;--green:#23f7a3}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}
+body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208 100%);color:#eef3ff;font-family:Inter,system-ui,sans-serif}
+#kb-loader{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208 100%);overflow:hidden}
+#kb-loader:before{content:"";position:absolute;inset:-20%;background:conic-gradient(from 90deg,rgba(25,230,255,.08),rgba(155,92,255,.09),rgba(255,79,216,.08),rgba(246,185,59,.08),rgba(35,247,163,.07),rgba(25,230,255,.08));filter:blur(40px);animation:aura 8s ease-in-out infinite}
+#kb-loader:after{content:"";position:absolute;inset:0;opacity:.3;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:42px 42px;mask-image:radial-gradient(circle at 50% 50%,black 20%,transparent 85%)}
+.core{position:relative;z-index:2;width:min(920px,95vw);text-align:center;padding:24px 16px}
+.brand{font:900 20px Orbitron,Inter,sans-serif;letter-spacing:.18em;background:linear-gradient(90deg,var(--cyan),var(--violet),var(--pink),var(--gold),var(--green),var(--cyan));background-size:500% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradient 3.2s linear infinite}
+.sub{margin-top:8px;color:#7b89ab;font:700 8px "JetBrains Mono",monospace;letter-spacing:.22em}
+.stage{position:relative;width:min(720px,95vw);height:360px;margin:8px auto 5px;display:grid;place-items:center;perspective:1200px}
+.halo{position:absolute;width:min(350px,78vw);height:min(350px,78vw);max-width:350px;max-height:350px;border-radius:50%;border:1px solid rgba(25,230,255,.28);box-shadow:0 0 110px rgba(25,230,255,.13),0 0 55px rgba(155,92,255,.08),inset 0 0 85px rgba(246,185,59,.06);animation:spin 12s linear infinite}
+.halo:before,.halo:after{content:"";position:absolute;border-radius:50%;inset:18px;border:1px dashed rgba(155,92,255,.34);animation:spinReverse 8s linear infinite}
+.halo:after{inset:48px;border-style:solid;border-color:rgba(246,185,59,.24);animation-duration:11s}
+.brain{position:relative;width:min(322px,72vw);height:min(322px,72vw);max-width:322px;max-height:322px;display:grid;place-items:center;transform-style:preserve-3d;animation:float 2.7s ease-in-out infinite}
+.brain-image-wrap{position:relative;width:100%;height:100%;display:grid;place-items:center;overflow:hidden;border-radius:50%;border:1px solid rgba(255,255,255,.12);background:radial-gradient(circle at 50% 45%,rgba(7,19,38,.55),rgba(2,4,10,.72) 72%,rgba(0,0,0,.88));box-shadow:0 0 35px rgba(25,230,255,.18),0 0 85px rgba(155,92,255,.10),inset 0 0 34px rgba(255,255,255,.05);transform-style:preserve-3d}
+.brain-image{width:100%;height:100%;padding:10px;object-fit:contain;display:block;mix-blend-mode:screen;filter:drop-shadow(0 0 14px rgba(25,230,255,.55)) drop-shadow(0 0 38px rgba(25,230,255,.22)) hue-rotate(0deg) saturate(1.35) brightness(1.08);animation:brainColor 8s linear infinite,brainDepth 4s ease-in-out infinite}
+.brain-energy{position:absolute;inset:-2%;border-radius:50%;pointer-events:none;background:conic-gradient(from 90deg,rgba(25,230,255,.10),rgba(155,92,255,.20),rgba(255,79,216,.18),rgba(246,185,59,.16),rgba(35,247,163,.15),rgba(25,230,255,.10));mix-blend-mode:screen;filter:blur(26px);opacity:.72;animation:energyShift 6s linear infinite}
+.brain-image-wrap:before{content:"";position:absolute;inset:7px;border-radius:50%;border:1px solid rgba(25,230,255,.20);box-shadow:0 0 40px rgba(25,230,255,.12),0 0 80px rgba(155,92,255,.08),inset 0 0 22px rgba(255,255,255,.04);pointer-events:none;animation:brainRing 5s ease-in-out infinite;z-index:3}
+@keyframes brainColor{0%,100%{filter:drop-shadow(0 0 14px rgba(25,230,255,.6)) drop-shadow(0 0 42px rgba(25,230,255,.24)) hue-rotate(0deg) saturate(1.35) brightness(1.08)}16%{filter:drop-shadow(0 0 16px rgba(25,230,255,.62)) drop-shadow(0 0 44px rgba(25,230,255,.24)) hue-rotate(38deg) saturate(1.4) brightness(1.1)}33%{filter:drop-shadow(0 0 18px rgba(155,92,255,.65)) drop-shadow(0 0 46px rgba(155,92,255,.25)) hue-rotate(95deg) saturate(1.45) brightness(1.12)}50%{filter:drop-shadow(0 0 19px rgba(255,79,216,.68)) drop-shadow(0 0 48px rgba(255,79,216,.26)) hue-rotate(145deg) saturate(1.5) brightness(1.14)}68%{filter:drop-shadow(0 0 19px rgba(246,185,59,.7)) drop-shadow(0 0 48px rgba(246,185,59,.27)) hue-rotate(205deg) saturate(1.5) brightness(1.15)}84%{filter:drop-shadow(0 0 18px rgba(35,247,163,.68)) drop-shadow(0 0 46px rgba(35,247,163,.25)) hue-rotate(275deg) saturate(1.45) brightness(1.12)}}
+@keyframes brainDepth{50%{transform:translateY(-5px) rotateY(-3deg) rotateX(1.5deg) scale(1.018)}}
+@keyframes energyShift{to{transform:rotate(360deg) scale(1.08);filter:blur(30px);opacity:.95}}
+@keyframes brainRing{50%{transform:scale(1.05);opacity:.75;box-shadow:0 0 75px rgba(255,79,216,.14),0 0 110px rgba(246,185,59,.08)}}
+.pulse{position:absolute;top:49%;left:50%;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 0 18px var(--cyan),0 0 36px var(--pink),0 0 68px rgba(246,185,59,.55);transform:translate(-50%,-50%) translateZ(35px);animation:pulse 1s ease-in-out infinite}
+.market{position:absolute;left:50%;bottom:8px;width:min(390px,78vw);height:62px;transform:translateX(-50%) rotateX(58deg) rotateZ(-1deg);transform-style:preserve-3d;opacity:.9}
+.grid{position:absolute;inset:0;border:1px solid rgba(25,230,255,.13);border-radius:14px;background:linear-gradient(rgba(25,230,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(155,92,255,.025) 1px,transparent 1px);background-size:28px 14px;box-shadow:0 0 28px rgba(25,230,255,.05),inset 0 0 22px rgba(155,92,255,.05)}
+.line{position:absolute;inset:4px;width:calc(100% - 8px);height:calc(100% - 8px)}
+.line polyline{fill:none;stroke:#19e6ff;stroke-width:2.7;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:14 8;filter:drop-shadow(0 0 5px #19e6ff) drop-shadow(0 0 11px #9b5cff);animation:trace 3s linear infinite}
+.readout{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;color:#657492;font:700 7px "JetBrains Mono",monospace;letter-spacing:.08em}.readout b{color:#eef3ff}
+.status{min-height:23px;margin-top:10px;font:900 10px Orbitron,Inter,sans-serif;letter-spacing:.17em;background:linear-gradient(90deg,var(--cyan),var(--violet),var(--pink),var(--gold),var(--green));-webkit-background-clip:text;background-clip:text;color:transparent}
+.progress{width:min(560px,92vw);height:5px;margin:10px auto 0;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
+.progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--cyan),var(--violet),var(--pink),var(--gold),var(--green));box-shadow:0 0 20px rgba(25,230,255,.7);animation:progress 10s linear forwards}
+.foot{margin-top:13px;color:#4f5d78;font:600 7px "JetBrains Mono",monospace;letter-spacing:.1em}
+@keyframes aura{0%,100%{transform:scale(1) rotate(0);opacity:.75}50%{transform:scale(1.08) rotate(35deg);opacity:1}}
+@keyframes gradient{to{background-position:500% center}}@keyframes spin{to{transform:rotate(360deg)}}@keyframes spinReverse{to{transform:rotate(-360deg)}}@keyframes float{50%{transform:translateY(-7px) rotateY(-3deg) rotateX(1.5deg)}}@keyframes pulse{50%{transform:translate(-50%,-50%) translateZ(35px) scale(1.8);opacity:.45}}@keyframes trace{to{stroke-dashoffset:-88}}@keyframes progress{to{width:100%}}
+@media(max-width:640px){.core{padding:18px 10px}.stage{height:315px;margin-top:8px}.brain{width:min(286px,74vw);height:min(286px,74vw)}.halo{width:min(312px,81vw);height:min(312px,81vw)}.market{width:min(340px,78vw);height:54px;bottom:4px}.brand{font-size:15px}.sub{font-size:6px;letter-spacing:.18em}.readout{gap:10px;font-size:6px}.status{font-size:8px;margin-top:7px}.progress{margin-top:7px}.foot{margin-top:9px;font-size:6px}}
 </style>
 </head>
 <body>
-<script>
+<div id="kb-loader">
+<div class="core">
+<div class="brand">KINGBOT FINTECH</div>
+<div class="sub">NEURAL TRADING INFRASTRUCTURE · SECURE INITIALIZATION</div>
+<div class="stage">
+<div class="halo"></div>
+<div class="brain">
+<div class="brain-image-wrap">
+<img class="brain-image" src="assets/images/kingbot_v8_logo.png" alt="KINGBOT modern high-tech neural brain" onerror="this.onerror=null;this.src='assets/images/kingbot-modern-brain.png'">
+<div class="brain-energy"></div>
+</div>
+<div class="pulse"></div>
+<div class="market">
+<div class="grid"></div>
+<svg class="line" viewBox="0 0 410 112" preserveAspectRatio="none" aria-hidden="true"><polyline points="5,94 34,90 62,84 88,86 111,75 137,79 163,66 188,68 213,53 238,58 263,43 288,47 314,32 341,35 368,18 405,8"/></svg>
+</div></div></div></div>
+<div class="readout"><span>AI CORE <b>ACTIVE</b></span><span>CYBER NEURAL CORE <b>ONLINE</b></span><span>UPTREND MATRIX <b>LINKING</b></span></div>
+<div class="status" id="status">NEURAL CORE INITIALIZING</div>
+<div class="progress"><i></i></div>
+<div class="foot">GIBSONFX TECH · KINGBOT FINTECH · 3.00 SEC STARTUP SEQUENCE</div>
+</div></div>
+
+<script type="module">
+import "./system/firebase-auth.js";
+import "./system/session.js";
+
 (function(){
   "use strict";
-  /* Home owns the canonical startup shell. */
-  window.location.replace("index.html");
+
+  const params=new URLSearchParams(window.location.search);
+  const durationRaw=Number(params.get("duration"));
+  const duration=(Number.isFinite(durationRaw)&&durationRaw>=800&&durationRaw<=10000)?durationRaw:3000;
+  const status=document.getElementById("status");
+
+  const states=[
+    "NEURAL CORE INITIALIZING",
+    "MARKET MATRIX LINKING",
+    "BOT BRAIN SYNCHRONIZING",
+    "RISK ENGINE ONLINE",
+    "AUTH GATE READY"
+  ];
+
+  let index=0;
+  const ticker=window.setInterval(()=>{
+    index=(index+1)%states.length;
+    if(status)status.textContent=states[index];
+  },600);
+
+  function go(path){
+    window.location.replace(path);
+  }
+
+  async function routeAfterStartup(){
+    window.clearInterval(ticker);
+    try{
+      const session=window.KINGBOT_SESSION;
+      if(!session){
+        go("access-stable.html?return="+encodeURIComponent("index.html")+"#signin");
+        return;
+      }
+
+      const state=await session.check({force:true});
+
+      if(state?.authenticated && state?.user?.verified){
+        go("index.html?kb-startup=complete");
+        return;
+      }
+
+      if(state?.authenticated && state?.user && !state.user.verified){
+        go("verify.html?return="+encodeURIComponent("index.html"));
+        return;
+      }
+
+      go("access-stable.html?return="+encodeURIComponent("index.html")+"#signin");
+    }catch(error){
+      console.warn("[KINGBOT LOADER] Startup auth routing failed:",error?.message||error);
+      go("access-stable.html?return="+encodeURIComponent("index.html")+"#signin");
+    }
+  }
+
+  window.setTimeout(routeAfterStartup,duration);
 })();
 </script>
 </body>
