@@ -10,9 +10,7 @@
 html{background:#02040a;color:#eef2ff;}
 html.kb-index-pending body{visibility:hidden!important}
 </style>
-<script>
-document.documentElement.classList.add("kb-index-pending");
-</script>
+<script>document.documentElement.classList.add("kb-index-pending");</script>
 <meta name="description" content="KINGBOT FINTECH — Intelligent trading infrastructure, market intelligence, automated trading systems and professional analytics.">
 
 <title>KINGBOT FINTECH — Intelligent Trading Infrastructure</title>
@@ -2093,9 +2091,241 @@ footer{
 })();
 </script>
 
+
+<style id="kb-startup-loader-style">
+/* =========================================================
+   KINGBOT FINTECH — CANONICAL STARTUP SHELL
+   The Home document itself owns the startup experience.
+   No loader -> index -> loader bounce.
+========================================================= */
+#kb-startup-loader{
+  position:fixed;
+  inset:0;
+  z-index:1000000;
+  display:grid;
+  place-items:center;
+  background:
+    radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208 100%);
+  color:#eef3ff;
+  overflow:hidden;
+  visibility:visible;
+  opacity:1;
+  transition:opacity .45s ease,visibility .45s ease;
+}
+html:not(.kb-index-pending) #kb-startup-loader{
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+}
+#kb-startup-loader:before{
+  content:"";
+  position:absolute;
+  inset:-20%;
+  background:conic-gradient(from 90deg,rgba(25,230,255,.08),rgba(155,92,255,.09),rgba(255,79,216,.08),rgba(246,185,59,.08),rgba(35,247,163,.07),rgba(25,230,255,.08));
+  filter:blur(40px);
+  animation:kbAura 8s ease-in-out infinite;
+}
+#kb-startup-loader:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  opacity:.3;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:42px 42px;
+  mask-image:radial-gradient(circle at 50% 50%,black 20%,transparent 85%);
+}
+.kb-loader-core{
+  position:relative;
+  z-index:2;
+  width:min(620px,90vw);
+  text-align:center;
+}
+.kb-loader-brand{
+  font-family:Orbitron,sans-serif;
+  font-size:clamp(34px,7vw,64px);
+  font-weight:900;
+  letter-spacing:.17em;
+  margin-left:.17em;
+  color:#ffc84a;
+  text-shadow:0 0 12px rgba(255,200,74,.35),0 0 40px rgba(255,200,74,.12);
+  animation:kbBrandPulse 3s ease-in-out infinite;
+}
+.kb-loader-system{
+  margin-top:12px;
+  color:#19e6ff;
+  font-family:"JetBrains Mono",monospace;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.35em;
+  text-transform:uppercase;
+}
+.kb-loader-visual{
+  position:relative;
+  width:220px;
+  height:220px;
+  margin:45px auto 38px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.kb-core-ring{
+  position:absolute;
+  border-radius:50%;
+  inset:0;
+  border:1px solid rgba(25,230,255,.35);
+  box-shadow:0 0 25px rgba(25,230,255,.08),inset 0 0 25px rgba(25,230,255,.04);
+  animation:kbRotate 9s linear infinite;
+}
+.kb-core-ring:before,.kb-core-ring:after{
+  content:"";
+  position:absolute;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#19e6ff;
+  box-shadow:0 0 10px #19e6ff,0 0 25px #19e6ff;
+}
+.kb-core-ring:before{top:16px;left:50%;transform:translateX(-50%)}
+.kb-core-ring:after{right:16px;top:50%;transform:translateY(-50%);background:#ff4fd8;box-shadow:0 0 10px #ff4fd8,0 0 25px #ff4fd8}
+.kb-ring-two{inset:19px;border-color:rgba(155,92,255,.4);animation:kbRotateReverse 6s linear infinite}
+.kb-ring-three{inset:40px;border-color:rgba(255,200,74,.45);animation:kbRotate 4s linear infinite}
+.kb-robot{
+  position:relative;
+  width:92px;
+  height:92px;
+  border-radius:27px;
+  transform:rotate(45deg);
+  border:1px solid #ffc84a;
+  background:linear-gradient(135deg,rgba(255,200,74,.08),rgba(25,230,255,.05));
+  box-shadow:0 0 35px rgba(255,200,74,.2),inset 0 0 35px rgba(25,230,255,.07);
+}
+.kb-robot:before{
+  content:"";
+  position:absolute;
+  inset:16px;
+  border-radius:50%;
+  border:1px solid #19e6ff;
+  box-shadow:0 0 18px rgba(25,230,255,.35);
+}
+.kb-robot:after{
+  content:"";
+  position:absolute;
+  inset:30px;
+  border-radius:50%;
+  border:2px solid #ff4fd8;
+  box-shadow:0 0 18px rgba(255,79,216,.4);
+}
+.kb-data-line{
+  position:absolute;
+  height:1px;
+  transform-origin:left center;
+  opacity:.55;
+  overflow:hidden;
+}
+.kb-data-line:after{
+  content:"";
+  position:absolute;
+  width:80px;
+  height:100%;
+  background:linear-gradient(90deg,transparent,currentColor,transparent);
+  animation:kbLineFlow 2.5s linear infinite;
+}
+.kb-data-one{width:130px;left:-70px;top:75px;color:#19e6ff;transform:rotate(-20deg)}
+.kb-data-two{width:145px;right:-85px;top:110px;color:#ff4fd8;transform:rotate(18deg)}
+.kb-data-three{width:120px;left:-60px;bottom:55px;color:#ffc84a;transform:rotate(15deg)}
+.kb-data-four{width:135px;right:-75px;bottom:58px;color:#9b5cff;transform:rotate(-15deg)}
+.kb-loader-status{
+  display:grid;
+  gap:8px;
+  text-align:left;
+  font-family:"JetBrains Mono",monospace;
+  font-size:11px;
+}
+.kb-status-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 15px;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:9px;
+  background:rgba(7,12,27,.82);
+  backdrop-filter:blur(14px);
+  box-shadow:inset 0 0 20px rgba(255,255,255,.015);
+}
+.kb-status-label{color:#8290b5;letter-spacing:.08em}
+.kb-status-value{color:#23f7a3;font-weight:700;display:flex;align-items:center;gap:7px}
+.kb-status-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:#23f7a3;
+  box-shadow:0 0 8px #23f7a3,0 0 15px rgba(35,247,163,.6);
+  animation:kbStatusPulse 1.6s infinite;
+}
+.kb-progress-section{margin-top:22px}
+.kb-progress-track{width:100%;height:5px;overflow:hidden;border-radius:10px;background:rgba(255,255,255,.06)}
+#kbStartupProgress{width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#19e6ff,#9b5cff,#ff4fd8,#ffc84a);box-shadow:0 0 12px rgba(25,230,255,.8);transition:width .1s linear}
+#kbStartupText{margin-top:10px;color:#8290b5;font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.08em}
+.kb-loader-powered{margin-top:28px;color:#8290b5;font-size:10px;letter-spacing:.28em;text-transform:uppercase}
+.kb-loader-powered strong{color:#ffc84a;font-weight:700}
+@keyframes kbAura{0%,100%{transform:scale(1) rotate(0);opacity:.75}50%{transform:scale(1.08) rotate(35deg);opacity:1}}
+@keyframes kbBrandPulse{0%,100%{opacity:.85}50%{opacity:1}}
+@keyframes kbRotate{to{transform:rotate(360deg)}}
+@keyframes kbRotateReverse{to{transform:rotate(-360deg)}}
+@keyframes kbLineFlow{from{left:-90px}to{left:150px}}
+@keyframes kbStatusPulse{0%,100%{opacity:.45}50%{opacity:1}}
+@media(max-width:600px){
+  .kb-loader-core{width:88vw}
+  .kb-loader-visual{width:180px;height:180px;margin-top:35px;margin-bottom:30px}
+  .kb-robot{width:76px;height:76px}
+  .kb-loader-brand{font-size:34px}
+  .kb-loader-system{font-size:9px}
+  .kb-loader-status{font-size:9px}
+  .kb-status-row{padding:10px 12px}
+  .kb-data-line{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+  #kb-startup-loader *,#kb-startup-loader *:before,#kb-startup-loader *:after{animation:none!important}
+}
+</style>
 </head>
 
-<body><div data-kingbot-navigation></div> 
+<body>
+<div id="kb-startup-loader" aria-label="KINGBOT startup system">
+  <div class="kb-loader-core">
+    <div class="kb-loader-brand">KINGBOT</div>
+    <div class="kb-loader-system">AUTOMATION CORE</div>
+
+    <div class="kb-loader-visual">
+      <div class="kb-core-ring"></div>
+      <div class="kb-core-ring kb-ring-two"></div>
+      <div class="kb-core-ring kb-ring-three"></div>
+
+      <div class="kb-data-line kb-data-one"></div>
+      <div class="kb-data-line kb-data-two"></div>
+      <div class="kb-data-line kb-data-three"></div>
+      <div class="kb-data-line kb-data-four"></div>
+
+      <div class="kb-robot"></div>
+    </div>
+
+    <section class="kb-loader-status" aria-live="polite">
+      <div class="kb-status-row"><span class="kb-status-label">AI CORE</span><span class="kb-status-value"><span class="kb-status-dot"></span>READY</span></div>
+      <div class="kb-status-row"><span class="kb-status-label">AUTOMATION</span><span class="kb-status-value"><span class="kb-status-dot"></span>READY</span></div>
+      <div class="kb-status-row"><span class="kb-status-label">RISK ENGINE</span><span class="kb-status-value"><span class="kb-status-dot"></span>READY</span></div>
+      <div class="kb-status-row"><span class="kb-status-label">SECURITY</span><span class="kb-status-value"><span class="kb-status-dot"></span>READY</span></div>
+      <div class="kb-status-row"><span class="kb-status-label">PLATFORM</span><span class="kb-status-value"><span class="kb-status-dot"></span>READY</span></div>
+    </section>
+
+    <div class="kb-progress-section">
+      <div class="kb-progress-track"><div id="kbStartupProgress"></div></div>
+      <div id="kbStartupText">SYSTEM INITIALIZATION 0%</div>
+    </div>
+
+    <div class="kb-loader-powered">POWERED BY <strong>GIBSONFX TECH</strong></div>
+  </div>
+</div>
+<div data-kingbot-navigation></div> 
 
 <!-- =========================================================
      HERO
@@ -4194,6 +4424,91 @@ function showToast(message){
 
 }
 
+</script>
+
+<script type="module">
+(function(){
+  "use strict";
+
+  const STARTUP_MS = 3000;
+  const startedAt = performance.now();
+  const loader = document.getElementById("kb-startup-loader");
+  const bar = document.getElementById("kbStartupProgress");
+  const label = document.getElementById("kbStartupText");
+
+  let authReady = false;
+  let authState = null;
+  let routed = false;
+
+  function paint(v){
+    const p=Math.max(0,Math.min(100,Math.round(v)));
+    if(bar) bar.style.width=p+"%";
+    if(label) label.textContent="SYSTEM INITIALIZATION "+p+"%";
+  }
+
+  function go(path){
+    if(routed) return;
+    routed=true;
+    window.location.replace(path);
+  }
+
+  async function readAuth(){
+    try{
+      await import("./system/firebase-auth.js");
+      await import("./system/session.js");
+
+      const session=window.KINGBOT_SESSION;
+      if(!session) throw new Error("SESSION_MANAGER_MISSING");
+
+      authState=await session.check({force:true});
+      authReady=true;
+    }catch(error){
+      console.warn("[KINGBOT STARTUP] Session bootstrap failed:",error?.message||error);
+      authState={authenticated:false, user:null, error:error?.message||String(error)};
+      authReady=true;
+    }
+  }
+
+  async function finish(){
+    if(routed || !authReady) return;
+
+    const elapsed=performance.now()-startedAt;
+    const remaining=Math.max(0,STARTUP_MS-elapsed);
+
+    if(remaining>0){
+      window.setTimeout(finish,remaining);
+      return;
+    }
+
+    const state=authState;
+
+    if(state?.authenticated && state?.user?.verified){
+      document.documentElement.classList.remove("kb-index-pending");
+      return;
+    }
+
+    if(state?.authenticated && state?.user && !state.user.verified){
+      go("verify.html?return="+encodeURIComponent("index.html"));
+      return;
+    }
+
+    go("access-stable.html?return="+encodeURIComponent("index.html")+"#signin");
+  }
+
+  function tick(now){
+    const progress=Math.min(100,((now-startedAt)/STARTUP_MS)*100);
+    paint(progress);
+    if(progress<100){
+      requestAnimationFrame(tick);
+    }else{
+      finish();
+    }
+  }
+
+  paint(0);
+  readAuth().finally(()=>finish());
+  requestAnimationFrame(tick);
+})();
 </script>
 <script src="system/session.js"></script>
 <script src="system/auth-gate.js"></script>
