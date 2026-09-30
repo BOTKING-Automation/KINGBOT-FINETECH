@@ -152,7 +152,9 @@ html {
   /* Paint the platform dark before any page CSS/images arrive. */
   background: var(--kb-bg-0);
   color: var(--kb-text);
+  color-scheme: dark;
   scroll-behavior: auto;
+  overscroll-behavior: none;
 
 }
 
@@ -186,6 +188,9 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+
+  overscroll-behavior: none;
+  background-color: var(--kb-bg-0);
 
   -webkit-font-smoothing:
     antialiased;
