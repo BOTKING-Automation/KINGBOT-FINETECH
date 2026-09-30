@@ -424,6 +424,9 @@ app.post("/api/ai/query", aiLimiter, async (req, res) => {
     ? req.body.message.trim()
     : "";
 
+  const requestedSymbolFromBody = String(req.body?.symbol || "").trim().toUpperCase();
+  const requestedTimeframe = String(req.body?.timeframe || "").trim().toUpperCase();
+
   const history = Array.isArray(req.body?.history)
     ? req.body.history
         .filter(item =>
@@ -461,9 +464,19 @@ app.post("/api/ai/query", aiLimiter, async (req, res) => {
   }
 
   try {
-    const requestedSymbol=extractRequestedSymbol(message);
+    const requestedSymbol =
+      /^[A-Z0-9._-]{3,30}$/.test(requestedSymbolFromBody)
+        ? requestedSymbolFromBody
+        : extractRequestedSymbol(message);
+
     const verifiedContext=await buildIntelligenceContext(aiUser,requestedSymbol);
-    const contextText=JSON.stringify(verifiedContext,null,2);
+    const contextText=JSON.stringify({
+      ...verifiedContext,
+      analysisHint: {
+        symbol: requestedSymbol || null,
+        timeframe: requestedTimeframe || null
+      }
+    },null,2);
     const contents = history.length
       ? [
           ...history,
