@@ -60,15 +60,15 @@
         top:14px;
         left:14px;
         z-index:2147483001;
-        width:42px;
-        height:42px;
+        width:58px;
+        height:58px;
         display:block;
         object-fit:contain;
-        border-radius:11px;
-        padding:4px;
+        border-radius:14px;
+        padding:5px;
         background:rgba(4,9,22,.82);
         border:1px solid rgba(255,255,255,.10);
-        box-shadow:0 0 22px rgba(25,230,255,.08),0 0 16px rgba(246,185,59,.05);
+        box-shadow:0 0 28px rgba(25,230,255,.12),0 0 20px rgba(246,185,59,.07);
         transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
       }
 
@@ -339,7 +339,7 @@
 
       @media(max-width:560px){
         #kb-compact-nav{top:10px;right:10px}
-        #kb-compact-nav .kb-fintech-logo{top:10px;left:10px;width:38px;height:38px;border-radius:10px}
+        #kb-compact-nav .kb-fintech-logo{top:10px;left:10px;width:46px;height:46px;border-radius:12px}
         #kb-compact-nav .kb-nav-trigger{width:44px;height:44px}
         #kb-compact-nav .kb-menu{
           top:53px;
@@ -388,7 +388,9 @@
     const root=document.createElement("div");
     root.id="kb-compact-nav";
     root.innerHTML=
-      '<img class="kb-fintech-logo" src="assets/images/kingbot-fintech-logo.png" alt="KINGBOT FINTECH logo" title="KINGBOT FINTECH">'+
+      '<a href="index.html" aria-label="KINGBOT FINTECH home" style="display:block">'+
+        '<img class="kb-fintech-logo" src="assets/images/kingbot-fintech-logo.png" alt="KINGBOT FINTECH logo" title="KINGBOT FINTECH">'+
+      '</a>'+
       '<button class="kb-nav-trigger" type="button" aria-label="Open KINGBOT navigation" aria-expanded="false">'+
         '<span class="kb-bars" aria-hidden="true"><i></i><i></i><i></i></span>'+
       '</button>'+
@@ -429,6 +431,51 @@
         window.location.replace("access-stable.html");
       }
     });
+
+      const state=root.querySelector(".kb-menu-state");
+      if(state){
+        state.innerHTML=authenticated
+          ? '<span class="kb-menu-dot"></span>AUTHENTICATED'
+          : '<span class="kb-menu-dot"></span>SYSTEM ONLINE';
+      }
+
+      document.querySelectorAll("[data-kb-auth-cta]").forEach(el=>{
+        if(authenticated){
+          el.textContent="DASHBOARD →";
+          el.setAttribute("href","index.html");
+          el.classList.remove("kb-guest-only");
+        }else{
+          el.textContent=el.dataset.guestText||"ENTER KINGBOT →";
+          el.setAttribute("href","access-stable.html#signin");
+        }
+      });
+
+      document.querySelectorAll("[data-kb-guest-only]").forEach(el=>{
+        el.hidden=authenticated;
+      });
+    }
+
+    function syncAuthUI(detail){
+      const authenticated = detail?.authenticated === true ||
+        window.KINGBOT_SESSION?.isAuthenticated?.() === true;
+
+      const accountNode=root.querySelector(".kb-menu-account");
+      if(accountNode){
+        const activeLinks=authenticated ? authenticatedAccountLinks : guestAccountLinks;
+        accountNode.innerHTML=activeLinks.map(([href,name,action])=>{
+          if(action==="logout") return '<a href="#" data-kb-logout>'+name+'</a>';
+          return '<a href="'+href+'">'+name+'</a>';
+        }).join("");
+
+        accountNode.querySelectorAll("a").forEach(a=>a.addEventListener("click",close));
+        accountNode.querySelector("[data-kb-logout]")?.addEventListener("click",async event=>{
+          event.preventDefault();
+          close();
+          const logout=window.KINGBOT_SESSION?.logout;
+          if(logout) await logout({redirect:true});
+          else window.location.replace("access-stable.html");
+        });
+      }
 
       const state=root.querySelector(".kb-menu-state");
       if(state){
