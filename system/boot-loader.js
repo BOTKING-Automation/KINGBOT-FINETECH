@@ -38,64 +38,61 @@ function start(){
     /\/index\.html$/i.test(window.location.pathname);
 
   /*
-    Customer entry contract:
-      FIRST VISIT   → neural loader → sign in/verify → home
-      LATER VISIT   → no loader → auth check → home or sign in/verify
+    CUSTOMER ENTRY CONTRACT
 
-    The one-time loader marker must never disable the authentication
-    handoff. It only controls whether the visual animation is shown.
+      Direct platform entry:
+        NEURAL LOADING → SIGN IN / CREATE ACCOUNT
+        → EMAIL VERIFICATION → HOME
+
+      After successful authentication/verification:
+        HOME opens normally without replaying the loader.
+
+    The loader is a visual startup surface. Authentication
+    remains handled by Firebase and the protected-page gate.
   */
-  const handoffHome=async()=>{
-    if(!homeEntry) return;
 
-    try{
-      const session=window.KINGBOT_SESSION;
-
-      if(!session){
-        window.setTimeout(handoffHome,100);
-        return;
+  const handoff =
+    (() => {
+      try{
+        return sessionStorage.getItem("KINGBOT_AUTH_HANDOFF")==="1";
+      }catch(e){
+        return false;
       }
+    })();
 
-      const state=await session.check({force:true});
-
-      if(state?.authenticated && state?.user?.verified){
-        return;
+  const seen =
+    (() => {
+      try{
+        return sessionStorage.getItem("KINGBOT_NEURAL_BOOT_SEEN")==="1";
+      }catch(e){
+        return false;
       }
+    })();
 
-      if(state?.authenticated && !state?.user?.verified){
-        window.location.replace(
-          "verify.html?return="+
-          encodeURIComponent("index.html")
-        );
-        return;
-      }
+  /*
+    A verified/login handoff explicitly unlocks Home.
+    This is how verify.html returns the user to the landing
+    page without replaying the neural animation.
+  */
+  if(homeEntry && handoff){
+    return;
+  }
 
+  /*
+    Home is the customer gateway when no verified/login handoff
+    exists. Show the neural animation once, then route directly
+    to secure access.
+  */
+  if(homeEntry){
+    if(seen){
       window.location.replace(
         "access-stable.html?return="+
         encodeURIComponent("index.html")+
         "#signin"
       );
-    }catch(error){
-      console.warn(
-        "[KINGBOT BOOT] Auth handoff check failed:",
-        error?.message || error
-      );
-
-      window.location.replace(
-        "access-stable.html?return="+
-        encodeURIComponent("index.html")+
-        "#signin"
-      );
-    }
-  };
-
-  try{
-    if(sessionStorage.getItem("KINGBOT_NEURAL_BOOT_SEEN")==="1"){
-      window.dispatchEvent(new CustomEvent("kingbot:boot-complete"));
-      handoffHome();
       return;
     }
-  }catch(e){}
+  }
 
   installStyle();
   document.documentElement.classList.add("kb-boot-lock");
@@ -105,10 +102,11 @@ function start(){
   frame.title="KINGBOT FINTECH neural startup";
   frame.setAttribute("aria-label","KINGBOT FINTECH neural startup");
   const isAdminEntry=/\/admin-entry\.html$/i.test(window.location.pathname);
-  frame.src="loader.html?embed=1&duration=3200&surface="+(isAdminEntry?"admin":"home")+"&v=3";
+  frame.src="loader.html?embed=1&duration=3200&surface="+(isAdminEntry?"admin":"home")+"&v=4";
   document.body.appendChild(frame);
 
   let finished=false;
+
   const finish=()=>{
     if(finished) return;
     finished=true;
@@ -119,31 +117,46 @@ function start(){
     }catch(e){}
 
     frame.classList.add("kb-boot-hide");
-    window.dispatchEvent(new CustomEvent("kingbot:boot-complete"));
+    window.dispatchEvent(
+      new CustomEvent("kingbot:boot-complete")
+    );
 
-    window.setTimeout(async ()=>{
+    window.setTimeout(()=>{
       frame.remove();
       document.documentElement.classList.remove("kb-boot-lock");
 
-      await handoffHome();
+      /*
+        The loader has completed. Only the customer Home entry
+        performs the Sign In handoff. Admin uses its own gate.
+      */
+      if(homeEntry){
+        window.location.replace(
+          "access-stable.html?return="+
+          encodeURIComponent("index.html")+
+          "#signin"
+        );
+      }
     },460);
   };
 
   const onMessage=(event)=>{
     if(event.origin!==window.location.origin) return;
     if(event.source!==frame.contentWindow) return;
-    if(event.data&&event.data.type==="KINGBOT_BOOT_COMPLETE") finish();
+    if(event.data&&event.data.type==="KINGBOT_BOOT_COMPLETE"){
+      finish();
+    }
   };
 
   window.addEventListener("message",onMessage);
 
-  // Safety release if the embedded loader fails to signal completion.
-  // Admin surfaces must never remain covered by the loader indefinitely.
+  /*
+    Safety release if the embedded loader fails to signal.
+    Home must still reach secure access rather than remain covered.
+  */
   const isAdminEntry=/\/admin-entry\.html$/i.test(window.location.pathname);
   const releaseMs=isAdminEntry?3200:11000;
   window.setTimeout(finish,releaseMs);
 }
-
 if(document.readyState==="loading"){
   document.addEventListener("DOMContentLoaded",start,{once:true});
 }else{
