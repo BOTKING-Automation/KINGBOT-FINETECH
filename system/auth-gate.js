@@ -39,8 +39,7 @@ IMPORTANT:
         "settings.html",
         "subscription.html",
         "broker-connect.html",
-        "partner-revenue.html",
-        "admin.html"
+        "partner-revenue.html"
       ],
 
       authPages: [
