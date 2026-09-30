@@ -2262,12 +2262,24 @@ async function waitForKingbotApi(timeoutMs=5000){
 
 async function fetchApi(path, options = {}) {
   const api=await waitForKingbotApi();
-  const response = await api.request(path, options);
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || data?.ok === false) {
-    throw new Error(data.error || data.reason || data.message || `Backend HTTP ${response.status}`);
+  const controller=new AbortController();
+  const timeoutMs=Number(options.timeoutMs)||9000;
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  const requestOptions={...options,signal:controller.signal};
+  delete requestOptions.timeoutMs;
+  try{
+    const response = await api.request(path, requestOptions);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.ok === false) {
+      throw new Error(data.error || data.reason || data.message || `Backend HTTP ${response.status}`);
+    }
+    return data;
+  }catch(error){
+    if(error?.name==="AbortError") throw new Error(`REQUEST_TIMEOUT: ${path}`);
+    throw error;
+  }finally{
+    clearTimeout(timer);
   }
-  return data;
 }
 
 /* =========================================================
@@ -2279,9 +2291,35 @@ async function checkBackend() {
 
   await waitForKingbotApi(5000);
 
-  // Account telemetry is the authoritative source for Terminal connection state.
+  const setConnection=(state,color,note)=>{
+    if($("accountConnectionValue")){
+      $("accountConnectionValue").textContent=state;
+      $("accountConnectionValue").style.color=color;
+    }
+    if($("accountConnectionNote")) $("accountConnectionNote").textContent=note;
+  };
+
+  // First verify the saved broker mapping. Full balance/equity telemetry follows.
   try{
-    const data=await fetchApi("/api/account");
+    const status=await fetchApi("/api/connection",{timeoutMs:7000});
+    if(status.configured || status.connected){
+      $("accountBroker").textContent=String(status.broker||"—").toUpperCase();
+      $("accountIdDisplay").textContent=status.accountId||"—";
+      $("accountMode").textContent=String(status.executionMode||"—").toUpperCase();
+      if(!status.connected){
+        backendConnected=true;
+        setConnection("RECONNECTING…","#ffc84a","Verified broker account is saved. Restoring the secure broker session and requesting live account telemetry.");
+        $("heroBrokerBadge").textContent="● VERIFIED ACCOUNT SAVED · RECONNECTING…";
+        $("heroBrokerBadge").className="hero-badge";
+      }
+    }
+  }catch(error){
+    logActivity(`Broker connection check: ${error.message}`);
+  }
+
+  // Account telemetry is the authoritative source for balances and trading details.
+  try{
+    const data=await fetchApi("/api/account",{timeoutMs:10000});
     const account=data.account||data.data||data;
     if(!account || (!account.accountId && !account.broker)){
       throw new Error("ACCOUNT_TELEMETRY_INCOMPLETE");
@@ -2289,7 +2327,7 @@ async function checkBackend() {
     backendConnected=true;
     accountLoaded=true;
 
-    $("accountConnectionValue").textContent="CONNECTED";
+    setConnection("CONNECTED","#23f7a3","Verified broker account is active. Live account telemetry is synchronized from the broker.");
     $("accountConnectionValue").style.color="#23f7a3";
     $("accountConnectionNote").textContent="Verified broker account is active. Connection controls remain on Broker Connect.";
 
@@ -2305,7 +2343,7 @@ async function checkBackend() {
     // Fall back to the connection endpoint so a saved mapping can be shown as
     // reconnecting without falsely destroying the user's broker authorization.
     try{
-      const data=await fetchApi("/api/connection");
+      const data=await fetchApi("/api/connection",{timeoutMs:7000});
       backendConnected=Boolean(data.connected);
 
       $("terminalBrokerName").textContent=String(data.broker||"—").toUpperCase();
@@ -2658,20 +2696,30 @@ function formatCompact(value) {
     "Public market-data layer starting"
   );
 
-  await loadCandles();
+  // Account synchronization is independent from public market data.
+  // Do not let a slow market endpoint block broker-account visibility.
+  const accountBoot=checkBackend().catch(error=>{
+    logActivity(`Account bootstrap deferred: ${error.message}`);
+  });
 
   connectMarketSocket();
 
-  await checkBackend();
+  // Market history loads in the background.
+  void loadCandles();
 
-  // Firebase can finish restoring the signed-in user milliseconds after the first render.
-  // Recheck once shortly after startup without changing any broker connection state.
+  await accountBoot;
+
+  // Firebase/Render session restoration can finish just after first paint.
   setTimeout(async()=>{try{await checkBackend();}catch{}},1200);
+  setTimeout(async()=>{try{await checkBackend();}catch{}},5000);
 
   clearInterval(window.__KINGBOT_ACCOUNT_REFRESH);
   window.__KINGBOT_ACCOUNT_REFRESH=setInterval(async()=>{
+    try{
+      const state=await checkBackend();
+      if(state===false && !backendConnected) return;
+    }catch{}
     if(backendConnected){
-      try{await loadAccount();}catch{}
       try{await loadPositions();}catch{}
       try{await loadOrders();}catch{}
     }
