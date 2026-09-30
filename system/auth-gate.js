@@ -37,7 +37,8 @@ IMPORTANT:
         "ai.html",
         "bots.html",
         "settings.html",
-        "subscription.html"
+        "subscription.html",
+        "broker-connect.html"
       ],
 
       authPages: [
