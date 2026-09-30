@@ -598,6 +598,14 @@
       line-height:1.6;
     }
 
+    .status-box.failed{
+      color:#ff9baa;
+      border-color:rgba(255,77,109,.28);
+      background:linear-gradient(145deg,rgba(255,77,109,.08),rgba(255,77,109,.025));
+      box-shadow:0 0 28px rgba(255,77,109,.08),inset 0 0 22px rgba(255,77,109,.025);
+      font-weight:800;
+    }
+
     .history-panel{
       margin-top:17px;
     }
@@ -1225,9 +1233,18 @@
         const data=await response.json().catch(()=>({}));
 
         if(!response.ok||!data.ok){
-          throw new Error(data.error||"Payment submission failed.");
+          const message=data.error||"Payment submission failed.";
+          if(data.code==="MPESA_CODE_REUSED" || response.status===409){
+            status.className="status-box failed";
+            status.innerHTML='<span style="font-weight:900">● FAILED</span> — '+esc(message.replace(/^FAILED:\s*/i,""))+' Please enter the correct M-Pesa transaction code.';
+          }else{
+            status.className="status-box";
+            status.textContent=message;
+          }
+          return;
         }
 
+        status.className="status-box";
         status.innerHTML='<span style="color:var(--green);font-weight:800">PAYMENT SUBMITTED.</span> Your access remains locked until manual verification.';
         document.getElementById("mpesaCode").value="";
         await loadMe();
