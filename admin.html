@@ -206,7 +206,19 @@ function esc(v){return String(v??"").replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&
 function fmtDate(v){if(!v)return"—";const d=new Date(v);return Number.isNaN(d.getTime())?"—":d.toLocaleString()}
 function money(v){return Number(v||0).toLocaleString("en-US",{maximumFractionDigits:2})}
 function toastMsg(msg,kind){toast.textContent=msg;toast.className="toast show "+(kind||"");setTimeout(()=>toast.className="toast",3500)}
-async function api(path,options={}){return window.KINGBOT_API.request(path,options)}
+async function api(path,options={}){
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),12000);
+ try{return await window.KINGBOT_API.request(path,{...options,signal:controller.signal});}
+ catch(error){
+  if(error?.name==="AbortError") {
+   const e=new Error("KINGBOT backend did not respond within 12 seconds.");
+   e.code="BACKEND_TIMEOUT";
+   throw e;
+  }
+  throw error;
+ }finally{clearTimeout(timer)}
+}
 async function json(path,options={}){const r=await api(path,options);const d=await r.json().catch(()=>({}));if(!r.ok||d.ok===false){const e=new Error(d.error||d.message||("Backend HTTP "+r.status));e.status=r.status;throw e}return d}
 function paymentPill(status){const s=String(status||"").toLowerCase();if(s==="approved")return '<span class="pill ok"><i class="dot" style="background:#23f7a3"></i>APPROVED</span>';if(s==="rejected")return '<span class="pill bad"><i class="dot" style="background:#ff4d6d"></i>DENIED</span>';return '<span class="pill wait"><i class="dot" style="background:#ffb52e"></i>WAITING</span>'}
 function statePill(state){const s=String(state||"").toUpperCase();if(s==="RUNNING")return '<span class="pill ok">● RUNNING</span>';if(s==="ERROR")return '<span class="pill bad">● ERROR</span>';if(s==="PAUSED")return '<span class="pill wait">● PAUSED</span>';return '<span class="pill info">● STOPPED</span>'}
@@ -238,7 +250,19 @@ async function loadAll(showToast=false){try{const results=await Promise.all([
 ]);const [ov,us,pa,ac,en,ru,ri,br,ex,pl,he]=results;users=us.users||[];payments=pa.payments||[];activity=ac.activity||[];entitlements=en.entitlements||[];runtimes=ru.runtimes||[];risks=ri.risk||[];brokers=br.brokers||[];executions=ex.executions||[];plans=pl.plans||[];health=he||{};renderMetrics(ov.metrics||{});$("adminBadge").textContent="ADMIN VERIFIED · "+(ov.adminEmail||"");$("lastSync").dataset.value=new Date().toLocaleTimeString();$("lastSync").textContent="SYNC "+$("lastSync").dataset.value;renderUsers();renderPayments();renderPlans();renderEntitlements();renderBotCards();renderRuntimes();renderBrokers();renderRisk();renderActivity();renderExecutions("overviewExecutions");renderExecutions("auditExecutions");renderOverview();if(showToast)toastMsg("Super Admin OS synchronized.","ok")}catch(e){console.error("[KINGBOT ADMIN]",e);if(Number(e.status)===401){lockMsg.textContent="Administrator session expired. Re-authentication required.";return}toastMsg(e.message||"Admin data refresh failed.","err")}}
 async function adminPost(path,body={},okMessage="Operation completed."){try{const d=await json(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});toastMsg(d.message||okMessage,"ok");await loadAll(false);return d}catch(e){toastMsg(e.message||"Operation failed.","err");throw e}}
 async function preserveAdminReturn(){const ret=window.location.pathname+window.location.search+window.location.hash;location.replace("access-stable.html?return="+encodeURIComponent(ret)+"#signin")}
-async function ensureAdminSession(){if(!window.KINGBOT_SESSION){try{await import(new URL("system/session.js",location.href).href)}catch{}}if(!window.KINGBOT_SESSION)throw new Error("Secure session manager did not load.");const s=await window.KINGBOT_SESSION.check({force:true});if(!s.authenticated){await preserveAdminReturn();return false}if(!s.user?.verified){location.replace("verify.html?return="+encodeURIComponent(window.location.pathname+window.location.search+window.location.hash));return false}return true}
+async function ensureAdminSession(){
+ if(!window.KINGBOT_SESSION){try{await import(new URL("system/session.js",location.href).href)}catch{}}
+ if(!window.KINGBOT_SESSION)throw new Error("Secure session manager did not load.");
+ lockMsg.textContent="Restoring secure administrator session…";
+ let s=await window.KINGBOT_SESSION.check();
+ if(!s.authenticated){
+   s=await window.KINGBOT_SESSION.check({force:true});
+ }
+ if(!s.authenticated){await preserveAdminReturn();return false}
+ if(!s.user?.verified){location.replace("verify.html?return="+encodeURIComponent(window.location.pathname+window.location.search+window.location.hash));return false}
+ lockMsg.textContent="Administrator identity verified. Loading command center…";
+ return true
+}
 document.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===btn));document.querySelectorAll(".tab-panel").forEach(x=>x.classList.toggle("active",x.dataset.tabPanel===btn.dataset.tab))}));
 $("refreshBtn").addEventListener("click",()=>loadAll(true));$("overviewRefreshBtn").addEventListener("click",()=>loadAll(true));
 async function emergencyStop(){if(!confirm("Activate the global KINGBOT emergency stop? This will lock all stored bot risk profiles and stop currently recorded RUNNING runtimes."))return;await adminPost("/api/subscription/admin/risk/kill-switch",{active:true},"Global kill switch activated.");}
@@ -249,7 +273,27 @@ $("payments").addEventListener("click",async e=>{const b=e.target.closest("butto
 $("runtimeBody").addEventListener("click",async e=>{const b=e.target.closest("[data-runtime-user]");if(!b)return;if(!confirm("Stop this running bot runtime now?"))return;await adminPost("/api/subscription/admin/runtime/"+encodeURIComponent(b.dataset.runtimeUser)+"/"+encodeURIComponent(b.dataset.runtimeBot)+"/stop",{},"Runtime stopped by administrator.");});
 $("brokersBody").addEventListener("click",async e=>{const b=e.target.closest("[data-broker-user]");if(!b)return;if(!confirm("Disconnect this user's current broker session? Stored encrypted credentials will not be deleted."))return;await adminPost("/api/subscription/admin/brokers/"+encodeURIComponent(b.dataset.brokerUser)+"/disconnect",{},"Broker session disconnected.");});
 $("riskBody").addEventListener("change",async e=>{const input=e.target.closest("[data-risk-user]");if(!input)return;const active=input.checked;try{await adminPost("/api/subscription/admin/risk/kill-switch",{active,userId:input.dataset.riskUser,botId:input.dataset.riskBot},active?"Bot risk lock activated.":"Bot risk lock cleared.");}catch{await loadAll(false)}});
-(async()=>{try{const ready=await ensureAdminSession();if(!ready)return;const gate=await json("/api/subscription/admin/overview");lock.hidden=true;app.hidden=false;$("adminBadge").textContent="ADMIN VERIFIED · "+(gate.adminEmail||"");await loadAll(false);setInterval(()=>loadAll(false),30000)}catch(e){lockMsg.textContent=e.message||"Administrator access denied.";if(Number(e.status)===401)setTimeout(()=>preserveAdminReturn(),500)}})();
+(async()=>{
+ try{
+  const ready=await ensureAdminSession();
+  if(!ready)return;
+  lockMsg.textContent="Administrator identity verified. Connecting to KINGBOT backend…";
+  const gate=await json("/api/subscription/admin/overview");
+  lock.hidden=true;
+  app.hidden=false;
+  $("adminBadge").textContent="ADMIN VERIFIED · "+(gate.adminEmail||"");
+  await loadAll(false);
+  setInterval(()=>loadAll(false),30000);
+ }catch(e){
+  console.error("[KINGBOT ADMIN GATE]",e);
+  if(e?.code==="BACKEND_TIMEOUT"){
+    lockMsg.textContent="KINGBOT backend is not responding. Refresh in a moment or check the backend deployment.";
+  }else{
+    lockMsg.textContent=e.message||"Administrator access denied.";
+    if(Number(e.status)===401)setTimeout(()=>preserveAdminReturn(),500);
+  }
+ }
+})();
 })();
 </script>
 </body>
