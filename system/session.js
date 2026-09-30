@@ -20,6 +20,12 @@ function apiUrl(path){
  if(/^https?:\/\//i.test(value))return value;
  return value.startsWith("/api/")?API_ORIGIN+value:API_BASE+(value.startsWith("/")?value:"/"+value);
 }
+function withTimeout(promise,ms){
+ return Promise.race([
+  promise,
+  new Promise((_,reject)=>setTimeout(()=>reject(new Error("REQUEST_TIMEOUT")),ms))
+ ]);
+}
 async function apiRequest(path,options={}){
  const firebase=await firebaseClient();
  const headers=new Headers(options.headers||{});
@@ -64,13 +70,13 @@ const session={
     if(!user){state.authenticated=false;state.user=null;}
     else{
      const token=await user.getIdToken();
-     let r=await fetch(this.config.sessionEndpoint,{headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"});
-     let d=await r.json().catch(()=>({}));
-     if(!r.ok&&user.emailVerified&&window.KINGBOT_FIREBASE?.syncAccount){
+     let r=await withTimeout(fetch(this.config.sessionEndpoint,{headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"}),3000).catch(()=>null);
+     let d=r?await r.json().catch(()=>({})):{};
+     if((!r||!r.ok)&&user.emailVerified&&window.KINGBOT_FIREBASE?.syncAccount){
       try{
        await window.KINGBOT_FIREBASE.syncAccount();
-       r=await fetch(this.config.sessionEndpoint,{headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"});
-       d=await r.json().catch(()=>({}));
+       r=await withTimeout(fetch(this.config.sessionEndpoint,{headers:{Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"}),3000).catch(()=>null);
+       d=r?await r.json().catch(()=>({})):{};
        if(r.ok)sessionStorage.removeItem("auth_sync_pending");
       }catch(syncError){
        console.warn("[KINGBOT SESSION] Backend account sync deferred:",syncError?.message||syncError);
