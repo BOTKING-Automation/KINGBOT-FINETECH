@@ -51,21 +51,13 @@ function start(){
     remains handled by Firebase and the protected-page gate.
   */
 
-  const handoff =
-    (() => {
-      try{
-        const value =
-          sessionStorage.getItem("KINGBOT_AUTH_HANDOFF")==="1";
-
-        if(value){
-          sessionStorage.removeItem("KINGBOT_AUTH_HANDOFF");
-        }
-
-        return value;
-      }catch(e){
-        return false;
-      }
-    })();
+  /*
+    Verification writes a one-time auth handoff marker. Consume it
+    immediately, but never use it as proof of authentication.
+  */
+  try{
+    sessionStorage.removeItem("KINGBOT_AUTH_HANDOFF");
+  }catch(e){}
 
   const seen =
     (() => {
