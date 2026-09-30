@@ -187,7 +187,6 @@ body{margin:0;min-height:100vh;background:
 <div id="toast" class="toast"></div>
 
 <script src="system/session.js"></script>
-<script src="system/auth-gate.js"></script>
 <script src="system/navigation.js"></script>
 <script>
 (function(){
@@ -251,16 +250,34 @@ async function loadAll(showToast=false){try{const results=await Promise.all([
 async function adminPost(path,body={},okMessage="Operation completed."){try{const d=await json(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});toastMsg(d.message||okMessage,"ok");await loadAll(false);return d}catch(e){toastMsg(e.message||"Operation failed.","err");throw e}}
 async function preserveAdminReturn(){const ret=window.location.pathname+window.location.search+window.location.hash;location.replace("access-stable.html?return="+encodeURIComponent(ret)+"#signin")}
 async function ensureAdminSession(){
- if(!window.KINGBOT_SESSION){try{await import(new URL("system/session.js",location.href).href)}catch{}}
- if(!window.KINGBOT_SESSION)throw new Error("Secure session manager did not load.");
- lockMsg.textContent="Restoring secure administrator session…";
- let s=await window.KINGBOT_SESSION.check();
- if(!s.authenticated){
-   s=await window.KINGBOT_SESSION.check({force:true});
+ lockMsg.textContent="Restoring secure administrator identity…";
+ if(!window.KINGBOT_FIREBASE){
+   try{await import(new URL("system/firebase-auth.js",location.href).href)}catch{}
  }
- if(!s.authenticated){await preserveAdminReturn();return false}
- if(!s.user?.verified){location.replace("verify.html?return="+encodeURIComponent(window.location.pathname+window.location.search+window.location.hash));return false}
- lockMsg.textContent="Administrator identity verified. Loading command center…";
+ const fb=window.KINGBOT_FIREBASE;
+ if(!fb?.auth)throw new Error("Firebase Authentication did not load.");
+ let user=fb.auth.currentUser;
+ if(!user){
+   user=await new Promise(resolve=>{
+     let done=false;
+     let unsubscribe=null;
+     const finish=value=>{if(done)return;done=true;try{unsubscribe?.()}catch{};resolve(value||null)};
+     try{
+       unsubscribe=fb.onChange(finish);
+       if(fb.auth.currentUser)finish(fb.auth.currentUser);
+       setTimeout(()=>finish(fb.auth.currentUser||null),5000);
+     }catch{finish(fb.auth.currentUser||null)}
+   });
+ }
+ if(!user){await preserveAdminReturn();return false}
+ try{await fb.refresh()}catch{}
+ user=fb.auth.currentUser;
+ if(!user){await preserveAdminReturn();return false}
+ if(!user.emailVerified){
+   location.replace("verify.html?return="+encodeURIComponent(window.location.pathname+window.location.search+window.location.hash));
+   return false;
+ }
+ lockMsg.textContent="Administrator identity verified. Connecting to KINGBOT backend…";
  return true
 }
 document.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===btn));document.querySelectorAll(".tab-panel").forEach(x=>x.classList.toggle("active",x.dataset.tabPanel===btn.dataset.tab))}));
