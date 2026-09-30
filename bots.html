@@ -123,7 +123,7 @@ function msg(t,kind=""){const e=$("message");e.textContent=t;e.className="messag
 function setTelemetry(a,d){$("telemetryState").textContent=a;$("telemetryDetail").textContent=d}
 async function refreshBrokerExecutionStatus(){
  try{
-  const d=await api("/api/connection");
+  const d=await api("/connection");
   const title=$("brokerExecutionTitle"),note=$("brokerExecutionNote"),action=$("brokerExecutionAction");
   if(d.connected){
    title.textContent="BROKER EXECUTION · CONNECTED";
