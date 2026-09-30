@@ -30,7 +30,7 @@
   const authenticatedAccountLinks = [
     ["index.html","Dashboard"],
     ["subscription.html","Subscription"],
-    ["admin.html","Admin","admin"],
+    ["admin-entry.html","Admin","admin"],
     ["#","Logout","logout"]
   ];
 
