@@ -10,6 +10,7 @@ import { createAuthRouter, ensureAuthSchema } from "./auth.js";
 import { createSubscriptionRouter, ensureSubscriptionSchema } from "./subscriptions.js";
 import { createBotEngineRouter, ensureBotEngineSchema } from "./bot-engines.js";
 import { UserBrokerManager } from "./user-broker-manager.js";
+import { PartnerManager } from "./partner-manager.js";
 import { requireUser } from "./subscriptions.js";
 import { createBotRuntimeRouter, ensureBotRuntimeSchema } from "./bot-runtime.js";
 
@@ -21,6 +22,7 @@ const API_KEY = process.env.GEMINI_API_KEY || "";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const pool = DATABASE_URL ? new pg.Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false } }) : null;
 const broker = new UserBrokerManager({pool});
+const partners = new PartnerManager({pool});
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "16kb" }));
@@ -111,6 +113,62 @@ app.get("/api/orders", async (req,res)=>{
 app.get("/api/trades", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   try{const x=await broker.getTrades({startTime:req.query.startTime,endTime:req.query.endTime,userId:user.id});res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Trade history unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
+});
+
+
+app.get("/api/partners/catalog", (_req,res)=>{
+  res.json({ok:true,partners:partners.catalog()});
+});
+
+app.post("/api/partners/click", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  try{
+    const result=await partners.trackClick({
+      userId:user.id,
+      brokerSlug:req.body?.brokerSlug,
+      landingUrl:req.body?.landingUrl,
+      metadata:req.body?.metadata
+    });
+    res.status(201).json(result);
+  }catch(error){
+    res.status(400).json({ok:false,error:error?.message||"PARTNER_CLICK_FAILED"});
+  }
+});
+
+async function requirePartnerAdmin(req,res){
+  const user=await requireUser(pool,req,res);
+  if(!user)return null;
+  const admins=String(process.env.KINGBOT_ADMIN_EMAILS||"")
+    .split(",")
+    .map(value=>value.trim().toLowerCase())
+    .filter(Boolean);
+  if(!admins.length || !admins.includes(String(user.email||"").toLowerCase())){
+    res.status(403).json({ok:false,error:"PARTNER_ADMIN_ACCESS_REQUIRED"});
+    return null;
+  }
+  return user;
+}
+
+app.get("/api/partners/dashboard", async (req,res)=>{
+  const user=await requirePartnerAdmin(req,res); if(!user)return;
+  try{
+    const result=await partners.dashboard({days:req.query.days});
+    res.json(result);
+  }catch(error){
+    console.error("[KINGBOT PARTNERS] dashboard failed:",error?.message||error);
+    res.status(503).json({ok:false,error:"Partner dashboard unavailable."});
+  }
+});
+
+app.post("/api/partners/events", async (req,res)=>{
+  const user=await requirePartnerAdmin(req,res); if(!user)return;
+  try{
+    const result=await partners.ingestEvents(req.body?.events || []);
+    res.status(201).json(result);
+  }catch(error){
+    console.error("[KINGBOT PARTNERS] event ingest failed:",error?.message||error);
+    res.status(400).json({ok:false,error:error?.message||"PARTNER_EVENT_INGEST_FAILED"});
+  }
 });
 
 
@@ -381,7 +439,7 @@ app.use((_req, res) => {
   });
 });
 
-ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => {
+ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => partners.ensureSchema()).then(() => {
 app.listen(PORT, () => {
   console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
 });
