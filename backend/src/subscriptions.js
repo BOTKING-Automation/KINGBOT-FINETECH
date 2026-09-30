@@ -424,9 +424,20 @@ export function createSubscriptionRouter({pool,broker}) {
 export async function ensureSubscriptionSchema(pool){
   if(!pool)return;
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_payments (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, plan_id TEXT NOT NULL, amount_kes NUMERIC(14,2) NOT NULL, mpesa_code TEXT UNIQUE NOT NULL, payer_phone TEXT, payer_name TEXT, selected_bot_id TEXT, status TEXT NOT NULL DEFAULT 'pending', submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), reviewed_at TIMESTAMPTZ, reviewed_by TEXT, reviewer_note TEXT)");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS payer_phone TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS reviewed_by TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS reviewer_note TEXT");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS selected_bot_id TEXT");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS payer_name TEXT");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_subscriptions (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, plan_id TEXT NOT NULL, status TEXT NOT NULL, started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), expires_at TIMESTAMPTZ, approved_at TIMESTAMPTZ, approved_by TEXT, payment_id UUID REFERENCES kingbot_payments(id))");
+  await pool.query("ALTER TABLE kingbot_subscriptions ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
+  await pool.query("ALTER TABLE kingbot_subscriptions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ");
+  await pool.query("ALTER TABLE kingbot_subscriptions ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ");
+  await pool.query("ALTER TABLE kingbot_subscriptions ADD COLUMN IF NOT EXISTS approved_by TEXT");
+  await pool.query("ALTER TABLE kingbot_subscriptions ADD COLUMN IF NOT EXISTS payment_id UUID");
   await pool.query("UPDATE kingbot_subscriptions SET expires_at=started_at+INTERVAL '1 month' WHERE status='active' AND expires_at IS NULL");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_entitlements (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, bot_id TEXT NOT NULL, subscription_id UUID REFERENCES kingbot_subscriptions(id) ON DELETE CASCADE, active BOOLEAN NOT NULL DEFAULT TRUE, granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id,bot_id,subscription_id))");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_audit_log (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID REFERENCES kingbot_users(id) ON DELETE SET NULL, event_type TEXT NOT NULL, metadata JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
