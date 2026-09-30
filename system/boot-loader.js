@@ -44,6 +44,7 @@ function start(){
     finished=true;
     window.removeEventListener("message",onMessage);
     frame.classList.add("kb-boot-hide");
+    window.dispatchEvent(new CustomEvent("kingbot:boot-complete"));
     window.setTimeout(()=>{
       frame.remove();
       document.documentElement.classList.remove("kb-boot-lock");
