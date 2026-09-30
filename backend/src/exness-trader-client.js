@@ -57,11 +57,11 @@ function validateAccountId(value){
 }
 
 export class ExnessTraderClient{
-  constructor({apiKey,privateKey,accountId,baseUrl}={}){
+  constructor({apiKey,secretKey,accountId,baseUrl}={}){
     this.apiKey=String(apiKey||"").trim();
     if(!this.apiKey)throw new Error("EXNESS_API_KEY_REQUIRED");
     this.accountId=validateAccountId(accountId);
-    this.privateKey=decodeKeyMaterial(privateKey);
+    this.privateKey=decodeKeyMaterial(secretKey);
     this.baseUrl=normalizeBaseUrl(baseUrl);
     this.accessPoint=null;
     this.limits=null;
