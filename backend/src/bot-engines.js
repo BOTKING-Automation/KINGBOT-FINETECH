@@ -59,6 +59,7 @@ function baseContext(snapshot = {}) {
     symbol: String(snapshot.symbol || "").toUpperCase(),
     timeframe: String(snapshot.timeframe || "unknown"),
     price: num(snapshot.price),
+    entryPrice: num(snapshot.entryPrice, num(snapshot.price)),
     spread: num(snapshot.spread),
     atr: num(snapshot.atr),
     volatility: num(snapshot.volatility),
