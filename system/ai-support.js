@@ -347,7 +347,7 @@
     const input = byId("commandInput");
     if (!input) return;
     input.focus();
-    input.scrollIntoView({ behavior: "smooth", block: "center" });
+    input.scrollIntoView({ behavior: "auto", block: "center" });
   }
 
   function clearHistory() {
