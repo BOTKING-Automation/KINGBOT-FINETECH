@@ -149,7 +149,10 @@ This file does NOT contain trading logic.
 
 html {
 
-  scroll-behavior: smooth;
+  /* Paint the platform dark before any page CSS/images arrive. */
+  background: var(--kb-bg-0);
+  color: var(--kb-text);
+  scroll-behavior: auto;
 
 }
 
