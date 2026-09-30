@@ -17,6 +17,8 @@ const broker = new UserBrokerManager({pool});
 let stopping = false;
 let timer = null;
 let lastSubscriptionSweep = 0;
+const WORKER_POLL_MS = 750;
+const MAX_PARALLEL_BOTS = 8;
 
 const num=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
 const timeframeMinutes={"1m":1,"2m":2,"3m":3,"4m":4,"5m":5,"6m":6,"10m":10,"12m":12,"15m":15,"20m":20,"30m":30,"1h":60,"2h":120,"3h":180,"4h":240,"6h":360,"8h":480,"12h":720,"1d":1440,"1w":10080,"1mn":43200};
@@ -218,20 +220,24 @@ async function cycle(){
     await expireStaleSubscriptions(pool);
   }
   const q=await pool.query("SELECT user_id,bot_id,state FROM kingbot_bot_runtime WHERE state='RUNNING' ORDER BY updated_at ASC LIMIT 100");
-  for(const row of q.rows){
+
+  for(let i=0;i<q.rows.length;i+=MAX_PARALLEL_BOTS){
     if(stopping)break;
-    try{await execute(row);}
-    catch(error){
-      await pool.query("UPDATE kingbot_bot_runtime SET state='ERROR',last_error=$3,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[row.user_id,row.bot_id,String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500)]);
-      await audit(row.user_id,"BOT_WORKER_ERROR",{botId:row.bot_id,error:String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500)});
-    }
+    const batch=q.rows.slice(i,i+MAX_PARALLEL_BOTS);
+    await Promise.allSettled(batch.map(async row=>{
+      try{await execute(row);}
+      catch(error){
+        await pool.query("UPDATE kingbot_bot_runtime SET state='ERROR',last_error=$3,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[row.user_id,row.bot_id,String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500)]);
+        await audit(row.user_id,"BOT_WORKER_ERROR",{botId:row.bot_id,error:String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500)});
+      }
+    }));
   }
 }
 
 async function main(){
   await ensureWorkerSchema();
   console.log("[KINGBOT WORKER] real broker execution loop started");
-  const loop=async()=>{try{await cycle();}catch(error){console.error("[KINGBOT WORKER]",error?.message||error);}if(!stopping)timer=setTimeout(loop,2000);};
+  const loop=async()=>{try{await cycle();}catch(error){console.error("[KINGBOT WORKER]",error?.message||error);}if(!stopping)timer=setTimeout(loop,WORKER_POLL_MS);};
   await loop();
 }
 async function shutdown(){if(stopping)return;stopping=true;if(timer)clearTimeout(timer);try{if(pool)await pool.end();}finally{process.exit(0);}}
