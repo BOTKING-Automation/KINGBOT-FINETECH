@@ -46,7 +46,7 @@ async function open(){
    user=await new Promise(resolve=>{
      let done=false,off=null;
      const finish=u=>{if(done)return;done=true;try{off?.()}catch{};resolve(u||null)};
-     try{off=fb.onChange(finish);if(fb.auth.currentUser)finish(fb.auth.currentUser);setTimeout(()=>finish(fb.auth.currentUser||null),7000)}
+     try{off=fb.onChange(finish);if(fb.auth.currentUser)finish(fb.auth.currentUser);setTimeout(()=>finish(fb.auth.currentUser||null),2500)}
      catch{finish(fb.auth.currentUser||null)}
    });
  }
@@ -55,7 +55,7 @@ async function open(){
    user=fb.auth.currentUser;
  }
  if(user?.emailVerified){status.textContent="Verified Firebase session detected. Opening Super Admin OS…";go();return}
- status.textContent="Sign in with the verified administrator account to continue.";
+ status.textContent="No active session. Sign in with the verified administrator account to continue.";
  form.hidden=false;
 }
 form.addEventListener("submit",async e=>{
