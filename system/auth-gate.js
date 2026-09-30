@@ -38,7 +38,8 @@ IMPORTANT:
         "bots.html",
         "settings.html",
         "subscription.html",
-        "broker-connect.html"
+        "broker-connect.html",
+        "partner-revenue.html"
       ],
 
       authPages: [
