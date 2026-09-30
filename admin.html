@@ -215,7 +215,7 @@ async function adminApiRequest(path,options={}){
    headers.set("Accept","application/json");
    if(options.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
    headers.set("Authorization","Bearer "+token);
-   return const rawPath=String(path||""); const apiPath=rawPath.startsWith("/api") ? rawPath : "/api"+(rawPath.startsWith("/")?rawPath:"/"+rawPath); return fetch("https://kingbot-fintech-api-etfv.onrender.com"+apiPath,{...options,headers,cache:"no-store"});
+   const rawPath=String(path||""); const apiPath=rawPath.startsWith("/api") ? rawPath : "/api"+(rawPath.startsWith("/")?rawPath:"/"+rawPath); return fetch("https://kingbot-fintech-api-etfv.onrender.com"+apiPath,{...options,headers,cache:"no-store"});
  };
  let response=await send(false);
  if(response.status===401)response=await send(true);
