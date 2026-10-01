@@ -36,6 +36,47 @@ export function createBotRuntimeRouter({pool,broker}){
     res.json({ok:true,bots});
   });
 
+  router.get("/selection/current",async(req,res)=>{
+    const user=await requireUser(pool,req,res);if(!user)return;
+    await ensureBotRuntimeSchema(pool);
+    const q=await pool.query("SELECT selected_bot_id,updated_at FROM kingbot_user_bot_selection WHERE user_id=$1",[user.id]);
+    const selectedBotId=q.rowCount?String(q.rows[0].selected_bot_id):null;
+    if(!selectedBotId){
+      return res.json({ok:true,selectedBotId:null,updatedAt:null,bot:null});
+    }
+    const bot=getBotDefinitions()[selectedBotId];
+    if(!bot){
+      await pool.query("DELETE FROM kingbot_user_bot_selection WHERE user_id=$1",[user.id]);
+      return res.json({ok:true,selectedBotId:null,updatedAt:null,bot:null});
+    }
+    const entitled=await entitlement(pool,user.id,selectedBotId,user.email);
+    if(!entitled){
+      return res.json({ok:true,selectedBotId:null,updatedAt:q.rows[0].updated_at,bot:null,reason:"SELECTED_BOT_NO_LONGER_ENTITLED"});
+    }
+    const r=await runtime(pool,user.id,selectedBotId),s=await settings(pool,user.id,selectedBotId);
+    return res.json({
+      ok:true,
+      selectedBotId,
+      updatedAt:q.rows[0].updated_at,
+      bot:{botId:bot.id,name:bot.name,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||"1m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null}
+    });
+  });
+
+  router.post("/selection",async(req,res)=>{
+    const user=await requireUser(pool,req,res);if(!user)return;
+    const botId=String(req.body?.botId||"").trim();
+    if(!getBotDefinitions()[botId])return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
+    if(!(await entitlement(pool,user.id,botId,user.email)))return res.status(403).json({ok:false,error:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
+    await ensureBotRuntimeSchema(pool);
+    await pool.query(
+      "INSERT INTO kingbot_user_bot_selection(user_id,selected_bot_id,updated_at) VALUES($1,$2,NOW()) ON CONFLICT(user_id) DO UPDATE SET selected_bot_id=EXCLUDED.selected_bot_id,updated_at=NOW()",
+      [user.id,botId]
+    );
+    await audit(pool,user.id,"BOT_SELECTION_SAVED",{botId});
+    const r=await runtime(pool,user.id,botId),s=await settings(pool,user.id,botId);
+    res.json({ok:true,selectedBotId:botId,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||"1m"});
+  });
+
   router.get("/:botId",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
@@ -226,6 +267,7 @@ export async function ensureBotRuntimeSchema(pool){
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_account_risk_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,baseline_date DATE NOT NULL,day_start_equity NUMERIC NOT NULL,peak_equity NUMERIC NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,provider,account_id))");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_execution_journal (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,execution_mode TEXT NOT NULL,symbol TEXT NOT NULL,side TEXT NOT NULL,volume NUMERIC NOT NULL,status TEXT NOT NULL,broker_result JSONB,error_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_runtime (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'STOPPED',last_signal JSONB,last_run_at TIMESTAMPTZ,last_error TEXT,symbol TEXT,timeframe TEXT DEFAULT '1m',updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,bot_id))");
+  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_user_bot_selection (user_id UUID PRIMARY KEY REFERENCES kingbot_users(id) ON DELETE CASCADE,selected_bot_id TEXT NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
 
   await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT 'STOPPED'");
   await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS last_signal JSONB");
