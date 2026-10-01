@@ -319,9 +319,12 @@ export class UserBrokerManager {
         }else{
           entry.executionMode=mode;
           entry.api.executionMode=mode;
-          entry.accountInfo=(await entry.api.getAccount()).data;
-          entry.accountInfoAt=Date.now();
+          if(!entry.accountInfoAt || Date.now()-entry.accountInfoAt>5000){
+            entry.accountInfo=(await entry.api.getAccount()).data;
+            entry.accountInfoAt=Date.now();
+          }
         }
+        this.connectBackoff.delete(backoffKey);
         entry.executionMode=mode;
         return {connected:true,mode,broker:"deriv",accountId:mapping.account_id,account:entry.accountInfo};
       }catch(error){
