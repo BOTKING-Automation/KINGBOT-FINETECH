@@ -83,6 +83,39 @@ function indicators(candles=[]){
   };
 }
 
+function strategyTimeframeProfile(botId,executionTimeframe){
+  const bot=getBotDefinitions()[botId];
+  const profile=bot?.timeframeProfile||{};
+  return {
+    regime:String(profile.regime||executionTimeframe||"1h"),
+    setup:String(profile.setup||executionTimeframe||"15m"),
+    execution:String(executionTimeframe||profile.execution||"5m")
+  };
+}
+
+async function getMultiTimeframeContext(userId,symbol,botId,executionTimeframe){
+  const profile=strategyTimeframeProfile(botId,executionTimeframe);
+  const unique=[...new Set([profile.regime,profile.setup,profile.execution])];
+  const results=await Promise.all(unique.map(async timeframe=>{
+    try{
+      const candles=await getWorkerCandles(userId,symbol,timeframe,100);
+      const data=indicators(candles);
+      return [timeframe,{timeframe,available:true,...data}];
+    }catch(error){
+      return [timeframe,{timeframe,available:false,reason:String(error?.message||"TIMEFRAME_DATA_UNAVAILABLE").slice(0,160)}];
+    }
+  }));
+  const byTimeframe=Object.fromEntries(results);
+  const ready=unique.every(tf=>Boolean(byTimeframe[tf]?.available));
+  return {
+    profile,
+    ready,
+    regime:byTimeframe[profile.regime]||null,
+    setup:byTimeframe[profile.setup]||null,
+    execution:byTimeframe[profile.execution]||null
+  };
+}
+
 async function consecutiveLosses(userId){
   const cached=workerLossCache.get(String(userId));
   if(cached && Date.now()-cached.at<LOSS_CACHE_MS)return cached.value;
@@ -633,8 +666,17 @@ async function execute(row){
   if(!Number.isFinite(bid)||!Number.isFinite(ask)||ask<bid)throw new Error("INVALID_BROKER_QUOTE");
   if(!Number.isFinite(quoteTime)||Date.now()-quoteTime>s.staleDataMs)throw new Error("STALE_BROKER_QUOTE");
 
-  const candles=await getWorkerCandles(userId,config.symbol,config.timeframe,100);
-  const ind=indicators(candles);
+  const executionTimeframe=String(config.timeframe||getBotDefinitions()[botId]?.timeframeProfile?.execution||"5m");
+  const multiTimeframe=await getMultiTimeframeContext(userId,config.symbol,botId,executionTimeframe);
+  if(!multiTimeframe.ready){
+    const reason="MULTI_TIMEFRAME_DATA_UNAVAILABLE:"+[multiTimeframe.regime,multiTimeframe.setup,multiTimeframe.execution]
+      .filter(x=>x&&!x.available)
+      .map(x=>x.timeframe+":"+(x.reason||"UNAVAILABLE")).join("|");
+    await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=$4,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",
+      [userId,botId,JSON.stringify({signal:"NO_SIGNAL",action:"MULTI_TIMEFRAME_BLOCKED",strategy:botId,timeframeProfile:multiTimeframe.profile,updatedAt:new Date().toISOString()}),reason.slice(0,500)]);
+    return;
+  }
+  const ind=multiTimeframe.execution;
   const spread=ask-bid;
   const velocityKey=ladderKey(userId,botId);
   const ladderCfg=getBotDefinitions()[botId]?.v8||LADDER_V8_DEFAULTS;
@@ -647,7 +689,9 @@ async function execute(row){
     : 0;
 
   const analysis=evaluateBot(botId,{
-    symbol:config.symbol,timeframe:config.timeframe,price:(bid+ask)/2,entryPrice:(bid+ask)/2,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,
+    symbol:config.symbol,timeframe:executionTimeframe,price:(bid+ask)/2,entryPrice:(bid+ask)/2,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,
+    timeframeProfile:multiTimeframe.profile,
+    multiTimeframe:{regime:multiTimeframe.regime,setup:multiTimeframe.setup,execution:multiTimeframe.execution},
     volatility:ind.volatility,trend:ind.trend,momentum:ind.momentum,volume:ind.volume,structure:ind.structure,
     liquiditySweep:ind.liquiditySweep,orderBlock:ind.orderBlock,fairValueGap:ind.fairValueGap,displacement:ind.displacement,breakout:ind.breakout,retest:ind.retest,
     emaFast:ind.emaFast,emaSlow:ind.emaSlow,adx:ind.adx,rsi:ind.rsi,velocityPoints:v8Velocity,brokerPoint:0
@@ -663,11 +707,17 @@ async function execute(row){
   const risk=authorizeOrder({limits:s,executionMode:s.executionMode,killSwitch:s.killSwitch,equity:Number(account.equity),dayStartEquity:dayStart,peakEquity:peak,openPositions:positions.length,requestedRiskPct:s.maxRiskPerTradePct,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,dataAgeMs:Date.now()-quoteTime,consecutiveLosses:losses,skipSpreadAtr:botId==="ladder-flip"&&String(status.broker||"").toLowerCase()==="deriv"});
 
   const aiMarket={
-    symbol:config.symbol,timeframe:config.timeframe,price:(bid+ask)/2,bid,ask,
+    symbol:config.symbol,timeframe:executionTimeframe,price:(bid+ask)/2,bid,ask,
     spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,
     volatility:ind.volatility,trend:ind.trend,momentum:ind.momentum,
     structure:ind.structure,adx:ind.adx,rsi:ind.rsi,emaFast:ind.emaFast,emaSlow:ind.emaSlow,
-    velocityPoints:v8Velocity
+    velocityPoints:v8Velocity,
+    timeframeProfile:multiTimeframe.profile,
+    multiTimeframe:{
+      regime:multiTimeframe.regime,
+      setup:multiTimeframe.setup,
+      execution:multiTimeframe.execution
+    }
   };
   const aiStrategySignal=getAiStrategySignal({userId,botId,market:aiMarket,analysis});
   const aiTradeGate=aiStrategySignal
@@ -717,7 +767,7 @@ async function execute(row){
       const v8d={contractType:started?.derivContractType||null,multiplier:started?.derivMultiplier||null,entryQualified:Boolean(ind.v8EntryQualified),rungsOpened:started?.rungsOpened||0,lotScale:started?.lotScale||null,velocityPoints:velocity,spreadPoints,spreadMaxPoints:ladderCfg.maxSpreadPoints,startDetails,aiConfirmed:Boolean(aiTradeGate?.confirm),aiSignal:aiStrategySignal?.direction||"HOLD",aiEngine:aiStrategySignal?.engine||null,aiStrategyMatch:Boolean(aiStrategySignal?.strategyMatch),aiTrigger:aiStrategySignal?.trigger||null,aiStatus:aiTradeGate?.status||"AI_SIGNAL_PENDING"};
       const signalPayload={signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action,executionMode:s.executionMode,strategy:botId,tradePlan:null,riskAllowed:risk.allowed,riskBlockedReasons:risk.blockedReasons||[],analysisReason:analysis.reason,riskReason:risk.reason||risk.blockedReasons,aiTradeGate:aiTradeGate?{confirm:Boolean(aiTradeGate.confirm),direction:aiTradeGate.direction,engine:aiTradeGate.engine||null,strategyMatch:Boolean(aiTradeGate.strategyMatch),status:aiTradeGate.status,trigger:aiTradeGate.trigger,reason:aiTradeGate.reason,expiresAt:aiTradeGate.expiresAt}:null,v8:v8d,updatedAt:new Date().toISOString()};
       await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify(signalPayload)]);
-      await audit(userId,"BOT_WORKER_TICK",{botId,executionMode:s.executionMode,symbol:config.symbol,timeframe:config.timeframe,signal:analysis.signal,score:analysis.score,action,v8:v8d,riskAllowed:risk.allowed});
+      await audit(userId,"BOT_WORKER_TICK",{botId,executionMode:s.executionMode,symbol:config.symbol,timeframe:executionTimeframe,timeframeProfile:multiTimeframe.profile,signal:analysis.signal,score:analysis.score,action,v8:v8d,riskAllowed:risk.allowed});
       return;
     }
     const sampleList=ladderVelocityBuffers.get(velocityKey)||[];
