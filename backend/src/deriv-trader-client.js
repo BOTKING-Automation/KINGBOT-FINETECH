@@ -32,6 +32,9 @@ export class DerivTraderClient {
     this.portfolioCacheAt=0;
     this.portfolioInflight=null;
     this.tradesCache=new Map();
+    this.accountBalance=null;
+    this.accountBalanceAt=0;
+    this.balanceSubscriptionId=null;
   }
 
   configured(){
@@ -68,8 +71,11 @@ export class DerivTraderClient {
       ws.once("close",()=>{if(!settled)fail(new Error("DERIV_WEBSOCKET_CLOSED_DURING_CONNECT"));});
     });
 
-    const account=await this.request({balance:1});
+    const account=await this.request({balance:1,subscribe:1});
     const balance=account?.balance||{};
+    this.accountBalance=balance;
+    this.accountBalanceAt=Date.now();
+    this.balanceSubscriptionId=account?.subscription?.id||null;
     const expectedDemo=this.executionMode==="PAPER";
     if(expectedDemo && this.accountTypeFromBalance(balance)!=="demo"){
       await this.disconnect();
@@ -100,6 +106,16 @@ export class DerivTraderClient {
     ws.on("message",raw=>{
       let data;
       try{data=JSON.parse(String(raw));}catch{return;}
+
+      // Deriv pushes balance messages whenever the subscribed account balance changes.
+      // Keep the latest broker-reported snapshot in memory so account telemetry can
+      // reflect deposits, withdrawals, and trade P/L changes without polling lag.
+      if(data?.msg_type==="balance" && data?.balance){
+        this.accountBalance=data.balance;
+        this.accountBalanceAt=Date.now();
+        if(data?.subscription?.id)this.balanceSubscriptionId=data.subscription.id;
+      }
+
       const reqId=data?.req_id;
       if(reqId && this.pending.has(reqId)){
         const item=this.pending.get(reqId);
@@ -113,6 +129,9 @@ export class DerivTraderClient {
       for(const item of this.pending.values())item.reject(new Error("DERIV_WEBSOCKET_CLOSED"));
       this.pending.clear();
       this.ws=null;
+      this.accountBalance=null;
+      this.accountBalanceAt=0;
+      this.balanceSubscriptionId=null;
     });
     ws.on("error",()=>{});
   }
@@ -342,6 +361,9 @@ export class DerivTraderClient {
     try{if(this.ws)this.ws.close();}finally{
       this.ws=null;
       this.connected=false;
+      this.accountBalance=null;
+      this.accountBalanceAt=0;
+      this.balanceSubscriptionId=null;
       for(const item of this.pending.values())item.reject(new Error("DERIV_DISCONNECTED"));
       this.pending.clear();
     }
@@ -349,8 +371,14 @@ export class DerivTraderClient {
   }
 
   async getAccount(){
-    const response=await this.request({balance:1});
-    const balance=response?.balance||{};
+    let balance=this.accountBalance;
+    if(!balance){
+      const response=await this.request({balance:1,subscribe:1});
+      balance=response?.balance||{};
+      this.accountBalance=balance;
+      this.accountBalanceAt=Date.now();
+      this.balanceSubscriptionId=response?.subscription?.id||this.balanceSubscriptionId;
+    }
     return {
       connected:true,
       data:{
@@ -363,7 +391,9 @@ export class DerivTraderClient {
         loginid:balance.loginid||this.accountId,
         tradeAllowed:true,
         provider:"deriv",
-        accountType:this.accountTypeFromBalance(balance)
+        accountType:this.accountTypeFromBalance(balance),
+        balanceUpdatedAt:this.accountBalanceAt?new Date(this.accountBalanceAt).toISOString():null,
+        balanceStreamActive:Boolean(this.balanceSubscriptionId)
       }
     };
   }
