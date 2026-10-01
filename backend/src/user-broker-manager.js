@@ -41,8 +41,8 @@ export class UserBrokerManager {
   async ensureSchema(){
     if(!this.pool)return;
     await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_broker_accounts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,credential_ciphertext TEXT NOT NULL,credential_iv TEXT NOT NULL,credential_tag TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'DEMO' CHECK(execution_mode IN ('DEMO','LIVE')),enabled BOOLEAN NOT NULL DEFAULT TRUE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,provider,account_id))");
-    await this.pool.query("UPDATE kingbot_broker_accounts SET execution_mode='DEMO' WHERE execution_mode='PAPER'");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts DROP CONSTRAINT IF EXISTS kingbot_broker_accounts_execution_mode_check");
+    await this.pool.query("UPDATE kingbot_broker_accounts SET execution_mode='DEMO' WHERE execution_mode='PAPER'");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD CONSTRAINT kingbot_broker_accounts_execution_mode_check CHECK(execution_mode IN ('DEMO','LIVE'))");
     await this.pool.query("UPDATE kingbot_broker_accounts SET execution_mode='DEMO' WHERE execution_mode='PAPER'");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts DROP CONSTRAINT IF EXISTS kingbot_broker_accounts_execution_mode_check");
