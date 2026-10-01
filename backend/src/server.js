@@ -382,14 +382,23 @@ app.get("/api/broker/quote", async (req,res)=>{
 app.get("/api/account", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   try{
-    const connection=await broker.getStatus(user.id);
-    if(!connection.connected){
+    // The persistent mapping identifies the authorized broker without first
+    // performing a broker rehydration. getAccount() performs the single live
+    // broker connection/telemetry operation needed for this request.
+    const mapping=await broker.getMapping(user.id);
+    if(!mapping){
       return res.status(503).json({
         ok:false,
         error:"Account telemetry unavailable.",
         reason:"BROKER_NOT_CONNECTED"
       });
     }
+    const connection={
+      connected:true,
+      broker:mapping.provider,
+      accountId:mapping.account_id,
+      executionMode:mapping.execution_mode||"PAPER"
+    };
 
     const now=new Date();
     const dayStartDate=new Date(now);
