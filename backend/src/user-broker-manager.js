@@ -470,6 +470,17 @@ export class UserBrokerManager {
     return {connected:true,data:{orders,deals}};
   }
 
+  async validateMarket(userId,symbol){
+    const requested=String(symbol||"").trim().toUpperCase();
+    if(!requested)throw new Error("BROKER_SYMBOL_REQUIRED");
+    const result=await this.getMarkets(userId);
+    const markets=Array.isArray(result?.data)?result.data:[];
+    const match=markets.find(item=>String(item?.symbol||"").trim().toUpperCase()===requested);
+    if(!match)return {ok:false,error:"BROKER_MARKET_NOT_AVAILABLE"};
+    if(match.tradeable===false)return {ok:false,error:"BROKER_MARKET_NOT_TRADEABLE"};
+    return {ok:true,market:match};
+  }
+
   async getMarkets(userId){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="exness")return {connected:true,data:await entry.api.getMarkets()};
