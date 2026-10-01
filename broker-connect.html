@@ -624,12 +624,12 @@ const modeButtons=[...document.querySelectorAll("#modeSwitch .mode-btn")];
 let selectedExecution="DEMO";
 const modeState=$("modeState"),modeCopy=$("modeCopy");
 function applyExecutionMode(){
-  if(selected==="derivmt5"&&$("mt5BridgeMode"))$("mt5BridgeMode").textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO · LIVE BROKER";
+  if(selected==="derivmt5"&&$("mt5BridgeMode"))$("mt5BridgeMode").textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO · BROKER MT5";
   modeButtons.forEach(b=>b.classList.toggle("active",b.dataset.exec===selectedExecution));
-  modeState.textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO · LIVE BROKER";
+  modeState.textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO · BROKER MT5";
   modeCopy.textContent=selectedExecution==="LIVE"
-    ?"Production mode. KINGBOT will target the broker's real-money environment only after explicit account authorization."
-    :"Training mode. KINGBOT will use broker-side simulated/demo execution where the connector supports it. Live funds are not targeted.";
+    ?"Production mode. KINGBOT targets the explicitly authorised Deriv MT5 REAL account."
+    :"DEMO mode executes on the selected broker-side Deriv MT5 DEMO account with virtual broker funds and live market execution. It is not a KINGBOT paper simulator.";
   document.querySelectorAll(".broker").forEach(card=>{
     const demo=card.dataset.capDemo==="yes",live=card.dataset.capLive==="yes";
     const connect=card.querySelector(".connect");
