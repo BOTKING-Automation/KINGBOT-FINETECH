@@ -884,7 +884,7 @@ async function execute(row){
   let action="NO_ACTION",order=null,tradePlan=null;
   if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&(!aiExecutionGateEnabled()||aiTradeGate?.confirm)){
     const side=analysis.signal==="LONG_CANDIDATE"?"BUY":"SELL";
-    const spec=(await broker.getSymbolSpecification(config.symbol,userId)).data||{};
+    const specResult=await broker.getSymbolSpecification(config.symbol,userId); const spec=specResult?.data??specResult??{};
     const tickSize=Number(spec.tickSize),minVolume=Number(spec.minVolume),maxVolume=Number(spec.maxVolume),volumeStep=Number(spec.volumeStep),point=Number(spec.point),stopsLevel=Number(spec.stopsLevel);
     const tickValue=Number(side==="BUY"?quote.lossTickValue:quote.lossTickValue);
     if(![tickSize,minVolume,maxVolume,volumeStep,point,stopsLevel,tickValue].every(Number.isFinite)||tickSize<=0||minVolume<=0||maxVolume<minVolume||volumeStep<=0||tickValue<=0)throw new Error("BROKER_SIZING_DATA_UNAVAILABLE");
