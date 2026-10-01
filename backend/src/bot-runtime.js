@@ -54,12 +54,19 @@ export function createBotRuntimeRouter({pool,broker}){
     if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before starting PAPER or LIVE execution. No order was submitted."});
     await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS symbol TEXT, ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '1m'");
     const configured=await pool.query("SELECT symbol,timeframe FROM kingbot_bot_runtime WHERE user_id=$1 AND bot_id=$2",[user.id,b.id]);
-    let symbol=String(configured.rows?.[0]?.symbol||"").trim().toUpperCase();
-    let timeframe=String(configured.rows?.[0]?.timeframe||"5m").trim();
+    const requestedSymbol=String(req.body?.symbol||"").trim().toUpperCase();
+    const requestedTimeframe=String(req.body?.timeframe||"").trim();
+    let symbol=requestedSymbol || String(configured.rows?.[0]?.symbol||"").trim().toUpperCase();
+    let timeframe=requestedTimeframe || String(configured.rows?.[0]?.timeframe||"5m").trim();
     if(!symbol){
       return res.status(400).json({ok:false,error:"BROKER_MARKET_REQUIRED",message:"Select a market from the connected broker catalog before starting the engine. No order was submitted."});
     }
-    await pool.query("INSERT INTO kingbot_bot_runtime(user_id,bot_id,state,symbol,timeframe,last_error,updated_at) VALUES($1,$2,'RUNNING',$3,$4,NULL,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET state='RUNNING',symbol=EXCLUDED.symbol,timeframe=COALESCE(kingbot_bot_runtime.timeframe,EXCLUDED.timeframe),last_error=NULL,updated_at=NOW()",[user.id,b.id,symbol,timeframe]);
+    const allowedTimeframes=["1m","2m","3m","4m","5m","6m","10m","12m","15m","20m","30m","1h","2h","3h","4h","6h","8h","12h","1d","1w","1mn"];
+    if(!allowedTimeframes.includes(timeframe))return res.status(400).json({ok:false,error:"INVALID_TIMEFRAME"});
+    if(requestedSymbol || requestedTimeframe){
+      await pool.query("INSERT INTO kingbot_bot_runtime(user_id,bot_id,state,symbol,timeframe,last_error,updated_at) VALUES($1,$2,'STOPPED',$3,$4,NULL,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET symbol=EXCLUDED.symbol,timeframe=EXCLUDED.timeframe,updated_at=NOW()",[user.id,b.id,symbol,timeframe]);
+    }
+    await pool.query("INSERT INTO kingbot_bot_runtime(user_id,bot_id,state,symbol,timeframe,last_error,updated_at) VALUES($1,$2,'RUNNING',$3,$4,NULL,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET state='RUNNING',symbol=EXCLUDED.symbol,timeframe=EXCLUDED.timeframe,last_error=NULL,updated_at=NOW()",[user.id,b.id,symbol,timeframe]);
     await audit(pool,user.id,"BOT_RUNTIME_STARTED",{botId:b.id,executionMode:s.executionMode});
     res.json({ok:true,botId:b.id,state:"RUNNING",executionMode:s.executionMode});
   });
