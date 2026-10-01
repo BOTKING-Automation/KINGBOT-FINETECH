@@ -431,7 +431,7 @@ async function executeLadderV8DerivManage({userId,botId,config,s,account,quote,p
     &&String(p?.status||"open").toLowerCase()==="open");
   if(!tracked.length){
     await closeLadderState(userId,botId,state,"DERIV_V8_CYCLE_CLOSED");
-    await audit(userId,"LADDER_V8_DERIV_CLOSED",{botId,symbol:state.symbol,cycleId:state.cycle_id});
+    await audit(userId,"LADDER_V8_DERIV_CLOSED",{botId,symbol:state.symbol,cycleId:state.cycleId});
     return {action:"DERIV_V8_CYCLE_CLOSED",state:{...state,active:false}};
   }
   const mid=(Number(quote.bid)+Number(quote.ask))/2;
@@ -439,9 +439,9 @@ async function executeLadderV8DerivManage({userId,botId,config,s,account,quote,p
   const samples=updateVelocitySamples(ladderVelocityBuffers.get(key)||state.velocitySamples||[],mid,Date.now(),cfg);
   ladderVelocityBuffers.set(key,samples);
   const v=velocityPoints(samples,spec.point,cfg);
-  let lockLevel=Number(state.lock_level||0);
-  const stakes=Array.isArray(state.rung_lots)?state.rung_lots.map(Number):[];
-  const locks=Array.isArray(state.locked_profits)?state.locked_profits.map(Number):stakes.map(()=>0);
+  let lockLevel=Number(state.lockLevel||0);
+  const stakes=Array.isArray(state.rungLots)?state.rungLots.map(Number):[];
+  const locks=Array.isArray(state.lockedProfits)?state.lockedProfits.map(Number):stakes.map(()=>0);
   const nextLocks=locks.slice();
   let action="DERIV_V8_MONITORING";
   let anyClosed=false;
@@ -480,29 +480,30 @@ async function executeLadderV8DerivManage({userId,botId,config,s,account,quote,p
   }
 
   const positionCap=Math.min(cfg.maxTotalRungs,Math.max(cfg.fixedRungCount,Number(s.maxPositions)||cfg.fixedRungCount));
-  const extendedSince=Number(state.direction)>0?Number(quote.bid)-Number(state.last_pyramid_price||state.anchor_price):Number(state.last_pyramid_price||state.anchor_price)-Number(quote.ask);
+  const extendedSince=Number(state.direction)>0?Number(quote.bid)-Number(state.lastPyramidPrice||state.anchorPrice):Number(state.lastPyramidPrice||state.anchorPrice)-Number(quote.ask);
   const highMomentum=v>=cfg.velocityHighPoints;
   const emergency=Number(ind.volatility)>0.95;
   const currentStakeRisk=stakes.reduce((a,b)=>a+Math.max(0,Number(b)||0),0);
   const budget=Number(account.equity)*(Number(s.maxRiskPerTradePct)/100);
-  if(highMomentum&&!emergency&&riskAllowed&&state.rungs_opened<positionCap&&extendedSince>=cfg.pyramidStepPoints*spec.point){
-    const raw=ladderRungLot(state.rungs_opened,cfg)*Number(state.lot_scale||1);
-    const nextStake=Number(Math.max(1,raw).toFixed(2));
+  if(highMomentum&&!emergency&&riskAllowed&&state.rungsOpened<positionCap&&extendedSince>=cfg.pyramidStepPoints*spec.point){
+    const growth=Math.max(1.01,Number(cfg.lotGrowthFactor)||2.0);
+    const priorStake=stakes.length?Number(stakes.at(-1)):Number(state.lotScale||1);
+    const nextStake=Number(Math.max(1,priorStake*growth).toFixed(2));
     if(nextStake>0&&currentStakeRisk+nextStake<=budget*1.000001){
       const side=Number(state.direction)>0?"BUY":"SELL";
       try{
         const clientId="kbv8d_"+crypto.randomUUID();
         const pyramidStopLoss=Number(Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||100))).toFixed(2));
         const pyramidTakeProfit=Number(Math.max(nextStake*1.05,nextStake+pyramidStopLoss*Number(cfg.takeProfitRR||2.0)).toFixed(2));
-        const order=await broker.placeOrder({side,symbol:config.symbol,volume:nextStake,stopLoss:pyramidStopLoss,takeProfit:pyramidTakeProfit,comment:"KINGBOT V8 DERIV PYRAMID R"+state.rungs_opened,clientId,userId,currency:String(account.currency||"USD"),multiplier:Number(state.deriv_multiplier||100),derivContractType:state.deriv_contract_type});
+        const order=await broker.placeOrder({side,symbol:config.symbol,volume:nextStake,stopLoss:pyramidStopLoss,takeProfit:pyramidTakeProfit,comment:"KINGBOT V8 DERIV PYRAMID R"+state.rungsOpened,clientId,userId,currency:String(account.currency||"USD"),multiplier:Number(state.deriv_multiplier||100),derivContractType:state.deriv_contract_type});
         if(order?.contractId){
           state.positionIds=[...state.positionIds.map(String),String(order.contractId)];
           stakes.push(nextStake);
           nextLocks.push(0);
-          state.rungs_opened++;
-          state.last_pyramid_price=Number(state.direction)>0?Number(quote.bid):Number(quote.ask);
+          state.rungsOpened++;
+          state.lastPyramidPrice=Number(state.direction)>0?Number(quote.bid):Number(quote.ask);
           action="DERIV_V8_PYRAMID";
-          await audit(userId,"LADDER_V8_DERIV_PYRAMID",{botId,symbol:config.symbol,rung:state.rungs_opened,stake:nextStake,contractId:order.contractId,velocity:v,cycleId:state.cycle_id});
+          await audit(userId,"LADDER_V8_DERIV_PYRAMID",{botId,symbol:config.symbol,rung:state.rungsOpened,stake:nextStake,contractId:order.contractId,velocity:v,cycleId:state.cycle_id});
         }
       }catch(error){
         action="DERIV_V8_PYRAMID_REJECTED";
@@ -546,7 +547,7 @@ async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,pos
   }
   if(!volumes.length)return {action:"LADDER_RISK_BUDGET_BLOCKED",state:null,details:{budget,plannedLots,basketRisk}};
   const positionCap=Math.min(cfg.maxTotalRungs,Math.max(cfg.fixedRungCount,Number(s.maxPositions)||cfg.fixedRungCount));
-  if(positions.length+rungCount>positionCap)return {action:"LADDER_MAX_POSITION_CAP",state:null,details:{positionCap}};
+  if(positions.length+volumes.length>positionCap)return {action:"LADDER_MAX_POSITION_CAP",state:null,details:{positionCap,affordableRungs:volumes.length}};
   const cycleId="kbv8_"+crypto.randomUUID();
   let opened=0;
   const positionIds=[];
@@ -604,7 +605,7 @@ async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,pos
     initialStopDistance:stopDistance,stepPrice,lockLevel:0,lastLockPrice:null,lastPyramidPrice:anchor,
     rungsOpened:opened,aggressiveEntry:velocity>=cfg.velocityHighPoints,positionIds:[...new Set(positionIds.map(String))],
     rungLots:openedLots,velocitySamples:updateVelocitySamples([],Number((quote.bid+quote.ask)/2),Date.now(),cfg),
-    cycleId,lotScale,lastAction:"LADDER_V8_STARTED"
+    cycleId,lotScale:1,plannedLots:plannedLots.slice(),executedLots:openedLots.slice(),lotGrowthFactor:Number(cfg.lotGrowthFactor)||2,brokerMinLot:ls.minVolume,brokerLotStep:ls.volumeStep,lastAction:"LADDER_V8_STARTED"
   };
   await saveLadderState(userId,botId,state);
   await audit(userId,"LADDER_V8_STARTED",{botId,symbol:config.symbol,side,rungsOpened:opened,plannedLots,executedLots:openedLots,lotGrowthFactor:Number(cfg.lotGrowthFactor)||2,brokerMinLot:ls.minVolume,brokerMaxLot:ls.maxVolume,brokerLotStep:ls.volumeStep,stepPrice,cycleId});
@@ -888,7 +889,7 @@ async function execute(row){
     else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!risk.allowed)action="RISK_BLOCKED";
     const v8Payload={
       ema20:ind.emaFast,ema50:ind.emaSlow,adx14:ind.adx,rsi14:ind.rsi,velocityPoints:velocity,direction:ind.v8Direction>0?"BUY":ind.v8Direction<0?"SELL":"NONE",
-      entryQualified:Boolean(ind.v8EntryQualified),spreadPoints,rungsOpened:started?.rungsOpened||0,lotScale:started?.lotScale||null
+      entryQualified:Boolean(ind.v8EntryQualified),spreadPoints,rungsOpened:started?.rungsOpened||0,plannedLots:started?.plannedLots||[],executedLots:started?.executedLots||[],lotGrowthFactor:started?.lotGrowthFactor||Number(ladderCfg.lotGrowthFactor)||2,brokerMinLot:started?.brokerMinLot||null,brokerLotStep:started?.brokerLotStep||null
     };
     const signalPayload={signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action,executionMode:s.executionMode,strategy:botId,tradePlan:null,riskAllowed:risk.allowed,analysisReason:analysis.reason,riskReason:risk.reason||risk.blockedReasons,v8:v8Payload,updatedAt:new Date().toISOString()};
     await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify(signalPayload)]);
