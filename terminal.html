@@ -1676,8 +1676,27 @@ let lastCandleTime = 0;
 let candles = [];
 let currentTicker = {};
 let backendConnected = false;
+let verificationCycle = 0;
+let brokerVerificationDelayTimer = null;
 
 const $ = id => document.getElementById(id);
+
+function showBrokerVerificationDelay(){
+  const state=$("accountConnectionValue");
+  const note=$("accountConnectionNote");
+  const badge=$("heroBrokerBadge");
+  if(state){
+    state.textContent="BROKER DETAILS TAKING LONGER TO VERIFY…";
+    state.style.color="#ffc84a";
+  }
+  if(note){
+    note.textContent="KINGBOT has not received the complete broker account snapshot yet. Verification is still running in the background; no broker connection has been changed.";
+  }
+  if(badge){
+    badge.textContent="● BROKER VERIFICATION IN PROGRESS…";
+    badge.className="hero-badge";
+  }
+}
 
 /* =========================================================
    CLOCK
@@ -2420,6 +2439,12 @@ async function fetchApi(path, options = {}) {
 
 async function checkBackend() {
   let accountLoaded=false;
+  const cycle=++verificationCycle;
+
+  clearTimeout(brokerVerificationDelayTimer);
+  brokerVerificationDelayTimer=setTimeout(()=>{
+    if(cycle===verificationCycle && !accountLoaded)showBrokerVerificationDelay();
+  },3200);
 
   await waitForKingbotApi(5000);
 
@@ -2455,6 +2480,7 @@ async function checkBackend() {
     }
   }catch(error){
     logActivity(`Broker identity check: ${error.message}`);
+    if(String(error?.message||"").includes("REQUEST_TIMEOUT"))showBrokerVerificationDelay();
   }
 
   // Full connection status may rehydrate a broker session, but it no longer blocks identity display.
@@ -2484,6 +2510,8 @@ async function checkBackend() {
     }
     backendConnected=true;
     accountLoaded=true;
+    clearTimeout(brokerVerificationDelayTimer);
+    brokerVerificationDelayTimer=null;
 
     setConnection("CONNECTED","#23f7a3","Verified broker account is active. Live account telemetry is synchronized from the broker.");
     $("accountConnectionValue").style.color="#23f7a3";
@@ -2546,6 +2574,10 @@ async function checkBackend() {
     try{ await loadOrders(); }catch{}
   }
   try{await loadRisk();}catch{}
+  if(cycle===verificationCycle){
+    clearTimeout(brokerVerificationDelayTimer);
+    brokerVerificationDelayTimer=null;
+  }
 }
 
 /* =========================================================
