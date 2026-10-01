@@ -44,6 +44,9 @@ export class UserBrokerManager {
     await this.pool.query("UPDATE kingbot_broker_accounts SET execution_mode='DEMO' WHERE execution_mode='PAPER'");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts DROP CONSTRAINT IF EXISTS kingbot_broker_accounts_execution_mode_check");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD CONSTRAINT kingbot_broker_accounts_execution_mode_check CHECK(execution_mode IN ('DEMO','LIVE'))");
+    await this.pool.query("UPDATE kingbot_broker_accounts SET execution_mode='DEMO' WHERE execution_mode='PAPER'");
+    await this.pool.query("ALTER TABLE kingbot_broker_accounts DROP CONSTRAINT IF EXISTS kingbot_broker_accounts_execution_mode_check");
+    await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD CONSTRAINT kingbot_broker_accounts_execution_mode_check CHECK(execution_mode IN ('DEMO','LIVE'))");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS credential_ciphertext TEXT");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS credential_iv TEXT");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS credential_tag TEXT"); 
@@ -215,7 +218,7 @@ export class UserBrokerManager {
     if(!this.pool||!userId)return {ok:false,error:"USER_CONTEXT_REQUIRED"};
     const requestedMode=String(executionMode||"DEMO").toUpperCase();
     if(!["DEMO","PAPER","LIVE"].includes(requestedMode))return {ok:false,error:"INVALID_EXECUTION_MODE"};
-    const mode=requestedMode==="DEMO"?"PAPER":requestedMode;
+    const mode=requestedMode==="PAPER"?"DEMO":requestedMode;
     const id=String(accountId||"").trim();
     const providerName=String(provider).toLowerCase();
     const isExness=providerName==="exness";
