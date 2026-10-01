@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireUser } from "./subscriptions.js";
 import { isAdminEmail } from "./admin-access.js";
 import { evaluateRisk, authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
+import { LADDER_V8_DEFAULTS } from "./ladder-v8.js";
 
 const BOT_DEFINITIONS = {
   strategic: {
@@ -70,6 +71,12 @@ function baseContext(snapshot = {}) {
     liquiditySweep: Boolean(snapshot.liquiditySweep),
     orderBlock: Boolean(snapshot.orderBlock),
     fairValueGap: Boolean(snapshot.fairValueGap),
+    emaFast: num(snapshot.emaFast),
+    emaSlow: num(snapshot.emaSlow),
+    adx: num(snapshot.adx),
+    rsi: num(snapshot.rsi),
+    velocityPoints: num(snapshot.velocityPoints),
+    brokerPoint: num(snapshot.brokerPoint),
     displacement: Boolean(snapshot.displacement),
     breakout: Boolean(snapshot.breakout),
     retest: Boolean(snapshot.retest)
@@ -131,16 +138,35 @@ function evaluateSmc(c) {
 }
 
 function evaluateLadder(c) {
-  // Calibrated so the 78% entry threshold is reachable only during a
-  // genuinely strong multi-factor setup. The previous weights capped the
-  // positive score near 72%, making the Ladder engine unable to signal.
-  const directional = c.momentum * 0.34 + c.trend * 0.34;
-  const alignment = c.structure === "bullish" ? 0.14 : c.structure === "bearish" ? -0.14 : 0;
-  const continuation = (c.breakout || c.retest) ? Math.sign(c.trend || c.momentum || 0) * 0.10 : 0;
-  const volatilityPenalty = c.volatility > 0.82 ? 0.28 : c.volatility < 0.08 ? 0.12 : -0.08;
-  const emergency = c.volatility > 0.95;
-  const score = clamp((directional + alignment + continuation - volatilityPenalty) * 100, -100, 100);
-  return { score, emergency, reason: "Adaptive ladder scoring combines momentum, trend, structure and continuation confirmation while reducing exposure in extreme or dead volatility." };
+  const cfg=BOT_DEFINITIONS["ladder-flip"].v8;
+  const adx=Number(c.adx);
+  const rsi=Number(c.rsi);
+  const emaFast=Number(c.emaFast);
+  const emaSlow=Number(c.emaSlow);
+  const price=Number(c.price);
+  if(![adx,rsi,emaFast,emaSlow,price].every(Number.isFinite)){
+    return {score:0,emergency:false,reason:"V8 entry gate waiting for EMA20/EMA50, ADX14 and RSI14 data."};
+  }
+  if(adx<cfg.adxMinStrength){
+    return {score:0,emergency:false,reason:`V8 entry blocked: ADX14 ${adx.toFixed(2)} is below ${cfg.adxMinStrength.toFixed(2)} trend strength.`};
+  }
+  const bull=emaFast>emaSlow&&price>emaFast&&rsi>=cfg.rsiBullMin;
+  const bear=emaFast<emaSlow&&price<emaFast&&rsi<=cfg.rsiBearMax;
+  if(!bull&&!bear){
+    return {score:0,emergency:false,reason:"V8 entry blocked: EMA20/EMA50, price location and RSI confirmation are not aligned."};
+  }
+  const adxBonus=Math.min(12,Math.max(0,(adx-cfg.adxMinStrength)*0.35));
+  const rsiBonus=bull?Math.min(8,Math.max(0,rsi-cfg.rsiBullMin)*0.8):Math.min(8,Math.max(0,cfg.rsiBearMax-rsi)*0.8);
+  const emaGap=Math.abs(emaFast-emaSlow);
+  const gapBonus=c.atr>0?Math.min(5,(emaGap/c.atr)*2):0;
+  const score=clamp(78+adxBonus+rsiBonus+gapBonus,0,100)*(bull?1:-1);
+  return {
+    score,
+    emergency:Number(c.volatility)>0.95,
+    reason:bull
+      ? `V8 BUY gate confirmed: EMA20>[0mEMA50, price>EMA20, RSI14 ${rsi.toFixed(2)}, ADX14 ${adx.toFixed(2)}.`.replace("\u001b[0m","")
+      : `V8 SELL gate confirmed: EMA20<EMA50, price<EMA20, RSI14 ${rsi.toFixed(2)}, ADX14 ${adx.toFixed(2)}.`
+  };
 }
 
 const evaluators = {
@@ -174,7 +200,7 @@ export function getTradePlan(botId, snapshot, side) {
   if (!Number.isFinite(c.atr) || c.atr <= 0) return { ok: false, reason: "ATR_REQUIRED" };
   const plan = bot.tradePlan;
   const stopDistance = c.atr * plan.slAtr;
-  const takeProfitDistance = c.atr * plan.tpAtr;
+  const takeProfitDistance = plan.tpAtr > 0 ? c.atr * plan.tpAtr : 0;
   const entry = Number(c.entryPrice || c.price || 0);
   const normalizedSide = String(side || "").toUpperCase();
   if (!entry || !["BUY","SELL"].includes(normalizedSide)) return { ok: false, reason: "TRADE_PLAN_INPUT_INVALID" };
@@ -187,7 +213,7 @@ export function getTradePlan(botId, snapshot, side) {
     takeProfitDistance,
     riskReward: Number((plan.tpAtr / plan.slAtr).toFixed(2)),
     stopLoss: normalizedSide === "BUY" ? entry - stopDistance : entry + stopDistance,
-    takeProfit: normalizedSide === "BUY" ? entry + takeProfitDistance : entry - takeProfitDistance,
+    takeProfit: takeProfitDistance > 0 ? (normalizedSide === "BUY" ? entry + takeProfitDistance : entry - takeProfitDistance) : null,
     trailingTriggerR: plan.trailingTriggerR,
     trailingLockR: plan.trailingLockR,
     maxHoldBars: plan.maxHoldBars,
