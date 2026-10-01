@@ -194,6 +194,8 @@ async function execute(row){
     strategy:botId,
     tradePlan:analysis.signal!=="NO_SIGNAL" ? (typeof tradePlan!=="undefined" ? tradePlan : null) : null,
     riskAllowed:risk.allowed,
+    analysisReason:analysis.reason||null,
+    riskReason:risk.reason||risk.reasons||null,
     updatedAt:new Date().toISOString()
   };
   await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify(signalPayload)]);
