@@ -9,7 +9,7 @@ export function createMt5BridgeRouter({pool,broker}={}){
     try{
       const requestedMode=String(req.body?.executionMode||"DEMO").toUpperCase();
       if(!["DEMO","PAPER","LIVE"].includes(requestedMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
-      const mode=requestedMode==="DEMO"?"PAPER":requestedMode;
+      const mode=requestedMode==="PAPER"?"DEMO":requestedMode;
       res.status(201).json(await mt5BridgeRegistry.issueToken({userId:user.id,mode,label:req.body?.label}));
     }catch(error){
       res.status(error?.message==="BROKER_ALREADY_CONNECTED"?409:500).json({ok:false,error:error?.message||"MT5_BRIDGE_TOKEN_CREATE_FAILED"});
