@@ -9,8 +9,6 @@ const BOT_DEFINITIONS = {
     name: "KINGBOT STRATEGIC",
     mode: "multi-strategy",
     strategies: ["trend-following", "mean-reversion", "volatility-regime", "multi-factor-consensus"],
-    signalThreshold: 70,
-    tradePlan: { slAtr: 1.8, tpAtr: 2.7, trailingTriggerR: 1.0, trailingLockR: 0.35, maxHoldBars: 24 },
     signalThreshold: 75,
     tradePlan: { slAtr: 1.6, tpAtr: 2.8, trailingTriggerR: 1.0, trailingLockR: 0.5, maxHoldBars: 30 },
     risk: { maxRiskPerTradePct: 1, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
@@ -38,6 +36,8 @@ const BOT_DEFINITIONS = {
     name: "KINGBOT SMC PRO",
     mode: "smart-money-concepts",
     strategies: ["market-structure", "liquidity-sweep", "order-block", "fair-value-gap", "displacement"],
+    signalThreshold: 74,
+    tradePlan: { slAtr: 1.5, tpAtr: 2.7, trailingTriggerR: 1.0, trailingLockR: 0.45, maxHoldBars: 28 },
     risk: { maxRiskPerTradePct: 1, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
   },
   "ladder-flip": {
