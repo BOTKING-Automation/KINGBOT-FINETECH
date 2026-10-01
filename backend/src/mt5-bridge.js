@@ -23,7 +23,8 @@ function timeMs(value){
 
 export class Mt5BridgeRegistry{
   constructor({pool}={}){this.pool=pool;this.sessions=new Map();this.pending=new Map();this.completed=new Map();}
-  async ensureSchema(){
+  async ensureSchema(pool=this.pool){
+    if(pool)this.pool=pool;
     if(!this.pool)return;
     await this.pool.query(`CREATE TABLE IF NOT EXISTS kingbot_mt5_bridge_tokens(
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -110,6 +111,9 @@ export class Mt5BridgeRegistry{
       accountType:terminalMode,mode:expected,state:state&&typeof state==="object"?state:{},lastSeenAt:Date.now(),connectedAt:previous.connectedAt||Date.now()};
     this.sessions.set(key,session);
     await this.pool.query("UPDATE kingbot_mt5_bridge_tokens SET last_seen_at=NOW(),mt5_login=$2,mt5_server=$3,account_type=$4,updated_at=NOW() WHERE id=$1",[row.id,mt5Login,mt5Server,terminalMode]);
+    if(!active.rowCount){
+      return {ok:true,needsMapping:true,userId:row.user_id,tokenId:row.id,login:mt5Login,server:mt5Server,accountType:terminalMode,mode:expected,connected:true};
+    }
     return {ok:true,userId:row.user_id,tokenId:row.id,login:mt5Login,server:mt5Server,accountType:terminalMode,mode:expected,connected:true};
   }
 
