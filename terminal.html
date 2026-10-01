@@ -528,7 +528,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
   <section class="section">
     <div class="tables">
       <div class="panel">
-        <div class="panel-head"><div class="panel-head-left"><div class="section-title">LIVE POSITIONS</div><div class="section-sub">Real positions returned by the connected broker.</div></div><span class="panel-badge" id="positionsBadge">0 OPEN</span></div>
+        <div class="panel-head"><div class="panel-head-left"><div class="section-title" id="positionsTitle">BROKER POSITIONS</div><div class="section-sub">Real positions returned by the connected broker.</div></div><span class="panel-badge" id="positionsBadge">0 OPEN</span></div>
         <div class="table-wrap"><table class="table"><thead><tr><th>Symbol</th><th>Side</th><th>Volume</th><th>Entry</th><th>Current</th><th>P&amp;L</th><th>Status</th><th>Action</th></tr></thead><tbody id="positionsTable"></tbody></table></div>
       </div>
       <div class="panel">
@@ -845,7 +845,12 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
   }
 
   function renderPositions(rows){
-    rows=Array.isArray(rows)?rows:[];$("positionCount").textContent=String(rows.length);$("positionsBadge").textContent=rows.length+" OPEN";
+    rows=Array.isArray(rows)?rows:[];
+    const mode=String(state.account?.executionMode||"").toUpperCase();
+    const type=String(state.account?.accountType||"").toUpperCase();
+    const verifiedDemo=mode==="PAPER"||type==="DEMO";
+    $("positionsTitle").textContent=verifiedDemo?"BROKER DEMO POSITIONS":"BROKER LIVE POSITIONS";
+    $("positionCount").textContent=String(rows.length);$("positionsBadge").textContent=rows.length+" OPEN · "+(verifiedDemo?"DEMO":"LIVE");
     $("positionsTable").innerHTML=rows.length?rows.map(p=>{
       const id=String(p.id||p.contractId||"");
       const canClose=Boolean(id)&&String(p.status||"OPEN").toUpperCase()==="OPEN";
@@ -985,7 +990,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       $("syncAccountState").className="sync-state live";
       $("syncAccountMain").textContent=(incoming?.accountId||"ACCOUNT")+" · LIVE STREAM";
       $("syncAccountTime").textContent=fmtTime(payload?.generatedAt||new Date().toISOString());
-      $("positionsBadge").textContent=(Array.isArray(payload?.positions)?payload.positions.length:0)+" OPEN · LIVE";
+      $("positionsBadge").textContent=(Array.isArray(payload?.positions)?payload.positions.length:0)+" OPEN · "+((String(state.account?.executionMode||"").toUpperCase()==="PAPER"||String(state.account?.accountType||"").toUpperCase()==="DEMO")?"DEMO":"LIVE");
       $("footerState").textContent="LIVE STREAM · ACCOUNT "+Math.max(0,Date.now()-state.live.lastSnapshotAt)+"ms ago";
       return;
     }
