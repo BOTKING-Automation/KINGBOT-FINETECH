@@ -493,10 +493,15 @@ async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,pos
   let opened=0;
   const positionIds=[];
   const openedLots=[];
+  // Snapshot positions and the daily order count once. The old implementation
+  // made a broker round-trip before every rung, which unnecessarily delayed the
+  // ladder and could leave later rungs waiting on telemetry.
+  const initialPositions=Array.isArray(positions)?positions:[];
+  const initialPositionIds=new Set(initialPositions.flatMap(positionIdentities).map(String));
+  const todayOrderCount=await ladderTodayOrders(userId,botId);
+
   for(let i=0;i<volumes.length;i++){
-    if((await ladderTodayOrders(userId,botId))+opened>=cfg.maxTradesPerDay)break;
-    const before=(await broker.getPositions(userId)).data||[];
-    const beforeIds=new Set(before.flatMap(positionIdentities).map(String));
+    if(todayOrderCount+opened>=cfg.maxTradesPerDay)break;
     const entry=side==="BUY"?Number(quote.ask):Number(quote.bid);
     const sl=ladderPrice(side==="BUY"?entry-stopDistance:entry+stopDistance,ls.point);
     const clientId="kbv8_"+crypto.randomUUID();
@@ -506,15 +511,31 @@ async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,pos
     try{
       const order=await broker.placeOrder({side,symbol:config.symbol,volume,stopLoss:sl,takeProfit:null,comment:"KINGBOT V8 LADDER R"+i,clientId,userId});
       await pool.query("UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,JSON.stringify(order)]);
-      const ids=await discoverNewLadderPositionIds(userId,config.symbol,side,beforeIds,order);
-      positionIds.push(...ids);
+      const id=order?.contractId!=null?String(order.contractId):"";
+      if(id)positionIds.push(id);
       openedLots.push(volume);
       opened++;
-      await audit(userId,"LADDER_V8_RUNG_OPENED",{botId,symbol:config.symbol,side,rung:i+1,volume,stopLoss:sl,positionIds:ids,cycleId});
+      await audit(userId,"LADDER_V8_RUNG_OPENED",{botId,symbol:config.symbol,side,rung:i+1,volume,stopLoss:sl,contractId:id||null,cycleId});
     }catch(error){
       await pool.query("UPDATE kingbot_execution_journal SET status='REJECTED',error_message=$2,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,String(error?.message||"ORDER_REJECTED").slice(0,500)]);
       if(opened===0)throw error;
       break;
+    }
+  }
+
+  // Deriv normally returns contractId directly. Only do one telemetry lookup
+  // when a broker response did not include an execution identifier.
+  if(opened>0&&positionIds.length<opened){
+    try{
+      const finalPositions=(await broker.getPositions(userId)).data||[];
+      const discovered=finalPositions.filter(p=>{
+        if(String(p?.symbol||"").toUpperCase()!==String(config.symbol).toUpperCase())return false;
+        const ps=String(p?.side||p?.type||"").toUpperCase();
+        return !ps||ps===side;
+      }).flatMap(positionIdentities).map(String).filter(id=>!initialPositionIds.has(id));
+      for(const id of discovered)if(!positionIds.includes(id))positionIds.push(id);
+    }catch(error){
+      console.warn("[KINGBOT V8] post-execution contract discovery failed:",error?.message||error);
     }
   }
   if(opened===0)return {action:"LADDER_NO_RUNG_OPENED",state:null};
