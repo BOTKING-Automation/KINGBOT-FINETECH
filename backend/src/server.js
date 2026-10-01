@@ -611,6 +611,16 @@ app.get("/api/account", async (req,res)=>{
     const positionData=positionsResult.status==="fulfilled" && Array.isArray(positionsResult.value?.data)
       ? positionsResult.value.data
       : [];
+    const positionRows=positionData.map(p=>({
+      id:p?.id||p?.positionId||p?.ticket||null,
+      symbol:p?.symbol||"—",
+      side:String(p?.side||p?.type||p?.positionSide||"—").toUpperCase(),
+      volume:firstFinite(p?.volume,p?.lots,p?.quantity),
+      entry:firstFinite(p?.openPrice,p?.entryPrice,p?.entry,p?.price),
+      current:firstFinite(p?.currentPrice,p?.current,p?.marketPrice),
+      pnl:firstFinite(p?.profit,p?.pnl,p?.unrealizedProfit,p?.unrealizedPnl),
+      status:String(p?.state||p?.status||"OPEN").toUpperCase()
+    }));
     const orderData=ordersResult.status==="fulfilled" && Array.isArray(ordersResult.value?.data)
       ? ordersResult.value.data
       : [];
@@ -711,6 +721,7 @@ app.get("/api/account", async (req,res)=>{
         freeMargin,
         marginLevel,
         positionCount:positionsResult.status==="fulfilled"?positionData.length:null,
+        positions:positionRows,
         orderCount:ordersResult.status==="fulfilled"?orderData.length:null,
         leverage:finiteOrNull(raw.leverage||raw.max_leverage),
         tradingEnabled,
