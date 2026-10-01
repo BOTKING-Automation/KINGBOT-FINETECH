@@ -454,7 +454,7 @@ export class UserBrokerManager {
 
   async getAccount(userId){
     const entry=await this.connectionFor(userId);
-    if(entry.provider==="deriv" && entry.accountInfo && entry.accountInfoAt && Date.now()-entry.accountInfoAt<30000){
+    if(entry.provider==="deriv" && entry.accountInfo && entry.accountInfoAt && Date.now()-entry.accountInfoAt<3000){
       const raw=entry.accountInfo||{};
       const loginid=String(raw.loginid||entry.accountId||"");
       const accountType=String(raw.accountType||entry.accountType||"").toUpperCase() || (loginid.startsWith("VR")||loginid.includes("_VRTC")?"DEMO":"REAL");
