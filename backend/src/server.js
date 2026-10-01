@@ -503,7 +503,7 @@ app.post("/api/broker/deriv/test-buy-gold", async (req,res)=>{
         clientId,
         userId:user.id,
         currency:String(account.currency||"USD"),
-        multiplier:10,
+        multiplier:100,
         derivContractType:"MULTUP"
       });
 
