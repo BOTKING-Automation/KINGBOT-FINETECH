@@ -106,6 +106,9 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 /* =========================================================
    INSTITUTIONAL HISTORY / PERFORMANCE TAPE
 ========================================================= */
+
+.live-chart-panel{overflow:hidden}.live-chart-wrap{position:relative;height:300px;background:radial-gradient(circle at 70% 15%,rgba(34,230,255,.07),transparent 35%),linear-gradient(180deg,rgba(5,10,20,.96),rgba(2,5,11,.98))}
+#tickChart{display:block;width:100%;height:100%}.live-chart-overlay{position:absolute;left:16px;top:14px;display:flex;align-items:baseline;gap:10px;padding:9px 11px;border:1px solid rgba(34,230,255,.12);border-radius:10px;background:rgba(4,9,18,.78);backdrop-filter:blur(10px);font:800 7px "JetBrains Mono";color:#5f6c82;pointer-events:none}.live-chart-overlay strong{font:900 16px "JetBrains Mono";color:var(--gold)}
 .history-console{display:grid;grid-template-columns:minmax(0,1.38fr) minmax(330px,.62fr);gap:10px}
 .history-panel{border:1px solid var(--line);border-radius:17px;background:linear-gradient(145deg,rgba(11,17,30,.96),rgba(5,9,17,.99));overflow:hidden;box-shadow:0 12px 38px rgba(0,0,0,.2)}
 .history-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;border-bottom:1px solid var(--line)}
@@ -445,6 +448,19 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
   </section>
 
   <section class="section">
+    <div class="panel live-chart-panel">
+      <div class="panel-head">
+        <div class="panel-head-left"><div class="section-title">LIVE MARKET CHART</div><div class="section-sub">Broker tick stream rendered directly in the terminal. No synthetic candles or delayed market values.</div></div>
+        <div class="history-tools"><span class="panel-badge" id="chartBadge">WAITING FOR TICKS</span><span class="panel-badge" id="chartLatency">—</span></div>
+      </div>
+      <div class="live-chart-wrap">
+        <canvas id="tickChart" aria-label="Live broker tick chart"></canvas>
+        <div class="live-chart-overlay"><span id="chartSymbol">—</span><strong id="chartPrice">—</strong><span id="chartTickCount">0 TICKS</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
     <div class="main-grid">
       <div class="panel">
         <div class="panel-head"><div class="panel-head-left"><div class="section-title">ENGINE TELEMETRY</div><div class="section-sub">The exact engine saved on this account, its worker state, signal and execution plan.</div></div><span class="panel-badge" id="engineBadge">READING SERVER</span></div>
@@ -566,7 +582,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 
   const $=(id)=>document.getElementById(id);
   const esc=(v)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
-  const state={selection:null,engine:null,runtimeBots:[],account:null,quote:null,risk:null,history:[],historyRangeDays:7,historyLastAt:0,cycle:0,lastSyncAt:null,marketSymbol:null,live:{running:false,reader:null,abort:null,reconnectTimer:null,reconnectDelayMs:1000,lastSnapshotAt:0,lastQuoteAt:0,lastQuoteServerAt:null,lastQuoteCount:0,lastSnapshotLatencyMs:null,events:0}};
+  const state={selection:null,engine:null,runtimeBots:[],account:null,quote:null,risk:null,history:[],historyRangeDays:7,historyLastAt:0,cycle:0,lastSyncAt:null,marketSymbol:null,tickSeries:[],live:{running:false,reader:null,abort:null,reconnectTimer:null,reconnectDelayMs:1000,lastSnapshotAt:0,lastQuoteAt:0,lastQuoteServerAt:null,lastQuoteCount:0,lastSnapshotLatencyMs:null,events:0}};
   let refreshRunning=false;
 
   function fmtTime(v){
@@ -761,6 +777,33 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
   }
 
 
+  function drawTickChart(){
+    const canvas=$("tickChart");if(!canvas)return;
+    const rect=canvas.getBoundingClientRect(),dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1)),w=Math.max(320,Math.floor(rect.width*dpr)),h=Math.max(180,Math.floor(rect.height*dpr));
+    if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
+    const ctx=canvas.getContext("2d");if(!ctx)return;ctx.clearRect(0,0,w,h);
+    const values=state.tickSeries.map(x=>x.price).filter(Number.isFinite);if(values.length<2)return;
+    const pad=34*dpr,min=Math.min(...values),max=Math.max(...values),span=Math.max(1e-9,max-min),plotW=w-pad*1.25,plotH=h-pad*1.15;
+    ctx.strokeStyle="rgba(255,255,255,.055)";ctx.lineWidth=1*dpr;
+    for(let i=0;i<6;i++){const y=pad+i*(plotH/5);ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(w-pad*.15,y);ctx.stroke()}
+    for(let i=0;i<8;i++){const x=pad+i*(plotW/7);ctx.beginPath();ctx.moveTo(x,pad);ctx.lineTo(x,pad+plotH);ctx.stroke()}
+    ctx.beginPath();
+    values.forEach((v,i)=>{const x=pad+(i/Math.max(1,values.length-1))*plotW,y=pad+(1-(v-min)/span)*plotH;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});
+    ctx.lineTo(pad+plotW,pad+plotH);ctx.lineTo(pad,pad+plotH);ctx.closePath();ctx.fillStyle="rgba(34,230,255,.07)";ctx.fill();
+    ctx.beginPath();
+    values.forEach((v,i)=>{const x=pad+(i/Math.max(1,values.length-1))*plotW,y=pad+(1-(v-min)/span)*plotH;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});
+    ctx.strokeStyle="#22e6ff";ctx.lineWidth=2*dpr;ctx.stroke();
+    const last=values[values.length-1],ly=pad+(1-(last-min)/span)*plotH;ctx.fillStyle="#f7c55b";ctx.beginPath();ctx.arc(pad+plotW,ly,3*dpr,0,Math.PI*2);ctx.fill();
+    ctx.font=700*(dpr)+" 9px JetBrains Mono";ctx.fillStyle="#566176";ctx.fillText(max.toFixed(last>=100?2:5),pad+plotW+5*dpr,pad+8*dpr);ctx.fillText(min.toFixed(last>=100?2:5),pad+plotW+5*dpr,pad+plotH);
+  }
+  function pushTickChart(q){
+    const price=Number(q?.price);if(!Number.isFinite(price))return;
+    state.tickSeries.push({time:Date.now(),price});
+    if(state.tickSeries.length>240)state.tickSeries.splice(0,state.tickSeries.length-240);
+    $("chartSymbol").textContent=q?.symbol||state.marketSymbol||"—";$("chartPrice").textContent=fmtNumber(price,price>=100?2:5);$("chartTickCount").textContent=state.tickSeries.length+" TICKS";$("chartBadge").textContent="LIVE TICK";$("chartLatency").textContent=(Number(q?.ageMs)||0)+"ms";
+    drawTickChart();
+  }
+
   function renderLiveQuote(q){
     const d=q||{};
     const bid=Number(d.bid);
@@ -789,7 +832,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     $("syncMarketTime").textContent=fmtTime(new Date().toISOString());
     state.quote={data:{...d,bid:Number.isFinite(bid)?bid:mid,ask:Number.isFinite(ask)?ask:mid}};$("itTapeSymbol").textContent=symbol;$("itTapeBid").textContent=Number.isFinite(bid)?fmtNumber(bid,dec):"—";$("itTapeAsk").textContent=Number.isFinite(ask)?fmtNumber(ask,dec):"—";$("itTapeEvent").textContent="TICK #"+(++state.live.lastQuoteCount);$("itTapePositions").textContent=String(state.account?.positionCount ?? ($("positionCount").textContent || "0"));if(q?.serverReceivedAt){state.live.lastQuoteServerAt=q.serverReceivedAt;}$("itQuoteAge").textContent="0ms";
     state.live.lastQuoteAt=Date.now();
-    const age=Number.isFinite(Number(d.ageMs))?Math.max(0,Number(d.ageMs)):0;
+    const age=Number.isFinite(Number(d.ageMs))?Math.max(0,Number(d.ageMs)):0;pushTickChart(d);
     $("footerState").textContent="LIVE STREAM · TICK AGE "+Math.round(age)+"ms";
   }
 
@@ -1137,6 +1180,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
   },250);
   // Safety fallback only. Normal terminal telemetry comes from the realtime stream.
   setInterval(()=>{if(!state.live.running)refreshAll(false)},15000);
+  window.addEventListener("resize",drawTickChart);
   $("clock").textContent=new Date().toLocaleTimeString([], {hour12:false});
   refreshAll(true);
   refreshHistory(true);
