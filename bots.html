@@ -197,11 +197,51 @@ function putSettings(s,mode,kill){
  renderStrategy();
  renderAiMonitor(selected?.lastSignal);
 }
+async function getBotsAuthToken(timeoutMs=2500){
+ let firebase=window.KINGBOT_FIREBASE||null;
+ if(!firebase){
+  try{
+   await import(new URL("system/firebase-auth.js",window.location.href).href);
+   firebase=window.KINGBOT_FIREBASE||null;
+  }catch{}
+ }
+ if(!firebase)throw new Error("FIREBASE_AUTH_UNAVAILABLE");
+ let user=null;
+ try{user=await firebase.waitForAuthReady(timeoutMs)}catch{user=firebase.auth?.currentUser||null}
+ if(!user)throw new Error("AUTH_TOKEN_NOT_READY");
+ const token=await firebase.getToken(false);
+ if(!token)throw new Error("AUTH_TOKEN_NOT_READY");
+ return {firebase,token};
+}
 async function api(path,options={}){
- const r=await window.KINGBOT_API.request(path,options);
- let data={};try{data=await r.json()}catch{}
- if(!r.ok||data?.ok===false)throw new Error(data.error||data.reason||data.message||("HTTP "+r.status));
- return data;
+ const controller=new AbortController();
+ const timeoutMs=Number(options.timeoutMs)||9000;
+ const timer=setTimeout(()=>controller.abort(),timeoutMs);
+ const requestOptions={...options,signal:controller.signal};
+ delete requestOptions.timeoutMs;
+ try{
+  const auth=await getBotsAuthToken(Math.min(2500,timeoutMs));
+  const headers=new Headers(requestOptions.headers||{});
+  headers.set("Accept","application/json");
+  if(requestOptions.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
+  headers.set("Authorization","Bearer "+auth.token);
+  let r=await fetch(window.KINGBOT_API.baseUrl+path,{...requestOptions,headers,credentials:"omit",cache:"no-store"});
+  if(r.status===401){
+   try{
+    const refreshed=await auth.firebase.getToken(true);
+    if(refreshed){
+     headers.set("Authorization","Bearer "+refreshed);
+     r=await fetch(window.KINGBOT_API.baseUrl+path,{...requestOptions,headers,credentials:"omit",cache:"no-store"});
+    }
+   }catch{}
+  }
+  let data={};try{data=await r.json()}catch{}
+  if(!r.ok||data?.ok===false)throw new Error(data.error||data.reason||data.message||("HTTP "+r.status));
+  return data;
+ }catch(error){
+  if(error?.name==="AbortError")throw new Error("REQUEST_TIMEOUT: "+path);
+  throw error;
+ }finally{clearTimeout(timer)}
 }
 async function refreshRuntime(){if(!selected)return;try{const r=await api("/runtime/"+encodeURIComponent(selected.id));selected.runtime=r.state||"STOPPED";selected.executionMode=r.executionMode||selected.executionMode;selected.symbol=r.symbol||selected.symbol||"";selected.timeframe=r.timeframe||selected.timeframe||"1m";selected.lastSignal=r.lastSignal||null;$("mRuntime").textContent=selected.runtime;$("mMode").textContent=selected.executionMode||"NOT_CONNECTED";$("mSymbol").textContent=selected.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected.timeframe||"—";$("enginePill").textContent=selected.runtime;renderAiMonitor(selected.lastSignal)}catch{}}
 setInterval(refreshRuntime,5000);
