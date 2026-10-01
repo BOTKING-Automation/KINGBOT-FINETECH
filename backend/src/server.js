@@ -799,11 +799,17 @@ app.get("/api/terminal/live", async (req,res)=>{
 
   const mapPosition=p=>({
     id:p?.id||p?.positionId||p?.ticket||p?.contractId||null,
+    ticket:p?.ticket||p?.id||p?.positionId||p?.contractId||null,
+    time:p?.time||p?.openTime||p?.open_time||p?.date_start||p?.timestamp||null,
     symbol:p?.symbol||p?.underlying_symbol||"—",
     side:String(p?.side||p?.type||p?.positionSide||"—").toUpperCase(),
     volume:firstFinite(p?.volume,p?.lots,p?.quantity,p?.stake,p?.buy_price),
     entry:firstFinite(p?.openPrice,p?.entryPrice,p?.entry,p?.open_price),
+    stopLoss:firstFinite(p?.stopLoss,p?.sl,p?.stop_loss),
+    takeProfit:firstFinite(p?.takeProfit,p?.tp,p?.take_profit),
     current:firstFinite(p?.currentPrice,p?.current,p?.marketPrice,p?.current_spot,p?.current_tick,p?.bidPrice,p?.bid_price),
+    swap:firstFinite(p?.swap,p?.swapAmount,p?.swap_amount),
+    commission:firstFinite(p?.commission,p?.commissionAmount,p?.commission_amount),
     pnl:firstFinite(p?.profit,p?.pnl,p?.unrealizedProfit,p?.unrealizedPnl),
     status:String(p?.state||p?.status||"OPEN").toUpperCase()
   });
