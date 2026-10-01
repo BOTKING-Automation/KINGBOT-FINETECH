@@ -107,8 +107,15 @@ export class Mt5BridgeRegistry{
       return {ok:false,status:409,error:"MT5_BRIDGE_ACCOUNT_MISMATCH"};
     const key=row.token_hash;
     const previous=this.sessions.get(key)||{};
+    const incomingState=state&&typeof state==="object"?state:{};
+    let mergedState={...(previous.state||{}),...incomingState};
+    if(incomingState.history && previous.state?.history){
+      const incomingHasDeals=Array.isArray(incomingState.history.deals)&&incomingState.history.deals.length>0;
+      const incomingHasOrders=Array.isArray(incomingState.history.orders)&&incomingState.history.orders.length>0;
+      if(!incomingHasDeals&&!incomingHasOrders) mergedState.history=previous.state.history;
+    }
     const session={...previous,tokenHash:key,userId:row.user_id,tokenId:row.id,login:mt5Login,server:mt5Server,
-      accountType:terminalMode,mode:expected,state:state&&typeof state==="object"?state:{},lastSeenAt:Date.now(),connectedAt:previous.connectedAt||Date.now()};
+      accountType:terminalMode,mode:expected,state:mergedState,lastSeenAt:Date.now(),connectedAt:previous.connectedAt||Date.now()};
     this.sessions.set(key,session);
     await this.pool.query("UPDATE kingbot_mt5_bridge_tokens SET last_seen_at=NOW(),mt5_login=$2,mt5_server=$3,account_type=$4,updated_at=NOW() WHERE id=$1",[row.id,mt5Login,mt5Server,terminalMode]);
     if(!active.rowCount){
@@ -200,7 +207,12 @@ export class Mt5BridgeConnection{
     throw new Error("MT5_SYMBOL_NOT_AVAILABLE:"+wanted);
   }
   async getHistoricalCandles(symbol,timeframe,limit=100){
-    return await this.registry.queueCommand({userId:this.userId,command:{type:"GET_CANDLES",symbol:String(symbol||"").toUpperCase(),timeframe:String(timeframe||"5m"),limit:Math.max(10,Math.min(1000,Number(limit)||100))}});
+    const result=await this.registry.queueCommand({
+      userId:this.userId,
+      command:{type:"GET_CANDLES",symbol:String(symbol||"").toUpperCase(),timeframe:String(timeframe||"5m"),limit:Math.max(10,Math.min(1000,Number(limit)||100))}
+    });
+    if(result?.status!=="FILLED")throw new Error(String(result?.message||"MT5_CANDLE_REQUEST_REJECTED"));
+    return Array.isArray(result?.result?.candles)?result.result.candles:[];
   }
   async modifyPosition(id,stopLoss,takeProfit){return this.registry.queueCommand({userId:this.userId,command:{type:"MODIFY_POSITION",positionId:String(id),stopLoss:Number(stopLoss)||0,takeProfit:Number(takeProfit)||0}});}
   async closePosition(id){return this.registry.queueCommand({userId:this.userId,command:{type:"CLOSE_POSITION",positionId:String(id)}});}
