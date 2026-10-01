@@ -299,16 +299,40 @@ export class DerivTraderClient {
     };
   }
 
+  async enrichContract(c){
+    const mapped=this.mapContract(c);
+    if(mapped.id){
+      try{
+        const open=await this.getOpenContract(mapped.id);
+        return {
+          ...mapped,
+          symbol:open?.underlying||open?.underlying_symbol||mapped.symbol,
+          entry:finite(open?.entry_spot||open?.entry_tick||open?.entry_price||mapped.entry),
+          openPrice:finite(open?.entry_spot||open?.entry_tick||open?.entry_price||mapped.openPrice),
+          currentPrice:finite(open?.current_spot||open?.current_tick||open?.bid_price||mapped.currentPrice),
+          profit:finite(open?.profit??mapped.profit),
+          bidPrice:finite(open?.bid_price??mapped.bidPrice),
+          stake:finite(open?.buy_price??mapped.stake),
+          volume:finite(open?.buy_price??mapped.volume),
+          status:String(open?.status||mapped.status||"OPEN").toUpperCase()
+        };
+      }catch{}
+    }
+    return mapped;
+  }
+
   async getPositions(){
     const response=await this.request({portfolio:1});
     const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
-    return {connected:true,data:contracts.map(c=>this.mapContract(c))};
+    const data=await Promise.all(contracts.map(c=>this.enrichContract(c)));
+    return {connected:true,data};
   }
 
   async getOrders(){
     const response=await this.request({portfolio:1});
     const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
-    return {connected:true,data:contracts.map(c=>this.mapContract(c))};
+    const data=await Promise.all(contracts.map(c=>this.enrichContract(c)));
+    return {connected:true,data};
   }
 
   async getTrades({startTime,endTime}={}){
