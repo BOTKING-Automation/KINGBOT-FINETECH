@@ -43,7 +43,7 @@ const BOT_DEFINITIONS = {
     timeframeProfile: { regime: "4h", setup: "15m", execution: "5m" },
     signalThreshold: 74,
     tradePlan: { slAtr: 1.5, tpAtr: 2.7, trailingTriggerR: 1.0, trailingLockR: 0.45, maxHoldBars: 28 },
-    risk: { maxRiskPerTradePct: 1, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
+    risk: { maxRiskPerTradePct: 1, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10, lotSize: 0.01 }
   },
   "ladder-flip": {
     id: "ladder-flip",
