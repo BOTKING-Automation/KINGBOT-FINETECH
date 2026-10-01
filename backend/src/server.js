@@ -948,17 +948,34 @@ app.post("/api/positions/:positionId/close", async (req,res)=>{
   if(!positionId)return res.status(400).json({ok:false,error:"BROKER_POSITION_ID_REQUIRED"});
   try{
     const entry=await broker.connectionFor(user.id);
-    if(entry.provider!=="deriv")return res.status(400).json({ok:false,error:"POSITION_CLOSE_PROVIDER_UNSUPPORTED"});
-    const positions=await entry.api.getPositions();
-    const openRows=Array.isArray(positions?.data)?positions.data:[];
-    const match=openRows.find(p=>String(p?.id||p?.contractId||"")===positionId);
-    if(!match)return res.status(404).json({ok:false,error:"POSITION_NOT_OPEN"});
-    const result=await entry.api.sellContract(positionId,0);
-    await pool.query(
-      "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'POSITION_CLOSED',$2::jsonb)",
-      [user.id,JSON.stringify({provider:"deriv",positionId,symbol:match?.symbol||null,side:match?.side||match?.type||null})]
-    );
-    res.json({ok:true,closed:true,provider:"deriv",positionId,result});
+    const provider=String(entry.provider||"").toLowerCase();
+    if(provider==="deriv"){
+      const positions=await entry.api.getPositions();
+      const openRows=Array.isArray(positions?.data)?positions.data:[];
+      const match=openRows.find(p=>String(p?.id||p?.contractId||"")===positionId);
+      if(!match)return res.status(404).json({ok:false,error:"POSITION_NOT_OPEN"});
+      const result=await entry.api.sellContract(positionId,0);
+      await pool.query(
+        "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'POSITION_CLOSED',$2::jsonb)",
+        [user.id,JSON.stringify({provider:"deriv",positionId,symbol:match?.symbol||null,side:match?.side||match?.type||null})]
+      );
+      return res.json({ok:true,closed:true,provider:"deriv",positionId,result});
+    }
+    if(provider==="deriv-mt5" || provider==="metaapi" || provider==="ig" || provider==="fxcm"){
+      if(typeof entry.connection?.closePosition!=="function")return res.status(400).json({ok:false,error:"POSITION_CLOSE_UNSUPPORTED"});
+      const positions=String(provider)==="deriv-mt5"
+        ? (Array.isArray(entry.connection.terminalState?.positions)?entry.connection.terminalState.positions:[])
+        : await entry.connection.getPositions();
+      const match=positions.find(p=>String(p?.id||"")===positionId);
+      if(!match)return res.status(404).json({ok:false,error:"POSITION_NOT_OPEN"});
+      const result=await entry.connection.closePosition(positionId);
+      await pool.query(
+        "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'POSITION_CLOSED',$2::jsonb)",
+        [user.id,JSON.stringify({provider,positionId,symbol:match?.symbol||null,type:match?.type||null,volume:match?.volume||null})]
+      );
+      return res.json({ok:true,closed:true,provider,positionId,result});
+    }
+    return res.status(400).json({ok:false,error:"POSITION_CLOSE_PROVIDER_UNSUPPORTED"});
   }catch(error){
     console.error("[KINGBOT POSITION] close failed:",error?.message||error);
     res.status(502).json({ok:false,error:"Position close failed.",reason:error?.message||"POSITION_CLOSE_FAILED"});
