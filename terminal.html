@@ -524,7 +524,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 
   async function loadAccount(){
     try{
-      const x=await api("/account",{timeoutMs:9500});renderAccount(x.account||x.data||x);
+      const x=await api("/account",{timeoutMs:9500});const account=x.account||x.data||x;renderAccount(account);if(Array.isArray(account?.positions))renderPositions(account.positions);
       setSync("backend","LIVE","API AUTHENTICATED",x.account?.syncedAt||new Date().toISOString());setSync("broker","LIVE",String(x.account?.broker||"BROKER").toUpperCase(),x.account?.syncedAt);
       addActivity("Account telemetry synchronized.");
     }catch(e){
@@ -585,7 +585,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       // exactly which engine Terminal should display after every refresh.
       let selectionOk=false;
       try{await loadSelection();selectionOk=true}catch{}
-      await Promise.allSettled([loadRuntime(),loadAccount(),loadPositions(),loadOrders(),loadRisk()]);
+      await Promise.allSettled([loadRuntime(),loadAccount(),loadOrders(),loadRisk()]);
       if(cycle!==state.cycle)return;
       await loadQuote();
       state.lastSyncAt=new Date().toISOString();$("lastSystemSync").textContent=fmtTime(state.lastSyncAt);$("footerState").textContent=selectionOk?(state.engine?"Saved engine synchronized: "+String(state.engine.name).replace(/^KINGBOT\s*/,""):"No saved engine"):"Selection telemetry needs attention";
