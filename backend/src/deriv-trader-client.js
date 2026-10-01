@@ -161,7 +161,11 @@ export class DerivTraderClient {
         }
         const req_id=++this.marketRequestId;
         const normalized={...payload};
-        if(normalized.subscribe===0||String(normalized.subscribe)==="0")delete normalized.subscribe;
+        if(endpoint===DERIV_PUBLIC_WS){
+          if(normalized.subscribe===0||String(normalized.subscribe)==="0")normalized.subscribe=0;
+        }else if(normalized.subscribe===0||String(normalized.subscribe)==="0"){
+          delete normalized.subscribe;
+        }
         const message={...normalized,req_id};
         return await new Promise((resolve,reject)=>{
           const timer=setTimeout(()=>{
@@ -398,7 +402,7 @@ export class DerivTraderClient {
   async getQuote(symbol){
     const requested=String(symbol||"").trim();
     const s=await this.resolveMarketSymbol(requested);
-    const response=await this.marketRequest({ticks:s},{timeoutMs:10000});
+    const response=await this.marketRequest({ticks:s,subscribe:0},{timeoutMs:10000});
     const tick=response?.tick||{};
     const quote=finite(tick.quote);
     if(quote===null)throw new Error("DERIV_QUOTE_UNAVAILABLE");
