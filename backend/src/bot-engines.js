@@ -44,11 +44,12 @@ const BOT_DEFINITIONS = {
   "ladder-flip": {
     id: "ladder-flip",
     name: "KINGBOT LADDER FLIP V8",
-    mode: "adaptive-ladder",
-    strategies: ["adaptive-spacing", "ladder-levels", "exposure-controller", "reversal-logic", "emergency-unwind"],
+    mode: "v8-adaptive-ladder",
+    strategies: ["ema20-50-trend-gate", "adx-strength-gate", "rsi-confirmation", "velocity-pyramiding", "staircase-profit-lock", "risk-governor"],
     signalThreshold: 78,
-    tradePlan: { slAtr: 1.3, tpAtr: 1.95, trailingTriggerR: 0.9, trailingLockR: 0.35, maxHoldBars: 20, maxLadderLevels: 3 },
-    risk: { maxRiskPerTradePct: 0.5, maxPositions: 5, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
+    tradePlan: { slAtr: 1.5, tpAtr: 0, trailingTriggerR: null, trailingLockR: null, maxHoldBars: 0, maxLadderLevels: 20 },
+    risk: { maxRiskPerTradePct: 0.5, maxPositions: 20, dailyDrawdownPct: 6, totalDrawdownPct: 20 },
+    v8: { ...LADDER_V8_DEFAULTS }
   }
 };
 
@@ -164,7 +165,7 @@ function evaluateLadder(c) {
     score,
     emergency:Number(c.volatility)>0.95,
     reason:bull
-      ? `V8 BUY gate confirmed: EMA20>[0mEMA50, price>EMA20, RSI14 ${rsi.toFixed(2)}, ADX14 ${adx.toFixed(2)}.`.replace("\u001b[0m","")
+      ? `V8 BUY gate confirmed: EMA20>EMA50, price>EMA20, RSI14 ${rsi.toFixed(2)}, ADX14 ${adx.toFixed(2)}.`
       : `V8 SELL gate confirmed: EMA20<EMA50, price<EMA20, RSI14 ${rsi.toFixed(2)}, ADX14 ${adx.toFixed(2)}.`
   };
 }
