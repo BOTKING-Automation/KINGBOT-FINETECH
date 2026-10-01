@@ -589,6 +589,23 @@ export class UserBrokerManager {
     return {connected:true,data:await entry.connection.getSymbolPrice(String(symbol).trim().toUpperCase())};
   }
 
+  async modifyPositionStops({userId,positionId,symbol,stopLoss,takeProfit}={}){
+    const entry=await this.connectionFor(userId);
+    const id=String(positionId||"").trim();
+    if(!id)throw new Error("BROKER_POSITION_ID_REQUIRED");
+    if(entry.provider==="exness"){
+      return {connected:true,data:await entry.api.modifyPositionStops({positionId:id,stopLoss,takeProfit})};
+    }
+    if(entry.provider==="oanda"){
+      return {connected:true,data:await entry.api.modifyTradeStops(id,{stopLoss,takeProfit})};
+    }
+    if(entry.provider==="deriv"){
+      throw new Error("DERIV_LADDER_POSITION_MODIFICATION_UNSUPPORTED");
+    }
+    if(typeof entry.connection.modifyPosition!=="function")throw new Error("BROKER_POSITION_MODIFICATION_UNSUPPORTED");
+    return {connected:true,data:await entry.connection.modifyPosition(id,stopLoss??null,takeProfit??null)};
+  }
+
   async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId}){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="deriv"){
