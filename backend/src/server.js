@@ -12,6 +12,7 @@ import { createSubscriptionRouter, ensureSubscriptionSchema } from "./subscripti
 import { createBotEngineRouter, ensureBotEngineSchema } from "./bot-engines.js";
 import { UserBrokerManager } from "./user-broker-manager.js";
 import { DerivTraderClient } from "./deriv-trader-client.js";
+import { getDerivMarketFeed } from "./deriv-market-feed.js";
 import { PartnerManager } from "./partner-manager.js";
 import { requireUser } from "./subscriptions.js";
 import { isAdminEmail } from "./admin-access.js";
@@ -745,6 +746,177 @@ app.get("/api/account", async (req,res)=>{
     });
   }
 });
+
+app.get("/api/terminal/live", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+
+  const mapping=await broker.getMapping(user.id);
+  if(!mapping){
+    return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED"});
+  }
+
+  let entry;
+  try{
+    entry=await broker.connectionFor(user.id);
+  }catch(error){
+    return res.status(503).json({ok:false,error:"BROKER_CONNECTION_UNAVAILABLE",reason:String(error?.message||"BROKER_CONNECTION_UNAVAILABLE")});
+  }
+
+  if(!entry?.api){
+    return res.status(503).json({ok:false,error:"BROKER_API_UNAVAILABLE"});
+  }
+
+  res.statusCode=200;
+  res.setHeader("Content-Type","text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control","no-cache, no-transform");
+  res.setHeader("Connection","keep-alive");
+  res.setHeader("X-Accel-Buffering","no");
+  if(typeof res.flushHeaders==="function")res.flushHeaders();
+
+  const provider=String(entry.provider||mapping.provider||"").toLowerCase();
+  const symbol=String(req.query?.symbol||"").trim();
+  let closed=false;
+  let snapshotTimer=null;
+  let heartbeatTimer=null;
+  let snapshotBusy=false;
+  let stopQuote=null;
+
+  const write=(event,payload)=>{
+    if(closed||res.writableEnded)return false;
+    try{
+      res.write("event: "+event+"\\n");
+      res.write("data: "+JSON.stringify(payload)+"\\n\\n");
+      return true;
+    }catch{
+      return false;
+    }
+  };
+
+  const moneyNumber=value=>{
+    const n=Number(value);
+    return Number.isFinite(n)?n:null;
+  };
+
+  const mapPosition=p=>({
+    id:p?.id||p?.positionId||p?.ticket||p?.contractId||null,
+    symbol:p?.symbol||p?.underlying_symbol||"—",
+    side:String(p?.side||p?.type||p?.positionSide||"—").toUpperCase(),
+    volume:firstFinite(p?.volume,p?.lots,p?.quantity,p?.stake,p?.buy_price),
+    entry:firstFinite(p?.openPrice,p?.entryPrice,p?.entry,p?.open_price),
+    current:firstFinite(p?.currentPrice,p?.current,p?.marketPrice,p?.current_spot,p?.current_tick,p?.bidPrice,p?.bid_price),
+    pnl:firstFinite(p?.profit,p?.pnl,p?.unrealizedProfit,p?.unrealizedPnl),
+    status:String(p?.state||p?.status||"OPEN").toUpperCase()
+  });
+
+  const pushSnapshot=async()=>{
+    if(closed||snapshotBusy)return;
+    snapshotBusy=true;
+    const startedAt=Date.now();
+    try{
+      const [accountResult,positionsResult]=await Promise.allSettled([
+        entry.api.getAccount(),
+        provider==="deriv"
+          ? entry.api.getLivePositions()
+          : entry.api.getPositions()
+      ]);
+
+      if(accountResult.status!=="fulfilled")throw accountResult.reason||new Error("BROKER_ACCOUNT_TELEMETRY_UNAVAILABLE");
+
+      const raw=accountResult.value?.data||{};
+      const sourcePositions=positionsResult.status==="fulfilled"
+        ? (Array.isArray(positionsResult.value?.data)?positionsResult.value.data:positionsResult.value?.data||[])
+        : [];
+      const positionRows=Array.isArray(sourcePositions)?sourcePositions.map(mapPosition):[];
+      const floating=positionRows.reduce((total,row)=>{
+        const p=moneyNumber(row.pnl);
+        return p===null?total:total+p;
+      },0);
+
+      const balance=moneyNumber(raw.balance);
+      const rawEquity=moneyNumber(raw.equity);
+      const equity=provider==="deriv" && balance!==null ? balance+floating : (rawEquity??balance);
+      const payload={
+        account:{
+          accountId:raw.loginid||raw.accountId||mapping.account_id||null,
+          broker:provider,
+          executionMode:entry.executionMode||mapping.execution_mode||"PAPER",
+          accountType:String(raw.accountType||raw.account_type||(entry.executionMode==="LIVE"?"REAL":"DEMO")).toUpperCase(),
+          currency:raw.currency||null,
+          balance,
+          equity,
+          floatingPnl:equity!==null&&balance!==null?equity-balance:floating,
+          realizedPnl:null,
+          dailyPnl:null,
+          dailyDrawdownPct:null,
+          totalDrawdownPct:null,
+          margin:moneyNumber(raw.margin),
+          freeMargin:moneyNumber(raw.freeMargin),
+          marginLevel:moneyNumber(raw.marginLevel),
+          positionCount:positionRows.length,
+          tradingEnabled:raw.tradeAllowed!==false&&raw.tradingEnabled!==false,
+          accountStatus:String(raw.account_status||raw.status||"ACTIVE").toUpperCase()
+        },
+        positions:positionRows,
+        orders:provider==="deriv"?[]:positionRows,
+        generatedAt:new Date().toISOString(),
+        latencyMs:Math.max(0,Date.now()-startedAt),
+        source:"authenticated-terminal-live-stream"
+      };
+      write("snapshot",payload);
+    }catch(error){
+      write("status",{state:"ERROR",reason:String(error?.message||"LIVE_TELEMETRY_UNAVAILABLE").slice(0,300),generatedAt:new Date().toISOString()});
+    }finally{
+      snapshotBusy=false;
+    }
+  };
+
+  try{
+    write("status",{state:"CONNECTED",provider,accountId:mapping.account_id||null,symbol:symbol||null,generatedAt:new Date().toISOString()});
+
+    if(provider==="deriv" && symbol){
+      const feed=getDerivMarketFeed();
+      stopQuote=await feed.onTick(symbol,tick=>{
+        write("quote",{quote:tick,serverReceivedAt:new Date().toISOString()});
+      });
+      const latest=feed.status(symbol);
+      if(latest.price!==null){
+        write("quote",{
+          quote:{
+            symbol:latest.symbol,
+            price:latest.price,
+            epoch:latest.epoch,
+            ageMs:latest.ageMs,
+            fresh:latest.fresh,
+            source:"deriv-shared-live-feed"
+          },
+          serverReceivedAt:new Date().toISOString()
+        });
+      }
+    }
+
+    await pushSnapshot();
+    snapshotTimer=setInterval(pushSnapshot,1000);
+    heartbeatTimer=setInterval(()=>{
+      if(!closed)try{res.write(": kingbot-live\\n\\n");}catch{}
+    },15000);
+
+    req.on("close",()=>{
+      closed=true;
+      if(snapshotTimer)clearInterval(snapshotTimer);
+      if(heartbeatTimer)clearInterval(heartbeatTimer);
+      if(stopQuote)try{stopQuote();}catch{}
+    });
+  }catch(error){
+    closed=true;
+    if(snapshotTimer)clearInterval(snapshotTimer);
+    if(heartbeatTimer)clearInterval(heartbeatTimer);
+    if(stopQuote)try{stopQuote();}catch{}
+    if(!res.writableEnded){
+      try{write("status",{state:"ERROR",reason:String(error?.message||"LIVE_STREAM_FAILED").slice(0,300),generatedAt:new Date().toISOString()});res.end();}catch{}
+    }
+  }
+});
+
 app.post("/api/positions/:positionId/close", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   const positionId=String(req.params?.positionId||"").trim();
