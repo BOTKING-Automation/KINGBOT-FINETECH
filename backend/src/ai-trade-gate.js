@@ -110,8 +110,32 @@ function snapshotFingerprint({botId,market,analysis}={}){
     velocityPoints:Number(market?.velocityPoints||0),
     deterministicSignal:String(analysis?.signal||"NO_SIGNAL"),
     deterministicScoreBucket:Math.round(Number(analysis?.score||0)/2),
-    deterministicReason:String(analysis?.reason||"")
+    deterministicReason:String(analysis?.reason||""),
+    multiTimeframe:compactTimeframeFingerprint(market?.multiTimeframe)
   });
+}
+
+function compactTimeframeFingerprint(value){
+  const clean=(item)=>item?({
+    timeframe:item.timeframe,
+    available:Boolean(item.available),
+    trend:Number(item.trend||0),
+    momentum:Number(item.momentum||0),
+    volatility:Number(item.volatility||0),
+    structure:String(item.structure||""),
+    adx:Number(item.adx||0),
+    rsi:Number(item.rsi||0),
+    emaFast:Number(item.emaFast||0),
+    emaSlow:Number(item.emaSlow||0),
+    breakout:Boolean(item.breakout),
+    retest:Boolean(item.retest)
+  }):null;
+  return {
+    profile:value?.profile||null,
+    regime:clean(value?.regime),
+    setup:clean(value?.setup),
+    execution:clean(value?.execution)
+  };
 }
 
 function normalizeSignal({botId,parsed}={}){
@@ -176,12 +200,14 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk,tr
     rsi:Number(analysis?.rsi14||market?.rsi||0),
     emaFast:Number(analysis?.ema20||market?.emaFast||0),
     emaSlow:Number(analysis?.ema50||market?.emaSlow||0),
-    velocityPoints:Number(analysis?.velocityPoints||market?.velocityPoints||0)
+    velocityPoints:Number(analysis?.velocityPoints||market?.velocityPoints||0),
+    multiTimeframe:compactTimeframeFingerprint(market?.multiTimeframe)
   };
 
   const aiInput={
     engine:botId,
     strategyProfile:profile,
+    timeframeProfile:bot.timeframeProfile||{},
     botDefinition:{
       name:bot.name,
       mode:bot.mode,
@@ -198,6 +224,7 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk,tr
   };
 
   const prompt=`TARGET ENGINE: ${botId}
+TIMEFRAME PROFILE: ${JSON.stringify(bot.timeframeProfile || {})}
 STRATEGY PROFILE:
 ${JSON.stringify(profile)}
 
