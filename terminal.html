@@ -2576,6 +2576,7 @@ async function runBackendCheck() {
           syncedAt:snapshot.syncedAt||new Date().toISOString()
         };
         renderAccountOverview(projected);
+        accountLoaded=true;
         $("accountConnectionValue").textContent="BALANCE PROJECTED";
         $("accountConnectionValue").style.color="#ffc84a";
         $("accountConnectionNote").textContent="Broker account snapshot projected while full account telemetry reconnects.";
