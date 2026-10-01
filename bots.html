@@ -107,7 +107,7 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
   </div>
   <div id="aiMonitorNote" class="telemetry-note" style="margin-top:12px">AI supervision runs asynchronously so execution speed is not gated by the AI request.</div>
 </div>
-<div class="telemetry-note"><strong>POSITION SIZE RULE:</strong> Each bot now has an explicit base lot size. On CFD/MT5-style brokers this is the order volume; on Deriv multiplier contracts, Deriv uses a monetary stake instead of MT5 lots, so V8 translates the configured base lot into its broker-valid stake plan and still respects the account risk budget.</div><div class="telemetry-note"><strong>REAL EXECUTION RULE:</strong> saving settings does not create trades. PAPER/LIVE authorization requires a connected broker, verified market/account telemetry, entitlement, and every risk gate to pass. Until then the platform must remain explicitly disconnected.</div>
+<div class="telemetry-note"><strong>POSITION SIZE RULE:</strong> Each bot now has an explicit base lot size. On CFD/MT5-style brokers this is the order volume; on Deriv multiplier contracts, Deriv uses a monetary stake instead of MT5 lots, so V8 translates the configured base lot into its broker-valid stake plan and still respects the account risk budget.</div><div class="telemetry-note"><strong>REAL EXECUTION RULE:</strong> saving settings does not create trades. DEMO/LIVE authorization requires a connected broker, verified market/account telemetry, entitlement, and every risk gate to pass. Until then the platform must remain explicitly disconnected.</div>
 </aside>
 </div>
 </section>
@@ -269,7 +269,7 @@ function renderAiMonitor(lastSignal){
  $("aiMonitorNote").textContent=ai?.note||"AI supervision runs asynchronously so execution speed is not gated by the AI request.";
 }
 function putSettings(s,mode,kill){
- fields.executionMode.value=mode||"PAPER";fields.lotSize.value=Number(s.lotSize||0.01).toFixed(2);fields.maxRisk.value=s.maxRiskPerTradePct;fields.dailyDd.value=s.dailyDrawdownPct;fields.totalDd.value=s.totalDrawdownPct;fields.maxPositions.value=s.maxPositions;fields.spreadRatio.value=s.maxSpreadAtrRatio;fields.staleMs.value=s.staleDataMs;fields.lossStreak.value=s.maxConsecutiveLosses;fields.autoPause.checked=Boolean(s.autoPauseOnLossStreak);fields.killSwitch.checked=Boolean(kill);
+ fields.executionMode.value=(mode==="PAPER"?"DEMO":mode)||"DEMO";fields.lotSize.value=Number(s.lotSize||0.01).toFixed(2);fields.maxRisk.value=s.maxRiskPerTradePct;fields.dailyDd.value=s.dailyDrawdownPct;fields.totalDd.value=s.totalDrawdownPct;fields.maxPositions.value=s.maxPositions;fields.spreadRatio.value=s.maxSpreadAtrRatio;fields.staleMs.value=s.staleDataMs;fields.lossStreak.value=s.maxConsecutiveLosses;fields.autoPause.checked=Boolean(s.autoPauseOnLossStreak);fields.killSwitch.checked=Boolean(kill);
  $("mLot").textContent=(Number(s.lotSize)||0.01).toFixed(2); $("mRisk").textContent=s.maxRiskPerTradePct+"%";$("mDaily").textContent=s.dailyDrawdownPct+"%";$("mTotal").textContent=s.totalDrawdownPct+"%";$("mPositions").textContent=s.maxPositions;
  $("mMode").textContent=mode||"NOT_CONNECTED";$("mRuntime").textContent=selected?.runtime||"STOPPED";$("mSymbol").textContent=selected?.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected?.timeframe||"—";
  $("riskPill").textContent=fields.killSwitch.checked?"KILL SWITCH":"CONFIGURED";$("enginePill").textContent=selected?.entitled?"ENTITLED":"LOCKED";
