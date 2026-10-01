@@ -108,7 +108,7 @@ Confirm whether the candidate direction is consistent with the supplied strategy
         }
       });
       const parsed=safeJson(response.text);
-      const decision=parsed?.decision==="BUY"||parsed?.decision==="SELL"?"${parsed?.decision}":"HOLD";
+      const decision=parsed?.decision==="BUY"||parsed?.decision==="SELL"?parsed.decision:"HOLD";
       const confirm=Boolean(parsed?.confirm)&&Boolean(parsed?.strategyMatch)&&decision===direction;
       const item={
         signal,
