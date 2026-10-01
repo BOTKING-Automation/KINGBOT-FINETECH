@@ -623,6 +623,33 @@ export class DerivTraderClient {
     return c;
   }
 
+  async confirmExecutedContract(contractId,{attempts=3,delayMs=250}={}){
+    const id=String(contractId||"").trim();
+    if(!id)throw new Error("DERIV_CONTRACT_ID_REQUIRED");
+    let lastError=null;
+    const count=Math.max(1,Math.min(5,Number(attempts)||3));
+    for(let attempt=1;attempt<=count;attempt++){
+      try{
+        const contract=await this.getOpenContract(id);
+        return {
+          confirmed:true,
+          status:String(contract?.status||"open").toUpperCase(),
+          contractId:String(contract.contract_id),
+          contract
+        };
+      }catch(error){
+        lastError=error;
+        if(attempt<count)await new Promise(resolve=>setTimeout(resolve,Math.max(0,Number(delayMs)||0)));
+      }
+    }
+    return {
+      confirmed:false,
+      status:"UNCONFIRMED",
+      contractId:id,
+      error:String(lastError?.message||"DERIV_CONTRACT_CONFIRMATION_FAILED")
+    };
+  }
+
   async updateContract(contractId,{stopLoss,takeProfit}={}){
     const id=String(contractId||"").trim();
     if(!id)throw new Error("DERIV_CONTRACT_ID_REQUIRED");
@@ -702,12 +729,44 @@ export class DerivTraderClient {
     console.log("[KINGBOT DERIV] proposal accepted",JSON.stringify({symbol:s,side:direction,stake:Number(volume),multiplier:resolvedMultiplier,proposalId:proposal.proposalId,clientId:clientId||null}));
     const bought=await this.buyContract({proposalId:proposal.proposalId,price:Number(proposal.askPrice),subscribe:0,reference:clientId||comment||""});
     console.log("[KINGBOT DERIV] contract purchased",JSON.stringify({symbol:s,side:direction,stake:Number(volume),multiplier:resolvedMultiplier,proposalId:proposal.proposalId,contractId:bought.contractId,clientId:clientId||null}));
+
+    // A successful buy response is not enough for the terminal to claim
+    // broker-confirmed execution. Re-read the contract from Deriv and expose
+    // the broker-confirmed snapshot to the caller. Never close a contract
+    // merely because confirmation is temporarily unavailable.
+    const confirmation=await this.confirmExecutedContract(bought.contractId);
+    console.log("[KINGBOT DERIV] execution confirmation",JSON.stringify({
+      symbol:s,
+      contractId:bought.contractId,
+      confirmed:confirmation.confirmed,
+      status:confirmation.status,
+      clientId:clientId||null
+    }));
+
     // MULTUP/MULTDOWN limit orders can be attached directly to the proposal.
     // Do not buy successfully and then close the contract merely because a
     // redundant post-buy contract_update failed.
     const protection=(stopLoss!==undefined||takeProfit!==undefined)
       ? {configured:true,source:"proposal_limit_order",stopLoss:finite(stopLoss),takeProfit:finite(takeProfit)}
       : null;
-    return {provider:"deriv",contractId:bought.contractId,proposalId:proposal.proposalId,contractType,stake:Number(volume),multiplier:resolvedMultiplier,comment:comment||"KINGBOT",buy:bought.buy,protection};
+    return {
+      provider:"deriv",
+      contractId:bought.contractId,
+      proposalId:proposal.proposalId,
+      contractType,
+      stake:Number(volume),
+      multiplier:resolvedMultiplier,
+      comment:comment||"KINGBOT",
+      buy:bought.buy,
+      protection,
+      brokerExecution:{
+        requested:true,
+        confirmed:Boolean(confirmation.confirmed),
+        status:confirmation.status,
+        contractId:confirmation.contractId,
+        error:confirmation.error||null
+      },
+      confirmedContract:confirmation.confirmed?this.mapContract(confirmation.contract):null
+    };
   }
 }
