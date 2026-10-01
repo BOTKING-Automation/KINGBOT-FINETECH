@@ -3148,7 +3148,6 @@ async function loadTerminalEngineProjection({force=false}={}){
    }
    setLiveSyncState("LIVE TELEMETRY SYNCHRONIZED",runtimeBots.length+" engine records · account selection restored · worker state read from backend.","live");
    flashLiveSync();
-   lastTerminalSyncAt=now;
    return true;
  }catch(error){
    setLiveSyncState("RUNTIME SYNC DELAYED",error?.message||"Runtime telemetry temporarily unavailable. Automatic retry remains active.","warn");
