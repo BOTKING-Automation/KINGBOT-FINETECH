@@ -13,8 +13,9 @@ export const LADDER_V8_DEFAULTS={
   rsiBullMin:52,
   rsiBearMax:48,
   baseLot:0.01,
-  maxLadderLot:1.0,
-  fixedRungCount:10,
+  maxLadderLot:10.0,
+  lotGrowthFactor:2.0,
+  fixedRungCount:20,
   aggressiveLotIncrement:0.10,
   maxTotalRungs:20,
   pyramidStepPoints:150,
@@ -151,6 +152,26 @@ export function ladderRungLot(rungIndex,cfg=LADDER_V8_DEFAULTS){
     lot=cfg.maxLadderLot+cfg.aggressiveLotIncrement*(i-cfg.fixedRungCount+1);
   }
   return lot;
+}
+
+export function brokerLadderLots({minLot,maxLot,step,maxRungs=20,growthFactor=2.0}={}){
+  const min=Number(minLot),max=Number(maxLot),s=Number(step)>0?Number(step):0.01;
+  const count=Math.max(1,Math.floor(Number(maxRungs)||20));
+  if(!Number.isFinite(min)||min<=0||!Number.isFinite(max)||max<min)return [];
+  const growth=Number(growthFactor)>1?Number(growthFactor):1.0;
+  const lots=[];
+  let previous=0;
+  for(let i=0;i<count;i++){
+    const raw=growth===1?min+s*i:min*Math.pow(growth,i);
+    let lot=normalizeLot(raw,{minLot:min,maxLot:max,step:s});
+    if(lot<=previous)lot=normalizeLot(previous+s,{minLot:min,maxLot:max,step:s});
+    if(lot>max)lot=max;
+    if(lot<=previous)break;
+    lots.push(lot);
+    previous=lot;
+    if(lot>=max)break;
+  }
+  return lots;
 }
 
 export function normalizeLot(lot,{minLot=0,maxLot=Infinity,step=0.01}={}){
