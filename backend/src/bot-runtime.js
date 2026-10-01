@@ -26,6 +26,16 @@ async function runtime(pool,userId,botId){
 async function audit(pool,userId,event,metadata){
   await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,$2,$3::jsonb)",[userId,event,JSON.stringify(metadata)]);
 }
+async function claimActiveBot(pool,userId,botId){
+  await pool.query(
+    "UPDATE kingbot_bot_runtime SET state='STOPPED',updated_at=NOW() WHERE user_id=$1 AND bot_id<>$2 AND state='RUNNING'",
+    [userId,botId]
+  );
+  await pool.query(
+    "INSERT INTO kingbot_user_bot_selection(user_id,selected_bot_id,updated_at) VALUES($1,$2,NOW()) ON CONFLICT(user_id) DO UPDATE SET selected_bot_id=EXCLUDED.selected_bot_id,updated_at=NOW()",
+    [userId,botId]
+  );
+}
 
 export function createBotRuntimeRouter({pool,broker}){
   const router=Router();
@@ -66,15 +76,11 @@ export function createBotRuntimeRouter({pool,broker}){
     const botId=String(req.body?.botId||"").trim();
     if(!getBotDefinitions()[botId])return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
     if(!(await entitlement(pool,user.id,botId,user.email)))return res.status(403).json({ok:false,error:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
-    await pool.query(
-      "INSERT INTO kingbot_user_bot_selection(user_id,selected_bot_id,updated_at) VALUES($1,$2,NOW()) ON CONFLICT(user_id) DO UPDATE SET selected_bot_id=EXCLUDED.selected_bot_id,updated_at=NOW()",
-      [user.id,botId]
-    );
+    await claimActiveBot(pool,user.id,botId);
     await audit(pool,user.id,"BOT_SELECTION_SAVED",{botId});
     const r=await runtime(pool,user.id,botId),s=await settings(pool,user.id,botId);
     res.json({ok:true,selectedBotId:botId,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||"1m"});
   });
-
   router.get("/:botId",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
@@ -111,9 +117,10 @@ export function createBotRuntimeRouter({pool,broker}){
     if(requestedSymbol || requestedTimeframe){
       await pool.query("INSERT INTO kingbot_bot_runtime(user_id,bot_id,state,symbol,timeframe,last_error,updated_at) VALUES($1,$2,'STOPPED',$3,$4,NULL,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET symbol=EXCLUDED.symbol,timeframe=EXCLUDED.timeframe,updated_at=NOW()",[user.id,b.id,symbol,timeframe]);
     }
+    await claimActiveBot(pool,user.id,b.id);
     await pool.query("INSERT INTO kingbot_bot_runtime(user_id,bot_id,state,symbol,timeframe,last_error,updated_at) VALUES($1,$2,'RUNNING',$3,$4,NULL,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET state='RUNNING',symbol=EXCLUDED.symbol,timeframe=EXCLUDED.timeframe,last_error=NULL,updated_at=NOW()",[user.id,b.id,symbol,timeframe]);
-    await audit(pool,user.id,"BOT_RUNTIME_STARTED",{botId:b.id,executionMode:s.executionMode});
-    res.json({ok:true,botId:b.id,state:"RUNNING",executionMode:s.executionMode});
+    await audit(pool,user.id,"BOT_RUNTIME_STARTED",{botId:b.id,executionMode:s.executionMode,exclusiveActiveEngine:true});
+    res.json({ok:true,botId:b.id,state:"RUNNING",executionMode:s.executionMode,exclusiveActiveEngine:true});
   });
 
   router.post("/:botId/stop",async(req,res)=>{
