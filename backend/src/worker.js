@@ -336,7 +336,7 @@ function collectDerivContractTypes(value,out=new Set(),depth=0){
   }
   return out;
 }
-function derivStakePlan(rawLots,budget,minStake=0.35){
+function derivStakePlan(rawLots,budget,minStake=1){
   const totalWeight=rawLots.reduce((sum,x)=>sum+Number(x||0),0);
   const floor=Math.max(0.01,Number(minStake)||0.35);
   if(!(budget>0)||!(totalWeight>0)||!rawLots.length)return [];
@@ -371,7 +371,7 @@ async function executeLadderV8DerivStart({userId,botId,config,s,account,quote,in
   const rawLots=[];
   const rungCount=Math.min(cfg.fixedRungCount,cfg.maxTotalRungs);
   for(let i=0;i<rungCount;i++)rawLots.push(ladderRungLot(i,cfg));
-  const minStake=Number(spec.minVolume)||0.35;
+  const minStake=Math.max(1,Number(spec.minVolume)||1);
   const desiredStakes=derivStakePlan(rawLots,budget,minStake);
   if(!desiredStakes.length)return {action:"DERIV_V8_STAKE_BUDGET_BLOCKED",state:null};
   const probeIndex=desiredStakes.findIndex(x=>Number(x)>0);
@@ -485,12 +485,12 @@ async function executeLadderV8DerivManage({userId,botId,config,s,account,quote,p
   const budget=Number(account.equity)*(Number(s.maxRiskPerTradePct)/100);
   if(highMomentum&&!emergency&&riskAllowed&&state.rungs_opened<positionCap&&extendedSince>=cfg.pyramidStepPoints*spec.point){
     const raw=ladderRungLot(state.rungs_opened,cfg)*Number(state.lot_scale||1);
-    const nextStake=Number(Math.max(0,raw).toFixed(2));
+    const nextStake=Number(Math.max(1,raw).toFixed(2));
     if(nextStake>0&&currentStakeRisk+nextStake<=budget*1.000001){
       const side=Number(state.direction)>0?"BUY":"SELL";
       try{
         const clientId="kbv8d_"+crypto.randomUUID();
-        const order=await broker.placeOrder({side,symbol:config.symbol,volume:nextStake,stopLoss:Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||100))),takeProfit:Math.max(nextStake*1.05, nextStake + Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||10)))*Number(cfg.takeProfitRR||2.0)),comment:"KINGBOT V8 DERIV PYRAMID R"+state.rungs_opened,clientId,userId,currency:String(account.currency||"USD"),multiplier:Number(state.deriv_multiplier||10),derivContractType:state.deriv_contract_type});
+        const order=await broker.placeOrder({side,symbol:config.symbol,volume:nextStake,stopLoss:Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||100))),takeProfit:Math.max(nextStake*1.05, nextStake + Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||100)))*Number(cfg.takeProfitRR||2.0)),comment:"KINGBOT V8 DERIV PYRAMID R"+state.rungs_opened,clientId,userId,currency:String(account.currency||"USD"),multiplier:Number(state.deriv_multiplier||100),derivContractType:state.deriv_contract_type});
         if(order?.contractId){
           state.positionIds=[...state.positionIds.map(String),String(order.contractId)];
           stakes.push(nextStake);
