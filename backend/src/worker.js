@@ -6,7 +6,7 @@ import pg from "pg";
 import { UserBrokerManager } from "./user-broker-manager.js";
 import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
 import { monitorBotDecision } from "./ai-bot-supervisor.js";
-import { getAiStrategySignal, warmAiStrategySignal, routeAiSignalToEngine } from "./ai-trade-gate.js";
+import { getAiStrategySignal, warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } from "./ai-trade-gate.js";
 import { authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
 import { calculateLadderV8Indicators, ladderRungLot, normalizeLot, ladderLockStepPrice, ladderLockPrice, updateVelocitySamples, velocityPoints, withinLadderSession, ladderBasketRisk, LADDER_V8_DEFAULTS } from "./ladder-v8.js";
 import { ensureAuthSchema } from "./auth.js";
@@ -23,6 +23,8 @@ let timer = null;
 let lastSubscriptionSweep = 0;
 const WORKER_POLL_MS = 750;
 const MAX_PARALLEL_BOTS = 8;
+const activeExecutionKeys = new Set();
+let lastWorkerHeartbeat = 0;
 
 const num=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
 const timeframeMinutes={"1m":1,"2m":2,"3m":3,"4m":4,"5m":5,"6m":6,"10m":10,"12m":12,"15m":15,"20m":20,"30m":30,"1h":60,"2h":120,"3h":180,"4h":240,"6h":360,"8h":480,"12h":720,"1d":1440,"1w":10080,"1mn":43200};
@@ -769,7 +771,7 @@ async function execute(row){
       }
       let action="NO_ACTION",started=null,startDetails=null;
       const spreadPoints=spec.point>0?spread/spec.point:Infinity;
-      if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&spreadPoints<=ladderCfg.maxSpreadPoints&&aiTradeGate?.confirm){
+      if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&spreadPoints<=ladderCfg.maxSpreadPoints&&(!aiExecutionGateEnabled()||aiTradeGate?.confirm)){
         try{
           const start=await executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity});
           action=start.action;started=start.state;startDetails=start.details||null;
@@ -831,7 +833,7 @@ async function execute(row){
   }
 
   let action="NO_ACTION",order=null,tradePlan=null;
-  if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&aiTradeGate?.confirm){
+  if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&(!aiExecutionGateEnabled()||aiTradeGate?.confirm)){
     const side=analysis.signal==="LONG_CANDIDATE"?"BUY":"SELL";
     const spec=(await broker.getSymbolSpecification(config.symbol,userId)).data||{};
     const tickSize=Number(spec.tickSize),minVolume=Number(spec.minVolume),maxVolume=Number(spec.maxVolume),volumeStep=Number(spec.volumeStep),point=Number(spec.point),stopsLevel=Number(spec.stopsLevel);
@@ -854,7 +856,7 @@ async function execute(row){
     const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,s.executionMode,config.symbol,side,volume]);
     if(!journal.rowCount)throw new Error("DUPLICATE_EXECUTION_REQUEST");
     try{
-      order=await broker.placeOrder({side,symbol:config.symbol,volume,stopLoss,takeProfit,comment:"KINGBOT",clientId,userId});
+      order=await broker.placeOrder({side,symbol:config.symbol,volume,stopLoss,takeProfit,comment:"KINGBOT",clientId,userId,multiplier:String(status.broker||"").toLowerCase()==="deriv"?100:undefined});
       await pool.query("UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,JSON.stringify(order)]);
       action="ORDER_SUBMITTED";
     }catch(error){
@@ -883,16 +885,25 @@ async function cycle(){
     await expireStaleSubscriptions(pool);
   }
   const q=await pool.query("SELECT user_id,bot_id,state FROM kingbot_bot_runtime WHERE state='RUNNING' ORDER BY updated_at ASC LIMIT 100");
+  if(Date.now()-lastWorkerHeartbeat>15000){
+    lastWorkerHeartbeat=Date.now();
+    console.log("[KINGBOT WORKER] heartbeat",JSON.stringify({runningBots:q.rows.length,bots:q.rows.map(x=>String(x.bot_id)).slice(0,25),pollMs:WORKER_POLL_MS}));
+  }
 
   for(let i=0;i<q.rows.length;i+=MAX_PARALLEL_BOTS){
     if(stopping)break;
     const batch=q.rows.slice(i,i+MAX_PARALLEL_BOTS);
     await Promise.allSettled(batch.map(async row=>{
+      const executionKey=String(row.user_id)+":"+String(row.bot_id);
+      if(activeExecutionKeys.has(executionKey))return;
+      activeExecutionKeys.add(executionKey);
       try{await execute(row);}
       catch(error){
         const message=String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500);
         await pool.query("UPDATE kingbot_bot_runtime SET state='RUNNING',last_error=$3,last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[row.user_id,row.bot_id,message]);
         await audit(row.user_id,"BOT_WORKER_ERROR",{botId:row.bot_id,error:message,retryable:true});
+      }finally{
+        activeExecutionKeys.delete(executionKey);
       }
     }));
   }
