@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 const LIVE_WINDOW_MS=6500;
 const COMMAND_TIMEOUT_MS=12000;
-const TOKEN_TTL_DAYS=90;
+export const TOKEN_TTL_DAYS=90;
 
 function hashToken(token){
   return crypto.createHash("sha256").update(String(token||""),"utf8").digest("hex");
