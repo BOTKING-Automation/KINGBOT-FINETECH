@@ -40,7 +40,10 @@ export class UserBrokerManager {
 
   async ensureSchema(){
     if(!this.pool)return;
-    await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_broker_accounts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,credential_ciphertext TEXT NOT NULL,credential_iv TEXT NOT NULL,credential_tag TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'PAPER' CHECK(execution_mode IN ('PAPER','LIVE')),enabled BOOLEAN NOT NULL DEFAULT TRUE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,provider,account_id))");
+    await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_broker_accounts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,credential_ciphertext TEXT NOT NULL,credential_iv TEXT NOT NULL,credential_tag TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'DEMO' CHECK(execution_mode IN ('DEMO','LIVE')),enabled BOOLEAN NOT NULL DEFAULT TRUE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,provider,account_id))");
+    await this.pool.query("UPDATE kingbot_broker_accounts SET execution_mode='DEMO' WHERE execution_mode='PAPER'");
+    await this.pool.query("ALTER TABLE kingbot_broker_accounts DROP CONSTRAINT IF EXISTS kingbot_broker_accounts_execution_mode_check");
+    await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD CONSTRAINT kingbot_broker_accounts_execution_mode_check CHECK(execution_mode IN ('DEMO','LIVE'))");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS credential_ciphertext TEXT");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS credential_iv TEXT");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS credential_tag TEXT"); 
@@ -67,11 +70,11 @@ export class UserBrokerManager {
     await this.pool.query("CREATE UNIQUE INDEX IF NOT EXISTS kingbot_deriv_oauth_states_pending_idx ON kingbot_deriv_oauth_states(pending_id) WHERE pending_id IS NOT NULL");
   }
 
-  async createDerivOAuthState({userId,codeVerifier,executionMode="PAPER"}={}){
+  async createDerivOAuthState({userId,codeVerifier,executionMode="DEMO"}={}){
     if(!this.pool||!userId)throw new Error("USER_CONTEXT_REQUIRED");
     const state=crypto.randomBytes(32).toString("base64url");
-    const mode=String(executionMode).toUpperCase();
-    if(!["PAPER","LIVE"].includes(mode))throw new Error("INVALID_EXECUTION_MODE");
+    const mode=String(executionMode).toUpperCase()==="PAPER"?"DEMO":String(executionMode).toUpperCase();
+    if(!["DEMO","PAPER","LIVE"].includes(mode))throw new Error("INVALID_EXECUTION_MODE");
     await this.pool.query("DELETE FROM kingbot_deriv_oauth_states WHERE expires_at<NOW()");
     await this.pool.query("INSERT INTO kingbot_deriv_oauth_states(state,user_id,code_verifier,execution_mode,expires_at) VALUES($1,$2,$3,$4,NOW()+INTERVAL '10 minutes')",[state,userId,String(codeVerifier||""),mode]);
     return {state,executionMode:mode};
@@ -160,7 +163,7 @@ export class UserBrokerManager {
       accountId:null,
       executionMode:"NOT_CONNECTED"
     };
-    const executionMode=String(mapping.execution_mode||"PAPER").toUpperCase();
+    const executionMode=String(mapping.execution_mode||"DEMO").toUpperCase();
     return {
       configured:true,
       connected:true,
@@ -208,7 +211,7 @@ export class UserBrokerManager {
     return q.rowCount?q.rows[0]:null;
   }
 
-  async saveMapping({userId,provider="metaapi",accountId,accountToken,executionMode="PAPER",apiKey,secretKey,baseUrl,derivAccountType}={}){
+  async saveMapping({userId,provider="metaapi",accountId,accountToken,executionMode="DEMO",apiKey,secretKey,baseUrl,derivAccountType}={}){
     if(!this.pool||!userId)return {ok:false,error:"USER_CONTEXT_REQUIRED"};
     const requestedMode=String(executionMode||"DEMO").toUpperCase();
     if(!["DEMO","PAPER","LIVE"].includes(requestedMode))return {ok:false,error:"INVALID_EXECUTION_MODE"};
