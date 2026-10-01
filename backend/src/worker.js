@@ -95,23 +95,63 @@ function strategyTimeframeProfile(botId,executionTimeframe){
   };
 }
 
+function timeframeSeconds(tf){
+  const map={"1m":60,"2m":120,"3m":180,"4m":240,"5m":300,"6m":360,"10m":600,"12m":720,"15m":900,"20m":1200,"30m":1800,"1h":3600,"2h":7200,"3h":10800,"4h":14400,"6h":21600,"8h":28800,"12h":43200,"1d":86400,"1w":604800,"1mn":2592000};
+  return Number(map[String(tf||"").trim()])||60;
+}
+function aggregateCandles(candles,targetTimeframe){
+  const targetSec=timeframeSeconds(targetTimeframe);
+  if(!Array.isArray(candles)||!candles.length)return [];
+  const buckets=new Map();
+  for(const row of candles){
+    const t=Math.floor(new Date(row.time).getTime()/1000);
+    if(!Number.isFinite(t))continue;
+    const key=Math.floor(t/targetSec)*targetSec;
+    const existing=buckets.get(key);
+    if(!existing){
+      buckets.set(key,{time:new Date(key*1000).toISOString(),open:Number(row.open),high:Number(row.high),low:Number(row.low),close:Number(row.close),volume:Number(row.volume)||0});
+    }else{
+      existing.high=Math.max(existing.high,Number(row.high));
+      existing.low=Math.min(existing.low,Number(row.low));
+      existing.close=Number(row.close);
+      existing.volume+=(Number(row.volume)||0);
+    }
+  }
+  return [...buckets.values()].sort((a,b)=>new Date(a.time)-new Date(b.time));
+}
 async function getMultiTimeframeContext(userId,symbol,botId,executionTimeframe){
   const profile=strategyTimeframeProfile(botId,executionTimeframe);
   const unique=[...new Set([profile.regime,profile.setup,profile.execution])];
-  const results=await Promise.all(unique.map(async timeframe=>{
+  const baseTimeframe=profile.execution;
+  const maxRatio=Math.max(...unique.map(tf=>Math.ceil(timeframeSeconds(tf)/timeframeSeconds(baseTimeframe))));
+  const baseLimit=Math.min(1000,Math.max(120,Math.min(1000,maxRatio*25)));
+  let baseCandles;
+  try{
+    baseCandles=await getWorkerCandles(userId,symbol,baseTimeframe,baseLimit);
+  }catch(error){
+    const reason=String(error?.message||"BASE_TIMEFRAME_DATA_UNAVAILABLE").slice(0,160);
+    console.warn("[KINGBOT MTF] base history unavailable",JSON.stringify({botId,symbol,timeframe:baseTimeframe,reason}));
+    return {profile,ready:false,regime:{timeframe:profile.regime,available:false,reason},setup:{timeframe:profile.setup,available:false,reason},execution:{timeframe:profile.execution,available:false,reason}};
+  }
+
+  const byTimeframe={};
+  for(const timeframe of unique){
     try{
-      const candles=await getWorkerCandles(userId,symbol,timeframe,100);
+      const candles=timeframe===baseTimeframe?baseCandles:aggregateCandles(baseCandles,timeframe);
       const data=indicators(candles);
-      return [timeframe,{timeframe,available:true,...data}];
+      byTimeframe[timeframe]={timeframe,available:true,...data,candleCount:candles.length};
     }catch(error){
-      return [timeframe,{timeframe,available:false,reason:String(error?.message||"TIMEFRAME_DATA_UNAVAILABLE").slice(0,160)}];
+      const reason=String(error?.message||"TIMEFRAME_DATA_UNAVAILABLE").slice(0,160);
+      console.warn("[KINGBOT MTF] timeframe unavailable",JSON.stringify({botId,symbol,timeframe,baseTimeframe,reason,candleCount:timeframe===baseTimeframe?baseCandles.length:aggregateCandles(baseCandles,timeframe).length}));
+      byTimeframe[timeframe]={timeframe,available:false,reason};
     }
-  }));
-  const byTimeframe=Object.fromEntries(results);
+  }
   const ready=unique.every(tf=>Boolean(byTimeframe[tf]?.available));
   return {
     profile,
     ready,
+    sourceTimeframe:baseTimeframe,
+    sourceCandles:baseCandles.length,
     regime:byTimeframe[profile.regime]||null,
     setup:byTimeframe[profile.setup]||null,
     execution:byTimeframe[profile.execution]||null
