@@ -30,6 +30,7 @@ export class DerivTraderClient {
     this.marketSymbolCacheAt=0;
     this.portfolioCache=null;
     this.portfolioCacheAt=0;
+    this.portfolioInflight=null;
     this.tradesCache=new Map();
   }
 
@@ -416,22 +417,27 @@ export class DerivTraderClient {
 
   async getPortfolioSnapshot({force=false}={}){
     const now=Date.now();
-    // Deriv currently limits portfolio/profit_table together to 30 requests/minute.
-    // Share one short-lived snapshot across the worker and dashboard callers.
-    if(!force&&this.portfolioCache&&now-this.portfolioCacheAt<2500)return this.portfolioCache;
-    const response=await this.request({portfolio:1});
-    const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
-    const mapped=[];
-    for(const contract of contracts){
-      try{mapped.push(await this.enrichContract(contract));}
-      catch(error){
-        console.warn("[KINGBOT DERIV] position enrichment failed",JSON.stringify({contractId:contract?.contract_id||null,error:String(error?.message||"ENRICH_FAILED").slice(0,300)}));
-        mapped.push(this.mapContract(contract));
+    // Deriv limits portfolio/profit_table calls. Cache and deduplicate
+    // concurrent callers so /account, /positions and /orders do not fan out
+    // into multiple portfolio requests for the same user.
+    if(!force&&this.portfolioCache&&now-this.portfolioCacheAt<3000)return this.portfolioCache;
+    if(this.portfolioInflight)return await this.portfolioInflight;
+    this.portfolioInflight=(async()=>{
+      const response=await this.request({portfolio:1});
+      const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
+      const mapped=[];
+      for(const contract of contracts){
+        try{mapped.push(await this.enrichContract(contract));}
+        catch(error){
+          console.warn("[KINGBOT DERIV] position enrichment failed",JSON.stringify({contractId:contract?.contract_id||null,error:String(error?.message||"ENRICH_FAILED").slice(0,300)}));
+          mapped.push(this.mapContract(contract));
+        }
       }
-    }
-    this.portfolioCache=mapped;
-    this.portfolioCacheAt=now;
-    return this.portfolioCache;
+      this.portfolioCache=mapped;
+      this.portfolioCacheAt=Date.now();
+      return this.portfolioCache;
+    })().finally(()=>{this.portfolioInflight=null;});
+    return await this.portfolioInflight;
   }
 
   async getPositions(){
