@@ -120,6 +120,31 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 .performance-wrap{padding:13px}.performance-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.performance-stat{padding:11px;border:1px solid rgba(255,255,255,.055);border-radius:11px;background:rgba(255,255,255,.017)}.performance-stat span{display:block;color:#526077;font:800 6.5px "JetBrains Mono";letter-spacing:.08em;text-transform:uppercase}.performance-stat strong{display:block;margin-top:7px;color:#dce5f3;font:900 14px "JetBrains Mono"}.performance-stat strong.good{color:var(--green)}.performance-stat strong.bad{color:var(--red)}.performance-stat strong.cyan{color:var(--cyan)}
 .curve-box{margin-top:9px;padding:10px;border:1px solid rgba(255,255,255,.05);border-radius:12px;background:radial-gradient(circle at 100% 0,rgba(34,230,255,.06),transparent 35%),rgba(255,255,255,.013)}.curve-meta{display:flex;justify-content:space-between;gap:10px;color:#58647a;font:700 6.5px "JetBrains Mono"}.curve-meta strong{color:#abb8cb}.curve-svg{display:block;width:100%;height:150px;margin-top:7px}.history-foot{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:#4f5c70;font:700 6.5px "JetBrains Mono"}.history-foot strong{color:#9eabbe}
 
+
+.position-terminal{overflow:hidden}
+.position-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.045);background:rgba(255,255,255,.012)}
+.position-led{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid rgba(40,239,171,.12);border-radius:7px;background:rgba(40,239,171,.035);color:#91eecf;font:800 6.5px "JetBrains Mono";letter-spacing:.06em}
+.position-led i{width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}
+.position-meta{color:#526077;font:700 6.5px "JetBrains Mono";letter-spacing:.05em}
+.position-meta strong{color:#aeb9ca}
+.position-table-wrap{overflow:auto;max-height:430px}
+.position-table{width:100%;border-collapse:collapse;min-width:1450px}
+.position-table th{padding:9px 10px;text-align:left;color:#4e5b70;border-bottom:1px solid var(--line);font:800 6.5px "JetBrains Mono";letter-spacing:.08em;text-transform:uppercase;position:sticky;top:0;background:#080d18;z-index:3;white-space:nowrap}
+.position-table td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.045);color:#c2ccdc;font:700 7.5px "JetBrains Mono";white-space:nowrap;vertical-align:middle}
+.position-table tbody tr:hover td{background:rgba(34,230,255,.018)}
+.position-table td.ticket{color:#7d8ca5}
+.position-table td.symbol{color:#e2e9f4;font-weight:900}
+.position-table td.type-buy{color:var(--green);font-weight:900}
+.position-table td.type-sell{color:var(--red);font-weight:900}
+.position-table td.num{font-variant-numeric:tabular-nums;text-align:right}
+.position-table td.pnl-positive{color:var(--green);font-weight:900}
+.position-table td.pnl-negative{color:var(--red);font-weight:900}
+.position-table td.muted{color:#606d83}
+.position-size-sub{display:block;margin-top:2px;color:#465269;font:700 5.5px "JetBrains Mono";letter-spacing:.04em}
+.position-row-status{display:inline-flex;align-items:center;gap:5px;padding:4px 6px;border:1px solid rgba(40,239,171,.11);border-radius:6px;color:#8ceccd;background:rgba(40,239,171,.035);font:800 6px "JetBrains Mono"}
+.position-row-status i{width:4px;height:4px;border-radius:50%;background:currentColor;box-shadow:0 0 7px currentColor}
+.position-action{min-width:52px}
+.position-empty{padding:26px 14px;text-align:center;color:#59667c;font:700 7px "JetBrains Mono"}
 .toast{position:fixed;right:18px;bottom:18px;z-index:100;max-width:390px;padding:13px 14px;border:1px solid rgba(255,255,255,.09);border-radius:13px;background:rgba(9,14,25,.96);box-shadow:var(--shadow);transform:translateY(18px);opacity:0;pointer-events:none;transition:.22s}.toast.show{transform:none;opacity:1}.toast strong{display:block;font:900 8px Orbitron}.toast span{display:block;margin-top:5px;color:#8390a5;font:700 7px "JetBrains Mono";line-height:1.5}
 
 
@@ -527,9 +552,28 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 
   <section class="section">
     <div class="tables">
-      <div class="panel">
-        <div class="panel-head"><div class="panel-head-left"><div class="section-title" id="positionsTitle">BROKER POSITIONS</div><div class="section-sub">Real positions returned by the connected broker.</div></div><span class="panel-badge" id="positionsBadge">0 OPEN</span></div>
-        <div class="table-wrap"><table class="table"><thead><tr><th>Symbol</th><th>Side</th><th>Volume</th><th>Entry</th><th>Current</th><th>P&amp;L</th><th>Status</th><th>Action</th></tr></thead><tbody id="positionsTable"></tbody></table></div>
+      <div class="panel position-terminal">
+        <div class="panel-head">
+          <div class="panel-head-left">
+            <div class="section-title" id="positionsTitle">BROKER POSITIONS</div>
+            <div class="section-sub">MT5-style position ledger · broker-authoritative open trade data.</div>
+          </div>
+          <span class="panel-badge" id="positionsBadge">0 OPEN</span>
+        </div>
+        <div class="position-toolbar">
+          <span class="position-led"><i></i><span id="positionFeedState">BROKER FEED LIVE</span></span>
+          <span class="position-meta">MODEL <strong id="positionSizeModel">—</strong></span>
+          <span class="position-meta">FLOATING <strong id="positionFloatingTotal">—</strong></span>
+          <span class="position-meta">LAST TICK <strong id="positionLastTick">—</strong></span>
+        </div>
+        <div class="position-table-wrap">
+          <table class="position-table">
+            <thead><tr>
+              <th>Ticket</th><th>Time</th><th>Symbol</th><th>Type</th><th>Volume</th><th>Price</th><th>S/L</th><th>T/P</th><th>Current</th><th>Swap</th><th>Commission</th><th>Profit</th><th>Status</th><th>Action</th>
+            </tr></thead>
+            <tbody id="positionsTable"></tbody>
+          </table>
+        </div>
       </div>
       <div class="panel">
         <div class="panel-head"><div class="panel-head-left"><div class="section-title">BROKER ORDERS</div><div class="section-sub">Confirmed order records only.</div></div><span class="panel-badge" id="ordersBadge">0 ORDERS</span></div>
@@ -844,18 +888,53 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     $("marketBadge").textContent=Number.isFinite(mid)?"LIVE QUOTE":"UNAVAILABLE";$("syncMarketMain").textContent=(m.symbol||state.marketSymbol||"NO MARKET")+" · "+(Number.isFinite(mid)?fmtNumber(mid,mid>=100?2:5):"—");$("syncMarketState").textContent=Number.isFinite(mid)?"LIVE":"ERROR";$("syncMarketState").className="sync-state "+(Number.isFinite(mid)?"live":"down");
   }
 
+  function positionNumber(...values){
+    for(const value of values){
+      if(value===null||value===undefined||value==="")continue;
+      const n=Number(value); if(Number.isFinite(n))return n;
+    }
+    return null;
+  }
+  function positionTime(p){return p?.time||p?.openTime||p?.open_time||p?.date_start||p?.timestamp||null;}
+  function positionPriceDecimals(v){const n=Number(v);return Number.isFinite(n)&&Math.abs(n)<100?5:2;}
   function renderPositions(rows){
     rows=Array.isArray(rows)?rows:[];
     const mode=String(state.account?.executionMode||"").toUpperCase();
     const type=String(state.account?.accountType||"").toUpperCase();
+    const broker=String(state.account?.broker||"").toLowerCase();
     const verifiedDemo=mode==="PAPER"||type==="DEMO";
+    const sizeModel=broker==="deriv"?"STAKE / CONTRACT":"LOTS";
+    const currency=String(state.account?.currency||"").toUpperCase();
     $("positionsTitle").textContent=verifiedDemo?"BROKER DEMO POSITIONS":"BROKER LIVE POSITIONS";
-    $("positionCount").textContent=String(rows.length);$("positionsBadge").textContent=rows.length+" OPEN · "+(verifiedDemo?"DEMO":"LIVE");
+    $("positionSizeModel").textContent=sizeModel;
+    $("positionFeedState").textContent=state.live.running?"BROKER FEED LIVE":"BROKER FEED OFFLINE";
+    $("positionFeedState").style.color=state.live.running?"var(--green)":"var(--orange)";
+    $("positionCount").textContent=String(rows.length);
+    $("positionsBadge").textContent=rows.length+" OPEN · "+(verifiedDemo?"DEMO":"LIVE");
+    const floatingTotal=rows.reduce((sum,p)=>{const n=positionNumber(p.pnl,p.profit,p.unrealizedPnl,p.unrealizedProfit);return Number.isFinite(n)?sum+n:sum},0);
+    $("positionFloatingTotal").textContent=fmtMoney(floatingTotal,currency);
+    $("positionFloatingTotal").style.color=Number.isFinite(floatingTotal)?(floatingTotal>0?"var(--green)":floatingTotal<0?"var(--red)":"#aeb9ca"):"";
+    $("positionLastTick").textContent=state.live.lastQuoteAt?Math.max(0,Date.now()-state.live.lastQuoteAt)+"ms":"—";
     $("positionsTable").innerHTML=rows.length?rows.map(p=>{
-      const id=String(p.id||p.contractId||"");
-      const canClose=Boolean(id)&&String(p.status||"OPEN").toUpperCase()==="OPEN";
-      return "<tr><td>"+esc(p.symbol)+"</td><td>"+esc(p.side)+"</td><td>"+esc(p.volume)+"</td><td>"+esc(p.entry)+"</td><td>"+esc(p.current)+"</td><td class=\""+classForPnl(p.pnl)+"\">"+esc(p.pnl)+"</td><td><span class=\"pill green\">"+esc(p.status||"OPEN")+"</span></td><td>"+(canClose?"<button class=\"close-position-btn\" data-position-id=\""+esc(id)+"\" type=\"button\">CLOSE</button>":"—")+"</td></tr>";
-    }).join(""):"<tr><td colspan=\"8\"><div class=\"empty\"><strong>NO OPEN POSITIONS</strong><span>The connected broker returned no open positions.</span></div></td></tr>";
+      const id=String(p.id||p.contractId||p.ticket||"");
+      const canClose=Boolean(id)&&String(p.status||p.state||"OPEN").toUpperCase()==="OPEN";
+      const side=String(p.side||p.type||p.positionSide||"—").toUpperCase();
+      const entry=positionNumber(p.entry,p.openPrice,p.entryPrice,p.open_price);
+      const current=positionNumber(p.current,p.currentPrice,p.marketPrice,p.current_spot,p.current_tick,p.bidPrice,p.bid_price);
+      const volume=positionNumber(p.volume,p.lots,p.quantity,p.stake,p.buy_price);
+      const sl=positionNumber(p.stopLoss,p.sl,p.stop_loss);
+      const tp=positionNumber(p.takeProfit,p.tp,p.take_profit);
+      const swap=positionNumber(p.swap,p.swapAmount,p.swap_amount);
+      const commission=positionNumber(p.commission,p.commissionAmount,p.commission_amount);
+      const pnl=positionNumber(p.pnl,p.profit,p.unrealizedPnl,p.unrealizedProfit);
+      const dec=positionPriceDecimals(entry??current);
+      const typeClass=side==="BUY"?"type-buy":side==="SELL"?"type-sell":"muted";
+      const pnlClass=Number.isFinite(pnl)?(pnl>0?"pnl-positive":pnl<0?"pnl-negative":"muted"):"muted";
+      const sizeLabel=broker==="deriv"?"STAKE":"LOTS";
+      const time=positionTime(p);
+      const status=String(p.status||p.state||"OPEN").toUpperCase();
+      return "<tr><td class=\"ticket\">"+esc(id||"—")+"</td><td>"+esc(fmtTime(time))+"</td><td class=\"symbol\">"+esc(p.symbol||"—")+"</td><td class=\""+typeClass+"\">"+esc(side)+"</td><td class=\"num\">"+esc(volume===null?"—":fmtNumber(volume,2))+"<span class=\"position-size-sub\">"+sizeLabel+"</span></td><td class=\"num\">"+esc(entry===null?"—":fmtNumber(entry,dec))+"</td><td class=\"num muted\">"+esc(sl===null?"—":fmtNumber(sl,dec))+"</td><td class=\"num muted\">"+esc(tp===null?"—":fmtNumber(tp,dec))+"</td><td class=\"num\">"+esc(current===null?"—":fmtNumber(current,dec))+"</td><td class=\"num muted\">"+esc(swap===null?"—":fmtMoney(swap,currency))+"</td><td class=\"num muted\">"+esc(commission===null?"—":fmtMoney(commission,currency))+"</td><td class=\"num "+pnlClass+"\">"+esc(pnl===null?"—":fmtMoney(pnl,currency))+"</td><td><span class=\"position-row-status\"><i></i>"+esc(status)+"</span></td><td class=\"position-action\">"+(canClose?"<button class=\"close-position-btn\" data-position-id=\""+esc(id)+"\" type=\"button\">CLOSE</button>":"—")+"</td></tr>";
+    }).join(""):"<tr><td colspan=\"14\"><div class=\"position-empty\"><strong>NO OPEN POSITIONS</strong><span>Waiting for broker-authoritative open position data.</span></div></td></tr>";
   }
   document.addEventListener("click",async e=>{
     const btn=e.target.closest(".close-position-btn");
