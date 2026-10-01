@@ -131,12 +131,16 @@ function evaluateSmc(c) {
 }
 
 function evaluateLadder(c) {
-  const directional = c.momentum * 0.3 + c.trend * 0.28;
+  // Calibrated so the 78% entry threshold is reachable only during a
+  // genuinely strong multi-factor setup. The previous weights capped the
+  // positive score near 72%, making the Ladder engine unable to signal.
+  const directional = c.momentum * 0.34 + c.trend * 0.34;
   const alignment = c.structure === "bullish" ? 0.14 : c.structure === "bearish" ? -0.14 : 0;
-  const volatilityPenalty = c.volatility > 0.82 ? 0.32 : 0;
+  const continuation = (c.breakout || c.retest) ? Math.sign(c.trend || c.momentum || 0) * 0.10 : 0;
+  const volatilityPenalty = c.volatility > 0.82 ? 0.28 : c.volatility < 0.08 ? 0.12 : -0.08;
   const emergency = c.volatility > 0.95;
-  const score = clamp((directional + alignment - volatilityPenalty) * 100, -100, 100);
-  return { score, emergency, reason: "Bounded ladder entries with volatility-adaptive spacing, structure alignment and emergency exposure control." };
+  const score = clamp((directional + alignment + continuation - volatilityPenalty) * 100, -100, 100);
+  return { score, emergency, reason: "Adaptive ladder scoring combines momentum, trend, structure and continuation confirmation while reducing exposure in extreme or dead volatility." };
 }
 
 const evaluators = {
