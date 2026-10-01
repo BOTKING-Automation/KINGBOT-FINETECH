@@ -26,6 +26,9 @@ export class DerivTraderClient {
     this.marketPending=new Map();
     this.marketSymbolCache=null;
     this.marketSymbolCacheAt=0;
+    this.portfolioCache=null;
+    this.portfolioCacheAt=0;
+    this.tradesCache=new Map();
   }
 
   configured(){
@@ -321,18 +324,24 @@ export class DerivTraderClient {
     return mapped;
   }
 
-  async getPositions(){
+  async getPortfolioSnapshot({force=false}={}){
+    const now=Date.now();
+    // Deriv currently limits portfolio/profit_table together to 30 requests/minute.
+    // Share one short-lived snapshot across the worker and dashboard callers.
+    if(!force&&this.portfolioCache&&now-this.portfolioCacheAt<2500)return this.portfolioCache;
     const response=await this.request({portfolio:1});
     const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
-    const data=await Promise.all(contracts.map(c=>this.enrichContract(c)));
-    return {connected:true,data};
+    this.portfolioCache=await Promise.all(contracts.map(c=>this.enrichContract(c)));
+    this.portfolioCacheAt=now;
+    return this.portfolioCache;
+  }
+
+  async getPositions(){
+    return {connected:true,data:await this.getPortfolioSnapshot()};
   }
 
   async getOrders(){
-    const response=await this.request({portfolio:1});
-    const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
-    const data=await Promise.all(contracts.map(c=>this.enrichContract(c)));
-    return {connected:true,data};
+    return {connected:true,data:await this.getPortfolioSnapshot()};
   }
 
   async getTrades({startTime,endTime}={}){
