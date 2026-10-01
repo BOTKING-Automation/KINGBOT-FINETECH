@@ -17,7 +17,7 @@ async function settings(pool,userId,botId){
   const q=await pool.query("SELECT * FROM kingbot_bot_risk_settings WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
   if(!q.rowCount)return {executionMode:"DEMO",killSwitch:false,dailyDrawdownPct:5,totalDrawdownPct:10,maxRiskPerTradePct:getBotDefinitions()[botId].risk.maxRiskPerTradePct,maxPositions:getBotDefinitions()[botId].risk.maxPositions,maxSpreadAtrRatio:.25,staleDataMs:5000,maxConsecutiveLosses:3,autoPauseOnLossStreak:true};
   const x=q.rows[0];
-  return {dailyDrawdownPct:Number(x.daily_drawdown_pct),totalDrawdownPct:Number(x.total_drawdown_pct),maxRiskPerTradePct:Number(x.max_risk_per_trade_pct),maxPositions:Number(x.max_positions),maxSpreadAtrRatio:Number(x.max_spread_atr_ratio),staleDataMs:Number(x.stale_data_ms),maxConsecutiveLosses:Number(x.max_consecutive_losses),autoPauseOnLossStreak:Boolean(x.auto_pause_on_loss_streak),executionMode:String(x.execution_mode)==="PAPER"?"DEMO":String(x.execution_mode)==="PAPER"?"DEMO":String(x.execution_mode),killSwitch:Boolean(x.kill_switch)};
+  return {dailyDrawdownPct:Number(x.daily_drawdown_pct),totalDrawdownPct:Number(x.total_drawdown_pct),maxRiskPerTradePct:Number(x.max_risk_per_trade_pct),maxPositions:Number(x.max_positions),maxSpreadAtrRatio:Number(x.max_spread_atr_ratio),staleDataMs:Number(x.stale_data_ms),maxConsecutiveLosses:Number(x.max_consecutive_losses),autoPauseOnLossStreak:Boolean(x.auto_pause_on_loss_streak),executionMode:String(x.execution_mode||"DEMO"),killSwitch:Boolean(x.kill_switch)};
 }
 async function runtime(pool,userId,botId){
   const q=await pool.query("SELECT * FROM kingbot_bot_runtime WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
@@ -95,7 +95,6 @@ export function createBotRuntimeRouter({pool,broker}){
     if(!(await entitlement(pool,user.id,b.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const s=await settings(pool,user.id,b.id);
     if(s.killSwitch)return res.status(409).json({ok:false,error:"KILL_SWITCH_ACTIVE"});
-    if(s.executionMode==="PAPER")s.executionMode="DEMO";
     if(!["DEMO","LIVE"].includes(s.executionMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
     if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before starting DEMO or LIVE execution. No order was submitted."});
     const brokerStatus=await broker.getStatus(user.id);
