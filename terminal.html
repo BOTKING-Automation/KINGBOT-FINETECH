@@ -2418,6 +2418,8 @@ async function getTerminalAuthToken(timeoutMs=2500){
 
 async function fetchApi(path, options = {}) {
   await waitForKingbotApi();
+  const rawPath=String(path||"").trim();
+  const normalizedPath=rawPath.replace(/^\/api(?=\/|$)/i,"") || "/";
   const controller=new AbortController();
   const timeoutMs=Number(options.timeoutMs)||9000;
   const timer=setTimeout(()=>controller.abort(),timeoutMs);
@@ -2431,7 +2433,7 @@ async function fetchApi(path, options = {}) {
     if(requestOptions.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
     headers.set("Authorization","Bearer "+auth.token);
 
-    let response=await fetch(window.KINGBOT_API.baseUrl+path,{
+    let response=await fetch(window.KINGBOT_API.baseUrl+normalizedPath,{
       ...requestOptions,
       headers,
       credentials:"omit",
@@ -2443,7 +2445,7 @@ async function fetchApi(path, options = {}) {
         const refreshed=await auth.firebase.getToken(true);
         if(refreshed){
           headers.set("Authorization","Bearer "+refreshed);
-          response=await fetch(window.KINGBOT_API.baseUrl+path,{
+          response=await fetch(window.KINGBOT_API.baseUrl+normalizedPath,{
             ...requestOptions,
             headers,
             credentials:"omit",
@@ -2459,7 +2461,7 @@ async function fetchApi(path, options = {}) {
     }
     return data;
   }catch(error){
-    if(error?.name==="AbortError") throw new Error(`REQUEST_TIMEOUT: ${path}`);
+    if(error?.name==="AbortError") throw new Error(`REQUEST_TIMEOUT: ${normalizedPath}`);
     throw error;
   }finally{
     clearTimeout(timer);
@@ -2931,7 +2933,7 @@ function parseSignal(value){
  return x&&typeof x==="object"?x:null;
 }
 function renderEngineProjection(bots=[]){
- const running=Array.isArray(bots)?bots.filter(x=>String(x.runtime||x.state||"STOPPED").toUpperCase()==="RUNNING"):[];
+ const running=Array.isArray(bots)?bots.filter(x=>String(x.runtime||x.state||x.status||"STOPPED").trim().toUpperCase()==="RUNNING"):[];
  const list=$("engineProjectionList");
  if(!running.length){
    list.innerHTML='<div class="projection-empty">No running engine trade-plan telemetry. Start an entitled bot from Bot Control OS.</div>';
@@ -2962,7 +2964,9 @@ function renderEngineProjection(bots=[]){
 async function loadTerminalEngineProjection(){
  try{
    const d=await fetchApi("/runtime",{timeoutMs:7000});
-   const info=renderEngineProjection(d.bots||[]);
+   const runtimeBots=Array.isArray(d?.bots)?d.bots:[];
+   const info=renderEngineProjection(runtimeBots);
+   $("engineProjectionState").dataset.syncedAt=new Date().toISOString();
    if(info?.symbol)await loadBrokerMarketProjection(info.symbol,info.broker||"");
    else{
      $("brokerMarketProjectionState").textContent="WAITING";
@@ -3007,10 +3011,11 @@ async function loadTerminalEngineProjection(){
   void loadCandles();
   void loadTerminalEngineProjection();
 
-  await accountBoot;
+  void accountBoot;
 
   clearInterval(window.__KINGBOT_ENGINE_PROJECTION_REFRESH);
-  window.__KINGBOT_ENGINE_PROJECTION_REFRESH=setInterval(()=>{void loadTerminalEngineProjection()},5000);
+  window.__KINGBOT_ENGINE_PROJECTION_REFRESH=setInterval(()=>{void loadTerminalEngineProjection()},3000);
+  void loadTerminalEngineProjection();
 
   clearInterval(window.__KINGBOT_ACCOUNT_REFRESH);
   window.__KINGBOT_ACCOUNT_REFRESH=setInterval(async()=>{
