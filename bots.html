@@ -346,7 +346,7 @@ async function selectBot(id){
 }
 async function load(){
  setTelemetry("BACKEND TELEMETRY","LOADING VERIFIED BOT STATE…");
- refreshBrokerExecutionStatus();
+ await refreshBrokerExecutionStatus();
  try{
   const [d,rt,sub]=await Promise.all([
     api("/bots"),
