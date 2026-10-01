@@ -104,6 +104,135 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 
 .toast{position:fixed;right:18px;bottom:18px;z-index:100;max-width:390px;padding:13px 14px;border:1px solid rgba(255,255,255,.09);border-radius:13px;background:rgba(9,14,25,.96);box-shadow:var(--shadow);transform:translateY(18px);opacity:0;pointer-events:none;transition:.22s}.toast.show{transform:none;opacity:1}.toast strong{display:block;font:900 8px Orbitron}.toast span{display:block;margin-top:5px;color:#8390a5;font:700 7px "JetBrains Mono";line-height:1.5}
 
+
+/* =========================================================
+   PROFESSIONAL IT / OPS MODE
+========================================================= */
+.it-console{
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:minmax(0,1.55fr) minmax(300px,.65fr);
+  gap:10px;
+}
+.it-panel{
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.075);
+  border-radius:17px;
+  background:
+    radial-gradient(circle at 92% 8%,rgba(34,230,255,.065),transparent 24%),
+    linear-gradient(145deg,rgba(10,16,28,.96),rgba(4,8,16,.99));
+  box-shadow:0 12px 38px rgba(0,0,0,.22);
+}
+.it-panel:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(90deg,transparent 0,rgba(255,255,255,.018) 50%,transparent 100%);
+  transform:translateX(-100%);
+  animation:itScan 5.5s linear infinite;
+}
+@keyframes itScan{to{transform:translateX(100%)}}
+.it-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.055);
+}
+.it-title{
+  font:900 10px Orbitron;letter-spacing:.12em;
+}
+.it-sub{
+  margin-top:4px;color:#5e6b82;font:700 7px "JetBrains Mono";letter-spacing:.04em;
+}
+.it-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 8px;border-radius:7px;
+  border:1px solid rgba(34,230,255,.13);
+  background:rgba(34,230,255,.045);
+  color:#8beefd;font:900 6.5px "JetBrains Mono";letter-spacing:.08em;
+}
+.it-chip i{
+  width:5px;height:5px;border-radius:50%;background:currentColor;
+  box-shadow:0 0 10px currentColor;
+}
+.it-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:7px;padding:10px 12px 12px;
+}
+.it-cell{
+  min-height:64px;padding:10px;border:1px solid rgba(255,255,255,.052);
+  border-radius:11px;background:rgba(255,255,255,.018);
+}
+.it-cell .k{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  color:#4e5b70;font:800 6.5px "JetBrains Mono";letter-spacing:.09em;
+  text-transform:uppercase;
+}
+.it-cell .v{
+  margin-top:8px;color:#dce5f2;font:900 11px "JetBrains Mono";
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.it-cell .v.good{color:var(--green)}
+.it-cell .v.warn{color:var(--gold)}
+.it-cell .v.bad{color:var(--red)}
+.it-cell .v.cyan{color:var(--cyan)}
+.it-cell .micro{
+  margin-top:4px;color:#48556a;font:700 6px "JetBrains Mono";
+}
+.it-tape{
+  display:grid;grid-template-columns:1.1fr .7fr .7fr .7fr 1fr;
+  margin:0 12px 12px;border:1px solid rgba(255,255,255,.05);
+  border-radius:11px;overflow:hidden;background:rgba(0,0,0,.14);
+}
+.it-tape-item{
+  padding:9px 10px;border-right:1px solid rgba(255,255,255,.045);
+}
+.it-tape-item:last-child{border-right:0}
+.it-tape-item span{
+  display:block;color:#4e5b70;font:800 6px "JetBrains Mono";letter-spacing:.08em;
+}
+.it-tape-item strong{
+  display:block;margin-top:5px;color:#bfcadb;font:900 9px "JetBrains Mono";
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.it-log{
+  max-height:162px;overflow:auto;padding:0 12px 11px;
+}
+.it-log-row{
+  display:grid;grid-template-columns:68px 70px 1fr;gap:8px;
+  align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.035);
+}
+.it-log-row time,.it-log-row .code{
+  color:#48556a;font:700 6px "JetBrains Mono";
+}
+.it-log-row .code{color:#66758d}
+.it-log-row .msg{color:#9aa7bb;font:700 7px "JetBrains Mono";white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it-mini-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px 12px 12px;
+}
+.it-mini{
+  padding:10px;border:1px solid rgba(255,255,255,.05);
+  border-radius:11px;background:rgba(255,255,255,.018);
+}
+.it-mini span{display:block;color:#4e5b70;font:800 6px "JetBrains Mono";letter-spacing:.08em}
+.it-mini strong{display:block;margin-top:7px;color:#d6dfec;font:900 9px "JetBrains Mono"}
+.it-progress{height:4px;margin-top:8px;border-radius:99px;background:#121a28;overflow:hidden}
+.it-progress i{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .18s linear}
+.it-command{
+  margin-top:8px;padding:9px 11px;border:1px solid rgba(34,230,255,.08);
+  border-radius:10px;background:rgba(34,230,255,.02);
+  color:#647188;font:700 6.5px "JetBrains Mono";letter-spacing:.06em;
+}
+.it-command b{color:#93a0b4}
+@media(max-width:1180px){
+  .it-console{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+  .it-grid{grid-template-columns:repeat(2,1fr)}
+  .it-tape{grid-template-columns:1fr 1fr}
+  .it-tape-item:nth-child(n+3){display:none}
+  .it-log-row{grid-template-columns:58px 60px 1fr}
+}
+
 @media(max-width:1180px){.nav{display:none}.hero{grid-template-columns:1fr}.sync-grid{grid-template-columns:repeat(3,1fr)}.main-grid{grid-template-columns:1fr}.grid-4{grid-template-columns:repeat(2,1fr)}.risk-grid,.tables{grid-template-columns:1fr}}
 @media(max-width:760px){.shell,.topbar-inner{width:min(100% - 18px,1640px)}.brand{min-width:auto}.brand-text span,.clock{display:none}.hero-main{padding:20px}.sync-grid{grid-template-columns:repeat(2,1fr)}.engine-status-hero{grid-template-columns:1fr}.telemetry-grid{grid-template-columns:repeat(2,1fr)}.plan-grid{grid-template-columns:repeat(3,1fr)}.identity{grid-template-columns:1fr}.grid-4{grid-template-columns:1fr 1fr}.top-actions .btn{display:none}}
 @media(max-width:480px){.grid-4{grid-template-columns:1fr}.sync-grid{grid-template-columns:1fr}.hero h1{font-size:28px}.plan-grid{grid-template-columns:repeat(2,1fr)}.quote-grid{grid-template-columns:1fr 1fr}.hero-actions .btn{width:100%}}
@@ -169,6 +298,120 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     <div class="sync"><div class="sync-top"><span class="sync-label">BROKER</span><span class="sync-state syncing" id="syncBrokerState">SYNCING</span></div><div class="sync-main" id="syncBrokerMain">Verified account</div><div class="sync-time" id="syncBrokerTime">—</div></div>
     <div class="sync"><div class="sync-top"><span class="sync-label">ACCOUNT</span><span class="sync-state syncing" id="syncAccountState">SYNCING</span></div><div class="sync-main" id="syncAccountMain">Balance / equity</div><div class="sync-time" id="syncAccountTime">—</div></div>
     <div class="sync"><div class="sync-top"><span class="sync-label">MARKET</span><span class="sync-state syncing" id="syncMarketState">SYNCING</span></div><div class="sync-main" id="syncMarketMain">Broker quote</div><div class="sync-time" id="syncMarketTime">—</div></div>
+  </section>
+
+
+  <section class="section">
+    <div class="it-console" aria-live="polite">
+      <div class="it-panel">
+        <div class="it-head">
+          <div>
+            <div class="it-title">REALTIME OPERATIONS BUS</div>
+            <div class="it-sub">LIVE ACCOUNT + MARKET TELEMETRY · EVENT-DRIVEN DATA PATH</div>
+          </div>
+          <span class="it-chip"><i></i><span id="itBusState">BOOTING</span></span>
+        </div>
+
+        <div class="it-grid">
+          <div class="it-cell">
+            <div class="k"><span>STREAM</span><span>01</span></div>
+            <div class="v" id="itStream">OFFLINE</div>
+            <div class="micro" id="itStreamSub">waiting for socket</div>
+          </div>
+          <div class="it-cell">
+            <div class="k"><span>QUOTE AGE</span><span>02</span></div>
+            <div class="v cyan" id="itQuoteAge">—</div>
+            <div class="micro">client-side receipt age</div>
+          </div>
+          <div class="it-cell">
+            <div class="k"><span>BROKER RTT</span><span>03</span></div>
+            <div class="v" id="itBrokerRtt">—</div>
+            <div class="micro">snapshot processing time</div>
+          </div>
+          <div class="it-cell">
+            <div class="k"><span>ACCOUNT AGE</span><span>04</span></div>
+            <div class="v" id="itAccountAge">—</div>
+            <div class="micro">latest account snapshot</div>
+          </div>
+          <div class="it-cell">
+            <div class="k"><span>POSITION AGE</span><span>05</span></div>
+            <div class="v" id="itPositionAge">—</div>
+            <div class="micro">latest positions snapshot</div>
+          </div>
+          <div class="it-cell">
+            <div class="k"><span>TRANSPORT</span><span>06</span></div>
+            <div class="v" id="itTransport">SSE</div>
+            <div class="micro">authenticated event stream</div>
+          </div>
+          <div class="it-cell">
+            <div class="k"><span>BROKER</span><span>07</span></div>
+            <div class="v" id="itBroker">—</div>
+            <div class="micro">active execution provider</div>
+          </div>
+          <div class="it-cell">
+            <div class="k"><span>TERMINAL BEAT</span><span>08</span></div>
+            <div class="v good" id="itBeat">ONLINE</div>
+            <div class="micro" id="itBeatSub">browser event loop healthy</div>
+          </div>
+        </div>
+
+        <div class="it-tape">
+          <div class="it-tape-item"><span>LIVE SYMBOL</span><strong id="itTapeSymbol">—</strong></div>
+          <div class="it-tape-item"><span>BID</span><strong id="itTapeBid">—</strong></div>
+          <div class="it-tape-item"><span>ASK</span><strong id="itTapeAsk">—</strong></div>
+          <div class="it-tape-item"><span>OPEN POS</span><strong id="itTapePositions">0</strong></div>
+          <div class="it-tape-item"><span>STREAM EVENT</span><strong id="itTapeEvent">WAITING</strong></div>
+        </div>
+
+        <div class="it-log" id="itLog">
+          <div class="it-log-row">
+            <time>--:--:--</time><span class="code">SYSTEM</span><span class="msg">Realtime operations bus initializing.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="it-panel">
+        <div class="it-head">
+          <div>
+            <div class="it-title">SYSTEM DIAGNOSTICS</div>
+            <div class="it-sub">TERMINAL HEALTH · DATA FRESHNESS · CONNECTION INTEGRITY</div>
+          </div>
+          <span class="it-chip"><i></i><span id="itDiagState">MONITORING</span></span>
+        </div>
+        <div class="it-mini-grid">
+          <div class="it-mini">
+            <span>QUOTE FRESHNESS</span>
+            <strong id="itQuoteFresh">WAITING</strong>
+            <div class="it-progress"><i id="itQuoteBar"></i></div>
+          </div>
+          <div class="it-mini">
+            <span>ACCOUNT FRESHNESS</span>
+            <strong id="itAccountFresh">WAITING</strong>
+            <div class="it-progress"><i id="itAccountBar"></i></div>
+          </div>
+          <div class="it-mini">
+            <span>POSITION FRESHNESS</span>
+            <strong id="itPositionFresh">WAITING</strong>
+            <div class="it-progress"><i id="itPositionBar"></i></div>
+          </div>
+          <div class="it-mini">
+            <span>SOCKET STATE</span>
+            <strong id="itSocketState">DISCONNECTED</strong>
+            <div class="it-command">CHANNEL <b>/api/terminal/live</b></div>
+          </div>
+          <div class="it-mini">
+            <span>EXECUTION MODE</span>
+            <strong id="itExecMode">—</strong>
+            <div class="it-command">BROKER AUTHORITATIVE</div>
+          </div>
+          <div class="it-mini">
+            <span>ACCOUNT ID</span>
+            <strong id="itAccountId">—</strong>
+            <div class="it-command">VERIFIED SESSION</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section class="section">
@@ -291,7 +534,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 
   const $=(id)=>document.getElementById(id);
   const esc=(v)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
-  const state={selection:null,engine:null,runtimeBots:[],account:null,quote:null,risk:null,cycle:0,lastSyncAt:null,marketSymbol:null,live:{running:false,reader:null,abort:null,reconnectTimer:null,reconnectDelayMs:1000,lastSnapshotAt:0,lastQuoteAt:0}};
+  const state={selection:null,engine:null,runtimeBots:[],account:null,quote:null,risk:null,cycle:0,lastSyncAt:null,marketSymbol:null,live:{running:false,reader:null,abort:null,reconnectTimer:null,reconnectDelayMs:1000,lastSnapshotAt:0,lastQuoteAt:0,lastQuoteServerAt:null,lastQuoteCount:0,lastSnapshotLatencyMs:null,events:0}};
   let refreshRunning=false;
 
   function fmtTime(v){
@@ -386,6 +629,61 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     }finally{clearTimeout(timer)}
   }
 
+
+  function itSet(id,value,cls=""){
+    const el=$(id); if(!el)return;
+    el.textContent=String(value??"—");
+    el.className="v"+(cls?" "+cls:"");
+  }
+
+  function itBar(id,value,max=5000){
+    const el=$(id); if(!el)return;
+    const n=Number(value);
+    const pct=Number.isFinite(n)?Math.min(100,Math.max(4,100-(n/max)*100)):0;
+    el.style.width=(pct||0)+"%";
+  }
+
+  function itPush(code,msg){
+    const log=$("itLog"); if(!log)return;
+    const row=document.createElement("div");
+    row.className="it-log-row";
+    row.innerHTML="<time>"+esc(fmtTime(new Date().toISOString()))+"</time><span class='code'>"+esc(code)+"</span><span class='msg'>"+esc(msg)+"</span>";
+    log.prepend(row);
+    while(log.children.length>14)log.lastElementChild.remove();
+  }
+
+  function renderItHeartbeat(){
+    const live=state.live;
+    const now=Date.now();
+    const quoteAge=live.lastQuoteAt?Math.max(0,now-live.lastQuoteAt):null;
+    const snapshotAge=live.lastSnapshotAt?Math.max(0,now-live.lastSnapshotAt):null;
+    const quoteClass=quoteAge===null?"warn":quoteAge<=750?"good":quoteAge<=2500?"warn":"bad";
+    const snapshotClass=snapshotAge===null?"warn":snapshotAge<=1600?"good":snapshotAge<=3500?"warn":"bad";
+    itSet("itQuoteAge",quoteAge===null?"—":quoteAge+"ms",quoteClass);
+    itSet("itAccountAge",snapshotAge===null?"—":snapshotAge+"ms",snapshotClass);
+    itSet("itPositionAge",snapshotAge===null?"—":snapshotAge+"ms",snapshotClass);
+    itSet("itBrokerRtt",live.lastSnapshotLatencyMs===null?"—":live.lastSnapshotLatencyMs+"ms",live.lastSnapshotLatencyMs<=500?"good":live.lastSnapshotLatencyMs<=1500?"warn":"bad");
+    $("itQuoteFresh").textContent=quoteAge===null?"WAITING":quoteAge<=750?"LIVE":quoteAge<=2500?"DELAYED":"STALE";
+    $("itAccountFresh").textContent=snapshotAge===null?"WAITING":snapshotAge<=1600?"LIVE":snapshotAge<=3500?"DELAYED":"STALE";
+    $("itPositionFresh").textContent=snapshotAge===null?"WAITING":snapshotAge<=1600?"LIVE":snapshotAge<=3500?"DELAYED":"STALE";
+    itBar("itQuoteBar",quoteAge);
+    itBar("itAccountBar",snapshotAge);
+    itBar("itPositionBar",snapshotAge);
+    const connected=Boolean(live.running);
+    itSet("itStream",connected?"ONLINE":"OFFLINE",connected?"good":"bad");
+    $("itStreamSub").textContent=connected?"authenticated event stream":"waiting for reconnect";
+    $("itSocketState").textContent=connected?"CONNECTED":"DISCONNECTED";
+    $("itBusState").textContent=connected?"LIVE BUS":"RECONNECTING";
+    $("itDiagState").textContent=connected?"MONITORING":"DEGRADED";
+    $("itBeat").textContent="ONLINE";
+    $("itBeatSub").textContent="browser event loop healthy";
+    if(state.account){
+      $("itBroker").textContent=String(state.account.broker||"—").toUpperCase();
+      $("itExecMode").textContent=String(state.account.executionMode||"—").toUpperCase();
+      $("itAccountId").textContent=state.account.accountId||"—";
+    }
+  }
+
   function renderEngine(engine,selection){
     const name=engine?.name||selection?.bot?.name||"NO SAVED ENGINE";
     const runtime=String(engine?.state||"STOPPED").toUpperCase();
@@ -427,7 +725,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     $("floatingPnl").className="metric-value "+classForPnl(a.floatingPnl);$("dailyPnl").className="metric-value "+classForPnl(a.dailyPnl);
     $("broker").textContent=String(a.broker||"—").toUpperCase();$("accountId").textContent=a.accountId||"—";$("accountType").textContent=String(a.accountType||"—").toUpperCase();$("currency").textContent=currency||"—";$("executionMode").textContent=String(a.executionMode||"—").toUpperCase();$("tradingStatus").textContent=a.tradingEnabled===false?"DISABLED":"ENABLED";
     $("accountState").textContent="CONNECTED";$("accountState").style.color="var(--green)";$("accountNote").textContent="Live account telemetry received from the secured broker connection.";
-    $("accountBadge").textContent="LIVE";$("syncAccountMain").textContent=(a.accountId||"ACCOUNT")+" · "+fmtMoney(a.equity,currency);$("syncAccountState").textContent="LIVE";$("syncAccountState").className="sync-state live";
+    $("accountBadge").textContent="LIVE";$("syncAccountMain").textContent=(a.accountId||"ACCOUNT")+" · "+fmtMoney(a.equity,currency);$("itTapePositions").textContent=Number.isFinite(Number(a.positionCount))?String(a.positionCount):"—";$("itAccountId").textContent=a.accountId||"—";$("itBroker").textContent=String(a.broker||"—").toUpperCase();$("itExecMode").textContent=String(a.executionMode||"—").toUpperCase();$("syncAccountState").textContent="LIVE";$("syncAccountState").className="sync-state live";
   }
 
 
@@ -457,7 +755,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     $("syncMarketState").className="sync-state live";
     $("syncMarketMain").textContent=symbol+" · "+(Number.isFinite(mid)?fmtNumber(mid,dec):"—");
     $("syncMarketTime").textContent=fmtTime(new Date().toISOString());
-    state.quote={data:{...d,bid:Number.isFinite(bid)?bid:mid,ask:Number.isFinite(ask)?ask:mid}};
+    state.quote={data:{...d,bid:Number.isFinite(bid)?bid:mid,ask:Number.isFinite(ask)?ask:mid}};$("itTapeSymbol").textContent=symbol;$("itTapeBid").textContent=Number.isFinite(bid)?fmtNumber(bid,dec):"—";$("itTapeAsk").textContent=Number.isFinite(ask)?fmtNumber(ask,dec):"—";$("itTapeEvent").textContent="TICK #"+(++state.live.lastQuoteCount);$("itTapePositions").textContent=state.account?.positionCount??$("positionCount").textContent||"0";if(q?.serverReceivedAt){state.live.lastQuoteServerAt=q.serverReceivedAt;}$("itQuoteAge").textContent="0ms";
     state.live.lastQuoteAt=Date.now();
     const age=Number.isFinite(Number(d.ageMs))?Math.max(0,Number(d.ageMs)):0;
     $("footerState").textContent="LIVE STREAM · TICK AGE "+Math.round(age)+"ms";
@@ -592,7 +890,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       }
       if(Array.isArray(payload?.positions))renderPositions(payload.positions);
       if(Array.isArray(payload?.orders))renderOrders(payload.orders);
-      state.live.lastSnapshotAt=Date.now();
+      state.live.lastSnapshotAt=Date.now();state.live.lastSnapshotLatencyMs=Number(payload?.latencyMs);state.live.events++;$("itTapeEvent").textContent="SNAPSHOT #"+state.live.events;itPush("SNAPSHOT",(Array.isArray(payload?.positions)?payload.positions.length:0)+" positions · broker "+(payload?.latencyMs??"—")+"ms");
       $("syncAccountState").textContent="LIVE";
       $("syncAccountState").className="sync-state live";
       $("syncAccountMain").textContent=(incoming?.accountId||"ACCOUNT")+" · LIVE STREAM";
@@ -605,10 +903,11 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       const status=String(payload?.state||"").toUpperCase();
       if(status==="CONNECTED"){
         $("topStatus").textContent="LIVE STREAM";
+        $("itSocketState").textContent="CONNECTED";$("itStream").textContent="ONLINE";$("itStream").className="v good";$("itStreamSub").textContent="authenticated event stream";itPush("STREAM","Connected to authenticated terminal channel");
         setSync("backend","LIVE","REALTIME STREAM",payload?.generatedAt||new Date().toISOString());
       }else if(status==="ERROR"){
         $("topStatus").textContent="STREAM ERROR";
-        addActivity("Realtime stream: "+String(payload?.reason||"unknown"));
+        addActivity("Realtime stream: "+String(payload?.reason||"unknown"));itPush("ERROR",String(payload?.reason||"unknown"));
       }
     }
   }
@@ -656,6 +955,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       state.live.running=true;
       state.live.reconnectDelayMs=1000;
       $("topStatus").textContent="LIVE STREAM";
+      $("itStream").textContent="ONLINE";$("itStream").className="v good";$("itStreamSub").textContent="authenticated event stream";$("itSocketState").textContent="CONNECTED";$("itBusState").textContent="LIVE BUS";itPush("STREAM","Realtime terminal stream connected · "+state.marketSymbol);
       addActivity("Realtime terminal stream connected · "+state.marketSymbol);
 
       const reader=response.body.getReader();
@@ -686,7 +986,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
         state.live.running=false;
         setSync("backend","SYNCING","LIVE STREAM RECONNECTING",new Date().toISOString());
         $("topStatus").textContent="RECONNECTING";
-        addActivity("Realtime stream: "+String(error?.message||"disconnected"));
+        addActivity("Realtime stream: "+String(error?.message||"disconnected"));itPush("STREAM",String(error?.message||"disconnected"));$("itStream").textContent="RECONNECTING";$("itStream").className="v warn";$("itSocketState").textContent="RECONNECTING";$("itBusState").textContent="RECONNECTING";
         scheduleLiveStream();
       }
     }finally{
@@ -775,6 +1075,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
   });
   window.addEventListener("pageshow",()=>{refreshAll(true);startLiveStream();});
   setInterval(()=>{$("clock").textContent=new Date().toLocaleTimeString([], {hour12:false})},1000);
+  setInterval(renderItHeartbeat,250);
   setInterval(()=>{
     const quoteAge=state.live.lastQuoteAt?Math.max(0,Date.now()-state.live.lastQuoteAt):null;
     const snapshotAge=state.live.lastSnapshotAt?Math.max(0,Date.now()-state.live.lastSnapshotAt):null;
@@ -789,6 +1090,8 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
   setInterval(()=>{if(!state.live.running)refreshAll(false)},15000);
   $("clock").textContent=new Date().toLocaleTimeString([], {hour12:false});
   refreshAll(true);
+  itPush("SYSTEM","Professional IT telemetry layer initialized.");
+  renderItHeartbeat();
   window.setTimeout(startLiveStream,900);
 })();
 </script>
