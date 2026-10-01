@@ -247,7 +247,7 @@ export class DerivTraderClient {
 
     let response;
     let lastError=null;
-    const endpoints=[DERIV_PUBLIC_WS,DERIV_PUBLIC_WS_LEGACY];
+    const endpoints=[DERIV_PUBLIC_WS_LEGACY,DERIV_PUBLIC_WS];
     for(const endpoint of endpoints){
       try{
         if(this.marketWs&&this.marketConnected)await this.closePublic();
@@ -443,8 +443,9 @@ export class DerivTraderClient {
 
   async getQuote(symbol){
     const requested=String(symbol||"").trim();
-    const s=await this.resolveMarketSymbol(requested);
-    const tick=await getDerivMarketFeed().getQuote(s,{maxAgeMs:5000,timeoutMs:8000});
+    if(!requested)throw new Error("DERIV_SYMBOL_REQUIRED");
+    const tick=await getDerivMarketFeed().getQuote(requested,{maxAgeMs:5000,timeoutMs:8000});
+    const s=String(tick.symbol||requested);
     const quote=finite(tick.price);
     if(quote===null)throw new Error("DERIV_QUOTE_UNAVAILABLE");
     return {
