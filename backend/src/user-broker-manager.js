@@ -74,7 +74,7 @@ export class UserBrokerManager {
   async createDerivOAuthState({userId,codeVerifier,executionMode="DEMO"}={}){
     if(!this.pool||!userId)throw new Error("USER_CONTEXT_REQUIRED");
     const state=crypto.randomBytes(32).toString("base64url");
-    const mode=String(executionMode).toUpperCase()==="PAPER"?"DEMO":String(executionMode).toUpperCase();
+    const mode=(String(executionMode||"DEMO").toUpperCase()==="PAPER"?"DEMO":String(executionMode||"DEMO").toUpperCase());
     if(!["DEMO","PAPER","LIVE"].includes(mode))throw new Error("INVALID_EXECUTION_MODE");
     await this.pool.query("DELETE FROM kingbot_deriv_oauth_states WHERE expires_at<NOW()");
     await this.pool.query("INSERT INTO kingbot_deriv_oauth_states(state,user_id,code_verifier,execution_mode,expires_at) VALUES($1,$2,$3,$4,NOW()+INTERVAL '10 minutes')",[state,userId,String(codeVerifier||""),mode]);
