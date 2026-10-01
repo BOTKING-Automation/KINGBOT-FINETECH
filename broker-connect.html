@@ -187,7 +187,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
           <div class="broker-top"><div class="brand"><div class="logo"><img src="https://rankia.com.br/_next/image/?q=100&url=https%3A%2F%2Frankia.com.br%2Fapp%2Fuploads%2F2024%2F09%2Finteractivebrokers_logo_corretora.webp&w=768" alt="Interactive Brokers"></div><div><div class="broker-name">IBKR</div><div class="broker-code">WEB API · OAUTH</div></div></div><span class="availability">ONBOARD</span></div>
           <div class="broker-copy">IBKR's Web API supports OAuth-based organization onboarding; access depends on the registered application model.</div>
           <div class="broker-specs"><div class="spec"><b>CONNECTION</b><span>OAUTH / WEB API</span></div><div class="spec"><b>MARKETS</b><span>MULTI-ASSET</span></div></div>
-          <div class="meta"><span>MULTI-ASSET</span><span>TRADING API</span><span>OAUTH</span></div><div class="environment"><span class="demo">● PAPER</span><span class="live">● LIVE / REAL</span></div><div class="connection-diagnostics"><div class="diag ok"><b>AUTH</b><span>WEB API</span></div><div class="diag ok"><b>MARKET DATA</b><span>API</span></div><div class="diag build"><b>ORDER TEST</b><span>PAPER</span></div><div class="diag build"><b>EXECUTION</b><span>ONBOARD</span></div></div>
+          <div class="meta"><span>MULTI-ASSET</span><span>TRADING API</span><span>OAUTH</span></div><div class="environment"><span class="demo">● DEMO · BROKER</span><span class="live">● LIVE / REAL</span></div><div class="connection-diagnostics"><div class="diag ok"><b>AUTH</b><span>WEB API</span></div><div class="diag ok"><b>MARKET DATA</b><span>API</span></div><div class="diag build"><b>ORDER TEST</b><span>DEMO</span></div><div class="diag build"><b>EXECUTION</b><span>ONBOARD</span></div></div>
           <div class="broker-action"><button class="connect" data-open="ibkr">CONNECT IBKR</button><a class="docs" href="https://www.interactivebrokers.com/campus/ibkr-api-page/web-api-account-management/" target="_blank" rel="noopener">START API ACCESS ↗</a></div><div class="status-line">IBKR Web API credentials are issued through application registration; eligible firms start with IBKR API Solutions.</div>
         </div>
       </article>
@@ -228,7 +228,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
 
       <div class="credentials" id="credentials">
         <div class="fields">
-          <div class="field"><label>EXECUTION MODE</label><select id="executionMode"><option value="PAPER">PAPER · DEMO</option><option value="LIVE">LIVE · REAL</option></select></div>
+          <div class="field"><label>EXECUTION MODE</label><select id="executionMode"><option value="DEMO">DEMO · BROKER</option><option value="LIVE">LIVE · REAL</option></select></div>
           <div class="field"><label>ACCOUNT ID</label><input id="accountId" autocomplete="off" placeholder="Exness trading account ID"></div>
           <div class="field" id="apiKeyField" style="grid-column:1/-1;display:none"><label>EXNESS API KEY</label><input id="apiKey" autocomplete="off" placeholder="exnsk_…"></div>
           <div class="field" id="secretKeyField" style="grid-column:1/-1;display:none"><label>EXNESS SECRET KEY</label><input id="secretKey" type="password" autocomplete="off" placeholder="Secret shown once by Exness"></div>
@@ -290,7 +290,7 @@ function cacheBrokerIdentity(connection){
       accountId:String(connection.accountId),
       executionMode:String(connection.executionMode||"DEMO"),
       accountType:String(connection.accountType||(
-        String(connection.executionMode||"PAPER").toUpperCase()==="LIVE"?"REAL":"DEMO"
+        String(connection.executionMode||"DEMO").toUpperCase()==="LIVE"?"REAL":"DEMO"
       )),
       verifiedAt:new Date().toISOString()
     }));
