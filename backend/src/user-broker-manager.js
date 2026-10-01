@@ -314,7 +314,7 @@ export class UserBrokerManager {
             accountType:parsed.accountType
           });
           const result=await api.connect();
-          entry={api,accountId:mapping.account_id,executionMode:mode,provider:"deriv",connectedAt:Date.now(),accountInfo:result.account,accountInfoAt:Date.now()};
+          entry={api,accountId:mapping.account_id,executionMode:mode,provider:"deriv",connectedAt:Date.now(),accountInfo:result.account,accountType:api.accountTypeFromBalance(result.account),accountInfoAt:Date.now()};
           this.connections.set(key,entry);
         }else{
           entry.executionMode=mode;
@@ -325,7 +325,9 @@ export class UserBrokerManager {
           // authenticated session stable under dashboard polling.
           if(!entry.accountInfoAt || Date.now()-entry.accountInfoAt>30000){
             try{
-              entry.accountInfo=(await entry.api.getAccount()).data;
+              const verified=(await entry.api.getAccount()).data;
+              entry.accountInfo=verified;
+              entry.accountType=verified.accountType||entry.accountType||"DEMO";
               entry.accountInfoAt=Date.now();
             }catch(error){
               const message=String(error?.message||"");
@@ -453,7 +455,19 @@ export class UserBrokerManager {
   async getAccount(userId){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="deriv" && entry.accountInfo && entry.accountInfoAt && Date.now()-entry.accountInfoAt<30000){
-      return {connected:true,data:entry.accountInfo};
+      const raw=entry.accountInfo||{};
+      const loginid=String(raw.loginid||entry.accountId||"");
+      const accountType=String(raw.accountType||entry.accountType||"").toUpperCase() || (loginid.startsWith("VR")||loginid.includes("_VRTC")?"DEMO":"REAL");
+      return {connected:true,data:{
+        ...raw,
+        balance:Number.isFinite(Number(raw.balance))?Number(raw.balance):null,
+        equity:Number.isFinite(Number(raw.equity))?Number(raw.equity):Number(raw.balance),
+        currency:raw.currency||null,
+        loginid:raw.loginid||entry.accountId,
+        tradeAllowed:raw.tradeAllowed!==false,
+        provider:"deriv",
+        accountType
+      }};
     }
     if(entry.provider==="exness"){
       const info=await entry.api.getAccountInformation();
