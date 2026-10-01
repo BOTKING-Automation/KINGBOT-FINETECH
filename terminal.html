@@ -291,7 +291,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 
   const $=(id)=>document.getElementById(id);
   const esc=(v)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
-  const state={selection:null,engine:null,runtimeBots:[],account:null,quote:null,risk:null,cycle:0,lastSyncAt:null,marketSymbol:null};
+  const state={selection:null,engine:null,runtimeBots:[],account:null,quote:null,risk:null,cycle:0,lastSyncAt:null,marketSymbol:null,live:{running:false,reader:null,abort:null,reconnectTimer:null,reconnectDelayMs:1000,lastSnapshotAt:0,lastQuoteAt:0}};
   let refreshRunning=false;
 
   function fmtTime(v){
@@ -430,6 +430,39 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     $("accountBadge").textContent="LIVE";$("syncAccountMain").textContent=(a.accountId||"ACCOUNT")+" · "+fmtMoney(a.equity,currency);$("syncAccountState").textContent="LIVE";$("syncAccountState").className="sync-state live";
   }
 
+
+  function renderLiveQuote(q){
+    const d=q||{};
+    const bid=Number(d.bid);
+    const ask=Number(d.ask);
+    const price=Number(d.price);
+    const mid=Number.isFinite(price)
+      ? price
+      : Number.isFinite(bid)&&Number.isFinite(ask)
+        ? (bid+ask)/2
+        : Number.isFinite(bid)?bid:Number.isFinite(ask)?ask:NaN;
+    const spread=Number.isFinite(bid)&&Number.isFinite(ask)?ask-bid:NaN;
+    const symbol=d.symbol||state.marketSymbol||"—";
+    const dec=Number.isFinite(mid)?(mid>=100?2:5):2;
+    $("marketSymbol").textContent=symbol;
+    $("marketPrice").textContent=Number.isFinite(mid)?fmtNumber(mid,dec):"—";
+    $("bid").textContent=Number.isFinite(bid)?fmtNumber(bid,dec):Number.isFinite(mid)?fmtNumber(mid,dec):"—";
+    $("ask").textContent=Number.isFinite(ask)?fmtNumber(ask,dec):Number.isFinite(mid)?fmtNumber(mid,dec):"—";
+    $("spread").textContent=Number.isFinite(spread)?fmtNumber(spread,dec):"—";
+    $("quoteTime").textContent=fmtTime(d.time||new Date().toISOString());
+    $("marketBroker").textContent="DERIV LIVE STREAM";
+    $("marketBadge").textContent="LIVE TICK";
+    $("marketBadge").className="panel-badge";
+    $("syncMarketState").textContent="LIVE";
+    $("syncMarketState").className="sync-state live";
+    $("syncMarketMain").textContent=symbol+" · "+(Number.isFinite(mid)?fmtNumber(mid,dec):"—");
+    $("syncMarketTime").textContent=fmtTime(new Date().toISOString());
+    state.quote={data:{...d,bid:Number.isFinite(bid)?bid:mid,ask:Number.isFinite(ask)?ask:mid}};
+    state.live.lastQuoteAt=Date.now();
+    const age=Number.isFinite(Number(d.ageMs))?Math.max(0,Number(d.ageMs)):0;
+    $("footerState").textContent="LIVE STREAM · TICK AGE "+Math.round(age)+"ms";
+  }
+
   function renderQuote(q){
     state.quote=q;
     const m=q?.market||{};const d=m.data||{};const bid=Number(d.bid),ask=Number(d.ask);const mid=Number.isFinite(bid)&&Number.isFinite(ask)?(bid+ask)/2:Number.isFinite(bid)?bid:Number.isFinite(ask)?ask:NaN;const spread=Number.isFinite(bid)&&Number.isFinite(ask)?ask-bid:NaN;
@@ -545,6 +578,124 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     }catch(e){setSync("runtime","ERROR","Runtime telemetry unavailable",new Date().toISOString());addActivity("Runtime telemetry: "+e.message)}
   }
 
+
+  function handleLiveEvent(eventName,payload){
+    if(eventName==="quote"){
+      renderLiveQuote(payload?.quote||payload);
+      return;
+    }
+    if(eventName==="snapshot"){
+      const incoming=payload?.account||null;
+      if(incoming){
+        const merged=state.account?{...state.account,...incoming}:incoming;
+        renderAccount(merged);
+      }
+      if(Array.isArray(payload?.positions))renderPositions(payload.positions);
+      if(Array.isArray(payload?.orders))renderOrders(payload.orders);
+      state.live.lastSnapshotAt=Date.now();
+      $("syncAccountState").textContent="LIVE";
+      $("syncAccountState").className="sync-state live";
+      $("syncAccountMain").textContent=(incoming?.accountId||"ACCOUNT")+" · LIVE STREAM";
+      $("syncAccountTime").textContent=fmtTime(payload?.generatedAt||new Date().toISOString());
+      $("positionsBadge").textContent=(Array.isArray(payload?.positions)?payload.positions.length:0)+" OPEN · LIVE";
+      $("footerState").textContent="LIVE STREAM · ACCOUNT "+Math.max(0,Date.now()-state.live.lastSnapshotAt)+"ms ago";
+      return;
+    }
+    if(eventName==="status"){
+      const status=String(payload?.state||"").toUpperCase();
+      if(status==="CONNECTED"){
+        $("topStatus").textContent="LIVE STREAM";
+        setSync("backend","LIVE","REALTIME STREAM",payload?.generatedAt||new Date().toISOString());
+      }else if(status==="ERROR"){
+        $("topStatus").textContent="STREAM ERROR";
+        addActivity("Realtime stream: "+String(payload?.reason||"unknown"));
+      }
+    }
+  }
+
+  async function stopLiveStream(reconnect=false){
+    const live=state.live;
+    if(live.reconnectTimer){clearTimeout(live.reconnectTimer);live.reconnectTimer=null;}
+    if(live.abort)try{live.abort.abort();}catch{}
+    live.abort=null;
+    live.running=false;
+    if(!reconnect)live.reconnectDelayMs=1000;
+  }
+
+  function scheduleLiveStream(){
+    const live=state.live;
+    if(live.reconnectTimer||document.hidden)return;
+    const delay=Math.min(5000,Math.max(500,Number(live.reconnectDelayMs)||1000));
+    live.reconnectDelayMs=Math.min(5000,delay*1.7);
+    live.reconnectTimer=setTimeout(()=>{
+      live.reconnectTimer=null;
+      startLiveStream();
+    },delay);
+  }
+
+  async function startLiveStream(){
+    await stopLiveStream(true);
+    if(document.hidden||!state.marketSymbol)return;
+    try{
+      await waitApi();
+      const auth=await getAuth(3500);
+      const controller=new AbortController();
+      state.live.abort=controller;
+      const response=await fetch(window.KINGBOT_API.baseUrl+"/terminal/live?symbol="+encodeURIComponent(state.marketSymbol),{
+        method:"GET",
+        headers:{
+          Accept:"text/event-stream",
+          Authorization:"Bearer "+auth.token
+        },
+        credentials:"omit",
+        cache:"no-store",
+        signal:controller.signal
+      });
+      if(!response.ok)throw new Error("LIVE_STREAM_HTTP_"+response.status);
+      if(!response.body)throw new Error("LIVE_STREAM_BODY_UNAVAILABLE");
+      state.live.running=true;
+      state.live.reconnectDelayMs=1000;
+      $("topStatus").textContent="LIVE STREAM";
+      addActivity("Realtime terminal stream connected · "+state.marketSymbol);
+
+      const reader=response.body.getReader();
+      state.live.reader=reader;
+      const decoder=new TextDecoder();
+      let buffer="";
+      while(!controller.signal.aborted){
+        const {value,done}=await reader.read();
+        if(done)break;
+        buffer+=decoder.decode(value,{stream:true});
+        let boundary;
+        while((boundary=buffer.indexOf("\\n\\n"))>=0){
+          const frame=buffer.slice(0,boundary);
+          buffer=buffer.slice(boundary+2);
+          let eventName="message";
+          let dataText="";
+          for(const line of frame.split(/\\r?\\n/)){
+            if(line.startsWith("event:"))eventName=line.slice(6).trim();
+            else if(line.startsWith("data:"))dataText+=line.slice(5).trim();
+          }
+          if(!dataText)continue;
+          try{handleLiveEvent(eventName,JSON.parse(dataText));}catch{}
+        }
+      }
+      if(!controller.signal.aborted)throw new Error("LIVE_STREAM_DISCONNECTED");
+    }catch(error){
+      if(error?.name!=="AbortError"&&!document.hidden){
+        state.live.running=false;
+        setSync("backend","SYNCING","LIVE STREAM RECONNECTING",new Date().toISOString());
+        $("topStatus").textContent="RECONNECTING";
+        addActivity("Realtime stream: "+String(error?.message||"disconnected"));
+        scheduleLiveStream();
+      }
+    }finally{
+      state.live.reader=null;
+      if(state.live.abort===controller)state.live.abort=null;
+      state.live.running=false;
+    }
+  }
+
   async function loadAccount(){
     try{
       const x=await api("/account",{timeoutMs:9500});const account=x.account||x.data||x;renderAccount(account);if(Array.isArray(account?.positions))renderPositions(account.positions);
@@ -618,13 +769,27 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 
   $("goldTestBtn").addEventListener("click",testGoldDemoBuy);
   $("syncNow").addEventListener("click",()=>refreshAll(true));
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshAll(true)});
-  window.addEventListener("pageshow",()=>refreshAll(true));
+  document.addEventListener("visibilitychange",()=>{
+    if(!document.hidden){refreshAll(true);startLiveStream();}
+    else stopLiveStream(false);
+  });
+  window.addEventListener("pageshow",()=>{refreshAll(true);startLiveStream();});
   setInterval(()=>{$("clock").textContent=new Date().toLocaleTimeString([], {hour12:false})},1000);
-  setInterval(()=>{if(state.lastSyncAt){const diff=Math.max(0,3-Math.floor((Date.now()-new Date(state.lastSyncAt).getTime())/1000));$("nextSync").textContent=diff+"s"}},500);
-  setInterval(()=>refreshAll(false),3000);
+  setInterval(()=>{
+    const quoteAge=state.live.lastQuoteAt?Math.max(0,Date.now()-state.live.lastQuoteAt):null;
+    const snapshotAge=state.live.lastSnapshotAt?Math.max(0,Date.now()-state.live.lastSnapshotAt):null;
+    $("nextSync").textContent=state.live.running
+      ? "LIVE · "+(quoteAge===null?"—":quoteAge+"ms")
+      : "RECONNECT";
+    if(state.live.running&&snapshotAge!==null&&snapshotAge>3500){
+      setSync("account","SYNCING","SNAPSHOT LATE",new Date().toISOString());
+    }
+  },250);
+  // Safety fallback only. Normal terminal telemetry comes from the realtime stream.
+  setInterval(()=>{if(!state.live.running)refreshAll(false)},15000);
   $("clock").textContent=new Date().toLocaleTimeString([], {hour12:false});
   refreshAll(true);
+  window.setTimeout(startLiveStream,900);
 })();
 </script>
 <script src="system/auth-gate.js"></script>
