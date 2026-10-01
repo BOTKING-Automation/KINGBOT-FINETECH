@@ -150,7 +150,9 @@ export class DerivTraderClient {
   async marketRequest(payload,{timeoutMs=10000}={}){
     if(!this.marketWs||!this.marketConnected)await this.publicConnect();
     const req_id=++this.marketRequestId;
-    const message={...payload,req_id};
+    const normalized={...payload};
+    if(normalized.subscribe===0||String(normalized.subscribe)==="0")delete normalized.subscribe;
+    const message={...normalized,req_id};
     return await new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>{
         this.marketPending.delete(req_id);
@@ -232,7 +234,9 @@ export class DerivTraderClient {
   async request(payload,{timeoutMs=12000}={}){
     if(!this.ws||!this.connected)throw new Error("DERIV_NOT_CONNECTED");
     const req_id=++this.requestId;
-    const message={...payload,req_id};
+    const normalized={...payload};
+    if(normalized.subscribe===0||String(normalized.subscribe)==="0")delete normalized.subscribe;
+    const message={...normalized,req_id};
     return await new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>{
         this.pending.delete(req_id);
@@ -429,7 +433,7 @@ export class DerivTraderClient {
     const id=String(proposalId||"").trim();
     const maxPrice=Number(price);
     if(!id||!Number.isFinite(maxPrice)||maxPrice<0)throw new Error("DERIV_BUY_INPUT_INVALID");
-    const response=await this.request({buy:id,price:maxPrice,subscribe:subscribe?1:0,passthrough:reference?{reference}:undefined});
+    const response=await this.request({buy:id,price:maxPrice,...(subscribe?{subscribe:1}:{}),passthrough:reference?{reference}:undefined});
     const buy=response?.buy;
     if(!buy?.contract_id)throw new Error("DERIV_CONTRACT_ID_MISSING");
     return {contractId:String(buy.contract_id),buy};
@@ -438,7 +442,7 @@ export class DerivTraderClient {
   async getOpenContract(contractId){
     const id=String(contractId||"").trim();
     if(!id)throw new Error("DERIV_CONTRACT_ID_REQUIRED");
-    const response=await this.request({proposal_open_contract:1,contract_id:Number(id),subscribe:0});
+    const response=await this.request({proposal_open_contract:1,contract_id:Number(id)});
     const c=response?.proposal_open_contract;
     if(!c?.contract_id)throw new Error("DERIV_OPEN_CONTRACT_NOT_FOUND");
     return c;
@@ -490,7 +494,7 @@ export class DerivTraderClient {
     const granularity=granularityMap[String(timeframe||"1m")]||60;
     const count=Math.max(20,Math.min(1000,Number(limit)||100));
     const resolved=await this.resolveMarketSymbol(s);
-    const response=await this.marketRequest({ticks_history:resolved,end:"latest",count,style:"candles",granularity,adjust_start_time:1,subscribe:0},{timeoutMs:15000});
+    const response=await this.marketRequest({ticks_history:resolved,end:"latest",count,style:"candles",granularity,adjust_start_time:1},{timeoutMs:15000});
     const candles=Array.isArray(response?.candles)?response.candles:[];
     const rows=candles.map(c=>({time:c?.epoch?new Date(Number(c.epoch)*1000).toISOString():null,open:finite(c?.open),high:finite(c?.high),low:finite(c?.low),close:finite(c?.close),volume:finite(c?.tick_count)})).filter(c=>c.time&&[c.open,c.high,c.low,c.close].every(Number.isFinite));
     if(rows.length<20)throw new Error("INSUFFICIENT_HISTORICAL_CANDLES");
