@@ -429,7 +429,7 @@ export class DerivTraderClient {
     const market=markets.find(x=>String(x.symbol).toUpperCase()===s.toUpperCase());
     const contracts=await this.getContractsFor(s);
     return {
-      symbol:s,
+      symbol:market?.symbol||s,
       point:Number(market?.pipSize)||0.00001,
       tickSize:Number(market?.pipSize)||0.00001,
       tickValue:1,
