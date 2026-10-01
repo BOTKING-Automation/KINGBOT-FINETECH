@@ -686,12 +686,14 @@ async function execute(row){
         }catch(error){
           action="DERIV_V8_EXECUTION_REJECTED";
           startDetails={error:String(error?.message||"DERIV_V8_EXECUTION_REJECTED").slice(0,500)};
+          console.error("[KINGBOT V8] execution rejected:",startDetails.error);
           await audit(userId,"LADDER_V8_DERIV_EXECUTION_REJECTED",{botId,symbol:config.symbol,error:startDetails.error,score:analysis.score,signal:analysis.signal});
         }
       }else if(!analysis.ok)action="SIGNAL_GATE_BLOCKED";
       else if(analysis.signal==="NO_SIGNAL")action="SIGNAL_BELOW_THRESHOLD";
       else if(!risk.allowed)action="RISK_BLOCKED";
       else if(spreadPoints>ladderCfg.maxSpreadPoints)action="V8_SPREAD_FILTER_BLOCKED";
+      console.log("[KINGBOT V8] cycle",JSON.stringify({botId,symbol:config.symbol,signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,riskAllowed:risk.allowed,spreadPoints,maxSpreadPoints:ladderCfg.maxSpreadPoints,entryQualified:Boolean(ind.v8EntryQualified),action}));
       const v8d={contractType:started?.derivContractType||null,multiplier:started?.derivMultiplier||null,entryQualified:Boolean(ind.v8EntryQualified),rungsOpened:started?.rungsOpened||0,lotScale:started?.lotScale||null,velocityPoints:velocity,spreadPoints,spreadMaxPoints:ladderCfg.maxSpreadPoints,startDetails};
       const signalPayload={signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action,executionMode:s.executionMode,strategy:botId,tradePlan:null,riskAllowed:risk.allowed,riskBlockedReasons:risk.blockedReasons||[],analysisReason:analysis.reason,riskReason:risk.reason||risk.blockedReasons,v8:v8d,updatedAt:new Date().toISOString()};
       await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify(signalPayload)]);
