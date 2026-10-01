@@ -338,6 +338,33 @@ app.post("/api/broker/disconnect", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   try{res.json({ok:true,...await broker.disconnect(user.id)});}catch(error){res.status(502).json({ok:false,error:"Broker disconnect failed."});}
 });
+app.get("/api/broker/markets", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  try{
+    const result=await broker.getMarkets(user.id);
+    const markets=Array.isArray(result?.data)?result.data:[];
+    res.json({ok:true,connected:Boolean(result?.connected),broker:(await broker.getStatus(user.id)).broker||null,markets,source:"broker",syncedAt:new Date().toISOString()});
+  }catch(error){
+    console.error("[KINGBOT BROKER] market discovery failed:",error?.message||error);
+    res.status(503).json({ok:false,error:"Broker market catalog unavailable.",reason:error?.message||"BROKER_MARKETS_UNAVAILABLE"});
+  }
+});
+
+app.get("/api/broker/quote", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  const symbol=String(req.query?.symbol||"").trim().toUpperCase();
+  if(!symbol)return res.status(400).json({ok:false,error:"BROKER_SYMBOL_REQUIRED"});
+  try{
+    const result=await broker.getQuote(symbol,user.id);
+    const data=result?.data||{};
+    const specResult=await broker.getSymbolSpecification(symbol,user.id).catch(()=>null);
+    const spec=specResult?.data||null;
+    res.json({ok:true,connected:Boolean(result?.connected),broker:(await broker.getStatus(user.id)).broker||null,market:{symbol,data,spec},syncedAt:new Date().toISOString()});
+  }catch(error){
+    res.status(503).json({ok:false,error:"Broker market telemetry unavailable.",reason:error?.message||"BROKER_QUOTE_UNAVAILABLE"});
+  }
+});
+
 app.get("/api/account", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   try{
