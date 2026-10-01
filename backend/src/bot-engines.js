@@ -10,6 +10,7 @@ const BOT_DEFINITIONS = {
     name: "KINGBOT STRATEGIC",
     mode: "multi-strategy",
     strategies: ["trend-following", "mean-reversion", "volatility-regime", "multi-factor-consensus"],
+    timeframeProfile: { regime: "4h", setup: "1h", execution: "15m" },
     signalThreshold: 75,
     tradePlan: { slAtr: 1.6, tpAtr: 2.8, trailingTriggerR: 1.0, trailingLockR: 0.5, maxHoldBars: 30 },
     risk: { maxRiskPerTradePct: 1, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
@@ -19,6 +20,7 @@ const BOT_DEFINITIONS = {
     name: "KINGBOT FLIPPER",
     mode: "high-speed-flipping",
     strategies: ["micro-momentum", "impulse-continuation", "rapid-reversal", "spread-filter"],
+    timeframeProfile: { regime: "15m", setup: "5m", execution: "1m" },
     signalThreshold: 76,
     tradePlan: { slAtr: 0.75, tpAtr: 1.05, trailingTriggerR: 0.7, trailingLockR: 0.2, maxHoldBars: 8 },
     risk: { maxRiskPerTradePct: 0.5, maxPositions: 2, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
@@ -28,6 +30,7 @@ const BOT_DEFINITIONS = {
     name: "KINGBOT BREAKOUT",
     mode: "breakout-momentum",
     strategies: ["range-compression", "level-breakout", "volatility-confirmation", "retest-continuation"],
+    timeframeProfile: { regime: "1h", setup: "15m", execution: "5m" },
     signalThreshold: 72,
     tradePlan: { slAtr: 1.25, tpAtr: 2.5, trailingTriggerR: 1.0, trailingLockR: 0.45, maxHoldBars: 18 },
     risk: { maxRiskPerTradePct: 0.75, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
@@ -37,6 +40,7 @@ const BOT_DEFINITIONS = {
     name: "KINGBOT SMC PRO",
     mode: "smart-money-concepts",
     strategies: ["market-structure", "liquidity-sweep", "order-block", "fair-value-gap", "displacement"],
+    timeframeProfile: { regime: "4h", setup: "15m", execution: "5m" },
     signalThreshold: 74,
     tradePlan: { slAtr: 1.5, tpAtr: 2.7, trailingTriggerR: 1.0, trailingLockR: 0.45, maxHoldBars: 28 },
     risk: { maxRiskPerTradePct: 1, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
@@ -46,6 +50,7 @@ const BOT_DEFINITIONS = {
     name: "KINGBOT LADDER FLIP V8",
     mode: "v8-adaptive-ladder",
     strategies: ["ema20-50-trend-gate", "adx-strength-gate", "rsi-confirmation", "velocity-pyramiding", "staircase-profit-lock", "risk-governor"],
+    timeframeProfile: { regime: "1h", setup: "15m", execution: "5m" },
     signalThreshold: 78,
     tradePlan: { slAtr: 1.5, tpAtr: 0, trailingTriggerR: null, trailingLockR: null, maxHoldBars: 0, maxLadderLevels: 20 },
     risk: { maxRiskPerTradePct: 0.5, maxPositions: 20, dailyDrawdownPct: 6, totalDrawdownPct: 20 },
