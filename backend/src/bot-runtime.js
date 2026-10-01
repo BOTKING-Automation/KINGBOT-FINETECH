@@ -276,6 +276,7 @@ export async function ensureBotRuntimeSchema(pool){
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_ladder_v8_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,symbol TEXT NOT NULL,timeframe TEXT NOT NULL DEFAULT '5m',active BOOLEAN NOT NULL DEFAULT FALSE,direction SMALLINT NOT NULL DEFAULT 0,anchor_price NUMERIC,initial_stop_distance NUMERIC,step_price NUMERIC,lock_level INTEGER NOT NULL DEFAULT 0,last_lock_price NUMERIC,last_pyramid_price NUMERIC,rungs_opened INTEGER NOT NULL DEFAULT 0,aggressive_entry BOOLEAN NOT NULL DEFAULT FALSE,position_ids JSONB NOT NULL DEFAULT '[]'::jsonb,rung_lots JSONB NOT NULL DEFAULT '[]'::jsonb,velocity_samples JSONB NOT NULL DEFAULT '[]'::jsonb,cycle_id TEXT,last_action TEXT,last_action_at TIMESTAMPTZ,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,bot_id))");
   await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS symbol TEXT");
   await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '5m'");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS lot_scale NUMERIC NOT NULL DEFAULT 1");
   await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT FALSE");
   await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS direction SMALLINT NOT NULL DEFAULT 0");
   await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS anchor_price NUMERIC");
