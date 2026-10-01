@@ -22,6 +22,7 @@ export class DerivTraderClient {
     this.pending=new Map();
     this.marketWs=null;
     this.marketConnected=false;
+    this.marketEndpoint=DERIV_PUBLIC_WS;
     this.marketRequestId=0;
     this.marketPending=new Map();
     this.marketSymbolCache=null;
@@ -114,13 +115,13 @@ export class DerivTraderClient {
     ws.on("error",()=>{});
   }
 
-  async publicConnect(endpoint=DERIV_PUBLIC_WS){
-    if(this.marketWs&&this.marketConnected)return;
+  async publicConnect(endpoint=this.marketEndpoint||DERIV_PUBLIC_WS){
+    if(this.marketWs&&this.marketConnected&&this.marketEndpoint===endpoint)return;
     await new Promise((resolve,reject)=>{
       const ws=new WebSocket(endpoint);
       let settled=false;
       const fail=(error)=>{if(settled)return;settled=true;try{ws.close();}catch{};reject(error instanceof Error?error:new Error(String(error)))};
-      ws.once("open",()=>{if(settled)return;settled=true;this.marketWs=ws;this.marketConnected=true;this.attachMarket(ws);resolve();});
+      ws.once("open",()=>{if(settled)return;settled=true;this.marketWs=ws;this.marketConnected=true;this.marketEndpoint=endpoint;this.attachMarket(ws);resolve();});
       ws.once("error",fail);
       ws.once("close",()=>{if(!settled)fail(new Error("DERIV_PUBLIC_WEBSOCKET_CLOSED_DURING_CONNECT"));});
     });
@@ -148,23 +149,41 @@ export class DerivTraderClient {
   }
 
   async marketRequest(payload,{timeoutMs=10000}={}){
-    if(!this.marketWs||!this.marketConnected)await this.publicConnect();
-    const req_id=++this.marketRequestId;
-    const normalized={...payload};
-    if(normalized.subscribe===0||String(normalized.subscribe)==="0")delete normalized.subscribe;
-    const message={...normalized,req_id};
-    return await new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>{
-        this.marketPending.delete(req_id);
-        reject(new Error("DERIV_MARKET_REQUEST_TIMEOUT"));
-      },timeoutMs);
-      this.marketPending.set(req_id,{
-        resolve:value=>{clearTimeout(timer);resolve(value);},
-        reject:error=>{clearTimeout(timer);reject(error);}
-      });
-      try{this.marketWs.send(JSON.stringify(message));}
-      catch(error){clearTimeout(timer);this.marketPending.delete(req_id);reject(error);}
-    });
+    const preferred=this.marketEndpoint||DERIV_PUBLIC_WS;
+    const endpoints=[preferred,preferred===DERIV_PUBLIC_WS?DERIV_PUBLIC_WS_LEGACY:DERIV_PUBLIC_WS]
+      .filter((endpoint,index,array)=>array.indexOf(endpoint)===index);
+    let lastError=null;
+    for(const endpoint of endpoints){
+      try{
+        if(!this.marketWs||!this.marketConnected||this.marketEndpoint!==endpoint){
+          await this.closePublic();
+          await this.publicConnect(endpoint);
+        }
+        const req_id=++this.marketRequestId;
+        const normalized={...payload};
+        if(normalized.subscribe===0||String(normalized.subscribe)==="0")delete normalized.subscribe;
+        const message={...normalized,req_id};
+        return await new Promise((resolve,reject)=>{
+          const timer=setTimeout(()=>{
+            this.marketPending.delete(req_id);
+            reject(new Error("DERIV_MARKET_REQUEST_TIMEOUT"));
+          },timeoutMs);
+          this.marketPending.set(req_id,{
+            resolve:value=>{clearTimeout(timer);resolve(value);},
+            reject:error=>{clearTimeout(timer);reject(error);}
+          });
+          try{this.marketWs.send(JSON.stringify(message));}
+          catch(error){clearTimeout(timer);this.marketPending.delete(req_id);reject(error);}
+        });
+      }catch(error){
+        lastError=error;
+        const message=String(error?.message||"");
+        const retryable=/DERIV_PUBLIC_WEBSOCKET_CLOSED|DERIV_MARKET_REQUEST_TIMEOUT|ECONNRESET|EPIPE|socket hang up/i.test(message);
+        if(!retryable)throw error;
+        await this.closePublic();
+      }
+    }
+    throw lastError||new Error("DERIV_PUBLIC_MARKET_UNAVAILABLE");
   }
 
   async closePublic(){
