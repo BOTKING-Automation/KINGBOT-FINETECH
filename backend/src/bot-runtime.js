@@ -277,6 +277,9 @@ export async function ensureBotRuntimeSchema(pool){
   await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS symbol TEXT");
   await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '5m'");
   await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS lot_scale NUMERIC NOT NULL DEFAULT 1");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS deriv_contract_type TEXT");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS deriv_multiplier NUMERIC");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS locked_profits JSONB NOT NULL DEFAULT '[]'::jsonb");
   await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT FALSE");
   await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS direction SMALLINT NOT NULL DEFAULT 0");
   await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS anchor_price NUMERIC");
