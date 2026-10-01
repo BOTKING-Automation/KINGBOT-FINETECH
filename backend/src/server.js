@@ -866,6 +866,14 @@ function extractRequestedSymbol(message=""){
   return candidates.find(symbol=>new RegExp("\\b"+symbol+"\\b").test(upper)) || null;
 }
 
+function firstFinite(...values){
+  for(const value of values){
+    const n=Number(value);
+    if(Number.isFinite(n))return n;
+  }
+  return null;
+}
+
 function finiteNumber(value){
   const n=Number(value);
   return Number.isFinite(n) ? n : null;
