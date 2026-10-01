@@ -659,6 +659,8 @@ async function executeLadderV8Manage({userId,botId,config,s,account,quote,positi
 
 async function execute(row){
   const {user_id:userId,bot_id:botId}=row;
+  const trace=(stage,extra={})=>console.log("[KINGBOT EXEC]",JSON.stringify({botId,stage,symbol:row.symbol||null,...extra,at:new Date().toISOString()}));
+  trace("START");
   if(!(await entitled(userId,botId))){
     await pool.query("UPDATE kingbot_bot_runtime SET state='ERROR',last_error='SUBSCRIPTION_NOT_ACTIVE',updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
     return;
@@ -674,6 +676,7 @@ async function execute(row){
     if(!connected.connected)throw new Error(connected.reason||"BROKER_CONNECTION_FAILED");
   }
   const account=await getWorkerAccount(userId);
+  trace("ACCOUNT_READY",{broker:status.broker,accountId:status.accountId,executionMode:s.executionMode});
   const brokerName=String(status.broker||"").toLowerCase();
   if(brokerName==="exness"){
     if(s.executionMode==="PAPER")throw new Error("EXNESS_PAPER_MODE_REQUIRES_DEMO_API_ACCOUNT");
@@ -686,12 +689,14 @@ async function execute(row){
   if(account.tradeAllowed===false)throw new Error("BROKER_TRADING_NOT_ALLOWED");
 
   const quote=(await broker.getQuote(config.symbol,userId)).data||{};
+  trace("QUOTE_READY",{symbol:config.symbol,quoteFresh:Boolean(quote.fresh),ageMs:Number(quote.ageMs||0)});
   const bid=Number(quote.bid),ask=Number(quote.ask),quoteTime=new Date(quote.time||0).getTime();
   if(!Number.isFinite(bid)||!Number.isFinite(ask)||ask<bid)throw new Error("INVALID_BROKER_QUOTE");
   if(!Number.isFinite(quoteTime)||Date.now()-quoteTime>s.staleDataMs)throw new Error("STALE_BROKER_QUOTE");
 
   const executionTimeframe=String(config.timeframe||getBotDefinitions()[botId]?.timeframeProfile?.execution||"5m");
   const multiTimeframe=await getMultiTimeframeContext(userId,config.symbol,botId,executionTimeframe);
+  trace("MULTI_TF_READY",{ready:Boolean(multiTimeframe.ready),profile:multiTimeframe.profile});
   if(!multiTimeframe.ready){
     const reason="MULTI_TIMEFRAME_DATA_UNAVAILABLE:"+[multiTimeframe.regime,multiTimeframe.setup,multiTimeframe.execution]
       .filter(x=>x&&!x.available)
@@ -721,6 +726,7 @@ async function execute(row){
     emaFast:ind.emaFast,emaSlow:ind.emaSlow,adx:ind.adx,rsi:ind.rsi,velocityPoints:v8Velocity,brokerPoint:0
   });
   const positions=await getWorkerPositions(userId);
+  trace("POSITIONS_READY",{count:positions.length});
 
   const riskStateQ=await pool.query("SELECT baseline_date,day_start_equity,peak_equity FROM kingbot_account_risk_state WHERE user_id=$1 AND provider=$2 AND account_id=$3",[userId,status.broker,status.accountId]);
   const today=new Date().toISOString().slice(0,10);
@@ -729,6 +735,7 @@ async function execute(row){
   await pool.query("INSERT INTO kingbot_account_risk_state(user_id,provider,account_id,baseline_date,day_start_equity,peak_equity,updated_at) VALUES($1,$2,$3,$4,$5,$6,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET baseline_date=EXCLUDED.baseline_date,day_start_equity=EXCLUDED.day_start_equity,peak_equity=EXCLUDED.peak_equity,updated_at=NOW()",[userId,status.broker,status.accountId,today,dayStart,peak]);
   const losses=await consecutiveLosses(userId);
   const risk=authorizeOrder({limits:s,executionMode:s.executionMode,killSwitch:s.killSwitch,equity:Number(account.equity),dayStartEquity:dayStart,peakEquity:peak,openPositions:positions.length,requestedRiskPct:s.maxRiskPerTradePct,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,dataAgeMs:Date.now()-quoteTime,consecutiveLosses:losses,skipSpreadAtr:botId==="ladder-flip"&&String(status.broker||"").toLowerCase()==="deriv"});
+  trace("RISK_EVALUATED",{signal:analysis.signal,score:analysis.score,riskAllowed:Boolean(risk.allowed),blocked:risk.blockedReasons||[]});
 
   const aiMarket={
     symbol:config.symbol,timeframe:executionTimeframe,price:(bid+ask)/2,bid,ask,
@@ -899,6 +906,7 @@ async function cycle(){
       activeExecutionKeys.add(executionKey);
       try{await execute(row);}
       catch(error){
+        console.error("[KINGBOT WORKER] execution error",JSON.stringify({botId:row.bot_id,error:String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500),at:new Date().toISOString()}));
         const message=String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500);
         await pool.query("UPDATE kingbot_bot_runtime SET state='RUNNING',last_error=$3,last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[row.user_id,row.bot_id,message]);
         await audit(row.user_id,"BOT_WORKER_ERROR",{botId:row.bot_id,error:message,retryable:true});
