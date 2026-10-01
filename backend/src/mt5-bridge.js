@@ -42,8 +42,8 @@ export class Mt5BridgeRegistry{
       account_type TEXT,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
-    await this.pool.query("UPDATE kingbot_mt5_bridge_tokens SET expected_mode='DEMO' WHERE expected_mode='PAPER'");
     await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens DROP CONSTRAINT IF EXISTS kingbot_mt5_bridge_tokens_expected_mode_check");
+    await this.pool.query("UPDATE kingbot_mt5_bridge_tokens SET expected_mode='DEMO' WHERE expected_mode='PAPER'");
     await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens ADD CONSTRAINT kingbot_mt5_bridge_tokens_expected_mode_check CHECK(expected_mode IN ('DEMO','LIVE'))");
     await this.pool.query("UPDATE kingbot_mt5_bridge_tokens SET expected_mode='DEMO' WHERE expected_mode='PAPER'");
     await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens DROP CONSTRAINT IF EXISTS kingbot_mt5_bridge_tokens_expected_mode_check");
