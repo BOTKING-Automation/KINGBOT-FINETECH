@@ -3047,16 +3047,17 @@ function parseSignal(value){
 }
 function renderEngineProjection(bots=[],selectedRuntime=null){
  const all=Array.isArray(bots)?bots:[];
- const running=all.filter(x=>String(x.runtime||x.state||x.status||"STOPPED").trim().toUpperCase()==="RUNNING");
+ const entitled=all.filter(x=>x.entitled!==false);
+ const running=entitled.filter(x=>String(x.runtime||x.state||x.status||"STOPPED").trim().toUpperCase()==="RUNNING");
  const list=$("engineProjectionList");
  const selectedId=String(selectedRuntime?.botId||"");
- const visible=running.length?running:(selectedId ? all.filter(x=>String(x.botId||"")===selectedId) : []);
+ const visible=entitled.length?entitled:(selectedId ? all.filter(x=>String(x.botId||"")===selectedId) : []);
  if(!visible.length){
    list.innerHTML='<div class="projection-empty">No subscribed engine is currently active. Bot Control state is synchronized from the account backend.</div>';
    $("engineProjectionState").textContent="0 ACTIVE";
    return null;
  }
- $("engineProjectionState").textContent=running.length?running.length+" RUNNING":String(visible[0]?.runtime||visible[0]?.state||"STOPPED").toUpperCase();
+ $("engineProjectionState").textContent=running.length?running.length+" RUNNING":String(visible.length)+" SYSTEMS";
  list.innerHTML=visible.map(b=>{
    const signal=parseSignal(b.lastSignal);
    const livePlan=signal?.tradePlan||{};
