@@ -6,7 +6,7 @@ import pg from "pg";
 import { UserBrokerManager } from "./user-broker-manager.js";
 import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
 import { monitorBotDecision } from "./ai-bot-supervisor.js";
-import { getAiTradeConfirmation, warmAiTradeConfirmation } from "./ai-trade-gate.js";
+import { getAiStrategySignal, warmAiStrategySignal, routeAiSignalToEngine } from "./ai-trade-gate.js";
 import { authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
 import { calculateLadderV8Indicators, ladderRungLot, normalizeLot, ladderLockStepPrice, ladderLockPrice, updateVelocitySamples, velocityPoints, withinLadderSession, ladderBasketRisk, LADDER_V8_DEFAULTS } from "./ladder-v8.js";
 import { ensureAuthSchema } from "./auth.js";
@@ -669,9 +669,13 @@ async function execute(row){
     structure:ind.structure,adx:ind.adx,rsi:ind.rsi,emaFast:ind.emaFast,emaSlow:ind.emaSlow,
     velocityPoints:v8Velocity
   };
-  let aiTradeGate=getAiTradeConfirmation({userId,botId,signal:analysis.signal,market:aiMarket,analysis});
-  if(analysis.ok&&analysis.signal!=="NO_SIGNAL"){
-    void warmAiTradeConfirmation({userId,botId,signal:analysis.signal,market:aiMarket,analysis,risk,tradePlan:null}).catch(error=>console.error("[KINGBOT AI TRADE GATE] warm failed:",error?.message||error));
+  const aiStrategySignal=getAiStrategySignal({userId,botId,market:aiMarket,analysis});
+  const aiTradeGate=aiStrategySignal
+    ? routeAiSignalToEngine({botId,signal:aiStrategySignal,candidateSignal:analysis.signal})
+    : null;
+  if(analysis.ok){
+    void warmAiStrategySignal({userId,botId,market:aiMarket,analysis,risk,tradePlan:null})
+      .catch(error=>console.error("[KINGBOT AI SIGNAL] warm failed:",error?.message||error));
   }
 
   if(botId==="ladder-flip"){
@@ -709,9 +713,9 @@ async function execute(row){
       else if(spreadPoints>ladderCfg.maxSpreadPoints)action="V8_SPREAD_FILTER_BLOCKED";
       else if(!aiTradeGate)action="AI_CONFIRMATION_PENDING";
       else action="AI_CONFIRMATION_REJECTED";
-      console.log("[KINGBOT V8] cycle",JSON.stringify({botId,symbol:config.symbol,signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,riskAllowed:risk.allowed,spreadPoints,maxSpreadPoints:ladderCfg.maxSpreadPoints,entryQualified:Boolean(ind.v8EntryQualified),action}));
-      const v8d={contractType:started?.derivContractType||null,multiplier:started?.derivMultiplier||null,entryQualified:Boolean(ind.v8EntryQualified),rungsOpened:started?.rungsOpened||0,lotScale:started?.lotScale||null,velocityPoints:velocity,spreadPoints,spreadMaxPoints:ladderCfg.maxSpreadPoints,startDetails,aiConfirmed:Boolean(aiTradeGate?.confirm)};
-      const signalPayload={signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action,executionMode:s.executionMode,strategy:botId,tradePlan:null,riskAllowed:risk.allowed,riskBlockedReasons:risk.blockedReasons||[],analysisReason:analysis.reason,riskReason:risk.reason||risk.blockedReasons,aiTradeGate:aiTradeGate?{confirm:Boolean(aiTradeGate.confirm),decision:aiTradeGate.decision,reason:aiTradeGate.reason,expiresAt:aiTradeGate.expiresAt}:null,v8:v8d,updatedAt:new Date().toISOString()};
+      console.log("[KINGBOT V8] cycle",JSON.stringify({botId,symbol:config.symbol,signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,riskAllowed:risk.allowed,spreadPoints,maxSpreadPoints:ladderCfg.maxSpreadPoints,entryQualified:Boolean(ind.v8EntryQualified),aiSignal:aiStrategySignal?.direction||"HOLD",aiEngine:aiStrategySignal?.engine||null,aiStrategyMatch:Boolean(aiStrategySignal?.strategyMatch),aiStatus:aiTradeGate?.status||"AI_SIGNAL_PENDING",action}));
+      const v8d={contractType:started?.derivContractType||null,multiplier:started?.derivMultiplier||null,entryQualified:Boolean(ind.v8EntryQualified),rungsOpened:started?.rungsOpened||0,lotScale:started?.lotScale||null,velocityPoints:velocity,spreadPoints,spreadMaxPoints:ladderCfg.maxSpreadPoints,startDetails,aiConfirmed:Boolean(aiTradeGate?.confirm),aiSignal:aiStrategySignal?.direction||"HOLD",aiEngine:aiStrategySignal?.engine||null,aiStrategyMatch:Boolean(aiStrategySignal?.strategyMatch),aiTrigger:aiStrategySignal?.trigger||null,aiStatus:aiTradeGate?.status||"AI_SIGNAL_PENDING"};
+      const signalPayload={signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action,executionMode:s.executionMode,strategy:botId,tradePlan:null,riskAllowed:risk.allowed,riskBlockedReasons:risk.blockedReasons||[],analysisReason:analysis.reason,riskReason:risk.reason||risk.blockedReasons,aiTradeGate:aiTradeGate?{confirm:Boolean(aiTradeGate.confirm),direction:aiTradeGate.direction,engine:aiTradeGate.engine||null,strategyMatch:Boolean(aiTradeGate.strategyMatch),status:aiTradeGate.status,trigger:aiTradeGate.trigger,reason:aiTradeGate.reason,expiresAt:aiTradeGate.expiresAt}:null,v8:v8d,updatedAt:new Date().toISOString()};
       await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify(signalPayload)]);
       await audit(userId,"BOT_WORKER_TICK",{botId,executionMode:s.executionMode,symbol:config.symbol,timeframe:config.timeframe,signal:analysis.signal,score:analysis.score,action,v8:v8d,riskAllowed:risk.allowed});
       return;
@@ -786,11 +790,11 @@ async function execute(row){
       throw error;
     }
   }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!risk.allowed){action="RISK_BLOCKED";}
-  else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!aiTradeGate){action="AI_CONFIRMATION_PENDING";}
-  else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&!aiTradeGate?.confirm){action="AI_CONFIRMATION_REJECTED";}
-  const signalPayload={signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action,executionMode:s.executionMode,strategy:botId,tradePlan:analysis.signal!=="NO_SIGNAL"?(typeof tradePlan!=="undefined"?tradePlan:null):null,riskAllowed:risk.allowed,analysisReason:analysis.reason||null,riskReason:risk.reason||risk.reasons||null,aiTradeGate:aiTradeGate?{confirm:Boolean(aiTradeGate.confirm),decision:aiTradeGate.decision,reason:aiTradeGate.reason,expiresAt:aiTradeGate.expiresAt}:null,updatedAt:new Date().toISOString()};
+  else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!aiTradeGate){action="AI_SIGNAL_PENDING";}
+  else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&!aiTradeGate?.confirm){action=aiTradeGate?.status||"AI_SIGNAL_REJECTED";}
+  const signalPayload={signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action,executionMode:s.executionMode,strategy:botId,tradePlan:analysis.signal!=="NO_SIGNAL"?(typeof tradePlan!=="undefined"?tradePlan:null):null,riskAllowed:risk.allowed,analysisReason:analysis.reason||null,riskReason:risk.reason||risk.reasons||null,aiTradeGate:aiTradeGate?{confirm:Boolean(aiTradeGate.confirm),direction:aiTradeGate.direction,engine:aiTradeGate.engine||null,strategyMatch:Boolean(aiTradeGate.strategyMatch),status:aiTradeGate.status,trigger:aiTradeGate.trigger,reason:aiTradeGate.reason,expiresAt:aiTradeGate.expiresAt}:null,aiSignal:aiStrategySignal?{direction:aiStrategySignal.direction,engine:aiStrategySignal.engine,strategyMatch:Boolean(aiStrategySignal.strategyMatch),trigger:aiStrategySignal.trigger,reason:aiStrategySignal.reason}:null,updatedAt:new Date().toISOString()};
   await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify(signalPayload)]);
-  await audit(userId,"BOT_WORKER_TICK",{botId,executionMode:s.executionMode,symbol:config.symbol,timeframe:config.timeframe,signal:analysis.signal,score:analysis.score,action,tradePlan:signalPayload.tradePlan});
+  await audit(userId,"BOT_WORKER_TICK",{botId,executionMode:s.executionMode,symbol:config.symbol,timeframe:config.timeframe,signal:analysis.signal,score:analysis.score,action,tradePlan:signalPayload.tradePlan,aiSignal:signalPayload.aiSignal,aiStatus:aiTradeGate?.status||"AI_SIGNAL_PENDING"});
   if(analysis.ok && analysis.signal!=="NO_SIGNAL"){
     void monitorBotDecision({userId,botId,analysis,market:{symbol:config.symbol,timeframe:config.timeframe,bid,ask,spread,atr:ind.atr,volatility:ind.volatility,trend:ind.trend,momentum:ind.momentum,structure:ind.structure},risk,tradePlan:signalPayload.tradePlan}).then(aiMonitor=>{
       if(!aiMonitor)return;
