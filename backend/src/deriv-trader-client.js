@@ -443,7 +443,7 @@ export class DerivTraderClient {
   async getQuote(symbol){
     const requested=String(symbol||"").trim();
     const s=await this.resolveMarketSymbol(requested);
-    const response=await this.marketRequest({ticks:s,subscribe:0},{timeoutMs:10000});
+    const response=await this.marketOneShot({ticks:s,subscribe:0},{timeoutMs:10000});
     const tick=response?.tick||{};
     const quote=finite(tick.quote);
     if(quote===null)throw new Error("DERIV_QUOTE_UNAVAILABLE");
