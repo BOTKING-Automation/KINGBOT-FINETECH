@@ -61,6 +61,8 @@ export class UserBrokerManager {
     // Retire stale duplicate active mappings before enforcing the database constraint.
     await this.pool.query("WITH ranked AS (SELECT id,ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY updated_at DESC,created_at DESC,id DESC) AS rn FROM kingbot_broker_accounts WHERE enabled=TRUE) UPDATE kingbot_broker_accounts a SET enabled=FALSE,updated_at=NOW() FROM ranked r WHERE a.id=r.id AND r.rn>1");
     await this.pool.query("CREATE UNIQUE INDEX IF NOT EXISTS kingbot_broker_accounts_one_active_per_user ON kingbot_broker_accounts(user_id) WHERE enabled=TRUE");
+    // Never allow one Deriv trading account to be shared across KINGBOT users.
+    await this.pool.query("CREATE UNIQUE INDEX IF NOT EXISTS kingbot_deriv_account_one_user ON kingbot_broker_accounts(account_id) WHERE provider='deriv'");
     await this.pool.query("CREATE INDEX IF NOT EXISTS kingbot_deriv_oauth_states_expires_idx ON kingbot_deriv_oauth_states(expires_at)");
     await this.pool.query("CREATE UNIQUE INDEX IF NOT EXISTS kingbot_deriv_oauth_states_pending_idx ON kingbot_deriv_oauth_states(pending_id) WHERE pending_id IS NOT NULL");
   }
@@ -248,6 +250,12 @@ export class UserBrokerManager {
     const existing=await this.getMapping(userId);
     if(existing && (String(existing.provider)!==providerName || String(existing.account_id)!==id)){
       return {ok:false,error:"BROKER_ALREADY_CONNECTED",message:"A broker account is already connected. Disconnect it before connecting another broker or account."};
+    }
+    if(providerName==="deriv"){
+      const owner=await this.pool.query("SELECT user_id FROM kingbot_broker_accounts WHERE provider='deriv' AND account_id=$1 AND user_id<>$2 AND enabled=TRUE LIMIT 1",[id,userId]);
+      if(owner.rowCount){
+        return {ok:false,error:"DERIV_ACCOUNT_ALREADY_LINKED",message:"This Deriv account is already linked to another KINGBOT user. Each Deriv account must remain private to one KINGBOT user."};
+      }
     }
     const encrypted=encryptSecret(secretValue);
     try{
