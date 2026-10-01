@@ -340,19 +340,17 @@ export class DerivTraderClient {
     return rows;
   }
 
-  async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId}={}){
-    const account=(await this.getAccount()).data||{};
-    const currency=String(account.currency||"USD").toUpperCase();
+  async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId,currency,multiplier=10,derivContractType}={}){
+    const resolvedCurrency=String(currency||this.currency||"").trim().toUpperCase()||String((await this.getAccount()).data?.currency||"USD").toUpperCase();
     const s=String(symbol||"").trim();
     const direction=String(side||"").toUpperCase();
-    const contractType=direction==="BUY"?"MULTUP":direction==="SELL"?"MULTDOWN":"";
+    const contractType=String(derivContractType||"").trim().toUpperCase()||(direction==="BUY"?"MULTUP":direction==="SELL"?"MULTDOWN":"");
     if(!contractType)throw new Error("INVALID_DERIV_SIDE");
-    const multiplier=10;
-    const proposal=await this.getProposal({symbol:s,contractType,stake:Number(volume),currency,multiplier,subscribe:0});
+    const proposal=await this.getProposal({symbol:s,contractType,stake:Number(volume),currency:resolvedCurrency,multiplier:Number(multiplier),subscribe:0});
     const bought=await this.buyContract({proposalId:proposal.proposalId,price:Number(proposal.askPrice||volume),subscribe:0,reference:clientId||comment||""});
     if(stopLoss!==undefined||takeProfit!==undefined){
       try{await this.updateContract(bought.contractId,{stopLoss,takeProfit});}catch{}
     }
-    return {provider:"deriv",contractId:bought.contractId,proposalId:proposal.proposalId,contractType,stake:Number(volume),multiplier,comment:comment||"KINGBOT",buy:bought.buy};
+    return {provider:"deriv",contractId:bought.contractId,proposalId:proposal.proposalId,contractType,stake:Number(volume),multiplier:Number(multiplier),comment:comment||"KINGBOT",buy:bought.buy};
   }
 }
