@@ -658,7 +658,7 @@ async function execute(row){
   if(riskStateQ.rowCount){dayStart=riskStateQ.rows[0].baseline_date===today?Number(riskStateQ.rows[0].day_start_equity):Number(account.equity);peak=Math.max(Number(riskStateQ.rows[0].peak_equity)||Number(account.equity),Number(account.equity));}
   await pool.query("INSERT INTO kingbot_account_risk_state(user_id,provider,account_id,baseline_date,day_start_equity,peak_equity,updated_at) VALUES($1,$2,$3,$4,$5,$6,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET baseline_date=EXCLUDED.baseline_date,day_start_equity=EXCLUDED.day_start_equity,peak_equity=EXCLUDED.peak_equity,updated_at=NOW()",[userId,status.broker,status.accountId,today,dayStart,peak]);
   const losses=await consecutiveLosses(userId);
-  const risk=authorizeOrder({limits:s,executionMode:s.executionMode,killSwitch:s.killSwitch,equity:Number(account.equity),dayStartEquity:dayStart,peakEquity:peak,openPositions:positions.length,requestedRiskPct:s.maxRiskPerTradePct,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,dataAgeMs:Date.now()-quoteTime,consecutiveLosses:losses});
+  const risk=authorizeOrder({limits:s,executionMode:s.executionMode,killSwitch:s.killSwitch,equity:Number(account.equity),dayStartEquity:dayStart,peakEquity:peak,openPositions:positions.length,requestedRiskPct:s.maxRiskPerTradePct,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,dataAgeMs:Date.now()-quoteTime,consecutiveLosses:losses,skipSpreadAtr:botId==="ladder-flip"&&String(status.broker||"").toLowerCase()==="deriv});
 
   if(botId==="ladder-flip"){
     const specResult=await broker.getSymbolSpecification(config.symbol,userId);
@@ -680,8 +680,14 @@ async function execute(row){
       let action="NO_ACTION",started=null,startDetails=null;
       const spreadPoints=spec.point>0?spread/spec.point:Infinity;
       if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&spreadPoints<=ladderCfg.maxSpreadPoints){
-        const start=await executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity});
-        action=start.action;started=start.state;startDetails=start.details||null;
+        try{
+          const start=await executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity});
+          action=start.action;started=start.state;startDetails=start.details||null;
+        }catch(error){
+          action="DERIV_V8_EXECUTION_REJECTED";
+          startDetails={error:String(error?.message||"DERIV_V8_EXECUTION_REJECTED").slice(0,500)};
+          await audit(userId,"LADDER_V8_DERIV_EXECUTION_REJECTED",{botId,symbol:config.symbol,error:startDetails.error,score:analysis.score,signal:analysis.signal});
+        }
       }else if(!analysis.ok)action="SIGNAL_GATE_BLOCKED";
       else if(analysis.signal==="NO_SIGNAL")action="SIGNAL_BELOW_THRESHOLD";
       else if(!risk.allowed)action="RISK_BLOCKED";
