@@ -31,6 +31,9 @@ export class DerivTraderClient {
     this.portfolioCache=null;
     this.portfolioCacheAt=0;
     this.portfolioInflight=null;
+    this.fastPortfolioCache=null;
+    this.fastPortfolioCacheAt=0;
+    this.fastPortfolioInflight=null;
     this.tradesCache=new Map();
     this.accountBalance=null;
     this.accountBalanceAt=0;
@@ -132,6 +135,9 @@ export class DerivTraderClient {
       this.accountBalance=null;
       this.accountBalanceAt=0;
       this.balanceSubscriptionId=null;
+      this.fastPortfolioCache=null;
+      this.fastPortfolioCacheAt=0;
+      this.fastPortfolioInflight=null;
     });
     ws.on("error",()=>{});
   }
@@ -470,10 +476,19 @@ export class DerivTraderClient {
     return await this.portfolioInflight;
   }
 
-  async getLivePositions(){
-    const response=await this.request({portfolio:1},{timeoutMs:6000});
-    const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
-    return contracts.map(contract=>this.mapContract(contract));
+  async getLivePositions({force=false}={}){
+    const now=Date.now();
+    if(!force&&this.fastPortfolioCache&&now-this.fastPortfolioCacheAt<3000)return this.fastPortfolioCache;
+    if(this.fastPortfolioInflight)return await this.fastPortfolioInflight;
+    this.fastPortfolioInflight=(async()=>{
+      const response=await this.request({portfolio:1},{timeoutMs:6000});
+      const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
+      const mapped=contracts.map(contract=>this.mapContract(contract));
+      this.fastPortfolioCache=mapped;
+      this.fastPortfolioCacheAt=Date.now();
+      return mapped;
+    })().finally(()=>{this.fastPortfolioInflight=null;});
+    return await this.fastPortfolioInflight;
   }
 
   async getPositions({force=false}={}){
