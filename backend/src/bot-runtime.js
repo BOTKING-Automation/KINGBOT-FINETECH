@@ -273,6 +273,26 @@ export async function ensureBotRuntimeSchema(pool){
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_execution_journal (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,execution_mode TEXT NOT NULL,symbol TEXT NOT NULL,side TEXT NOT NULL,volume NUMERIC NOT NULL,status TEXT NOT NULL,broker_result JSONB,error_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_runtime (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'STOPPED',last_signal JSONB,last_run_at TIMESTAMPTZ,last_error TEXT,symbol TEXT,timeframe TEXT DEFAULT '1m',updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,bot_id))");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_user_bot_selection (user_id UUID PRIMARY KEY REFERENCES kingbot_users(id) ON DELETE CASCADE,selected_bot_id TEXT NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_ladder_v8_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,symbol TEXT NOT NULL,timeframe TEXT NOT NULL DEFAULT '5m',active BOOLEAN NOT NULL DEFAULT FALSE,direction SMALLINT NOT NULL DEFAULT 0,anchor_price NUMERIC,initial_stop_distance NUMERIC,step_price NUMERIC,lock_level INTEGER NOT NULL DEFAULT 0,last_lock_price NUMERIC,last_pyramid_price NUMERIC,rungs_opened INTEGER NOT NULL DEFAULT 0,aggressive_entry BOOLEAN NOT NULL DEFAULT FALSE,position_ids JSONB NOT NULL DEFAULT '[]'::jsonb,rung_lots JSONB NOT NULL DEFAULT '[]'::jsonb,velocity_samples JSONB NOT NULL DEFAULT '[]'::jsonb,cycle_id TEXT,last_action TEXT,last_action_at TIMESTAMPTZ,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,bot_id))");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS symbol TEXT");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '5m'");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT FALSE");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS direction SMALLINT NOT NULL DEFAULT 0");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS anchor_price NUMERIC");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS initial_stop_distance NUMERIC");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS step_price NUMERIC");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS lock_level INTEGER NOT NULL DEFAULT 0");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS last_lock_price NUMERIC");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS last_pyramid_price NUMERIC");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS rungs_opened INTEGER NOT NULL DEFAULT 0");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS aggressive_entry BOOLEAN NOT NULL DEFAULT FALSE");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS position_ids JSONB NOT NULL DEFAULT '[]'::jsonb");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS rung_lots JSONB NOT NULL DEFAULT '[]'::jsonb");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS velocity_samples JSONB NOT NULL DEFAULT '[]'::jsonb");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS cycle_id TEXT");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS last_action TEXT");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS last_action_at TIMESTAMPTZ");
+  await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
 
   await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT 'STOPPED'");
   await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS last_signal JSONB");
