@@ -25,7 +25,7 @@ export function evaluateRisk(input={}){
   ["MAX_POSITIONS",openPositions<r.maxPositions],
   ["MAX_RISK_PER_TRADE",riskPct<=r.maxRiskPerTradePct],
   ["STALE_MARKET_DATA",dataAgeMs<=r.staleDataMs],
-  ["SPREAD_FILTER",!(atr>0)||spread/atr<=r.maxSpreadAtrRatio],
+  ["SPREAD_FILTER",input.skipSpreadAtr===true||!(atr>0)||spread/atr<=r.maxSpreadAtrRatio],
   ["LOSS_STREAK",!r.autoPauseOnLossStreak||consecutiveLosses<r.maxConsecutiveLosses]
  ];
  const blocked=checks.filter(x=>!x[1]).map(x=>x[0]);
