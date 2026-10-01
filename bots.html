@@ -122,6 +122,18 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 const $=id=>document.getElementById(id);
 let bots=[],selected=null;
 let changeBotMode=false;
+function canChangeBot(){return bots.filter(b=>b.entitled).length>1}
+function syncChangeBotVisibility(){
+ const btn=$("changeBotBtn");
+ if(!btn)return;
+ const allowed=canChangeBot();
+ btn.hidden=!allowed;
+ if(!allowed){
+   changeBotMode=false;
+   $("botGrid").classList.remove("change-mode");
+   btn.textContent="CHANGE BOT";
+ }
+}
 const fields={executionMode:$("executionMode"),symbol:$("symbol"),timeframe:$("timeframe"),maxRisk:$("maxRisk"),dailyDd:$("dailyDd"),totalDd:$("totalDd"),maxPositions:$("maxPositions"),spreadRatio:$("spreadRatio"),staleMs:$("staleMs"),lossStreak:$("lossStreak"),autoPause:$("autoPause"),killSwitch:$("killSwitch")};
 function msg(t,kind=""){const e=$("message");e.textContent=t;e.className="message "+kind}
 function setTelemetry(a,d){$("telemetryState").textContent=a;$("telemetryDetail").textContent=d}
@@ -332,7 +344,7 @@ async function selectBot(id){
    const saved=await api("/runtime/selection",{method:"POST",body:JSON.stringify({botId:id})});
    $("savedBotLabel").textContent="SAVED BOT · "+selected.name.toUpperCase();
    $("savedBotDetail").textContent=(saved.state==="RUNNING"?"ENGINE RUNNING · ":"ENGINE "+String(saved.state||"STOPPED")+" · ")+"selection is saved to your account and will restore automatically.";
-   $("changeBotBtn").hidden=false;
+   syncChangeBotVisibility();
  }catch(e){msg(e.message,"error");return}
  changeBotMode=false;
  $("botGrid").classList.remove("change-mode");
@@ -395,7 +407,7 @@ async function load(){
     }catch{}
     const restored=bots.find(b=>b.entitled&&b.id===savedId)||first;
     await selectBot(restored.id);
-    $("changeBotBtn").hidden=false;
+    syncChangeBotVisibility();
     if(hasSavedSelection){
       $("savedBotLabel").textContent="RESTORED BOT · "+restored.name.toUpperCase();
       $("savedBotDetail").textContent=(restored.runtime==="RUNNING"?"ENGINE RUNNING · ":"ENGINE "+String(restored.runtime||"STOPPED")+" · ")+"restored from your saved account selection.";
