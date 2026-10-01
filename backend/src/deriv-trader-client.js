@@ -576,23 +576,38 @@ export class DerivTraderClient {
     return rows;
   }
 
-  async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId,currency,multiplier=10,derivContractType}={}){
+  async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId,currency,multiplier=100,derivContractType}={}){
     const resolvedCurrency=String(currency||this.currency||"").trim().toUpperCase()||String((await this.getAccount()).data?.currency||"USD").toUpperCase();
     const s=String(symbol||"").trim();
     const direction=String(side||"").toUpperCase();
     const contractType=String(derivContractType||"").trim().toUpperCase()||(direction==="BUY"?"MULTUP":direction==="SELL"?"MULTDOWN":"");
     if(!contractType)throw new Error("INVALID_DERIV_SIDE");
-    const proposal=await this.getProposal({symbol:s,contractType,stake:Number(volume),currency:resolvedCurrency,multiplier:Number(multiplier),subscribe:0,stopLoss,takeProfit});
-    const bought=await this.buyContract({proposalId:proposal.proposalId,price:Number(proposal.askPrice),subscribe:0,reference:clientId||comment||""});
-    let protection=null;
-    if(stopLoss!==undefined||takeProfit!==undefined){
-      try{
-        protection=await this.updateContract(bought.contractId,{stopLoss,takeProfit});
-      }catch(error){
-        try{await this.sellContract(bought.contractId,0);}catch{}
-        throw new Error("DERIV_PROTECTION_ATTACH_FAILED:"+(error?.message||"UNKNOWN_ERROR"));
-      }
+    let resolvedMultiplier=Number(multiplier);
+    const proposalRequest=async chosenMultiplier=>this.getProposal({symbol:s,contractType,stake:Number(volume),currency:resolvedCurrency,multiplier:Number(chosenMultiplier),subscribe:0,stopLoss,takeProfit});
+    let proposal;
+    try{
+      proposal=await proposalRequest(resolvedMultiplier);
+    }catch(error){
+      const message=String(error?.message||"");
+      const match=message.match(/Accepts?\\s+([0-9,\\s]+)/i);
+      const candidates=match
+        ? [...new Set((match[1].match(/\\d+(?:\\.\\d+)?/g)||[]).map(Number).filter(Number.isFinite&&((n)=>n>0)))]
+        : [];
+      const fallback=candidates.sort((a,b)=>a-b)[0];
+      if(!fallback||fallback===resolvedMultiplier)throw error;
+      resolvedMultiplier=fallback;
+      console.warn("[KINGBOT DERIV] multiplier fallback",JSON.stringify({symbol:s,requestedMultiplier:Number(multiplier),selectedMultiplier:resolvedMultiplier,reason:message.slice(0,180)}));
+      proposal=await proposalRequest(resolvedMultiplier);
     }
-    return {provider:"deriv",contractId:bought.contractId,proposalId:proposal.proposalId,contractType,stake:Number(volume),multiplier:Number(multiplier),comment:comment||"KINGBOT",buy:bought.buy,protection};
+    console.log("[KINGBOT DERIV] proposal accepted",JSON.stringify({symbol:s,side:direction,stake:Number(volume),multiplier:resolvedMultiplier,proposalId:proposal.proposalId,clientId:clientId||null}));
+    const bought=await this.buyContract({proposalId:proposal.proposalId,price:Number(proposal.askPrice),subscribe:0,reference:clientId||comment||""});
+    console.log("[KINGBOT DERIV] contract purchased",JSON.stringify({symbol:s,side:direction,stake:Number(volume),multiplier:resolvedMultiplier,proposalId:proposal.proposalId,contractId:bought.contractId,clientId:clientId||null}));
+    // MULTUP/MULTDOWN limit orders can be attached directly to the proposal.
+    // Do not buy successfully and then close the contract merely because a
+    // redundant post-buy contract_update failed.
+    const protection=(stopLoss!==undefined||takeProfit!==undefined)
+      ? {configured:true,source:"proposal_limit_order",stopLoss:finite(stopLoss),takeProfit:finite(takeProfit)}
+      : null;
+    return {provider:"deriv",contractId:bought.contractId,proposalId:proposal.proposalId,contractType,stake:Number(volume),multiplier:resolvedMultiplier,comment:comment||"KINGBOT",buy:bought.buy,protection};
   }
 }
