@@ -24,6 +24,7 @@ export const LADDER_V8_DEFAULTS={
   profitLockUSD:1.0,
   atrPeriod:14,
   atrSLMult:1.5,
+  takeProfitRR:2.0,
   maxSpreadPoints:40,
   sessionStartHour:0,
   sessionEndHour:23,
