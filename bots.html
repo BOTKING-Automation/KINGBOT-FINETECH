@@ -22,7 +22,8 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 .hud-line{display:flex;align-items:center;gap:7px;margin-bottom:19px;color:#596987;font:700 8px "JetBrains Mono";letter-spacing:.14em}
 .hud-line i{width:4px;height:4px;border-radius:50%;background:#19e6ff;box-shadow:0 0 9px #19e6ff}.hud-line i:nth-child(2){background:#9b5cff;box-shadow:0 0 9px #9b5cff}.hud-line i:nth-child(3){background:#ff4fd8;box-shadow:0 0 9px #ff4fd8}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.eyebrow{font:800 10px "JetBrains Mono";letter-spacing:.2em;color:#19e6ff}.top h1{margin:10px 0 8px;font:900 clamp(28px,4.5vw,54px) Orbitron;letter-spacing:.04em;background:linear-gradient(110deg,#f6b93b,#19e6ff 58%,#9b5cff);-webkit-background-clip:text;color:transparent}.sub{max-width:900px;color:#8e9bb5;font-size:13px;line-height:1.7}.telemetry{min-width:190px;padding:14px 16px;border:1px solid rgba(25,230,255,.15);border-radius:16px;background:rgba(25,230,255,.035)}.telemetry b{display:block;font:800 11px "JetBrains Mono";color:#19e6ff}.telemetry span{display:block;margin-top:7px;color:#77849e;font:700 9px "JetBrains Mono";letter-spacing:.08em}
-.bot-grid{position:relative;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:24px}.bot{position:relative;text-align:left;overflow:hidden;min-width:0;padding:0;border:1px solid rgba(255,255,255,.08);border-radius:20px;background:linear-gradient(145deg,rgba(9,17,38,.92),rgba(3,7,17,.98));color:#eef2ff;cursor:pointer;transition:.25s;isolation:isolate}
+.bot-grid{position:relative;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:24px}
+.selection-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;padding:10px 12px;border:1px solid rgba(25,230,255,.12);border-radius:12px;background:linear-gradient(90deg,rgba(25,230,255,.035),rgba(155,92,255,.035),rgba(246,185,59,.025))}.selection-state{min-width:0}.selection-state strong{display:block;color:#d9e6f5;font:900 8px Orbitron;letter-spacing:.08em}.selection-state span{display:block;margin-top:4px;color:#65738b;font:700 7px "JetBrains Mono";white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.selection-toolbar .change-bot{border:1px solid rgba(25,230,255,.18);border-radius:8px;padding:8px 11px;background:rgba(25,230,255,.045);color:#19e6ff;font:900 7px "JetBrains Mono";cursor:pointer}.selection-toolbar .change-bot:hover{background:rgba(25,230,255,.09)}.selection-toolbar .change-bot[hidden]{display:none}.bot-grid.change-mode{outline:1px solid rgba(25,230,255,.16);outline-offset:6px}.bot-grid:not(.change-mode) .bot:not(.active){cursor:not-allowed}.bot{position:relative;text-align:left;overflow:hidden;min-width:0;padding:0;border:1px solid rgba(255,255,255,.08);border-radius:20px;background:linear-gradient(145deg,rgba(9,17,38,.92),rgba(3,7,17,.98));color:#eef2ff;cursor:pointer;transition:.25s;isolation:isolate}
 .bot:after{content:"";position:absolute;inset:-2px;border-radius:21px;padding:1px;background:linear-gradient(115deg,var(--bot-c1),var(--bot-c2),var(--bot-c3),var(--bot-c1));background-size:300% 100%;animation:botColorFlow 5s linear infinite;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;opacity:.7;z-index:-1}
 @keyframes botColorFlow{0%{background-position:0% 50%}100%{background-position:300% 50%}}
 .bot-media{position:relative;height:145px;overflow:hidden;background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--bot-c1) 22%,transparent),transparent 65%)}
@@ -62,7 +63,7 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 <div><div class="eyebrow">KINGBOT FINTECH / INTELLIGENT CONTROL CENTER</div><h1>BOT <span style="background:linear-gradient(90deg,#19e6ff,#4787ff,#9b5cff,#ff4fd8,#f6b93b);-webkit-background-clip:text;color:transparent">CONTROL OS</span></h1><p class="sub">Configure each bot's risk envelope and execution mode from one institutional control surface. Settings are stored per user and enforced by the server-side risk engine before execution.</p></div>
 <div class="telemetry"><b id="telemetryState">BACKEND TELEMETRY</b><span id="telemetryDetail">VERIFYING SESSION…</span><span id="subscriptionState" style="display:block;margin-top:9px;color:#f6b93b;font:800 8px &quot;JetBrains Mono&quot;">SUBSCRIPTION: CHECKING…</span></div>
 </div>
-<div class="bot-grid" id="botGrid"></div><div id="selectionNotice" style="margin-top:12px;padding:11px 13px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.018);color:#68768f;font:700 8px &quot;JetBrains Mono&quot;">Select a subscribed bot to open its control surface.</div>
+<div class="bot-grid" id="botGrid"></div><div class="selection-toolbar" id="selectionToolbar"><div class="selection-state"><strong id="savedBotLabel">NO BOT SELECTED</strong><span id="savedBotDetail">Select an entitled bot. Your selection is saved to your account.</span></div><button class="change-bot" id="changeBotBtn" type="button" hidden>CHANGE BOT</button></div><div id="selectionNotice" style="margin-top:9px;padding:10px 13px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.018);color:#68768f;font:700 8px &quot;JetBrains Mono&quot;">Select a subscribed bot to open its control surface.</div>
 <div class="layout">
 <section class="panel">
 <div id="botHero" class="bot-detail-hero"><div class="detail-image"><img id="detailImage" src="assets/images/hero-bot.png" alt="Selected KINGBOT bot"></div><div class="detail-copy"><span id="detailCode" class="bot-chip">BOT ENGINE / READY</span><h2 id="botTitle">Select a bot</h2><p id="detailRole">Choose an engine to inspect its architecture.</p></div></div>
@@ -120,6 +121,7 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 "use strict";
 const $=id=>document.getElementById(id);
 let bots=[],selected=null;
+let changeBotMode=false;
 const fields={executionMode:$("executionMode"),symbol:$("symbol"),timeframe:$("timeframe"),maxRisk:$("maxRisk"),dailyDd:$("dailyDd"),totalDd:$("totalDd"),maxPositions:$("maxPositions"),spreadRatio:$("spreadRatio"),staleMs:$("staleMs"),lossStreak:$("lossStreak"),autoPause:$("autoPause"),killSwitch:$("killSwitch")};
 function msg(t,kind=""){const e=$("message");e.textContent=t;e.className="message "+kind}
 function setTelemetry(a,d){$("telemetryState").textContent=a;$("telemetryDetail").textContent=d}
@@ -227,6 +229,10 @@ function renderBots(){
     msg("That bot is locked by subscription. Choose an included bot or upgrade your subscription.","error");
     return;
   }
+  if(!changeBotMode && selected?.id!==bot.id){
+    msg("Your saved bot is active. Use CHANGE BOT to select another subscribed engine.","error");
+    return;
+  }
   selectBot(x.dataset.id);
 }));
 }
@@ -308,6 +314,7 @@ async function api(path,options={}){
 async function refreshRuntime(){if(!selected)return;try{const r=await api("/runtime/"+encodeURIComponent(selected.id));selected.runtime=r.state||"STOPPED";selected.executionMode=r.executionMode||selected.executionMode;selected.symbol=r.symbol||selected.symbol||"";selected.timeframe=r.timeframe||selected.timeframe||"1m";selected.lastSignal=r.lastSignal||null;$("mRuntime").textContent=selected.runtime;$("mMode").textContent=selected.executionMode||"NOT_CONNECTED";$("mSymbol").textContent=selected.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected.timeframe||"—";$("enginePill").textContent=selected.runtime;renderAiMonitor(selected.lastSignal)}catch{}}
 setInterval(refreshRuntime,5000);
 async function selectBot(id){
+ if(!changeBotMode && selected?.id===id)return;
  selected=bots.find(x=>x.id===id);
  if(!selected)return;
  if(!selected.entitled){
@@ -321,6 +328,14 @@ async function selectBot(id){
  $("selectionNotice").textContent="SUBSCRIBED BOT SELECTED · Configuration changes apply to this bot only.";
  $("selectionNotice").style.borderColor="rgba(35,247,163,.16)";
  $("selectionNotice").style.color="#69e6c1";
+ try{
+   const saved=await api("/runtime/selection",{method:"POST",body:JSON.stringify({botId:id})});
+   $("savedBotLabel").textContent="SAVED BOT · "+selected.name.toUpperCase();
+   $("savedBotDetail").textContent=(saved.state==="RUNNING"?"ENGINE RUNNING · ":"ENGINE "+String(saved.state||"STOPPED")+" · ")+"selection is saved to your account and will restore automatically.";
+   $("changeBotBtn").hidden=false;
+ }catch(e){msg(e.message,"error");return}
+ changeBotMode=false;
+ $("botGrid").classList.remove("change-mode");
  renderBots();
  const imageMap={"strategic":"assets/images/bots/strategic.png","flipper":"assets/images/bots/flipper.png","breakout":"assets/images/bots/breakout.png","smc-pro":"assets/images/bots/smc-pro.png","ladder-flip":"assets/images/bots/ladder-flip.png"};
  const roleMap={"strategic":"MULTI-STRATEGY ENGINE","flipper":"HIGH-SPEED FLIPPING","breakout":"BREAKOUT & MOMENTUM","smc-pro":"SMART MONEY CONCEPTS","ladder-flip":"ADAPTIVE LADDER SYSTEM"};
@@ -371,7 +386,23 @@ async function load(){
   setTelemetry("BACKEND CONNECTED",bots.length+" BOT ENGINES / ENTITLEMENT VERIFIED");
   const first=bots.find(b=>b.entitled);
   if(first){
-    await selectBot(first.id);
+    let savedId=null;
+    let hasSavedSelection=false;
+    try{
+      const saved=await api("/runtime/selection/current",{timeoutMs:7000});
+      savedId=String(saved.selectedBotId||"").trim()||null;
+      hasSavedSelection=Boolean(savedId);
+    }catch{}
+    const restored=bots.find(b=>b.entitled&&b.id===savedId)||first;
+    await selectBot(restored.id);
+    $("changeBotBtn").hidden=false;
+    if(hasSavedSelection){
+      $("savedBotLabel").textContent="RESTORED BOT · "+restored.name.toUpperCase();
+      $("savedBotDetail").textContent=(restored.runtime==="RUNNING"?"ENGINE RUNNING · ":"ENGINE "+String(restored.runtime||"STOPPED")+" · ")+"restored from your saved account selection.";
+    }else{
+      $("savedBotLabel").textContent="SAVED BOT · "+restored.name.toUpperCase();
+      $("savedBotDetail").textContent="This entitled bot has been saved as your default selection. It will restore automatically.";
+    }
   }else{
     setTelemetry("ENTITLEMENT REQUIRED","No active bot entitlement was returned.");
     $("selectionNotice").innerHTML='No bot is currently subscribed on this account. <a href="subscription.html" style="color:#19e6ff;text-decoration:none">Open Subscription →</a>';
@@ -383,6 +414,12 @@ async function load(){
    msg(e.message,"error");
  }
 }
+$("changeBotBtn").addEventListener("click",()=>{
+ changeBotMode=!changeBotMode;
+ $("botGrid").classList.toggle("change-mode",changeBotMode);
+ $("changeBotBtn").textContent=changeBotMode?"CANCEL CHANGE":"CHANGE BOT";
+ msg(changeBotMode?"CHANGE BOT MODE ACTIVE · choose another subscribed engine.":"Saved bot selection unchanged.","ok");
+});
 $("configBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");const symbol=fields.symbol.value.trim().toUpperCase(),timeframe=fields.timeframe.value;if(!symbol)return msg("Broker symbol is required.","error");msg("Saving market configuration…");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/config",{method:"POST",body:JSON.stringify({symbol,timeframe})});selected.symbol=d.symbol;selected.timeframe=d.timeframe;$("mSymbol").textContent=d.symbol;$("mTimeframe").textContent=d.timeframe;msg("Market configuration saved. Engine remains stopped until explicitly started.","ok")}catch(e){msg(e.message,"error")}});
 $("startBtn").addEventListener("click",async()=>{
  if(!selected)return msg("Select a bot first.","error");
