@@ -860,7 +860,7 @@ app.get("/api/terminal/live", async (req,res)=>{
           accountStatus:String(raw.account_status||raw.status||"ACTIVE").toUpperCase()
         },
         positions:positionRows,
-        orders:provider==="deriv"?[]:positionRows,
+        orders:[],
         generatedAt:new Date().toISOString(),
         latencyMs:Math.max(0,Date.now()-startedAt),
         source:"authenticated-terminal-live-stream"
