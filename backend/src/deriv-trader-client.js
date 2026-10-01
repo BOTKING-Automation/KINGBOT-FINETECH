@@ -148,6 +148,47 @@ export class DerivTraderClient {
     ws.on("error",()=>{});
   }
 
+  async marketOneShot(payload,{timeoutMs=10000}={}){
+    const endpoints=[DERIV_PUBLIC_WS,DERIV_PUBLIC_WS_LEGACY];
+    let lastError=null;
+    for(const endpoint of endpoints){
+      let ws=null;
+      try{
+        ws=new WebSocket(endpoint);
+        const result=await new Promise((resolve,reject)=>{
+          let settled=false;
+          const req_id=++this.marketRequestId;
+          const timer=setTimeout(()=>{if(settled)return;settled=true;reject(new Error("DERIV_MARKET_REQUEST_TIMEOUT"));},timeoutMs);
+          const finish=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);fn(value);};
+          ws.once("open",()=>{
+            const normalized={...payload};
+            if(endpoint===DERIV_PUBLIC_WS){
+              if(normalized.subscribe===0||String(normalized.subscribe)==="0")normalized.subscribe=0;
+            }else{
+              delete normalized.subscribe;
+            }
+            ws.send(JSON.stringify({...normalized,req_id}));
+          });
+          ws.on("message",raw=>{
+            let data;
+            try{data=JSON.parse(String(raw));}catch{return;}
+            if(Number(data?.req_id)!==Number(req_id))return;
+            if(data.error)finish(reject,new Error(data.error.message||"DERIV_MARKET_API_ERROR"));
+            else finish(resolve,data);
+          });
+          ws.once("error",error=>finish(reject,error instanceof Error?error:new Error(String(error))));
+          ws.once("close",()=>{if(!settled)finish(reject,new Error("DERIV_PUBLIC_WEBSOCKET_CLOSED"));});
+        });
+        return result;
+      }catch(error){
+        lastError=error;
+      }finally{
+        try{if(ws)ws.close();}catch{}
+      }
+    }
+    throw lastError||new Error("DERIV_PUBLIC_MARKET_UNAVAILABLE");
+  }
+
   async marketRequest(payload,{timeoutMs=10000}={}){
     const preferred=this.marketEndpoint||DERIV_PUBLIC_WS;
     const endpoints=[preferred,preferred===DERIV_PUBLIC_WS?DERIV_PUBLIC_WS_LEGACY:DERIV_PUBLIC_WS]
@@ -426,7 +467,7 @@ export class DerivTraderClient {
 
   async getContractsFor(symbol){
     const s=await this.resolveMarketSymbol(symbol);
-    const response=await this.marketRequest({contracts_for:s},{timeoutMs:10000});
+    const response=await this.marketOneShot({contracts_for:s},{timeoutMs:10000});
     return response?.contracts_for||response?.contracts||{};
   }
 
@@ -517,7 +558,7 @@ export class DerivTraderClient {
     const granularity=granularityMap[String(timeframe||"1m")]||60;
     const count=Math.max(20,Math.min(1000,Number(limit)||100));
     const resolved=await this.resolveMarketSymbol(s);
-    const response=await this.marketRequest({ticks_history:resolved,end:"latest",count,style:"candles",granularity,adjust_start_time:1},{timeoutMs:15000});
+    const response=await this.marketOneShot({ticks_history:resolved,end:"latest",count,style:"candles",granularity,adjust_start_time:0},{timeoutMs:15000});
     const candles=Array.isArray(response?.candles)?response.candles:[];
     const rows=candles.map(c=>({time:c?.epoch?new Date(Number(c.epoch)*1000).toISOString():null,open:finite(c?.open),high:finite(c?.high),low:finite(c?.low),close:finite(c?.close),volume:finite(c?.tick_count)})).filter(c=>c.time&&[c.open,c.high,c.low,c.close].every(Number.isFinite));
     if(rows.length<20)throw new Error("INSUFFICIENT_HISTORICAL_CANDLES");
