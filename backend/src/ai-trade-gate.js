@@ -10,6 +10,14 @@ const inflight = new Map();
 const COOLDOWN_MS = Math.max(1500, Number(process.env.GEMINI_TRADE_COOLDOWN_MS || 2500));
 const TTL_MS = Math.max(4000, Number(process.env.GEMINI_TRADE_SIGNAL_TTL_MS || 6500));
 
+// AI is a strategy supervisor by default, not a single point of failure for execution.
+// Set GEMINI_EXECUTION_GATE=1 (or "gated") when an installation explicitly wants
+// Gemini confirmation to be mandatory before the deterministic engine may submit.
+export function aiExecutionGateEnabled(){
+  const mode=String(process.env.GEMINI_EXECUTION_GATE||"advisory").trim().toLowerCase();
+  return mode==="1"||mode==="true"||mode==="gated";
+}
+
 const STRATEGY_PROFILES = {
   strategic: {
     mode: "multi-strategy",
@@ -275,7 +283,7 @@ Produce the next strategy-specific signal for TARGET ENGINE ${botId}. The signal
         strategyMatch:false,
         trigger:"AI_UNAVAILABLE",
         riskFlags:["AI_SIGNAL_UNAVAILABLE"],
-        reason:"Gemini strategy signal unavailable; execution remains blocked.",
+        reason:"Gemini strategy signal unavailable; deterministic engine remains authoritative unless AI execution gating is explicitly enabled.",
         engineAccepted:true,
         fingerprint:snapshotFingerprint({botId,market,analysis}),
         at:Date.now(),
