@@ -142,7 +142,7 @@ async function settings(userId,botId){
   if(!bot)throw new Error("BOT_NOT_FOUND");
   const base=!q.rowCount
     ? {...normalizeRiskSettings(bot.risk),executionMode:"PAPER",killSwitch:false}
-    : (()=>{const x=q.rows[0];return {...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:String(x.execution_mode||"PAPER"),killSwitch:Boolean(x.kill_switch)};})();
+    : (()=>{const x=q.rows[0];return {...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,lotSize:x.lot_size,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:String(x.execution_mode||"PAPER"),killSwitch:Boolean(x.kill_switch)};})();
   if(botId==="ladder-flip")base.maxPositions=Math.min(LADDER_V8_DEFAULTS.maxTotalRungs,Math.max(LADDER_V8_DEFAULTS.fixedRungCount,base.maxPositions));
   return base;
 }
@@ -307,7 +307,8 @@ function derivStakePlan(rawLots,budget,minStake=0.35){
   return lots.map(x=>floor+distributable*(Number(x||0)/Math.max(weight,1e-12)));
 }
 async function executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity}){
-  const cfg=getBotDefinitions()[botId].v8||LADDER_V8_DEFAULTS;
+  const baseCfg=getBotDefinitions()[botId].v8||LADDER_V8_DEFAULTS;
+  const cfg={...baseCfg,baseLot:Number(s.lotSize)||Number(baseCfg.baseLot)||LADDER_V8_DEFAULTS.baseLot};
   if(!withinLadderSession(new Date(),cfg))return {action:"SESSION_BLOCKED",state:null};
   const side=ind.v8Direction>0?"BUY":"SELL";
   const contractType=side==="BUY"?"MULTUP":"MULTDOWN";
