@@ -368,14 +368,46 @@ app.get("/api/broker/quote", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   const symbol=String(req.query?.symbol||"").trim().toUpperCase();
   if(!symbol)return res.status(400).json({ok:false,error:"BROKER_SYMBOL_REQUIRED"});
+
+  // Market telemetry must not depend on an authenticated balance/status refresh.
+  // Deriv rate-limits balance requests, so getStatus()/isConnected() here could
+  // turn a valid public quote into a false "telemetry unavailable" response.
   try{
     const result=await broker.getQuote(symbol,user.id);
     const data=result?.data||{};
-    const specResult=await broker.getSymbolSpecification(symbol,user.id).catch(()=>null);
-    const spec=specResult?.data||null;
-    res.json({ok:true,connected:Boolean(result?.connected),broker:(await broker.getStatus(user.id)).broker||null,market:{symbol,data,spec},syncedAt:new Date().toISOString()});
+    let spec=null;
+    let specError=null;
+    try{
+      const specResult=await broker.getSymbolSpecification(symbol,user.id);
+      spec=specResult?.data||null;
+    }catch(error){
+      // A quote is still authoritative market telemetry. Symbol metadata is
+      // supplemental and must not make the quote endpoint fail.
+      specError=String(error?.message||"BROKER_SPECIFICATION_UNAVAILABLE");
+    }
+
+    let brokerName=null;
+    try{
+      const identity=await broker.getStoredIdentity(user.id);
+      brokerName=identity?.broker||null;
+    }catch{}
+
+    return res.json({
+      ok:true,
+      connected:Boolean(result?.connected),
+      broker:brokerName,
+      market:{symbol,data,spec},
+      metadataAvailable:Boolean(spec),
+      metadataError:specError,
+      syncedAt:new Date().toISOString()
+    });
   }catch(error){
-    res.status(503).json({ok:false,error:"Broker market telemetry unavailable.",reason:error?.message||"BROKER_QUOTE_UNAVAILABLE"});
+    console.error("[KINGBOT BROKER] quote failed:",error?.message||error);
+    return res.status(503).json({
+      ok:false,
+      error:"Broker market telemetry unavailable.",
+      reason:error?.message||"BROKER_QUOTE_UNAVAILABLE"
+    });
   }
 });
 
