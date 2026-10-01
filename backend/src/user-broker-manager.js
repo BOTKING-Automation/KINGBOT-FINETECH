@@ -459,7 +459,7 @@ export class UserBrokerManager {
 
   async getPositions(userId){
     const entry=await this.connectionFor(userId);
-    if(entry.provider==="exness")throw new Error("EXNESS_POSITIONS_USE_SERVER_EVENTS");
+    if(entry.provider==="exness")return {connected:true,data:await entry.api.getPositions()};
     if(entry.provider==="deriv")return await entry.api.getPositions();
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getPositions()};
     return {connected:true,data:await entry.connection.getPositions()};
@@ -467,7 +467,7 @@ export class UserBrokerManager {
 
   async getOrders(userId){
     const entry=await this.connectionFor(userId);
-    if(entry.provider==="exness")throw new Error("EXNESS_OPEN_ORDERS_USE_SERVER_EVENTS");
+    if(entry.provider==="exness")return {connected:true,data:await entry.api.getOrders()};
     if(entry.provider==="deriv")return await entry.api.getOrders();
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getOrders()};
     return {connected:true,data:await entry.connection.getOrders()};
