@@ -512,7 +512,13 @@ export class UserBrokerManager {
       }catch(error){
         const message=String(error?.message||"");
         if(/DERIV_(?:WEBSOCKET_CLOSED|NOT_CONNECTED|REQUEST_TIMEOUT)/i.test(message)){
-          this.connections.delete(userId+":"+entry.provider+":"+entry.accountId);
+          // Delete the exact persistent mapping key; entry.accountId may not be
+          // populated on older in-memory entries after a deploy/reconnect.
+          const mapping=await this.getMapping(userId);
+          const key=mapping
+            ? String(userId)+":"+mapping.provider+":"+mapping.account_id
+            : String(userId)+":"+entry.provider+":"+String(entry.accountId||"");
+          this.connections.delete(key);
           const refreshed=await this.connectionFor(userId);
           return await refreshed.api.getPositions();
         }
