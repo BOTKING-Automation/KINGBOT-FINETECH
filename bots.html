@@ -400,12 +400,23 @@ async function load(){
   if(first){
     let savedId=null;
     let hasSavedSelection=false;
+    let selectionReadOk=false;
     try{
       const saved=await api("/runtime/selection/current",{timeoutMs:7000});
+      selectionReadOk=true;
       savedId=String(saved.selectedBotId||"").trim()||null;
       hasSavedSelection=Boolean(savedId);
     }catch{}
-    const restored=bots.find(b=>b.entitled&&b.id===savedId)||first;
+
+    // Never fall back to the first subscribed bot when the saved-selection
+    // request is delayed. The backend enforces one active runtime per user,
+    // so an existing RUNNING engine is the safest authoritative fallback.
+    const restored=
+      bots.find(b=>b.entitled&&b.id===savedId)
+      || (!hasSavedSelection && selectionReadOk ? bots.find(b=>b.entitled&&b.runtime==="RUNNING") : null)
+      || (!selectionReadOk ? bots.find(b=>b.entitled&&b.runtime==="RUNNING") : null)
+      || first;
+
     await selectBot(restored.id);
     syncChangeBotVisibility();
     if(hasSavedSelection){
