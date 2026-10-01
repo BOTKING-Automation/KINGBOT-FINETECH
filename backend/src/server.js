@@ -813,11 +813,14 @@ app.get("/api/terminal/live", async (req,res)=>{
     snapshotBusy=true;
     const startedAt=Date.now();
     try{
-      const [accountResult,positionsResult]=await Promise.allSettled([
+      const [accountResult,positionsResult,quoteResult]=await Promise.allSettled([
         entry.api.getAccount(),
         provider==="deriv"
           ? entry.api.getLivePositions()
-          : entry.api.getPositions()
+          : entry.api.getPositions(),
+        provider!=="deriv" && symbol && typeof entry.api.getQuote==="function"
+          ? entry.api.getQuote(symbol)
+          : Promise.resolve(null)
       ]);
 
       if(accountResult.status!=="fulfilled")throw accountResult.reason||new Error("BROKER_ACCOUNT_TELEMETRY_UNAVAILABLE");
@@ -863,6 +866,22 @@ app.get("/api/terminal/live", async (req,res)=>{
         source:"authenticated-terminal-live-stream"
       };
       write("snapshot",payload);
+      if(provider!=="deriv" && quoteResult.status==="fulfilled" && quoteResult.value?.data){
+        const q=quoteResult.value.data;
+        write("quote",{
+          quote:{
+            symbol:q.symbol||symbol,
+            bid:q.bid??q.buy??q.bidPrice??null,
+            ask:q.ask??q.sell??q.askPrice??null,
+            price:q.price??null,
+            time:q.time||q.timestamp||new Date().toISOString(),
+            epoch:q.epoch??null,
+            ageMs:q.ageMs??0,
+            source:"broker-live-quote"
+          },
+          serverReceivedAt:new Date().toISOString()
+        });
+      }
     }catch(error){
       write("status",{state:"ERROR",reason:String(error?.message||"LIVE_TELEMETRY_UNAVAILABLE").slice(0,300),generatedAt:new Date().toISOString()});
     }finally{
