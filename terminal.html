@@ -569,7 +569,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
         <div class="position-table-wrap">
           <table class="position-table">
             <thead><tr>
-              <th>Ticket</th><th>Time</th><th>Symbol</th><th>Type</th><th>Volume</th><th>Price</th><th>S/L</th><th>T/P</th><th>Current</th><th>Swap</th><th>Commission</th><th>Profit</th><th>Status</th><th>Action</th>
+              <th>Ticket</th><th>Time</th><th>Type</th><th>Volume</th><th>Symbol</th><th>Price</th><th>S/L</th><th>T/P</th><th>Current</th><th>Commission</th><th>Swap</th><th>Profit</th><th>Status</th><th>Action</th>
             </tr></thead>
             <tbody id="positionsTable"></tbody>
           </table>
@@ -816,8 +816,8 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     $("balance").textContent=fmtMoney(a.balance,currency);$("equity").textContent=fmtMoney(a.equity,currency);$("floatingPnl").textContent=fmtMoney(a.floatingPnl,currency);$("dailyPnl").textContent=fmtMoney(a.dailyPnl,currency);$("margin").textContent=fmtMoney(a.margin,currency);$("freeMargin").textContent=fmtMoney(a.freeMargin,currency);$("positionCount").textContent=Number.isFinite(Number(a.positionCount))?String(a.positionCount):"—";$("drawdown").textContent=Number.isFinite(Number(a.totalDrawdownPct))?Number(a.totalDrawdownPct).toFixed(2)+"%":"—";
     $("floatingPnl").className="metric-value "+classForPnl(a.floatingPnl);$("dailyPnl").className="metric-value "+classForPnl(a.dailyPnl);
     $("broker").textContent=String(a.broker||"—").toUpperCase();$("accountId").textContent=a.accountId||"—";$("accountType").textContent=String(a.accountType||"—").toUpperCase();$("currency").textContent=currency||"—";$("executionMode").textContent=String(a.executionMode||"—").toUpperCase();$("tradingStatus").textContent=a.tradingEnabled===false?"DISABLED":"ENABLED";
-    $("accountState").textContent="CONNECTED";$("accountState").style.color="var(--green)";$("accountNote").textContent="Live account telemetry received from the secured broker connection.";
-    $("accountBadge").textContent="LIVE";$("syncAccountMain").textContent=(a.accountId||"ACCOUNT")+" · "+fmtMoney(a.equity,currency);$("itTapePositions").textContent=Number.isFinite(Number(a.positionCount))?String(a.positionCount):"—";$("itAccountId").textContent=a.accountId||"—";$("itBroker").textContent=String(a.broker||"—").toUpperCase();$("itExecMode").textContent=String(a.executionMode||"—").toUpperCase();$("syncAccountState").textContent="LIVE";$("syncAccountState").className="sync-state live";
+    const demo=String(a.executionMode||"").toUpperCase()==="PAPER"||String(a.accountType||"").toUpperCase()==="DEMO";$("accountState").textContent=demo?"CONNECTED · DEMO":"CONNECTED · LIVE";$("accountState").style.color="var(--green)";$("accountNote").textContent="Broker-authoritative account telemetry received from the secured connection.";
+    $("accountBadge").textContent=demo?"DEMO":"LIVE";$("syncAccountMain").textContent=(a.accountId||"ACCOUNT")+" · "+fmtMoney(a.equity,currency);$("itTapePositions").textContent=Number.isFinite(Number(a.positionCount))?String(a.positionCount):"—";$("itAccountId").textContent=a.accountId||"—";$("itBroker").textContent=String(a.broker||"—").toUpperCase();$("itExecMode").textContent=String(a.executionMode||"—").toUpperCase();$("syncAccountState").textContent="LIVE";$("syncAccountState").className="sync-state live";
   }
 
 
@@ -896,6 +896,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     return null;
   }
   function positionTime(p){return p?.time||p?.openTime||p?.open_time||p?.date_start||p?.timestamp||null;}
+  function fmtMt5Time(v){if(!v)return "—";const d=new Date(v);if(Number.isNaN(d.getTime()))return "—";const pad=n=>String(n).padStart(2,"0");return d.getFullYear()+"."+pad(d.getMonth()+1)+"."+pad(d.getDate())+" "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());}
   function positionPriceDecimals(v){const n=Number(v);return Number.isFinite(n)&&Math.abs(n)<100?5:2;}
   function renderPositions(rows){
     rows=Array.isArray(rows)?rows:[];
@@ -912,7 +913,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     $("positionCount").textContent=String(rows.length);
     $("positionsBadge").textContent=rows.length+" OPEN · "+(verifiedDemo?"DEMO":"LIVE");
     const floatingTotal=rows.reduce((sum,p)=>{const n=positionNumber(p.pnl,p.profit,p.unrealizedPnl,p.unrealizedProfit);return Number.isFinite(n)?sum+n:sum},0);
-    $("positionFloatingTotal").textContent=fmtMoney(floatingTotal,currency);
+    $("positionFloatingTotal").textContent=fmtNumber(floatingTotal,2);
     $("positionFloatingTotal").style.color=Number.isFinite(floatingTotal)?(floatingTotal>0?"var(--green)":floatingTotal<0?"var(--red)":"#aeb9ca"):"";
     $("positionLastTick").textContent=state.live.lastQuoteAt?Math.max(0,Date.now()-state.live.lastQuoteAt)+"ms":"—";
     $("positionsTable").innerHTML=rows.length?rows.map(p=>{
@@ -933,7 +934,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       const sizeLabel=broker==="deriv"?"STAKE":"LOTS";
       const time=positionTime(p);
       const status=String(p.status||p.state||"OPEN").toUpperCase();
-      return "<tr><td class=\"ticket\">"+esc(id||"—")+"</td><td>"+esc(fmtTime(time))+"</td><td class=\"symbol\">"+esc(p.symbol||"—")+"</td><td class=\""+typeClass+"\">"+esc(side)+"</td><td class=\"num\">"+esc(volume===null?"—":fmtNumber(volume,2))+"<span class=\"position-size-sub\">"+sizeLabel+"</span></td><td class=\"num\">"+esc(entry===null?"—":fmtNumber(entry,dec))+"</td><td class=\"num muted\">"+esc(sl===null?"—":fmtNumber(sl,dec))+"</td><td class=\"num muted\">"+esc(tp===null?"—":fmtNumber(tp,dec))+"</td><td class=\"num\">"+esc(current===null?"—":fmtNumber(current,dec))+"</td><td class=\"num muted\">"+esc(swap===null?"—":fmtMoney(swap,currency))+"</td><td class=\"num muted\">"+esc(commission===null?"—":fmtMoney(commission,currency))+"</td><td class=\"num "+pnlClass+"\">"+esc(pnl===null?"—":fmtMoney(pnl,currency))+"</td><td><span class=\"position-row-status\"><i></i>"+esc(status)+"</span></td><td class=\"position-action\">"+(canClose?"<button class=\"close-position-btn\" data-position-id=\""+esc(id)+"\" type=\"button\">CLOSE</button>":"—")+"</td></tr>";
+      return "<tr><td class=\"ticket\">"+esc(id||"—")+"</td><td>"+esc(fmtMt5Time(time))+"</td><td class=\""+typeClass+"\">"+esc(side)+"</td><td class=\"num\">"+esc(volume===null?"—":fmtNumber(volume,2))+"<span class=\"position-size-sub\">"+sizeLabel+"</span></td><td class=\"symbol\">"+esc(p.symbol||"—")+"</td><td class=\"num\">"+esc(entry===null?"—":fmtNumber(entry,dec))+"</td><td class=\"num muted\">"+esc(sl===null?"—":fmtNumber(sl,dec))+"</td><td class=\"num muted\">"+esc(tp===null?"—":fmtNumber(tp,dec))+"</td><td class=\"num\">"+esc(current===null?"—":fmtNumber(current,dec))+"</td><td class=\"num muted\">"+esc(commission===null?"—":fmtNumber(commission,2))+"</td><td class=\"num muted\">"+esc(swap===null?"—":fmtNumber(swap,2))+"</td><td class=\"num "+pnlClass+"\">"+esc(pnl===null?"—":fmtNumber(pnl,2))+"</td><td><span class=\"position-row-status\"><i></i>"+esc(status)+"</span></td><td class=\"position-action\">"+(canClose?"<button class=\"close-position-btn\" data-position-id=\""+esc(id)+"\" type=\"button\">CLOSE</button>":"—")+"</td></tr>";
     }).join(""):"<tr><td colspan=\"14\"><div class=\"position-empty\"><strong>NO OPEN POSITIONS</strong><span>Waiting for broker-authoritative open position data.</span></div></td></tr>";
   }
   document.addEventListener("click",async e=>{
