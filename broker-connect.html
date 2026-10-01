@@ -369,7 +369,7 @@ function selectBroker(slug){
    $("modalSubtitle").textContent=selected==="exness"?"EXNESS PUBLIC TRADER API":selected==="deriv"?"DERIV OAUTH 2.0 · SECURE REDIRECT":selected==="derivmt5"?"KINGBOT MT5 BRIDGE · NATIVE CFD · LOTS":"SECURE BROKER CONNECTION FLOW";
   $("modalLogo").src=logos[slug];$("modalLogo").alt=d.name;
   $("accountId").value="";$("apiKey").value="";$("secretKey").value="";$("apiHost").value="";$("accessToken").value="";$("oandaToken").value="";if($("mt5BridgeToken"))$("mt5BridgeToken").value="";if($("mt5BridgeStatus"))$("mt5BridgeStatus").textContent="TOKEN NOT GENERATED";if(mt5BridgePollTimer){clearInterval(mt5BridgePollTimer);mt5BridgePollTimer=null;}
-  $("accountList").innerHTML="";$("authorizeBtn").disabled=true;
+  $("accountList").innerHTML="";$("authorizeBtn").disabled=true;$("accountId").parentElement.style.display="block";
   $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=(selected==="exness"||selected==="oanda")?"block":"none";$("bridgeTokenField").style.display=(selected==="exness"||selected==="oanda"||selected==="deriv")?"none":"block";$("oandaTokenField").style.display=selected==="oanda"?"block":"none";if(selected==="derivmt5")$("accountId").placeholder="MetaApi account ID (UUID)";
   $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION"; $("verifyBtn").style.display=(selected==="deriv"||selected==="derivmt5")?"none":"inline-flex"; $("executionMode").value=selectedExecution;
   if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
@@ -609,6 +609,7 @@ const modeButtons=[...document.querySelectorAll("#modeSwitch .mode-btn")];
 let selectedExecution="PAPER";
 const modeState=$("modeState"),modeCopy=$("modeCopy");
 function applyExecutionMode(){
+  if(selected==="derivmt5"&&$("mt5BridgeMode"))$("mt5BridgeMode").textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO / PAPER";
   modeButtons.forEach(b=>b.classList.toggle("active",b.dataset.exec===selectedExecution));
   modeState.textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO / PAPER";
   modeCopy.textContent=selectedExecution==="LIVE"
