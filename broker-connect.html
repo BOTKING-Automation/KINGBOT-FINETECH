@@ -83,9 +83,9 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
 
   <section class="control-strip">
     <div class="mode-panel">
-      <div class="mode-head"><div class="mode-label">EXECUTION ENVIRONMENT</div><div class="mode-state" id="modeState">DEMO / PAPER</div></div>
+      <div class="mode-head"><div class="mode-label">EXECUTION ENVIRONMENT</div><div class="mode-state" id="modeState">DEMO · LIVE BROKER</div></div>
       <div class="mode-switch" id="modeSwitch">
-        <button class="mode-btn active" type="button" data-exec="PAPER">DEMO / PAPER</button>
+        <button class="mode-btn active" type="button" data-exec="DEMO">DEMO · LIVE BROKER</button>
         <button class="mode-btn" type="button" data-exec="LIVE">LIVE / REAL</button>
       </div>
       <div class="mode-copy" id="modeCopy">Training mode. KINGBOT will use broker-side simulated/demo execution where the connector supports it. Live funds are not targeted.</div>
@@ -93,7 +93,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
     <div class="intel-panel">
       <div class="intel-label">SMART ROUTING INTELLIGENCE</div>
       <div class="intel-grid">
-        <div class="intel-chip"><b id="supportedCount">05</b><span>DEMO / PAPER API</span></div>
+        <div class="intel-chip"><b id="supportedCount">05</b><span>DEMO · LIVE BROKER API</span></div>
         <div class="intel-chip"><b>06</b><span>BROKER CONNECTORS</span></div>
         <div class="intel-chip"><b id="nativeCount">02</b><span>NATIVE NOW</span></div>
       </div>
@@ -127,7 +127,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
           <div class="broker-top"><div class="brand"><div class="logo"><img src="https://mma.prnewswire.com/media/1581985/OANDA_colour_logo_Logo.jpg?p=facebook" alt="OANDA"></div><div><div class="broker-name">OANDA</div><div class="broker-code">FX · V20 REST API</div></div></div><span class="availability live">API</span></div>
           <div class="broker-copy">Official v20 API supports programmatic account access, pricing, orders and trading history.</div>
           <div class="broker-specs"><div class="spec"><b>CONNECTION</b><span>NATIVE API</span></div><div class="spec"><b>MARKETS</b><span>FX · METALS</span></div></div>
-          <div class="meta"><span>FOREX</span><span>METALS</span><span>ACCOUNT API</span></div><div class="environment"><span class="demo">● DEMO / PAPER</span><span class="live">● LIVE / REAL</span></div><div class="connection-diagnostics"><div class="diag ok"><b>AUTH</b><span>READY</span></div><div class="diag ok"><b>MARKET DATA</b><span>READY</span></div><div class="diag ok"><b>ORDER TEST</b><span>READY</span></div><div class="diag ok"><b>EXECUTION</b><span>NATIVE</span></div></div>
+          <div class="meta"><span>FOREX</span><span>METALS</span><span>ACCOUNT API</span></div><div class="environment"><span class="demo">● DEMO · LIVE BROKER</span><span class="live">● LIVE / REAL</span></div><div class="connection-diagnostics"><div class="diag ok"><b>AUTH</b><span>READY</span></div><div class="diag ok"><b>MARKET DATA</b><span>READY</span></div><div class="diag ok"><b>ORDER TEST</b><span>READY</span></div><div class="diag ok"><b>EXECUTION</b><span>NATIVE</span></div></div>
           <div class="broker-action"><button class="connect" data-open="oanda">CONNECT OANDA</button><a class="docs" href="https://hub.oanda.com/" target="_blank" rel="noopener">OPEN API ACCESS ↗</a></div><div class="status-line">Get token: OANDA Hub → Trading Tools → OANDA API → Generate.</div>
         </div>
       </article>
@@ -238,7 +238,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
         </div>
         <div class="status-line" id="credentialHelp">Exness flow: create the API key in Exness Key Management, select the trading account that the key may access, copy the secret once, and paste the values here. KINGBOT signs requests on the server; credentials are encrypted and never stored in browser localStorage.</div>
 <div id="mt5BridgePanel" style="display:none;margin-top:16px;padding:16px;border:1px solid rgba(34,230,255,.22);border-radius:16px;background:linear-gradient(135deg,rgba(10,18,36,.96),rgba(15,10,28,.92));box-shadow:0 0 28px rgba(34,230,255,.08)">
-<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><div style="font-size:11px;font-weight:800;letter-spacing:.14em;color:#22e6ff">KINGBOT MT5 EA BRIDGE</div><div style="margin-top:4px;font-size:12px;color:#aeb9ca">Execution stays inside your MT5 terminal.</div></div><div id="mt5BridgeMode" style="font-size:11px;font-weight:800;color:#ffc84a">DEMO / PAPER</div></div>
+<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><div style="font-size:11px;font-weight:800;letter-spacing:.14em;color:#22e6ff">KINGBOT MT5 EA BRIDGE</div><div style="margin-top:4px;font-size:12px;color:#aeb9ca">Execution stays inside your MT5 terminal.</div></div><div id="mt5BridgeMode" style="font-size:11px;font-weight:800;color:#ffc84a">DEMO · LIVE BROKER</div></div>
 <div style="margin-top:14px;font-size:12px;line-height:1.65;color:#aeb9ca">1. Sign into the exact Deriv MT5 account. 2. Install and compile <b>KINGBOT_MT5_BRIDGE.mq5</b>. 3. Add the KINGBOT API host to MT5 WebRequest allowed URLs. 4. Generate a token below and paste it into the EA.</div>
 <div style="margin-top:14px;display:grid;grid-template-columns:1fr auto;gap:8px"><input id="mt5BridgeToken" readonly type="text" autocomplete="off" placeholder="Generate a secure bridge token" style="width:100%;box-sizing:border-box;font-family:monospace;letter-spacing:.04em"><button class="modal-btn alt" id="copyMt5Token" type="button">COPY</button></div>
 <div class="modal-actions" style="margin-top:10px"><button class="modal-btn" id="generateMt5Token" type="button">GENERATE BRIDGE TOKEN</button></div>
@@ -341,7 +341,7 @@ function textFor(){
     $("hostField").style.display="none";
     $("oandaTokenField").style.display="none";
     $("mt5BridgePanel").style.display="block";
-    $("mt5BridgeMode").textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO / PAPER";
+    $("mt5BridgeMode").textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO · LIVE BROKER";
     $("credentialHelp").textContent="No MT5 password is entered here. KINGBOT issues a bridge token; the EA authenticates the terminal and executes trades locally through MQL5.";
     $("flowStatus").textContent="Generate the bridge token, paste it into the EA, attach the EA to MT5, and keep Algo Trading enabled.";
   }else if(step===2 && (!d.native || selected==='oanda')){
@@ -387,7 +387,7 @@ async function generateMt5BridgeToken(){
     const d=await r.json().catch(()=>({}));
     if(!r.ok||!d.token)throw new Error(d.error||d.reason||"Unable to generate the MT5 bridge token.");
     $("mt5BridgeToken").value=d.token;
-    $("mt5BridgeStatus").textContent="TOKEN READY · "+(d.expectedMode==="LIVE"?"LIVE / REAL":"DEMO / PAPER")+" · COPY INTO THE EA NOW";
+    $("mt5BridgeStatus").textContent="TOKEN READY · "+(d.expectedMode==="LIVE"?"LIVE / REAL":"DEMO · LIVE BROKER")+" · COPY INTO THE EA NOW";
     setStatus("Bridge token generated. Paste it into KINGBOT_MT5_BRIDGE.mq5, compile the EA, attach it to MT5, and enable Algo Trading.");
     startMt5BridgeWatch();
   }catch(e){$("mt5BridgeStatus").textContent="TOKEN ERROR";setStatus(e.message||"MT5 bridge token generation failed.");}
@@ -520,7 +520,7 @@ function renderAccounts(list){
   $("accountList").innerHTML=items.map((a,i)=>{
     const id=String(a.id||a.accountId||"");
     const type=String(a.accountType||"").toLowerCase();
-    const mode=type==="real"?"LIVE · REAL":"PAPER · DEMO";
+    const mode=type==="real"?"LIVE · REAL":"DEMO · BROKER EXECUTION";
     const balance=a.balance==null?"—":Number(a.balance).toLocaleString(undefined,{maximumFractionDigits:2});
     const label=type==="real"?"DERIV REAL ACCOUNT":"DERIV DEMO ACCOUNT";
     return '<div class="account-item'+(i===0?" active":"")+'" data-account="'+id.replace(/"/g,"&quot;")+'" data-account-type="'+type.replace(/"/g,"&quot;")+'"><div><b>'+label+'</b><span>'+id+' · '+mode+' · '+String(a.currency||"USD")+' · Balance '+balance+'</span></div><span>SELECT</span></div>';
@@ -603,7 +603,7 @@ $("authorizeBtn").addEventListener("click",async()=>{
       if(!r.ok||!d.connected)throw new Error(d.reason||d.error||"Deriv account connection failed.");
       verified=true;
       $("flowCopy").innerHTML="<strong>STEP 4 · DERIV CONNECTION COMPLETE</strong><br>Authorization, account ownership and broker connection were verified. KINGBOT is now bound to the selected Deriv account.";
-      setStatus("DERIV CONNECTED ✓ · "+(accountType==="real"?"LIVE / REAL":"DEMO / PAPER")+" · "+selectedAccount);
+      setStatus("DERIV CONNECTED ✓ · "+(accountType==="real"?"LIVE / REAL":"DEMO · LIVE BROKER")+" · "+selectedAccount);
       btn.textContent="CONNECTED ✓";
       window.__KINGBOT_DERIV_PENDING=null;
       applyConnectionLock({connected:true,broker:"deriv",accountId:selectedAccount,executionMode:accountType==="real"?"LIVE":"PAPER"});
@@ -621,12 +621,12 @@ $("authorizeBtn").addEventListener("click",async()=>{
 
 
 const modeButtons=[...document.querySelectorAll("#modeSwitch .mode-btn")];
-let selectedExecution="PAPER";
+let selectedExecution="DEMO";
 const modeState=$("modeState"),modeCopy=$("modeCopy");
 function applyExecutionMode(){
-  if(selected==="derivmt5"&&$("mt5BridgeMode"))$("mt5BridgeMode").textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO / PAPER";
+  if(selected==="derivmt5"&&$("mt5BridgeMode"))$("mt5BridgeMode").textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO · LIVE BROKER";
   modeButtons.forEach(b=>b.classList.toggle("active",b.dataset.exec===selectedExecution));
-  modeState.textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO / PAPER";
+  modeState.textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO · LIVE BROKER";
   modeCopy.textContent=selectedExecution==="LIVE"
     ?"Production mode. KINGBOT will target the broker's real-money environment only after explicit account authorization."
     :"Training mode. KINGBOT will use broker-side simulated/demo execution where the connector supports it. Live funds are not targeted.";
@@ -641,7 +641,7 @@ function applyExecutionMode(){
     card.classList.toggle("mode-unavailable",!allowed);
   });
 }
-modeButtons.forEach(btn=>btn.addEventListener("click",()=>{selectedExecution=btn.dataset.exec||"PAPER";applyExecutionMode()}));
+modeButtons.forEach(btn=>btn.addEventListener("click",()=>{selectedExecution=btn.dataset.exec||"DEMO";applyExecutionMode()}));
 applyExecutionMode();
 
 (async function handleDerivReturn(){
