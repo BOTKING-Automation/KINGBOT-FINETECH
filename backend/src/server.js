@@ -85,7 +85,7 @@ app.post("/api/broker/account", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   const provider=String(req.body?.provider||"metaapi").trim().toLowerCase();
   const accountId=String(req.body?.accountId||"").trim();
-  const executionMode=String(req.body?.executionMode||"PAPER").toUpperCase();
+  const executionMode=String(req.body?.executionMode||"DEMO").toUpperCase();
   if(!accountId)return res.status(400).json({ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"});
 
   if(provider==="exness"){
@@ -181,7 +181,7 @@ app.get("/api/broker/deriv/oauth/start", async (req,res)=>{
   }
   const requestedMode=String(req.query?.executionMode||"DEMO").toUpperCase();
   if(!["DEMO","PAPER","LIVE"].includes(requestedMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
-  const mode=requestedMode==="DEMO"?"PAPER":requestedMode;
+  const mode=requestedMode==="PAPER"?"DEMO":requestedMode;
   try{
     const {verifier,challenge}=createPkce();
     const saved=await broker.createDerivOAuthState({userId:user.id,codeVerifier:verifier,executionMode:mode});
