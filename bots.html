@@ -346,13 +346,13 @@ async function selectBot(id){
 }
 async function load(){
  setTelemetry("BACKEND TELEMETRY","LOADING VERIFIED BOT STATE…");
- await refreshBrokerExecutionStatus();
  try{
   const [d,rt,sub]=await Promise.all([
     api("/bots"),
     api("/runtime"),
     api("/subscription/me"),
   ]);
+  void refreshBrokerExecutionStatus();
   await refreshBrokerMarkets();
   const entitledIds=new Set((sub.entitlements||[]).map(x=>String(x.botId||"").toLowerCase()));
   bots=(d.bots||[]).map(b=>{
