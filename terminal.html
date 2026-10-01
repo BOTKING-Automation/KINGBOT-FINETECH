@@ -2592,14 +2592,17 @@ function renderAccountOverview(account){
   renderPnl("floatingPnl",account.floatingPnl,currency);
   renderPnl("realizedPnl",account.realizedPnl,currency);
   renderPnl("dailyPnl",account.dailyPnl,currency);
-  $("accountMargin").textContent=formatMoney(account.margin,currency);
-  $("freeMargin").textContent=formatMoney(account.freeMargin,currency);
-  $("marginLevel").textContent=formatPct(account.marginLevel);
+  const isDeriv=String(account.broker||"").toLowerCase()==="deriv";
+  $("accountMargin").textContent=isDeriv && !Number.isFinite(Number(account.margin))?"N/A":formatMoney(account.margin,currency);
+  $("freeMargin").textContent=isDeriv && !Number.isFinite(Number(account.freeMargin))?"N/A":formatMoney(account.freeMargin,currency);
+  $("marginLevel").textContent=isDeriv && !Number.isFinite(Number(account.marginLevel))?"N/A":formatPct(account.marginLevel);
   $("dailyDrawdown").textContent=formatPct(account.dailyDrawdownPct);
   $("drawdown").textContent=formatPct(account.totalDrawdownPct);
   $("positionCount").textContent=Number.isFinite(Number(account.positionCount))?String(account.positionCount):"—";
   $("orderCount").textContent=Number.isFinite(Number(account.orderCount))?String(account.orderCount):"—";
-  $("accountLeverage").textContent=Number.isFinite(Number(account.leverage))?"1:"+Number(account.leverage).toFixed(0):"—";
+  $("accountLeverage").textContent=Number.isFinite(Number(account.leverage))
+    ?"1:"+Number(account.leverage).toFixed(0)
+    :(isDeriv?"N/A":"—");
 
   if(account.syncedAt){
     $("accountSync").textContent=new Date(account.syncedAt).toLocaleTimeString([], {hour12:false});
