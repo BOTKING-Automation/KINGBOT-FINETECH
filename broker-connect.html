@@ -85,10 +85,10 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
     <div class="mode-panel">
       <div class="mode-head"><div class="mode-label">EXECUTION ENVIRONMENT</div><div class="mode-state" id="modeState">DEMO · LIVE BROKER</div></div>
       <div class="mode-switch" id="modeSwitch">
-        <button class="mode-btn active" type="button" data-exec="DEMO">DEMO · LIVE BROKER</button>
+        <button class="mode-btn active" type="button" data-exec="DEMO">DEMO · BROKER MT5</button>
         <button class="mode-btn" type="button" data-exec="LIVE">LIVE / REAL</button>
       </div>
-      <div class="mode-copy" id="modeCopy">Training mode. KINGBOT will use broker-side simulated/demo execution where the connector supports it. Live funds are not targeted.</div>
+      <div class="mode-copy" id="modeCopy">DEMO mode uses the selected Deriv MT5 broker account with broker-side virtual funds and live market execution. It is not a KINGBOT paper simulator.</div>
     </div>
     <div class="intel-panel">
       <div class="intel-label">SMART ROUTING INTELLIGENCE</div>
@@ -341,7 +341,7 @@ function textFor(){
     $("hostField").style.display="none";
     $("oandaTokenField").style.display="none";
     $("mt5BridgePanel").style.display="block";
-    $("mt5BridgeMode").textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO · LIVE BROKER";
+    $("mt5BridgeMode").textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO · BROKER MT5";
     $("credentialHelp").textContent="No MT5 password is entered here. KINGBOT issues a bridge token; the EA authenticates the terminal and executes trades locally through MQL5.";
     $("flowStatus").textContent="Generate the bridge token, paste it into the EA, attach the EA to MT5, and keep Algo Trading enabled.";
   }else if(step===2 && (!d.native || selected==='oanda')){
