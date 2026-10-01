@@ -32,7 +32,7 @@ string Clean(string v,int maxLen=300)
    if(StringLen(v)>maxLen)v=StringSubstr(v,0,maxLen);
    return v;
 }
-string Upper(string v){return StringToUpper(Clean(v));}
+string Upper(string v){v=Clean(v);StringToUpper(v);return v;}
 string JsonEscape(string v)
 {
    StringReplace(v,"\\","\\\\");
