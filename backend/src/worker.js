@@ -392,8 +392,10 @@ async function executeLadderV8DerivStart({userId,botId,config,s,account,quote,in
     if(!(stake>0))continue;
     const clientId="kbv8d_"+crypto.randomUUID();
     const sideName=side;
-    const stopLoss=Math.max(0.01,Math.min(stake*0.9,atrStop*multiplier));
-    const takeProfit=Math.max(stake*1.05,stake+stopLoss*Number(cfg.takeProfitRR||2.0));
+    // Deriv MULTUP/MULTDOWN limit_order monetary values accept max 2 decimals.
+    // Round before the API request so Gemini-confirmed trades are not rejected by broker precision rules.
+    const stopLoss=Number(Math.max(0.01,Math.min(stake*0.9,atrStop*multiplier)).toFixed(2));
+    const takeProfit=Number(Math.max(stake*1.05,stake+stopLoss*Number(cfg.takeProfitRR||2.0)).toFixed(2));
     const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,s.executionMode,config.symbol,sideName,stake]);
     if(!journal.rowCount)continue;
     try{
@@ -490,7 +492,9 @@ async function executeLadderV8DerivManage({userId,botId,config,s,account,quote,p
       const side=Number(state.direction)>0?"BUY":"SELL";
       try{
         const clientId="kbv8d_"+crypto.randomUUID();
-        const order=await broker.placeOrder({side,symbol:config.symbol,volume:nextStake,stopLoss:Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||100))),takeProfit:Math.max(nextStake*1.05, nextStake + Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||100)))*Number(cfg.takeProfitRR||2.0)),comment:"KINGBOT V8 DERIV PYRAMID R"+state.rungs_opened,clientId,userId,currency:String(account.currency||"USD"),multiplier:Number(state.deriv_multiplier||100),derivContractType:state.deriv_contract_type});
+        const pyramidStopLoss=Number(Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||100))).toFixed(2));
+        const pyramidTakeProfit=Number(Math.max(nextStake*1.05,nextStake+pyramidStopLoss*Number(cfg.takeProfitRR||2.0)).toFixed(2));
+        const order=await broker.placeOrder({side,symbol:config.symbol,volume:nextStake,stopLoss:pyramidStopLoss,takeProfit:pyramidTakeProfit,comment:"KINGBOT V8 DERIV PYRAMID R"+state.rungs_opened,clientId,userId,currency:String(account.currency||"USD"),multiplier:Number(state.deriv_multiplier||100),derivContractType:state.deriv_contract_type});
         if(order?.contractId){
           state.positionIds=[...state.positionIds.map(String),String(order.contractId)];
           stakes.push(nextStake);
