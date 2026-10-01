@@ -106,6 +106,20 @@ export class OandaTraderClient{
     const trades=(await this.request("/v3/accounts/"+encodeURIComponent(this.accountId)+"/trades?"+q)).trades||[];
     return {orders:[],deals:trades};
   }
+  async getMarkets(){
+    const data=await this.request("/v3/accounts/"+encodeURIComponent(this.accountId)+"/instruments");
+    const list=Array.isArray(data?.instruments)?data.instruments:[];
+    return list.map(item=>({
+      symbol:String(item?.name||"").trim(),
+      name:String(item?.displayName||item?.name||"").trim(),
+      category:String(item?.type||"").trim(),
+      submarket:"",
+      tradeable:true,
+      source:"broker",
+      marginRate:item?.marginRate??null,
+      displayPrecision:item?.displayPrecision??null
+    })).filter(x=>x.symbol);
+  }
   async getInstrumentSpecification(symbol){
     const instrument=normalizeInstrument(symbol);
     const data=await this.request("/v3/accounts/"+encodeURIComponent(this.accountId)+"/instruments?instruments="+encodeURIComponent(instrument));
