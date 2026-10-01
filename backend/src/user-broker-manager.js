@@ -42,9 +42,7 @@ export class UserBrokerManager {
     if(!this.pool)return;
     await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_broker_accounts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,credential_ciphertext TEXT NOT NULL,credential_iv TEXT NOT NULL,credential_tag TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'DEMO' CHECK(execution_mode IN ('DEMO','LIVE')),enabled BOOLEAN NOT NULL DEFAULT TRUE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,provider,account_id))");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts DROP CONSTRAINT IF EXISTS kingbot_broker_accounts_execution_mode_check");
-    await this.pool.query("UPDATE kingbot_broker_accounts SET execution_mode='DEMO' WHERE execution_mode='PAPER'");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD CONSTRAINT kingbot_broker_accounts_execution_mode_check CHECK(execution_mode IN ('DEMO','LIVE'))");
-    await this.pool.query("UPDATE kingbot_broker_accounts SET execution_mode='DEMO' WHERE execution_mode='PAPER'");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts DROP CONSTRAINT IF EXISTS kingbot_broker_accounts_execution_mode_check");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD CONSTRAINT kingbot_broker_accounts_execution_mode_check CHECK(execution_mode IN ('DEMO','LIVE'))");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS credential_ciphertext TEXT");
@@ -52,11 +50,11 @@ export class UserBrokerManager {
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS credential_tag TEXT"); 
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS provider TEXT");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS account_id TEXT");
-    await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS execution_mode TEXT DEFAULT 'PAPER'");
+    await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS execution_mode TEXT DEFAULT 'DEMO'");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT TRUE");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()");
-    await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_deriv_oauth_states (state TEXT PRIMARY KEY,user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,code_verifier TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'PAPER',expires_at TIMESTAMPTZ NOT NULL,pending_id TEXT,token_ciphertext TEXT,token_iv TEXT,token_tag TEXT,accounts_json JSONB,status TEXT NOT NULL DEFAULT 'pending')");
+    await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_deriv_oauth_states (state TEXT PRIMARY KEY,user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,code_verifier TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'DEMO',expires_at TIMESTAMPTZ NOT NULL,pending_id TEXT,token_ciphertext TEXT,token_iv TEXT,token_tag TEXT,accounts_json JSONB,status TEXT NOT NULL DEFAULT 'pending')");
     await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS pending_id TEXT");
     await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS token_ciphertext TEXT");
     await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS token_iv TEXT");
@@ -275,15 +273,16 @@ export class UserBrokerManager {
     }
   }
 
-  async connect(userId,executionMode="PAPER"){
+  async connect(userId,executionMode="DEMO"){
     if(!userId)return {connected:false,mode:"NOT_CONNECTED",reason:"USER_CONTEXT_REQUIRED"};
     const backoffKey=String(userId);
     const blockedUntil=Number(this.connectBackoff.get(backoffKey)||0);
     if(blockedUntil>Date.now())return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_RECONNECT_BACKOFF",retryAt:new Date(blockedUntil).toISOString()};
     const mapping=await this.getMapping(userId);
     if(!mapping)return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_ACCOUNT_NOT_CONFIGURED"};
-    const mode=String(executionMode||mapping.execution_mode).toUpperCase();
-    if(!["PAPER","LIVE"].includes(mode))return {connected:false,mode:"NOT_CONNECTED",reason:"INVALID_EXECUTION_MODE"};
+    const requestedMode=String(executionMode||mapping.execution_mode||"DEMO").toUpperCase();
+    const mode=requestedMode==="PAPER"?"DEMO":requestedMode;
+    if(!["DEMO","LIVE"].includes(mode))return {connected:false,mode:"NOT_CONNECTED",reason:"INVALID_EXECUTION_MODE"};
     let credential;
     try{credential=decryptSecret(mapping);}
     catch(error){return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_CREDENTIAL_DECRYPTION_FAILED"};}
@@ -303,9 +302,9 @@ export class UserBrokerManager {
         const terminalMode=String(accountInfo.accountType||accountInfo.account_type||"").toUpperCase()||(
           Number(accountInfo.tradeMode)===4?"REAL":"DEMO"
         );
-        if(mode==="PAPER"&&terminalMode!=="DEMO"){
+        if(mode==="DEMO"&&terminalMode!=="DEMO"){
           this.connections.delete(key);
-          return {connected:false,mode:"NOT_CONNECTED",reason:"PAPER_REQUIRES_DEMO_ACCOUNT"};
+          return {connected:false,mode:"NOT_CONNECTED",reason:"DEMO_REQUIRES_DEMO_ACCOUNT"};
         }
         if(mode==="LIVE"&&terminalMode!=="REAL"){
           this.connections.delete(key);
@@ -455,7 +454,7 @@ export class UserBrokerManager {
         : await entry.connection.getAccountInformation();
       entry.accountInfo=accountInfo;
       entry.accountInfoAt=Date.now();
-      if(mode==="PAPER"&&accountInfo.type!=="ACCOUNT_TRADE_MODE_DEMO"){
+      if(mode==="DEMO"&&accountInfo.type!=="ACCOUNT_TRADE_MODE_DEMO"){
         await entry.connection.close();
         this.connections.delete(key);
         return {connected:false,mode:"NOT_CONNECTED",reason:"PAPER_REQUIRES_DEMO_ACCOUNT"};
