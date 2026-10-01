@@ -273,7 +273,7 @@ app.get("/api/broker/deriv/oauth/accounts", async (req,res)=>{
       id:account.accountId,
       accountId:account.accountId,
       accountType:account.accountType,
-      mode:account.accountType==="real"?"LIVE":"PAPER",
+      mode:account.accountType==="real"?"LIVE":"DEMO",
       label:account.accountType==="real"?"DERIV REAL ACCOUNT":"DERIV DEMO ACCOUNT",
       currency:account.currency||"USD",
       balance:account.balance,
@@ -299,7 +299,7 @@ app.post("/api/broker/deriv/oauth/connect", async (req,res)=>{
     if(!pending)return res.status(404).json({ok:false,error:"DERIV_OAUTH_CONNECTION_EXPIRED"});
     const authorized=pending.accounts.find(account=>account.accountId===accountId&&account.accountType===accountType&&account.status==="active");
     if(!authorized)return res.status(403).json({ok:false,error:"DERIV_ACCOUNT_NOT_AUTHORIZED"});
-    const executionMode=accountType==="real"?"LIVE":"PAPER";
+    const executionMode=accountType==="real"?"LIVE":"DEMO";
     const mapping=await broker.saveMapping({
       userId:user.id,
       provider:"deriv",
@@ -394,7 +394,7 @@ app.get("/api/market/quote", async (req,res)=>{
   const symbol=String(req.query?.symbol||"").trim().toUpperCase();
   if(!symbol)return res.status(400).json({ok:false,error:"MARKET_SYMBOL_REQUIRED"});
   try{
-    const publicDeriv=new DerivTraderClient({executionMode:"PAPER"});
+    const publicDeriv=new DerivTraderClient({executionMode:"DEMO"});
     const result=await publicDeriv.getQuote(symbol);
     return res.json({
       ok:true,
@@ -478,11 +478,11 @@ app.post("/api/broker/deriv/test-buy-gold", async (req,res)=>{
   }
 
   const mode=String(mapping.execution_mode||"").toUpperCase();
-  if(mode!=="PAPER"){
+  if(mode!=="DEMO"){
     return res.status(409).json({
       ok:false,
       error:"DEMO_ONLY_TEST",
-      message:"This verification endpoint never submits a real-money order. Set the connected Deriv account to PAPER/DEMO mode. No order was submitted."
+      message:"This verification endpoint never submits a real-money order. Set the connected Deriv account to DEMO mode. No order was submitted."
     });
   }
 
@@ -512,7 +512,7 @@ app.post("/api/broker/deriv/test-buy-gold", async (req,res)=>{
     const stake=Math.min(1,Math.max(0.01,Number(req.body?.stake)||1));
     const clientId="kbtest_"+crypto.randomUUID();
     const journal=await pool.query(
-      "INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,'deriv-execution-test',$2,'PAPER',$3,'BUY',$4,'PENDING',NOW()) RETURNING id",
+      "INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,'deriv-execution-test',$2,'DEMO',$3,'BUY',$4,'PENDING',NOW()) RETURNING id",
       [user.id,clientId,resolvedSymbol,stake]
     );
 
@@ -545,7 +545,7 @@ app.post("/api/broker/deriv/test-buy-gold", async (req,res)=>{
       return res.json({
         ok:true,
         test:"DERIV_XAUUSD_BUY",
-        executionMode:"PAPER",
+        executionMode:"DEMO",
         accountType:"DEMO",
         symbol:resolvedSymbol,
         side:"BUY",
@@ -603,7 +603,7 @@ app.get("/api/account", async (req,res)=>{
       connected:true,
       broker:mapping.provider,
       accountId:mapping.account_id,
-      executionMode:mapping.execution_mode||"PAPER"
+      executionMode:mapping.execution_mode||"DEMO"
     };
 
     const now=new Date();
@@ -872,7 +872,7 @@ app.get("/api/terminal/live", async (req,res)=>{
         account:{
           accountId:raw.loginid||raw.accountId||mapping.account_id||null,
           broker:provider,
-          executionMode:entry.executionMode||mapping.execution_mode||"PAPER",
+          executionMode:entry.executionMode||mapping.execution_mode||"DEMO",
           accountType:String(raw.accountType||raw.account_type||(entry.executionMode==="LIVE"?"REAL":"DEMO")).toUpperCase(),
           currency:raw.currency||null,
           balance,
