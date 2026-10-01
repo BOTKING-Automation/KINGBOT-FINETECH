@@ -391,13 +391,11 @@ $("startBtn").addEventListener("click",async()=>{
    let symbol=fields.symbol.value.trim().toUpperCase()||selected.symbol||"";
    if(!symbol)return msg("Select a market from the connected broker market list first.","error");
    let timeframe=fields.timeframe.value||selected.timeframe||"5m";
-   if(!selected.symbol){
-     const cfg=await api("/runtime/"+encodeURIComponent(selected.id)+"/config",{method:"POST",body:JSON.stringify({symbol,timeframe})});
-     selected.symbol=cfg.symbol;selected.timeframe=cfg.timeframe;
-     $("mSymbol").textContent=cfg.symbol;$("mTimeframe").textContent=cfg.timeframe;
-   }
+   const cfg=await api("/runtime/"+encodeURIComponent(selected.id)+"/config",{method:"POST",body:JSON.stringify({symbol,timeframe})});
+   selected.symbol=cfg.symbol;selected.timeframe=cfg.timeframe;
+   $("mSymbol").textContent=cfg.symbol;$("mTimeframe").textContent=cfg.timeframe;
    msg("Authorizing engine start…");
-   const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/start",{method:"POST",body:"{}"});
+   const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/start",{method:"POST",body:JSON.stringify({symbol,timeframe})});
    selected.runtime=d.state;selected.executionMode=d.executionMode;
    $("mRuntime").textContent=d.state;$("enginePill").textContent="RUNNING";
    msg("Engine started with "+selected.symbol+" / "+selected.timeframe+". Broker and server risk gates remain authoritative.","ok");
