@@ -11,11 +11,11 @@ function finite(value){
 }
 
 export class DerivTraderClient {
-  constructor({accessToken,accountId,executionMode="PAPER",accountType=""}={}){
+  constructor({accessToken,accountId,executionMode="DEMO",accountType=""}={}){
     this.id="deriv";
     this.accessToken=String(accessToken||"").trim();
     this.accountId=String(accountId||"").trim();
-    this.executionMode=String(executionMode||"PAPER").toUpperCase();
+    this.executionMode=(String(executionMode||"DEMO").toUpperCase()==="PAPER"?"DEMO":String(executionMode||"DEMO").toUpperCase());
     this.accountType=String(accountType||"").toLowerCase();
     this.ws=null;
     this.connected=false;
@@ -41,7 +41,7 @@ export class DerivTraderClient {
   }
 
   configured(){
-    return Boolean(this.accessToken&&this.accountId&&["PAPER","LIVE"].includes(this.executionMode));
+    return Boolean(this.accessToken&&this.accountId&&["DEMO","LIVE"].includes(this.executionMode));
   }
 
   async rest(path,options={}){
@@ -79,10 +79,10 @@ export class DerivTraderClient {
     this.accountBalance=balance;
     this.accountBalanceAt=Date.now();
     this.balanceSubscriptionId=account?.subscription?.id||null;
-    const expectedDemo=this.executionMode==="PAPER";
+    const expectedDemo=this.executionMode==="DEMO";
     if(expectedDemo && this.accountTypeFromBalance(balance)!=="demo"){
       await this.disconnect();
-      throw new Error("PAPER_REQUIRES_DERIV_DEMO_ACCOUNT");
+      throw new Error("DEMO_REQUIRES_DERIV_DEMO_ACCOUNT");
     }
     if(!expectedDemo && this.accountTypeFromBalance(balance)==="demo"){
       await this.disconnect();
