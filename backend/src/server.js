@@ -434,6 +434,132 @@ app.get("/api/broker/quote", async (req,res)=>{
   }
 });
 
+app.post("/api/broker/deriv/test-buy-gold", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+
+  // This endpoint is a verification tool, not a strategy bypass. It can only
+  // create a tiny DEMO contract on XAUUSD when the caller explicitly confirms.
+  if(String(req.body?.confirm||"")!=="BUY_GOLD_DEMO_TEST"){
+    return res.status(400).json({
+      ok:false,
+      error:"EXPLICIT_DEMO_CONFIRMATION_REQUIRED",
+      message:"Use confirm=BUY_GOLD_DEMO_TEST to run the XAUUSD demo execution test. No order was submitted."
+    });
+  }
+
+  const mapping=await broker.getMapping(user.id);
+  if(!mapping||String(mapping.provider||"").toLowerCase()!=="deriv"){
+    return res.status(409).json({ok:false,error:"DERIV_ACCOUNT_REQUIRED",message:"Connect a Deriv account first. No order was submitted."});
+  }
+
+  const mode=String(mapping.execution_mode||"").toUpperCase();
+  if(mode!=="PAPER"){
+    return res.status(409).json({
+      ok:false,
+      error:"DEMO_ONLY_TEST",
+      message:"This verification endpoint never submits a real-money order. Set the connected Deriv account to PAPER/DEMO mode. No order was submitted."
+    });
+  }
+
+  try{
+    const connection=await broker.connectionFor(user.id);
+    if(connection.provider!=="deriv")throw new Error("DERIV_PROVIDER_MISMATCH");
+
+    const account=(await connection.api.getAccount()).data||{};
+    const accountType=String(account.accountType||"").toUpperCase();
+    if(accountType!=="DEMO"){
+      return res.status(409).json({ok:false,error:"DEMO_ACCOUNT_REQUIRED",accountType,message:"Only a Deriv DEMO account is permitted for this execution test. No order was submitted."});
+    }
+
+    const resolvedSymbol=await connection.api.resolveMarketSymbol("XAUUSD");
+    if(String(resolvedSymbol).toUpperCase()!=="FRXXAUUSD" && String(resolvedSymbol).toUpperCase()!=="XAUUSD"){
+      throw new Error("DERIV_XAUUSD_SYMBOL_RESOLUTION_FAILED");
+    }
+
+    const contracts=await connection.api.getContractsFor(resolvedSymbol);
+    const available=Array.isArray(contracts?.available)?contracts.available:[];
+    const multiplierAvailable=available.some(item=>String(item?.contract_type||"").toUpperCase()==="MULTUP");
+    if(!multiplierAvailable){
+      return res.status(409).json({ok:false,error:"XAUUSD_MULTUP_UNAVAILABLE",symbol:resolvedSymbol,message:"Deriv does not currently expose MULTUP for XAUUSD on this account/market. No order was submitted."});
+    }
+
+    const quote=(await connection.api.getQuote(resolvedSymbol)).data||{};
+    const stake=Math.min(1,Math.max(0.01,Number(req.body?.stake)||1));
+    const clientId="kbtest_"+crypto.randomUUID();
+    const journal=await pool.query(
+      "INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,'deriv-execution-test',$2,'PAPER',$3,'BUY',$4,'PENDING',NOW()) RETURNING id",
+      [user.id,clientId,resolvedSymbol,stake]
+    );
+
+    try{
+      console.log("[KINGBOT DERIV TEST] proposal pending",JSON.stringify({userId:user.id,symbol:resolvedSymbol,side:"BUY",stake,clientId}));
+      const order=await connection.api.placeOrder({
+        side:"BUY",
+        symbol:resolvedSymbol,
+        volume:stake,
+        stopLoss:undefined,
+        takeProfit:undefined,
+        comment:"KINGBOT XAUUSD DEMO EXECUTION TEST",
+        clientId,
+        userId:user.id,
+        currency:String(account.currency||"USD"),
+        multiplier:10,
+        derivContractType:"MULTUP"
+      });
+
+      await pool.query(
+        "UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",
+        [journal.rows[0].id,JSON.stringify(order)]
+      );
+      await pool.query(
+        "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'DERIV_DEMO_XAUUSD_EXECUTION_TEST',$2::jsonb)",
+        [user.id,JSON.stringify({symbol:resolvedSymbol,side:"BUY",stake,proposalId:order.proposalId||null,contractId:order.contractId||null,clientId})]
+      );
+      console.log("[KINGBOT DERIV TEST] BUY completed",JSON.stringify({symbol:resolvedSymbol,side:"BUY",stake,proposalId:order.proposalId||null,contractId:order.contractId||null,clientId}));
+
+      return res.json({
+        ok:true,
+        test:"DERIV_XAUUSD_BUY",
+        executionMode:"PAPER",
+        accountType:"DEMO",
+        symbol:resolvedSymbol,
+        side:"BUY",
+        stake,
+        quote,
+        proposalId:order.proposalId||null,
+        contractId:order.contractId||null,
+        contractType:order.contractType||"MULTUP",
+        broker:"deriv",
+        verified: Boolean(order?.contractId),
+        message:Boolean(order?.contractId)
+          ?"XAUUSD demo BUY reached Deriv and returned a contract ID."
+          :"Deriv accepted the flow but no contract ID was returned."
+      });
+    }catch(error){
+      await pool.query(
+        "UPDATE kingbot_execution_journal SET status='REJECTED',error_message=$2,updated_at=NOW() WHERE id=$1",
+        [journal.rows[0].id,String(error?.message||"DERIV_DEMO_BUY_REJECTED").slice(0,500)]
+      );
+      console.error("[KINGBOT DERIV TEST] BUY rejected:",error?.message||error);
+      return res.status(502).json({
+        ok:false,
+        error:"DERIV_DEMO_BUY_REJECTED",
+        reason:String(error?.message||"DERIV_DEMO_BUY_REJECTED").slice(0,500),
+        symbol:resolvedSymbol,
+        side:"BUY",
+        stake
+      });
+    }
+  }catch(error){
+    console.error("[KINGBOT DERIV TEST] setup failed:",error?.message||error);
+    return res.status(503).json({
+      ok:false,
+      error:"DERIV_DEMO_EXECUTION_TEST_UNAVAILABLE",
+      reason:String(error?.message||"DERIV_DEMO_EXECUTION_TEST_UNAVAILABLE").slice(0,500)
+    });
+  }
+});
+
 app.get("/api/account", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   try{
