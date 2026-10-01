@@ -431,7 +431,8 @@ export class UserBrokerManager {
           freeMargin:state.free_margin??info.free_margin,
           marginLevel:state.margin_level??info.margin_level,
           tradeAllowed:info.trade_mode==="enabled" && info.account_status==="active",
-          provider:"exness"
+          provider:"exness",
+          accountType:entry.executionMode==="LIVE"?"REAL":"DEMO"
         }
       };
     }
@@ -449,7 +450,8 @@ export class UserBrokerManager {
         freeMargin:info.marginAvailable,
         marginLevel:Number(info.marginUsed)>0 ? Number(info.NAV)/Number(info.marginUsed)*100 : null,
         tradeAllowed:true,
-        provider:"oanda"
+        provider:"oanda",
+        accountType:entry.executionMode==="LIVE"?"REAL":"DEMO"
       }};
     }
     return {connected:true,data:await entry.connection.getAccountInformation()};
