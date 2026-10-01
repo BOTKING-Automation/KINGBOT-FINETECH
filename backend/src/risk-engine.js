@@ -1,4 +1,4 @@
-const DEFAULTS={dailyDrawdownPct:5,totalDrawdownPct:10,maxRiskPerTradePct:1,maxPositions:3,maxSpreadAtrRatio:0.25,staleDataMs:5000,maxConsecutiveLosses:3,autoPauseOnLossStreak:true};
+const DEFAULTS={dailyDrawdownPct:5,totalDrawdownPct:10,maxRiskPerTradePct:1,maxPositions:3,lotSize:0.01,maxSpreadAtrRatio:0.25,staleDataMs:5000,maxConsecutiveLosses:3,autoPauseOnLossStreak:true};
 const finite=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
 const clamp=(v,min,max)=>Math.min(max,Math.max(min,finite(v,min)));
 export function normalizeRiskSettings(input={},defaults=DEFAULTS){
@@ -8,6 +8,7 @@ export function normalizeRiskSettings(input={},defaults=DEFAULTS){
   totalDrawdownPct:clamp(x.totalDrawdownPct,1,30),
   maxRiskPerTradePct:clamp(x.maxRiskPerTradePct,0.1,5),
   maxPositions:Math.round(clamp(x.maxPositions,1,50)),
+  lotSize:Number(Math.max(0.01,Math.min(100,finite(x.lotSize,Number(defaults.lotSize||0.01))))),
   maxSpreadAtrRatio:clamp(x.maxSpreadAtrRatio,0.05,1),
   staleDataMs:Math.round(clamp(x.staleDataMs,500,30000)),
   maxConsecutiveLosses:Math.round(clamp(x.maxConsecutiveLosses,1,20)),
