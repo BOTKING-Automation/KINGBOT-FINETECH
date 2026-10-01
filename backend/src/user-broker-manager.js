@@ -592,19 +592,30 @@ export class UserBrokerManager {
   }
 
   async getQuote(symbol,userId){
-    const entry=await this.connectionFor(userId);
+    const requested=String(symbol).trim().toUpperCase();
+    let entry=null;
+    try{entry=await this.connectionFor(userId);}catch(error){
+      const mapping=await this.getMapping(userId);
+      if(mapping?.provider==="deriv"){
+        // Deriv market data is public and must remain available even when the
+        // authenticated trading socket is temporarily rate-limited.
+        const publicApi=new DerivTraderClient();
+        return await publicApi.getQuote(requested);
+      }
+      throw error;
+    }
     if(entry.provider==="exness"){
-      const quote=await entry.api.getQuote(String(symbol).trim().toUpperCase());
+      const quote=await entry.api.getQuote(requested);
       return {connected:true,data:{...quote,time:quote.timestamp||quote.time||new Date().toISOString(),lossTickValue:quote.lossTickValue}};
     }
     if(entry.provider==="deriv"){
-      return await entry.api.getQuote(String(symbol).trim().toUpperCase());
+      return await entry.api.getQuote(requested);
     }
     if(entry.provider==="oanda"){
-      const quote=await entry.api.getQuote(String(symbol).trim().toUpperCase());
+      const quote=await entry.api.getQuote(requested);
       return {connected:true,data:{...quote,lossTickValue:1}};
     }
-    return {connected:true,data:await entry.connection.getSymbolPrice(String(symbol).trim().toUpperCase())};
+    return {connected:true,data:await entry.connection.getSymbolPrice(requested)};
   }
 
   async modifyPositionStops({userId,positionId,symbol,stopLoss,takeProfit}={}){
