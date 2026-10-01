@@ -132,6 +132,23 @@ export class PartnerManager {
     };
   }
 
+  async recordActiveConnection({userId,brokerSlug,metadata={}}={}){
+    if(!this.pool||!userId)return {ok:false,recorded:false};
+    const slug=String(brokerSlug||"").trim().toLowerCase();
+    if(!BROKER_DEFS[slug])return {ok:false,recorded:false,error:"UNKNOWN_BROKER"};
+    const q=await this.pool.query(
+      "SELECT click_id FROM kingbot_partner_clicks WHERE user_id=$1 AND broker_slug=$2 ORDER BY created_at DESC LIMIT 1",
+      [userId,slug]
+    );
+    const clickId=q.rowCount?q.rows[0].click_id:null;
+    const ext="active:"+String(userId)+":"+slug;
+    await this.pool.query(
+      "INSERT INTO kingbot_partner_events(click_id,user_id,broker_slug,event_type,external_reference,source,metadata) VALUES($1,$2,$3,'ACTIVE',$4,'kingbot_connection',$5::jsonb) ON CONFLICT DO NOTHING",
+      [clickId,userId,slug,ext,JSON.stringify(metadata||{})]
+    );
+    return {ok:true,recorded:true,clickId};
+  }
+
   async dashboard({days=30}={}){
     if(!this.pool){
       return {ok:true,configured:false,days,data:null};
