@@ -260,6 +260,17 @@ export class ExnessTraderClient{
     return this.request("GET",path);
   }
 
+  async getMarkets(){
+    await this.ensureReady();
+    const data=await this.request("GET","/v1/configuration/accounts/"+this.accountId+"/instruments");
+    const raw=Array.isArray(data?.instruments)?data.instruments:(Array.isArray(data?.data?.instruments)?data.data.instruments:(Array.isArray(data?.data)?data.data:[]));
+    return raw.map(item=>{
+      if(typeof item==="string")return {symbol:item.trim().toUpperCase(),name:item.trim().toUpperCase(),category:"",submarket:"",tradeable:true,source:"broker"};
+      const symbol=String(item?.instrument||item?.symbol||item?.name||"").trim().toUpperCase();
+      return {symbol,name:String(item?.display_name||item?.displayName||item?.name||symbol).trim(),category:String(item?.type||item?.category||"").trim(),submarket:String(item?.group||item?.subgroup||"").trim(),tradeable:item?.tradeable!==false,source:"broker"};
+    }).filter(x=>x.symbol);
+  }
+
   async getInstrumentConditions(instrument){
     await this.ensureReady();
     const symbol=String(instrument||"").trim().toUpperCase();
