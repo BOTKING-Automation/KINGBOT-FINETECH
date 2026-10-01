@@ -30,7 +30,19 @@ export class DerivMarketFeed {
   normalize(symbol) {
     const value = String(symbol||"").trim();
     if (!value) throw new Error("DERIV_SYMBOL_REQUIRED");
-    return value;
+    const upper = value.toUpperCase();
+    const aliases = {
+      XAUUSD:"frxXAUUSD",
+      XAGUSD:"frxXAGUSD",
+      EURUSD:"frxEURUSD",
+      GBPUSD:"frxGBPUSD",
+      USDJPY:"frxUSDJPY",
+      AUDUSD:"frxAUDUSD",
+      USDCAD:"frxUSDCAD",
+      USDCHF:"frxUSDCHF",
+      NZDUSD:"frxNZDUSD"
+    };
+    return aliases[upper] || value;
   }
 
   async connect() {
