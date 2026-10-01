@@ -555,11 +555,40 @@ app.get("/api/account", async (req,res)=>{
 });
 app.get("/api/positions", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
-  try{const x=await broker.getPositions(user.id);res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Position telemetry unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
+  try{
+    const x=await broker.getPositions(user.id);
+    const rows=(Array.isArray(x?.data)?x.data:[]).map(p=>({
+      id:p?.id||p?.positionId||p?.ticket||null,
+      symbol:p?.symbol||"—",
+      side:String(p?.side||p?.type||p?.positionSide||"—").toUpperCase(),
+      volume:firstFinite(p?.volume,p?.lots,p?.quantity),
+      entry:firstFinite(p?.openPrice,p?.entryPrice,p?.entry,p?.price),
+      current:firstFinite(p?.currentPrice,p?.current,p?.marketPrice),
+      pnl:firstFinite(p?.profit,p?.pnl,p?.unrealizedProfit,p?.unrealizedPnl),
+      status:String(p?.state||p?.status||"OPEN").toUpperCase()
+    }));
+    res.json({ok:true,connected:Boolean(x?.connected),data:rows,positions:rows,syncedAt:new Date().toISOString()});
+  }catch(error){
+    res.status(503).json({ok:false,error:"Position telemetry unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});
+  }
 });
 app.get("/api/orders", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
-  try{const x=await broker.getOrders(user.id);res.json({ok:true,...x});}catch(error){res.status(503).json({ok:false,error:"Order telemetry unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});}
+  try{
+    const x=await broker.getOrders(user.id);
+    const rows=(Array.isArray(x?.data)?x.data:[]).map(o=>({
+      id:o?.id||o?.orderId||o?.ticket||null,
+      time:isoOrNull(o?.time||o?.createTime||o?.openTime||o?.updateTime),
+      symbol:o?.symbol||"—",
+      side:String(o?.side||o?.type||o?.orderSide||"—").toUpperCase(),
+      volume:firstFinite(o?.volume,o?.lots,o?.quantity),
+      price:firstFinite(o?.openPrice,o?.price,o?.entryPrice),
+      status:String(o?.state||o?.status||"OPEN").toUpperCase()
+    }));
+    res.json({ok:true,connected:Boolean(x?.connected),data:rows,orders:rows,syncedAt:new Date().toISOString()});
+  }catch(error){
+    res.status(503).json({ok:false,error:"Order telemetry unavailable.",reason:error?.message||"BROKER_NOT_CONNECTED"});
+  }
 });
 app.get("/api/trades", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
