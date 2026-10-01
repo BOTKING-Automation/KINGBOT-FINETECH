@@ -17,7 +17,7 @@ async function settings(pool,userId,botId){
   const q=await pool.query("SELECT * FROM kingbot_bot_risk_settings WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
   if(!q.rowCount)return {executionMode:"DEMO",killSwitch:false,dailyDrawdownPct:5,totalDrawdownPct:10,maxRiskPerTradePct:getBotDefinitions()[botId].risk.maxRiskPerTradePct,maxPositions:getBotDefinitions()[botId].risk.maxPositions,maxSpreadAtrRatio:.25,staleDataMs:5000,maxConsecutiveLosses:3,autoPauseOnLossStreak:true};
   const x=q.rows[0];
-  return {dailyDrawdownPct:Number(x.daily_drawdown_pct),totalDrawdownPct:Number(x.total_drawdown_pct),maxRiskPerTradePct:Number(x.max_risk_per_trade_pct),maxPositions:Number(x.max_positions),maxSpreadAtrRatio:Number(x.max_spread_atr_ratio),staleDataMs:Number(x.stale_data_ms),maxConsecutiveLosses:Number(x.max_consecutive_losses),autoPauseOnLossStreak:Boolean(x.auto_pause_on_loss_streak),executionMode:String(x.execution_mode)==="PAPER"?"DEMO":String(x.execution_mode),killSwitch:Boolean(x.kill_switch)};
+  return {dailyDrawdownPct:Number(x.daily_drawdown_pct),totalDrawdownPct:Number(x.total_drawdown_pct),maxRiskPerTradePct:Number(x.max_risk_per_trade_pct),maxPositions:Number(x.max_positions),maxSpreadAtrRatio:Number(x.max_spread_atr_ratio),staleDataMs:Number(x.stale_data_ms),maxConsecutiveLosses:Number(x.max_consecutive_losses),autoPauseOnLossStreak:Boolean(x.auto_pause_on_loss_streak),executionMode:String(x.execution_mode)==="PAPER"?"DEMO":String(x.execution_mode)==="PAPER"?"DEMO":String(x.execution_mode),killSwitch:Boolean(x.kill_switch)};
 }
 async function runtime(pool,userId,botId){
   const q=await pool.query("SELECT * FROM kingbot_bot_runtime WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
