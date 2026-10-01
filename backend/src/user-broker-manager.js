@@ -3,6 +3,7 @@ import MetaApi from "metaapi.cloud-sdk/esm-node";
 import { ExnessTraderClient } from "./exness-trader-client.js";
 import { OandaTraderClient } from "./oanda-trader-client.js";
 import { DerivTraderClient } from "./deriv-trader-client.js";
+import { Mt5BridgeConnection, mt5BridgeRegistry } from "./mt5-bridge.js";
 
 const ALGORITHM="aes-256-gcm";
 
@@ -274,6 +275,39 @@ export class UserBrokerManager {
     const key=userId+":"+mapping.provider+":"+mapping.account_id;
     let entry=this.connections.get(key);
 
+    if(mapping.provider==="mt5-bridge"){
+      try{
+        if(!entry){
+          const connection=new Mt5BridgeConnection({registry:mt5BridgeRegistry,token:credential,userId});
+          if(!await connection.waitConnected(5000))return {connected:false,mode:"NOT_CONNECTED",reason:"MT5_BRIDGE_OFFLINE"};
+          entry={api:connection,connection,accountId:mapping.account_id,executionMode:mode,provider:"mt5-bridge",connectedAt:Date.now(),accountInfo:null};
+          this.connections.set(key,entry);
+        }
+        if(!entry.connection.connected)return {connected:false,mode:"NOT_CONNECTED",reason:"MT5_BRIDGE_OFFLINE"};
+        const accountInfo=await entry.connection.getAccountInformation();
+        const terminalMode=String(accountInfo.accountType||accountInfo.account_type||"").toUpperCase()||(
+          Number(accountInfo.tradeMode)===4?"REAL":"DEMO"
+        );
+        if(mode==="PAPER"&&terminalMode!=="DEMO"){
+          this.connections.delete(key);
+          return {connected:false,mode:"NOT_CONNECTED",reason:"PAPER_REQUIRES_DEMO_ACCOUNT"};
+        }
+        if(mode==="LIVE"&&terminalMode!=="REAL"){
+          this.connections.delete(key);
+          return {connected:false,mode:"NOT_CONNECTED",reason:"LIVE_REQUIRES_REAL_ACCOUNT"};
+        }
+        entry.accountInfo=accountInfo;
+        entry.accountInfoAt=Date.now();
+        entry.executionMode=mode;
+        this.connectBackoff.delete(backoffKey);
+        return {connected:true,mode,broker:"mt5-bridge",accountId:mapping.account_id,account:accountInfo};
+      }catch(error){
+        this.connections.delete(key);
+        console.error("[KINGBOT MT5 BRIDGE] connect failed:",error?.message||error);
+        return {connected:false,mode:"NOT_CONNECTED",reason:error?.message||"MT5_BRIDGE_CONNECTION_FAILED"};
+      }
+    }
+
     if(mapping.provider==="exness"){
       try{
         const parsed=JSON.parse(credential);
@@ -491,6 +525,10 @@ export class UserBrokerManager {
         balanceStreamActive:Boolean(entry.api?.balanceSubscriptionId)
       }};
     }
+    if(String(entry.provider).toLowerCase()==="mt5-bridge"){
+      const info=await entry.connection.getAccountInformation();
+      return {connected:true,data:{...info,provider:"mt5-bridge",accountType:entry.executionMode==="LIVE"?"REAL":"DEMO"}};
+    }
     if(entry.provider==="exness"){
       const info=await entry.api.getAccountInformation();
       let state={};
@@ -544,6 +582,7 @@ export class UserBrokerManager {
 
   async getPositions(userId){
     const entry=await this.connectionFor(userId);
+    if(String(entry.provider).toLowerCase()==="mt5-bridge")return {connected:true,data:await entry.connection.getPositions()};
     if(entry.provider==="exness")return {connected:true,data:await entry.api.getPositions()};
     if(entry.provider==="deriv"){
       try{
@@ -571,6 +610,7 @@ export class UserBrokerManager {
 
   async getOrders(userId){
     const entry=await this.connectionFor(userId);
+    if(String(entry.provider).toLowerCase()==="mt5-bridge")return {connected:true,data:await entry.connection.getOrders()};
     if(entry.provider==="exness")return {connected:true,data:await entry.api.getOrders()};
     if(entry.provider==="deriv")return await entry.api.getOrders();
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getOrders()};
@@ -582,6 +622,15 @@ export class UserBrokerManager {
     const entry=await this.connectionFor(userId);
     const end=endTime?new Date(endTime):new Date();
     const start=startTime?new Date(startTime):new Date(end.getTime()-24*60*60*1000);
+    if(String(entry.provider).toLowerCase()==="mt5-bridge"){
+      return {
+        connected:true,
+        data:{
+          orders:await entry.connection.getHistoryOrdersByTimeRange(start,end),
+          deals:await entry.connection.getDealsByTimeRange(start,end)
+        }
+      };
+    }
     if(entry.provider==="exness"){
       return {
         connected:true,
@@ -620,6 +669,12 @@ export class UserBrokerManager {
 
   async getMarkets(userId){
     let entry=await this.connectionFor(userId);
+    if(String(entry.provider).toLowerCase()==="mt5-bridge"){
+      const list=await entry.connection.getSymbols();
+      return {connected:true,data:(Array.isArray(list)?list:[]).map(item=>typeof item==="string"
+        ? {symbol:item.toUpperCase(),name:item,category:"CFD",submarket:"",tradeable:true,source:"mt5-ea-bridge"}
+        : {symbol:String(item?.symbol||"").toUpperCase(),name:String(item?.name||item?.description||item?.symbol||"").trim(),category:String(item?.category||"CFD"),submarket:String(item?.path||"").trim(),tradeable:item?.tradeable!==false,source:"mt5-ea-bridge",minVolume:Number(item?.minVolume)||null,maxVolume:Number(item?.maxVolume)||null,volumeStep:Number(item?.volumeStep)||null,digits:Number(item?.digits)||null,point:Number(item?.point)||null,tickSize:Number(item?.tickSize)||null,tickValue:Number(item?.tickValue)||null,stopsLevel:Number(item?.stopsLevel)||0,contractSize:Number(item?.contractSize)||null}).filter(x=>x.symbol)};
+    }
     if(entry.provider==="exness")return {connected:true,data:await entry.api.getMarkets()};
     if(entry.provider==="deriv"){
       try{
@@ -652,6 +707,7 @@ export class UserBrokerManager {
 
   async getSymbolSpecification(symbol,userId){
     const entry=await this.connectionFor(userId);
+    if(String(entry.provider).toLowerCase()==="mt5-bridge")return {connected:true,data:await entry.connection.getSymbolSpecification(String(symbol).trim().toUpperCase())};
     if(entry.provider==="exness")return {connected:true,data:await entry.api.getInstrumentConditions(String(symbol).trim().toUpperCase())};
     if(entry.provider==="deriv")return await entry.api.getSymbolSpecification(String(symbol).trim().toUpperCase());
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getInstrumentSpecification(String(symbol).trim().toUpperCase())};
@@ -665,6 +721,9 @@ export class UserBrokerManager {
 
   async getHistoricalCandles(symbol,timeframe,userId,limit=100){
     const entry=await this.connectionFor(userId);
+    if(String(entry.provider).toLowerCase()==="mt5-bridge"){
+      return {connected:true,data:await entry.connection.getHistoricalCandles(String(symbol).trim().toUpperCase(),String(timeframe),limit)};
+    }
     if(entry.provider==="exness")throw new Error("EXNESS_CANDLES_ADAPTER_PENDING");
     if(entry.provider==="deriv")return await entry.api.getHistoricalCandles(String(symbol).trim().toUpperCase(),String(timeframe),limit);
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getHistoricalCandles(String(symbol).trim().toUpperCase(),String(timeframe),limit)};
@@ -689,6 +748,9 @@ export class UserBrokerManager {
         return await publicApi.getQuote(requested);
       }
       throw error;
+    }
+    if(String(entry.provider).toLowerCase()==="mt5-bridge"){
+      return await entry.connection.getQuote(requested);
     }
     if(entry.provider==="exness"){
       const quote=await entry.api.getQuote(requested);
