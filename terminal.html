@@ -2438,7 +2438,7 @@ async function fetchApi(path, options = {}) {
    BACKEND CONNECTION CHECK
 ========================================================= */
 
-async function checkBackend() {
+async function runBackendCheck() {
   let accountLoaded=false;
   const cycle=++verificationCycle;
 
@@ -2582,6 +2582,13 @@ async function checkBackend() {
     clearTimeout(brokerVerificationDelayTimer);
     brokerVerificationDelayTimer=null;
   }
+}
+
+let backendCheckPromise=null;
+function checkBackend(){
+  if(backendCheckPromise)return backendCheckPromise;
+  backendCheckPromise=runBackendCheck().finally(()=>{backendCheckPromise=null;});
+  return backendCheckPromise;
 }
 
 /* =========================================================
@@ -2983,12 +2990,6 @@ async function loadTerminalEngineProjection(){
   void loadTerminalEngineProjection();
 
   await accountBoot;
-
-  // Firebase may finish restoring the token just after first paint.
-  // Retry identity/telemetry without blocking the first render.
-  setTimeout(async()=>{try{await checkBackend();}catch{}},800);
-  setTimeout(async()=>{try{await checkBackend();}catch{}},2500);
-  setTimeout(async()=>{try{await checkBackend();}catch{}},5000);
 
   clearInterval(window.__KINGBOT_ENGINE_PROJECTION_REFRESH);
   window.__KINGBOT_ENGINE_PROJECTION_REFRESH=setInterval(()=>{void loadTerminalEngineProjection()},5000);
