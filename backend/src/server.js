@@ -965,7 +965,7 @@ app.post("/api/positions/:positionId/close", async (req,res)=>{
       );
       return res.json({ok:true,closed:true,provider:"deriv",positionId,result});
     }
-    if(provider==="deriv-mt5" || provider==="metaapi" || provider==="ig" || provider==="fxcm"){
+    if(provider==="mt5-bridge" || provider==="deriv-mt5" || provider==="metaapi" || provider==="ig" || provider==="fxcm"){
       if(typeof entry.connection?.closePosition!=="function")return res.status(400).json({ok:false,error:"POSITION_CLOSE_UNSUPPORTED"});
       const positions=String(provider)==="deriv-mt5"
         ? (Array.isArray(entry.connection.terminalState?.positions)?entry.connection.terminalState.positions:[])
