@@ -320,7 +320,7 @@ async function executeLadderV8DerivStart({userId,botId,config,s,account,quote,in
   if(types.size>0&&!types.has(contractType))return {action:"DERIV_V8_CONTRACT_TYPE_UNAVAILABLE",state:null,details:{requested:contractType,available:[...types].slice(0,30)}};
   const point=Number(spec.point);
   if(!Number.isFinite(point)||point<=0)throw new Error("DERIV_V8_POINT_SIZE_UNAVAILABLE");
-  const multiplier=10;
+  const multiplier=100;
   const accountCurrency=String(account.currency||"USD").toUpperCase();
   const budget=Number(account.equity)*(Number(s.maxRiskPerTradePct)/100);
   const rawLots=[];
@@ -445,7 +445,7 @@ async function executeLadderV8DerivManage({userId,botId,config,s,account,quote,p
       const side=Number(state.direction)>0?"BUY":"SELL";
       try{
         const clientId="kbv8d_"+crypto.randomUUID();
-        const order=await broker.placeOrder({side,symbol:config.symbol,volume:nextStake,stopLoss:Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||10))),takeProfit:Math.max(nextStake*1.05, nextStake + Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||10)))*Number(cfg.takeProfitRR||2.0)),comment:"KINGBOT V8 DERIV PYRAMID R"+state.rungs_opened,clientId,userId,currency:String(account.currency||"USD"),multiplier:Number(state.deriv_multiplier||10),derivContractType:state.deriv_contract_type});
+        const order=await broker.placeOrder({side,symbol:config.symbol,volume:nextStake,stopLoss:Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||100))),takeProfit:Math.max(nextStake*1.05, nextStake + Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||10)))*Number(cfg.takeProfitRR||2.0)),comment:"KINGBOT V8 DERIV PYRAMID R"+state.rungs_opened,clientId,userId,currency:String(account.currency||"USD"),multiplier:Number(state.deriv_multiplier||10),derivContractType:state.deriv_contract_type});
         if(order?.contractId){
           state.positionIds=[...state.positionIds.map(String),String(order.contractId)];
           stakes.push(nextStake);
