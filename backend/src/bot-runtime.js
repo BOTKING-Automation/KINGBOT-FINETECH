@@ -15,9 +15,9 @@ async function entitlement(pool,userId,botId,userEmail){
 }
 async function settings(pool,userId,botId){
   const q=await pool.query("SELECT * FROM kingbot_bot_risk_settings WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
-  if(!q.rowCount)return {executionMode:"PAPER",killSwitch:false,dailyDrawdownPct:5,totalDrawdownPct:10,maxRiskPerTradePct:getBotDefinitions()[botId].risk.maxRiskPerTradePct,maxPositions:getBotDefinitions()[botId].risk.maxPositions,maxSpreadAtrRatio:.25,staleDataMs:5000,maxConsecutiveLosses:3,autoPauseOnLossStreak:true};
+  if(!q.rowCount)return {executionMode:"DEMO",killSwitch:false,dailyDrawdownPct:5,totalDrawdownPct:10,maxRiskPerTradePct:getBotDefinitions()[botId].risk.maxRiskPerTradePct,maxPositions:getBotDefinitions()[botId].risk.maxPositions,maxSpreadAtrRatio:.25,staleDataMs:5000,maxConsecutiveLosses:3,autoPauseOnLossStreak:true};
   const x=q.rows[0];
-  return {dailyDrawdownPct:Number(x.daily_drawdown_pct),totalDrawdownPct:Number(x.total_drawdown_pct),maxRiskPerTradePct:Number(x.max_risk_per_trade_pct),maxPositions:Number(x.max_positions),maxSpreadAtrRatio:Number(x.max_spread_atr_ratio),staleDataMs:Number(x.stale_data_ms),maxConsecutiveLosses:Number(x.max_consecutive_losses),autoPauseOnLossStreak:Boolean(x.auto_pause_on_loss_streak),executionMode:String(x.execution_mode),killSwitch:Boolean(x.kill_switch)};
+  return {dailyDrawdownPct:Number(x.daily_drawdown_pct),totalDrawdownPct:Number(x.total_drawdown_pct),maxRiskPerTradePct:Number(x.max_risk_per_trade_pct),maxPositions:Number(x.max_positions),maxSpreadAtrRatio:Number(x.max_spread_atr_ratio),staleDataMs:Number(x.stale_data_ms),maxConsecutiveLosses:Number(x.max_consecutive_losses),autoPauseOnLossStreak:Boolean(x.auto_pause_on_loss_streak),executionMode:String(x.execution_mode)==="PAPER"?"DEMO":String(x.execution_mode),killSwitch:Boolean(x.kill_switch)};
 }
 async function runtime(pool,userId,botId){
   const q=await pool.query("SELECT * FROM kingbot_bot_runtime WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
@@ -95,8 +95,11 @@ export function createBotRuntimeRouter({pool,broker}){
     if(!(await entitlement(pool,user.id,b.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const s=await settings(pool,user.id,b.id);
     if(s.killSwitch)return res.status(409).json({ok:false,error:"KILL_SWITCH_ACTIVE"});
-    if(!["PAPER","LIVE"].includes(s.executionMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
-    if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before starting PAPER or LIVE execution. No order was submitted."});
+    if(s.executionMode==="PAPER")s.executionMode="DEMO";
+    if(!["DEMO","LIVE"].includes(s.executionMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+    if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before starting DEMO or LIVE execution. No order was submitted."});
+    const brokerStatus=await broker.getStatus(user.id);
+    if(String(brokerStatus.broker||"").toLowerCase()==="deriv")return res.status(409).json({ok:false,error:"DERIV_OPTIONS_NOT_VALID_FOR_MT5_BOTS",message:"The connected account is Deriv Options. These bot engines use MT5 lots and require KINGBOT MT5 BRIDGE on the selected Deriv MT5 account."});
     await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS symbol TEXT, ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '5m'");
     const configured=await pool.query("SELECT symbol,timeframe FROM kingbot_bot_runtime WHERE user_id=$1 AND bot_id=$2",[user.id,b.id]);
     const requestedSymbol=String(req.body?.symbol||"").trim().toUpperCase();
@@ -140,6 +143,8 @@ export function createBotRuntimeRouter({pool,broker}){
     const timeframe=String(req.body?.timeframe||b.timeframeProfile?.execution||"5m").trim();
     if(!/^[A-Z0-9._-]{3,30}$/.test(symbol))return res.status(400).json({ok:false,error:"INVALID_SYMBOL"});
     if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before selecting a market. No bot configuration was saved."});
+    const brokerStatus=await broker.getStatus(user.id);
+    if(String(brokerStatus.broker||"").toLowerCase()==="deriv")return res.status(409).json({ok:false,error:"DERIV_OPTIONS_NOT_VALID_FOR_MT5_BOTS",message:"Use KINGBOT MT5 BRIDGE for MT5 lot-based bot execution."});
     try{
       const marketCheck=await broker.validateMarket(user.id,symbol);
       if(!marketCheck.ok)return res.status(400).json({ok:false,error:marketCheck.error,message:"The selected market is not available for the connected broker account. Choose a market from the broker catalog."});
