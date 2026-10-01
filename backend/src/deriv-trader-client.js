@@ -449,6 +449,9 @@ export class DerivTraderClient {
   }
 
   async getTrades({startTime,endTime}={}){
+    const cacheKey=String(startTime||"")+"|"+String(endTime||"");
+    const cached=this.tradesCache.get(cacheKey);
+    if(cached&&Date.now()-cached.at<30000)return cached.value;
     const body={profit_table:1,limit:500,sort:"DESC"};
     if(startTime)body.date_from=Math.floor(new Date(startTime).getTime()/1000);
     if(endTime)body.date_to=Math.floor(new Date(endTime).getTime()/1000);
@@ -467,13 +470,15 @@ export class DerivTraderClient {
         realizedPnl:profit
       };
     });
-    return {
+    const value={
       connected:true,
       data:{
         orders:[],
         deals
       }
     };
+    this.tradesCache.set(cacheKey,{at:Date.now(),value});
+    return value;
   }
 
   async getQuote(symbol){
