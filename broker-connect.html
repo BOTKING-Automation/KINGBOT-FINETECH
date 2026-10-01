@@ -326,7 +326,7 @@ function textFor(){
   }else{
     $("brokerLogin").href=step===1?(selected==="exness" && partnerOpened ? $("brokerLogin").href : d.login):d.api;
   }
-  if(selected!=="deriv")$("nextStep").style.display=(step<2||(!verified&&step===2&&d.native&&!["oanda"].includes(selected)))?"inline-flex":"none";
+  if(selected!=="deriv")$("nextStep").style.display=(selected==="derivmt5"?"none":(step<2||(!verified&&step===2&&d.native&&!["oanda"].includes(selected)))?"inline-flex":"none");
   if(selected==="deriv"){
     $("credentials").classList.remove("show");
     $("verifyBtn").style.display="none";
@@ -352,7 +352,7 @@ function textFor(){
       $("credentialHelp").textContent=selected==="derivmt5"?"Paste the MetaApi access token and MetaApi account ID for the Deriv MT5 account you added to the bridge. KINGBOT validates the MT5 account and uses native lot-based CFD execution.":"Bridge credentials are sent over HTTPS to the authenticated KINGBOT backend and are not stored in browser localStorage.";
     }
   }else {$("credentials").classList.remove("show");$("mt5BridgePanel").style.display="none";}
-  if(step===3)$("accountSelect").classList.add("show");else $("accountSelect").classList.remove("show");
+  if(step===3&&selected!=="derivmt5")$("accountSelect").classList.add("show");else $("accountSelect").classList.remove("show");
   if(selected!=="deriv")$("flowStatus").textContent=step===1?"Waiting for broker account confirmation.":step===2?(selected==="exness"?"Create or manage the Exness API key in Key Management, then return with the issued credentials.":(native?"Native API authorization is selected for this broker.":"Bridge credential entry is ready.")):(step===3?"Choose one account to continue.":"Account authorization is ready.");
 }
 function selectBroker(slug){
