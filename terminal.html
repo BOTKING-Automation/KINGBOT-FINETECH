@@ -3113,40 +3113,75 @@ async function loadTerminalEngineProjection({force=false}={}){
  if(liveRuntimeSyncInFlight&&!force)return false;
  liveRuntimeSyncInFlight=true;
  try{
-   const [runtime,selection]=await Promise.all([
+   const [runtimeResult,selectionResult]=await Promise.allSettled([
      fetchApi("/runtime",{timeoutMs:7000}),
-     fetchApi("/runtime/selection/current",{timeoutMs:7000}).catch(()=>({selectedBotId:null}))
+     fetchApi("/runtime/selection/current",{timeoutMs:7000})
    ]);
-   const runtimeBots=Array.isArray(runtime?.bots)?runtime.bots:[];
-   const selectedId=String(selection?.selectedBotId||"").trim();
-   const selectedBot=runtimeBots.find(x=>String(x.botId||"")===selectedId)||runtimeBots.find(x=>String(x.runtime||x.state||"").toUpperCase()==="RUNNING")||null;
-   const info=renderEngineProjection(runtimeBots,selectedBot);
+   const runtimeBots=runtimeResult.status==="fulfilled" && Array.isArray(runtimeResult.value?.bots)
+     ? runtimeResult.value.bots : [];
+   const selection=selectionResult.status==="fulfilled"?selectionResult.value:null;
+   const selectedId=String(selection?.selectedBotId||selection?.bot?.botId||"").trim();
+
+   // Terminal must not hide a running engine just because the aggregate
+   // runtime list is delayed. The persisted selection endpoint is a second
+   // authoritative backend source and is safe to project independently.
+   let selectedBot=runtimeBots.find(x=>String(x.botId||"")===selectedId)||null;
+   if(!selectedBot && selection?.bot){
+     selectedBot={
+       ...selection.bot,
+       botId:String(selection.bot.botId||selectedId),
+       name:selection.bot.name||selection.bot.botId||"ENGINE",
+       runtime:String(selection.bot.state||"STOPPED").toUpperCase(),
+       executionMode:selection.bot.executionMode||"NOT_SET",
+       symbol:selection.bot.symbol||null,
+       timeframe:selection.bot.timeframe||"1m",
+       lastSignal:selection.bot.lastSignal||null,
+       lastRunAt:selection.bot.lastRunAt||null,
+       lastError:selection.bot.lastError||null
+     };
+   }
+   const aggregateRunning=runtimeBots.find(x=>String(x.runtime||x.state||x.status||"STOPPED").trim().toUpperCase()==="RUNNING");
+   const preferred=selectedBot?.runtime==="RUNNING"?selectedBot:(aggregateRunning||selectedBot);
+   const info=renderEngineProjection(runtimeBots,preferred);
    const now=new Date().toISOString();
    setSyncClock("syncRuntimeAt",now);
-   lastRuntimeSnapshotKey=JSON.stringify(runtimeBots.map(x=>[x.botId,x.runtime||x.state,x.symbol,x.lastRunAt,x.lastError,x.lastSignal?.signal||null,x.lastSignal?.updatedAt||null]));
-   if(selectedBot){
-     $("syncEngine").textContent=String(selectedBot.name||selectedBot.botId||"ENGINE").toUpperCase();
-     $("syncEngineNote").textContent=String(selectedBot.runtime||selectedBot.state||"STOPPED").toUpperCase()+" · "+String(selectedBot.executionMode||"NOT SET").toUpperCase()+" · SAVED ACCOUNT SELECTION";
-     $("syncMarket").textContent=String(selectedBot.symbol||info?.symbol||"—").toUpperCase();
-     $("syncMarketNote").textContent=selectedBot.timeframe?String(selectedBot.timeframe).toUpperCase()+" · BROKER-VERIFIED MARKET":"BROKER MARKET NOT CONFIGURED";
-     const sig=parseSignal(selectedBot.lastSignal);
-     noteEngineEvent(sig?.signal||selectedBot.lastError||selectedBot.runtime||"ENGINE SYNC",sig?.updatedAt||selectedBot.lastRunAt||now);
-     if(selectedBot.symbol){
-       await loadBrokerMarketProjection(selectedBot.symbol,String(selectedBot.broker||info?.broker||""));
+
+   if(preferred){
+     const preferredState=String(preferred.runtime||preferred.state||"STOPPED").toUpperCase();
+     $("syncEngine").textContent=String(preferred.name||preferred.botId||"ENGINE").toUpperCase();
+     $("syncEngineNote").textContent=preferredState+" · "+String(preferred.executionMode||"NOT SET").toUpperCase()+" · SERVER AUTHORITATIVE";
+     $("syncMarket").textContent=String(preferred.symbol||info?.symbol||"—").toUpperCase();
+     $("syncMarketNote").textContent=preferred.timeframe?String(preferred.timeframe).toUpperCase()+" · BROKER-VERIFIED MARKET":"BROKER MARKET NOT CONFIGURED";
+     const sig=parseSignal(preferred.lastSignal);
+     noteEngineEvent(sig?.signal||preferred.lastError||preferredState||"ENGINE SYNC",sig?.updatedAt||preferred.lastRunAt||selection?.updatedAt||now);
+
+     if(preferredState==="RUNNING"&&preferred.symbol){
+       await loadBrokerMarketProjection(preferred.symbol,String(preferred.broker||info?.broker||""));
        setSyncClock("syncMarketAt",new Date().toISOString());
-     }else{
+     }else if(!preferred.symbol){
        $("brokerMarketProjectionState").textContent="WAITING";
        $("projectionMarketNote").textContent="Selected engine has no saved broker market.";
      }
    }else{
      $("syncEngine").textContent="NO ENGINE";
-     $("syncEngineNote").textContent="No saved entitled engine was returned by Bot Control.";
+     $("syncEngineNote").textContent=runtimeResult.status==="rejected"
+       ?"Runtime endpoint delayed; no persisted selected engine was returned."
+       :"No saved entitled engine was returned by Bot Control.";
      $("syncMarket").textContent="—";
      $("syncMarketNote").textContent="Waiting for a saved broker market.";
      noteEngineEvent("NO ACTIVE ENGINE",now);
      $("brokerMarketProjectionState").textContent="WAITING";
    }
-   setLiveSyncState("LIVE TELEMETRY SYNCHRONIZED",runtimeBots.length+" engine records · account selection restored · worker state read from backend.","live");
+
+   const source=selectionResult.status==="fulfilled"&&selection?.bot?"PERSISTED SELECTION":"RUNTIME LIST";
+   const syncText=runtimeResult.status==="fulfilled"
+     ?runtimeBots.length+" engine records · "+source+" · backend authoritative."
+     :"Runtime list delayed · persisted engine selection checked independently.";
+   setLiveSyncState(
+     preferred?.runtime==="RUNNING"?"ENGINE LIVE · TELEMETRY SYNCHRONIZED":"LIVE TELEMETRY SYNCHRONIZED",
+     syncText,
+     preferred?.runtime==="RUNNING"?"live":"warn"
+   );
    flashLiveSync();
    return true;
  }catch(error){
