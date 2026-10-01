@@ -214,6 +214,19 @@ string BuildAccount()
    j+="}";
    return j;
 }
+double PositionCommission(ulong positionId)
+{
+   if(!HistorySelectByPosition(positionId))return 0.0;
+   double commission=0.0;
+   int total=HistoryDealsTotal();
+   for(int i=0;i<total;i++)
+   {
+      ulong deal=HistoryDealGetTicket(i);
+      if(deal==0)continue;
+      commission+=HistoryDealGetDouble(deal,DEAL_COMMISSION);
+   }
+   return commission;
+}
 string BuildPositions()
 {
    string j="[";bool first=true;
@@ -237,7 +250,7 @@ string BuildPositions()
       j+="\"takeProfit\":"+JsonNumber(PositionGetDouble(POSITION_TP),digits)+",";
       j+="\"currentPrice\":"+JsonNumber(PositionGetDouble(POSITION_PRICE_CURRENT),digits)+",";
       j+="\"swap\":"+JsonNumber(PositionGetDouble(POSITION_SWAP),2)+",";
-      j+="\"commission\":null,";
+      j+="\"commission\":"+JsonNumber(PositionCommission(ticket),2)+",";
       j+="\"profit\":"+JsonNumber(PositionGetDouble(POSITION_PROFIT),2)+",";
       j+="\"magic\":"+LongToString((long)PositionGetInteger(POSITION_MAGIC))+",";
       j+="\"comment\":\""+JsonEscape(PositionGetString(POSITION_COMMENT))+"\",";
