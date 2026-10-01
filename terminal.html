@@ -2540,15 +2540,51 @@ async function runBackendCheck() {
       const data=await fetchApi("/api/connection",{timeoutMs:7000});
       backendConnected=Boolean(data.connected);
 
+      const snapshot=data.accountSnapshot||null;
       $("terminalBrokerName").textContent=String(data.broker||"—").toUpperCase();
       $("terminalAccountId").textContent=data.accountId||"—";
       $("terminalExecutionMode").textContent=String(data.executionMode||"—").toUpperCase();
-      $("terminalAccountType").textContent="—";
-
-      if(data.connected){
+      $("terminalAccountType").textContent=String(snapshot?.accountType||"—").toUpperCase();
+      $("accountBroker").textContent=String(data.broker||"—").toUpperCase();
+      $("accountIdDisplay").textContent=data.accountId||"—";
+      $("accountMode").textContent=String(data.executionMode||"—").toUpperCase();
+      $("accountType").textContent=String(snapshot?.accountType||"—").toUpperCase();
+      $("accountCurrency").textContent=snapshot?.currency||"—";
+      if(snapshot){
+        const projected={
+          accountId:data.accountId||null,
+          broker:data.broker||null,
+          executionMode:data.executionMode||"NOT_CONNECTED",
+          accountType:snapshot.accountType||"DEMO",
+          currency:snapshot.currency||null,
+          balance:snapshot.balance,
+          equity:snapshot.equity,
+          floatingPnl:Number.isFinite(Number(snapshot.equity))&&Number.isFinite(Number(snapshot.balance))
+            ? Number(snapshot.equity)-Number(snapshot.balance) : null,
+          realizedPnl:null,
+          dailyPnl:null,
+          dailyDrawdownPct:null,
+          totalDrawdownPct:null,
+          margin:null,
+          freeMargin:null,
+          marginLevel:null,
+          positionCount:null,
+          orderCount:null,
+          leverage:null,
+          tradingEnabled:snapshot.tradingEnabled!==false,
+          accountStatus:snapshot.accountStatus||"ACTIVE",
+          syncedAt:snapshot.syncedAt||new Date().toISOString()
+        };
+        renderAccountOverview(projected);
+        $("accountConnectionValue").textContent="BALANCE PROJECTED";
+        $("accountConnectionValue").style.color="#ffc84a";
+        $("accountConnectionNote").textContent="Broker account snapshot projected while full account telemetry reconnects.";
+        $("heroBrokerBadge").textContent="● "+String(data.broker||"BROKER").toUpperCase()+" · ACCOUNT SNAPSHOT";
+        $("heroBrokerBadge").className="hero-badge";
+      }else if(data.connected){
         $("accountConnectionValue").textContent="CONNECTED";
         $("accountConnectionValue").style.color="#23f7a3";
-        $("accountConnectionNote").textContent="Verified broker account is active. Connection controls remain on Broker Connect.";
+        $("accountConnectionNote").textContent="Verified broker account is active. Live account telemetry is being requested.";
         $("heroBrokerBadge").textContent="● "+String(data.broker||"BROKER").toUpperCase()+" · ACCOUNT CONNECTED";
         $("heroBrokerBadge").className="hero-badge public";
       }else if(data.configured){
@@ -2666,10 +2702,39 @@ function renderAccountOverview(account){
   }
 }
 async function loadAccount(){
-  const data=await fetchApi("/api/account");
-  if(!data)return;
-  const account=data.account||data.data||data;
-  renderAccountOverview(account);
+  try{
+    const data=await fetchApi("/api/account",{timeoutMs:10000});
+    if(!data)return false;
+    const account=data.account||data.data||data;
+    renderAccountOverview(account);
+    return true;
+  }catch(error){
+    logActivity("Live account telemetry retry: "+error.message);
+    try{
+      const status=await fetchApi("/api/connection",{timeoutMs:7000});
+      if(status?.accountSnapshot){
+        const s=status.accountSnapshot;
+        renderAccountOverview({
+          accountId:status.accountId||null,
+          broker:status.broker||null,
+          executionMode:status.executionMode||"NOT_CONNECTED",
+          accountType:s.accountType||"DEMO",
+          currency:s.currency||null,
+          balance:s.balance,
+          equity:s.equity,
+          floatingPnl:Number.isFinite(Number(s.equity))&&Number.isFinite(Number(s.balance)) ? Number(s.equity)-Number(s.balance) : null,
+          tradingEnabled:s.tradingEnabled!==false,
+          accountStatus:s.accountStatus||"ACTIVE",
+          syncedAt:s.syncedAt||new Date().toISOString()
+        });
+        $("accountConnectionValue").textContent="BALANCE PROJECTED";
+        $("accountConnectionValue").style.color="#ffc84a";
+        $("accountConnectionNote").textContent="Broker account snapshot projected while live account telemetry reconnects.";
+        return true;
+      }
+    }catch{}
+    throw error;
+  }
 }
 
 
