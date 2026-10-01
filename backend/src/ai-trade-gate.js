@@ -104,7 +104,8 @@ Confirm whether the candidate direction is consistent with the supplied strategy
           systemInstruction:SYSTEM,
           temperature:0,
           maxOutputTokens:220,
-          responseMimeType:"application/json"
+          responseMimeType:"application/json",
+          thinkingConfig:{thinkingLevel:"low"}
         }
       });
       const parsed=safeJson(response.text);
