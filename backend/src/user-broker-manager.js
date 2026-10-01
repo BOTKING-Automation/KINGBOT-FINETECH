@@ -606,10 +606,10 @@ export class UserBrokerManager {
     return {connected:true,data:await entry.connection.modifyPosition(id,stopLoss??null,takeProfit??null)};
   }
 
-  async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId}){
+  async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId,currency,multiplier,derivContractType}){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="deriv"){
-      return await entry.api.placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId});
+      return await entry.api.placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId,currency,multiplier,derivContractType});
     }
     if(entry.provider==="oanda"){
       return await entry.api.placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId});
