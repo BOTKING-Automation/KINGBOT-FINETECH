@@ -39,6 +39,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 .brand-text strong{display:block;font:900 12px Orbitron;letter-spacing:.13em}.brand-text span{display:block;margin-top:4px;color:var(--dim);font:700 8px "JetBrains Mono";letter-spacing:.17em}
 .nav{display:flex;gap:5px;align-items:center}.nav a{padding:9px 11px;border-radius:9px;color:#8792a9;font-size:11px}.nav a:hover,.nav a.active{color:#fff;background:rgba(255,255,255,.05)}
 .top-actions{display:flex;align-items:center;gap:8px}
+.close-position-btn{border:1px solid rgba(255,92,122,.22);border-radius:7px;padding:6px 8px;background:rgba(255,92,122,.07);color:#ff9cad;font:900 6px "JetBrains Mono";cursor:pointer}.close-position-btn:hover{background:rgba(255,92,122,.12);border-color:rgba(255,92,122,.35)}.close-position-btn:disabled{opacity:.55;cursor:wait}
 .live-status{display:flex;align-items:center;gap:7px;padding:8px 11px;border:1px solid rgba(40,239,171,.16);border-radius:999px;background:rgba(40,239,171,.05);font:800 8px "JetBrains Mono";color:#bfffe9}
 .live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 12px rgba(40,239,171,.9);animation:pulse 1.6s infinite}
 @keyframes pulse{50%{opacity:.45;transform:scale(.8)}}.clock{color:var(--dim);font:700 9px "JetBrains Mono"}
@@ -253,7 +254,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     <div class="tables">
       <div class="panel">
         <div class="panel-head"><div class="panel-head-left"><div class="section-title">LIVE POSITIONS</div><div class="section-sub">Real positions returned by the connected broker.</div></div><span class="panel-badge" id="positionsBadge">0 OPEN</span></div>
-        <div class="table-wrap"><table class="table"><thead><tr><th>Symbol</th><th>Side</th><th>Volume</th><th>Entry</th><th>Current</th><th>P&amp;L</th><th>Status</th></tr></thead><tbody id="positionsTable"></tbody></table></div>
+        <div class="table-wrap"><table class="table"><thead><tr><th>Symbol</th><th>Side</th><th>Volume</th><th>Entry</th><th>Current</th><th>P&amp;L</th><th>Status</th><th>Action</th></tr></thead><tbody id="positionsTable"></tbody></table></div>
       </div>
       <div class="panel">
         <div class="panel-head"><div class="panel-head-left"><div class="section-title">BROKER ORDERS</div><div class="section-sub">Confirmed order records only.</div></div><span class="panel-badge" id="ordersBadge">0 ORDERS</span></div>
@@ -439,8 +440,30 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 
   function renderPositions(rows){
     rows=Array.isArray(rows)?rows:[];$("positionCount").textContent=String(rows.length);$("positionsBadge").textContent=rows.length+" OPEN";
-    $("positionsTable").innerHTML=rows.length?rows.map(p=>"<tr><td>"+esc(p.symbol)+"</td><td>"+esc(p.side)+"</td><td>"+esc(p.volume)+"</td><td>"+esc(p.entry)+"</td><td>"+esc(p.current)+"</td><td class=\""+classForPnl(p.pnl)+"\">"+esc(p.pnl)+"</td><td><span class=\"pill green\">"+esc(p.status||"OPEN")+"</span></td></tr>").join(""):"<tr><td colspan=\"7\"><div class=\"empty\"><strong>NO OPEN POSITIONS</strong><span>The connected broker returned no open positions.</span></div></td></tr>";
+    $("positionsTable").innerHTML=rows.length?rows.map(p=>{
+      const id=String(p.id||p.contractId||"");
+      const canClose=Boolean(id)&&String(p.status||"OPEN").toUpperCase()==="OPEN";
+      return "<tr><td>"+esc(p.symbol)+"</td><td>"+esc(p.side)+"</td><td>"+esc(p.volume)+"</td><td>"+esc(p.entry)+"</td><td>"+esc(p.current)+"</td><td class=\""+classForPnl(p.pnl)+"\">"+esc(p.pnl)+"</td><td><span class=\"pill green\">"+esc(p.status||"OPEN")+"</span></td><td>"+(canClose?"<button class=\"close-position-btn\" data-position-id=\""+esc(id)+"\" type=\"button\">CLOSE</button>":"—")+"</td></tr>";
+    }).join(""):"<tr><td colspan=\"8\"><div class=\"empty\"><strong>NO OPEN POSITIONS</strong><span>The connected broker returned no open positions.</span></div></td></tr>";
   }
+  document.addEventListener("click",async e=>{
+    const btn=e.target.closest(".close-position-btn");
+    if(!btn)return;
+    const positionId=String(btn.dataset.positionId||"").trim();
+    if(!positionId)return;
+    if(!window.confirm("Close this exact broker position now?"))return;
+    btn.disabled=true;btn.textContent="CLOSING…";
+    try{
+      await api("/positions/"+encodeURIComponent(positionId)+"/close",{method:"POST",timeoutMs:10000});
+      addActivity("Position "+positionId+" closed.");
+      await loadAccount();
+      await loadOrders();
+    }catch(error){
+      btn.disabled=false;btn.textContent="CLOSE";
+      addActivity("Position close failed: "+error.message);
+      alert(error.message||"Position close failed.");
+    }
+  });
   function renderOrders(rows){
     rows=Array.isArray(rows)?rows:[];$("ordersBadge").textContent=rows.length+" ORDERS";
     $("ordersTable").innerHTML=rows.length?rows.map(o=>"<tr><td>"+esc(fmtTime(o.time))+"</td><td>"+esc(o.symbol)+"</td><td>"+esc(o.side)+"</td><td>"+esc(o.volume)+"</td><td>"+esc(o.price)+"</td><td><span class=\"pill\">"+esc(o.status||"OPEN")+"</span></td></tr>").join(""):"<tr><td colspan=\"6\"><div class=\"empty\"><strong>NO ORDER RECORDS</strong><span>No confirmed broker orders were returned.</span></div></td></tr>";
