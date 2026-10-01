@@ -161,11 +161,17 @@ export class DerivTraderClient {
         contractId:c.contract_id,
         symbol:c.underlying_symbol||c.symbol||null,
         type:c.contract_type||c.type||null,
-        side:c.contract_type||null,
+        side:(String(c.contract_type||"").toUpperCase().includes("DOWN")||String(c.contract_type||"").toUpperCase().includes("PUT")||String(c.contract_type||"").toUpperCase().includes("SHORT"))?"SELL":"BUY",
+        contractType:c.contract_type||c.type||null,
         volume:finite(c.buy_price),
+        stake:finite(c.buy_price),
         openPrice:finite(c.entry_spot||c.entry_tick),
         currentPrice:finite(c.current_spot||c.current_tick),
         profit:finite(c.profit),
+        bidPrice:finite(c.bid_price),
+        payout:finite(c.payout),
+        multiplier:finite(c.multiplier),
+        expiryTime:finite(c.date_expiry),
         status:c.status||"open"
       }))
     };
@@ -230,13 +236,95 @@ export class DerivTraderClient {
       name:String(item?.underlying_symbol_name||item?.display_name||item?.underlying_symbol||item?.symbol||"").trim(),
       category:String(item?.market||item?.underlying_symbol_type||"").trim(),
       submarket:String(item?.submarket||item?.subgroup||"").trim(),
+      pipSize:finite(item?.pip_size),
       tradeable:Number(item?.exchange_is_open)===0||Number(item?.is_trading_suspended)===1?false:true,
       source:"broker"
     })).filter(x=>x.symbol);
   }
 
-  async getSymbolSpecification(){
-    throw new Error("DERIV_CONTRACT_SPECIFICATION_REQUIRES_OPTIONS_MODEL");
+  async getContractsFor(symbol){
+    const s=String(symbol||"").trim();
+    if(!/^[A-Za-z0-9._-]{2,30}$/.test(s))throw new Error("INVALID_DERIV_SYMBOL");
+    const response=await this.request({contracts_for:s});
+    return response?.contracts_for||response?.contracts||{};
+  }
+
+  async getProposal({symbol,contractType,stake,currency,multiplier,subscribe=0}={}){
+    const s=String(symbol||"").trim();
+    const type=String(contractType||"").trim().toUpperCase();
+    if(!s||!type)throw new Error("DERIV_PROPOSAL_INPUT_REQUIRED");
+    const payload={
+      proposal:1,
+      amount:Number(stake),
+      basis:"stake",
+      contract_type:type,
+      currency:String(currency||"USD").trim().toUpperCase(),
+      underlying_symbol:s,
+      subscribe:subscribe?1:0
+    };
+    if(multiplier!==undefined&&multiplier!==null)payload.multiplier=Number(multiplier);
+    const response=await this.request(payload,{timeoutMs:12000});
+    const proposal=response?.proposal;
+    if(!proposal?.id)throw new Error("DERIV_PROPOSAL_ID_MISSING");
+    return {proposalId:String(proposal.id),askPrice:finite(proposal.ask_price),payout:finite(proposal.payout),spot:finite(proposal.spot),proposal};
+  }
+
+  async buyContract({proposalId,price,subscribe=0,reference=""}={}){
+    const id=String(proposalId||"").trim();
+    const maxPrice=Number(price);
+    if(!id||!Number.isFinite(maxPrice)||maxPrice<0)throw new Error("DERIV_BUY_INPUT_INVALID");
+    const response=await this.request({buy:id,price:maxPrice,subscribe:subscribe?1:0,passthrough:reference?{reference}:undefined});
+    const buy=response?.buy;
+    if(!buy?.contract_id)throw new Error("DERIV_CONTRACT_ID_MISSING");
+    return {contractId:String(buy.contract_id),buy};
+  }
+
+  async getOpenContract(contractId){
+    const id=String(contractId||"").trim();
+    if(!id)throw new Error("DERIV_CONTRACT_ID_REQUIRED");
+    const response=await this.request({proposal_open_contract:1,contract_id:Number(id),subscribe:0});
+    const c=response?.proposal_open_contract;
+    if(!c?.contract_id)throw new Error("DERIV_OPEN_CONTRACT_NOT_FOUND");
+    return c;
+  }
+
+  async updateContract(contractId,{stopLoss,takeProfit}={}){
+    const id=String(contractId||"").trim();
+    if(!id)throw new Error("DERIV_CONTRACT_ID_REQUIRED");
+    const limit_order={};
+    if(stopLoss!==undefined)limit_order.stop_loss=Number(stopLoss);
+    if(takeProfit!==undefined)limit_order.take_profit=Number(takeProfit);
+    if(!Object.keys(limit_order).length)throw new Error("DERIV_LIMIT_ORDER_REQUIRED");
+    return this.request({contract_update:1,contract_id:Number(id),limit_order});
+  }
+
+  async sellContract(contractId,price=0){
+    const id=String(contractId||"").trim();
+    const minimumPrice=Number(price);
+    if(!id||!Number.isFinite(minimumPrice)||minimumPrice<0)throw new Error("DERIV_SELL_INPUT_INVALID");
+    const response=await this.request({sell:Number(id),price:minimumPrice});
+    if(!response?.sell?.contract_id)throw new Error("DERIV_SELL_FAILED");
+    return response.sell;
+  }
+
+  async getSymbolSpecification(symbol){
+    const s=String(symbol||"").trim();
+    const markets=await this.getMarkets();
+    const market=markets.find(x=>String(x.symbol).toUpperCase()===s.toUpperCase());
+    const contracts=await this.getContractsFor(s);
+    return {
+      symbol:s,
+      point:Number(market?.pipSize)||0.00001,
+      tickSize:Number(market?.pipSize)||0.00001,
+      tickValue:1,
+      minVolume:0.35,
+      maxVolume:100000,
+      volumeStep:0.01,
+      stopsLevel:0,
+      pipSize:Number(market?.pipSize)||null,
+      contractModel:"OPTIONS",
+      availableContracts:contracts
+    };
   }
 
   async getHistoricalCandles(symbol,timeframe="1m",limit=100){
@@ -252,7 +340,19 @@ export class DerivTraderClient {
     return rows;
   }
 
-  async placeOrder(){
-    throw new Error("DERIV_OPTIONS_EXECUTION_REQUIRES_CONTRACT_PROPOSAL");
+  async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId}={}){
+    const account=(await this.getAccount()).data||{};
+    const currency=String(account.currency||"USD").toUpperCase();
+    const s=String(symbol||"").trim();
+    const direction=String(side||"").toUpperCase();
+    const contractType=direction==="BUY"?"MULTUP":direction==="SELL"?"MULTDOWN":"";
+    if(!contractType)throw new Error("INVALID_DERIV_SIDE");
+    const multiplier=10;
+    const proposal=await this.getProposal({symbol:s,contractType,stake:Number(volume),currency,multiplier,subscribe:0});
+    const bought=await this.buyContract({proposalId:proposal.proposalId,price:Number(proposal.askPrice||volume),subscribe:0,reference:clientId||comment||""});
+    if(stopLoss!==undefined||takeProfit!==undefined){
+      try{await this.updateContract(bought.contractId,{stopLoss,takeProfit});}catch{}
+    }
+    return {provider:"deriv",contractId:bought.contractId,proposalId:proposal.proposalId,contractType,stake:Number(volume),multiplier,comment:comment||"KINGBOT",buy:bought.buy};
   }
 }
