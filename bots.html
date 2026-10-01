@@ -153,7 +153,7 @@ async function refreshBrokerExecutionStatus(){
    action.textContent="BROKER SETTINGS →";
   }else{
    title.textContent="BROKER EXECUTION · NOT CONNECTED";
-   note.textContent="Connect and verify a broker before enabling PAPER or LIVE execution.";
+   note.textContent="Connect and verify a broker before enabling DEMO or LIVE execution.";
    action.textContent="CONNECT BROKER →";
   }
  }catch{
@@ -469,7 +469,7 @@ $("saveBtn").addEventListener("click",async()=>{
  msg("Saving…");
  try{const d=await api("/bots/"+encodeURIComponent(selected.id)+"/risk",{method:"PUT",body:JSON.stringify(payload)});putSettings(d.settings,d.executionMode,d.killSwitch);msg("Saved and enforced by the server-side risk engine.","ok")}catch(e){msg(e.message,"error")}
 });
-$("resetBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");try{const d=await api("/bots/"+encodeURIComponent(selected.id)+"/risk");putSettings(d.defaults,"PAPER",false);msg("Defaults restored locally. Press SAVE TO RISK ENGINE to persist them.","ok")}catch(e){msg(e.message,"error")}});
+$("resetBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");try{const d=await api("/bots/"+encodeURIComponent(selected.id)+"/risk");putSettings(d.defaults,"DEMO",false);msg("Defaults restored locally. Press SAVE TO RISK ENGINE to persist them.","ok")}catch(e){msg(e.message,"error")}});
 if(window.KINGBOT_SESSION)window.KINGBOT_SESSION.requireVerified({redirect:true}).then(ok=>{if(ok)load()});
 else load();
 })();
