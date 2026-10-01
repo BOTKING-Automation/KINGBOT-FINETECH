@@ -45,7 +45,6 @@ export class Mt5BridgeRegistry{
     await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens DROP CONSTRAINT IF EXISTS kingbot_mt5_bridge_tokens_expected_mode_check");
     await this.pool.query("UPDATE kingbot_mt5_bridge_tokens SET expected_mode='DEMO' WHERE expected_mode='PAPER'");
     await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens ADD CONSTRAINT kingbot_mt5_bridge_tokens_expected_mode_check CHECK(expected_mode IN ('DEMO','LIVE'))");
-    await this.pool.query("UPDATE kingbot_mt5_bridge_tokens SET expected_mode='DEMO' WHERE expected_mode='PAPER'");
     await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens DROP CONSTRAINT IF EXISTS kingbot_mt5_bridge_tokens_expected_mode_check");
     await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens ADD CONSTRAINT kingbot_mt5_bridge_tokens_expected_mode_check CHECK(expected_mode IN ('DEMO','LIVE'))");
     await this.pool.query("CREATE INDEX IF NOT EXISTS kingbot_mt5_bridge_tokens_user_idx ON kingbot_mt5_bridge_tokens(user_id,revoked,expires_at)");
@@ -103,7 +102,7 @@ export class Mt5BridgeRegistry{
     const row=await this.authenticate(token);
     if(!row)return {ok:false,status:401,error:"MT5_BRIDGE_TOKEN_INVALID_OR_EXPIRED"};
     const terminalMode=terminalTypeOf(accountType),expected=modeOf(row.expected_mode);
-    if((expected==="LIVE"&&terminalMode!=="REAL")||(expected==="PAPER"&&terminalMode!=="DEMO"))
+    if((expected==="LIVE"&&terminalMode!=="REAL")||(expected==="DEMO"&&terminalMode!=="DEMO"))
       return {ok:false,status:409,error:"MT5_ACCOUNT_MODE_MISMATCH",expectedMode:expected,terminalAccountType:terminalMode};
     const mt5Login=clean(login,64),mt5Server=clean(server,120);
     if(!/^\d+$/.test(mt5Login))return {ok:false,status:400,error:"MT5_LOGIN_REQUIRED"};
