@@ -121,8 +121,29 @@ export class DerivTraderClient {
     await new Promise((resolve,reject)=>{
       const ws=new WebSocket(endpoint);
       let settled=false;
-      const fail=(error)=>{if(settled)return;settled=true;try{ws.close();}catch{};reject(error instanceof Error?error:new Error(String(error)))};
-      ws.once("open",()=>{if(settled)return;settled=true;this.marketWs=ws;this.marketConnected=true;this.marketEndpoint=endpoint;this.attachMarket(ws);resolve();});
+      const timer=setTimeout(()=>{
+        if(settled)return;
+        settled=true;
+        try{ws.close();}catch{}
+        reject(new Error("DERIV_PUBLIC_WEBSOCKET_CONNECT_TIMEOUT"));
+      },8000);
+      const fail=(error)=>{
+        if(settled)return;
+        settled=true;
+        clearTimeout(timer);
+        try{ws.close();}catch{}
+        reject(error instanceof Error?error:new Error(String(error)));
+      };
+      ws.once("open",()=>{
+        if(settled)return;
+        settled=true;
+        clearTimeout(timer);
+        this.marketWs=ws;
+        this.marketConnected=true;
+        this.marketEndpoint=endpoint;
+        this.attachMarket(ws);
+        resolve();
+      });
       ws.once("error",fail);
       ws.once("close",()=>{if(!settled)fail(new Error("DERIV_PUBLIC_WEBSOCKET_CLOSED_DURING_CONNECT"));});
     });
