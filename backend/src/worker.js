@@ -258,10 +258,13 @@ function collectDerivContractTypes(value,out=new Set(),depth=0){
   }
   return out;
 }
-function derivStakePlan(rawLots,budget){
+function derivStakePlan(rawLots,budget,minStake=0.35){
   const totalWeight=rawLots.reduce((sum,x)=>sum+Number(x||0),0);
-  if(!(budget>0)||!(totalWeight>0))return [];
-  return rawLots.map(x=>budget*(Number(x||0)/totalWeight));
+  const count=rawLots.length;
+  const floor=Math.max(0.01,Number(minStake)||0.35);
+  if(!(budget>0)||!(totalWeight>0)||count<1||budget<floor*count)return [];
+  const distributable=budget-floor*count;
+  return rawLots.map(x=>floor+distributable*(Number(x||0)/totalWeight));
 }
 async function executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity}){
   const cfg=getBotDefinitions()[botId].v8||LADDER_V8_DEFAULTS;
@@ -283,7 +286,8 @@ async function executeLadderV8DerivStart({userId,botId,config,s,account,quote,in
   const rawLots=[];
   const rungCount=Math.min(cfg.fixedRungCount,cfg.maxTotalRungs);
   for(let i=0;i<rungCount;i++)rawLots.push(ladderRungLot(i,cfg));
-  const desiredStakes=derivStakePlan(rawLots,budget);
+  const minStake=Number(spec.minVolume)||0.35;
+  const desiredStakes=derivStakePlan(rawLots,budget,minStake);
   if(!desiredStakes.length)return {action:"DERIV_V8_STAKE_BUDGET_BLOCKED",state:null};
   const probeIndex=desiredStakes.findIndex(x=>Number(x)>0);
   if(probeIndex<0)return {action:"DERIV_V8_STAKE_BUDGET_BLOCKED",state:null};
