@@ -506,7 +506,19 @@ export class UserBrokerManager {
   async getPositions(userId){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="exness")return {connected:true,data:await entry.api.getPositions()};
-    if(entry.provider==="deriv")return await entry.api.getPositions();
+    if(entry.provider==="deriv"){
+      try{
+        return await entry.api.getPositions();
+      }catch(error){
+        const message=String(error?.message||"");
+        if(/DERIV_(?:WEBSOCKET_CLOSED|NOT_CONNECTED|REQUEST_TIMEOUT)/i.test(message)){
+          this.connections.delete(userId+":"+entry.provider+":"+entry.accountId);
+          const refreshed=await this.connectionFor(userId);
+          return await refreshed.api.getPositions();
+        }
+        throw error;
+      }
+    }
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getPositions()};
     return {connected:true,data:await entry.connection.getPositions()};
   }
