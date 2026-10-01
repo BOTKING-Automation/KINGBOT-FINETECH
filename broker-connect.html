@@ -132,6 +132,16 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
         </div>
       </article>
 
+      <article class="broker deriv" data-broker="derivmt5" data-mode="bridge" data-cap-demo="yes" data-cap-live="yes" data-native="no" data-search="deriv mt5 cfd forex gold xauusd mt5 metaapi bridge demo real">
+        <div class="broker-inner">
+          <div class="broker-top"><div class="brand"><div class="logo"><img src="https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg" alt="Deriv MT5"></div><div><div class="broker-name">DERIV MT5</div><div class="broker-code">CFD · MT5 · CLOUD BRIDGE</div></div></div><span class="availability live">MT5</span></div>
+          <div class="broker-copy">Use the dedicated Deriv MT5 account for native CFD execution. KINGBOT will receive MT5 lot volume, entry/current price, floating profit, commission, swap and protective levels.</div>
+          <div class="broker-specs"><div class="spec"><b>CONNECTION</b><span>MT5 CLOUD BRIDGE</span></div><div class="spec"><b>EXECUTION</b><span>NATIVE CFD · LOTS</span></div></div>
+          <div class="meta"><span>XAUUSD</span><span>CFDs</span><span>LOTS</span><span>MT5</span></div><div class="environment"><span class="demo">● DEMO</span><span class="live">● LIVE / REAL</span></div><div class="connection-diagnostics"><div class="diag ok"><b>AUTH</b><span>BRIDGE</span></div><div class="diag ok"><b>POSITIONS</b><span>MT5</span></div><div class="diag ok"><b>MARKET DATA</b><span>STREAM</span></div><div class="diag build"><b>EXECUTION</b><span>MT5 LOTS</span></div></div>
+          <div class="broker-action"><button class="connect" data-open="derivmt5">CONNECT DERIV MT5</button><a class="docs" href="https://app.metaapi.cloud/" target="_blank" rel="noopener">OPEN MT5 BRIDGE ↗</a></div><div class="status-line">Setup: add the Deriv MT5 account to MetaApi, then enter the MetaApi account ID and access token below.</div>
+        </div>
+      </article>
+
       <article class="broker deriv" data-broker="deriv" data-mode="oauth" data-cap-demo="yes" data-cap-live="yes" data-native="yes" data-search="deriv oauth websocket trading demo real">
         <div class="broker-inner">
           <div class="broker-top"><div class="brand"><div class="logo"><img src="https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg" alt="Deriv"></div><div><div class="broker-name">DERIV</div><div class="broker-code">OAUTH · WEBSOCKET API</div></div></div><span class="availability live">OAUTH</span></div>
@@ -249,6 +259,7 @@ const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbo
 const cfg={
   oanda:{name:"OANDA",login:"https://fxtrade.oanda.com/",api:"https://developer.oanda.com/rest-live-v20/authentication/",native:true,mode:"oanda"},
   deriv:{name:"DERIV",login:"https://app.deriv.com/",api:"https://auth.deriv.com/oauth2/auth",native:true,mode:"oauth"},
+  derivmt5:{name:"DERIV MT5",login:"https://deriv.com/trading-platforms/mt5/web-terminal",api:"https://app.metaapi.cloud/",native:false,mode:"metaapi"},
   exness:{name:"EXNESS",login:"https://my.exness.com/",api:"https://my.exness.com/",native:false,mode:"exness"},
   ig:{name:"IG",login:"https://my.ig.com/",api:"https://labs.ig.com/gettingstarted",native:false,mode:"metaapi"},
   fxcm:{name:"FXCM",login:"https://www.fxcm.com/",api:"https://www.fxcm.com/markets/help/api-trading-what-api-interfaces-does-fxcm-have/",native:false,mode:"metaapi"},
@@ -302,6 +313,9 @@ function textFor(){
     $("brokerLogin").textContent="CONTINUE WITH DERIV ↗";
     $("brokerLogin").href="#";
     $("nextStep").style.display="none";
+  }else if(selected==="derivmt5"){
+    $("brokerLogin").textContent="OPEN DERIV MT5 ↗";
+    $("brokerLogin").href=d.login;
   }else{
     $("brokerLogin").href=step===1?(selected==="exness" && partnerOpened ? $("brokerLogin").href : d.login):d.api;
   }
@@ -315,7 +329,7 @@ function textFor(){
     if(selected==="exness"){
       $("credentialHelp").textContent="Create the Exness API key in Key Management, select the trading account that this key can access, copy the API key and secret once, and paste them here. The host is optional because KINGBOT can resolve the Exness access point.";
     }else{
-      $("credentialHelp").textContent="Bridge credentials are sent over HTTPS to the authenticated KINGBOT backend and are not stored in browser localStorage.";
+      $("credentialHelp").textContent=selected==="derivmt5"?"Paste the MetaApi access token and MetaApi account ID for the Deriv MT5 account you added to the bridge. KINGBOT validates the MT5 account and uses native lot-based CFD execution.":"Bridge credentials are sent over HTTPS to the authenticated KINGBOT backend and are not stored in browser localStorage.";
     }
   }else $("credentials").classList.remove("show");
   if(step===3)$("accountSelect").classList.add("show");else $("accountSelect").classList.remove("show");
@@ -332,11 +346,11 @@ function selectBroker(slug){
   document.querySelectorAll(".broker").forEach(el=>el.classList.toggle("selected",el.dataset.broker===slug));
   const d=cfg[slug];
   $("modalTitle").textContent=d.name;
-  $("modalSubtitle").textContent=selected==="exness"?"EXNESS PUBLIC TRADER API":selected==="deriv"?"DERIV OAUTH 2.0 · SECURE REDIRECT":"SECURE BROKER CONNECTION FLOW";
+  $("modalSubtitle").textContent=selected==="exness"?"EXNESS PUBLIC TRADER API":selected==="deriv"?"DERIV OAUTH 2.0 · SECURE REDIRECT":selected==="derivmt5"?"DERIV MT5 · CFD · METAAPI BRIDGE":"SECURE BROKER CONNECTION FLOW";
   $("modalLogo").src=logos[slug];$("modalLogo").alt=d.name;
   $("accountId").value="";$("apiKey").value="";$("secretKey").value="";$("apiHost").value="";$("accessToken").value="";$("oandaToken").value="";
   $("accountList").innerHTML="";$("authorizeBtn").disabled=true;
-  $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=(selected==="exness"||selected==="oanda")?"block":"none";$("bridgeTokenField").style.display=(selected==="exness"||selected==="oanda")?"none":"block";$("oandaTokenField").style.display=selected==="oanda"?"block":"none";
+  $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=(selected==="exness"||selected==="oanda")?"block":"none";$("bridgeTokenField").style.display=(selected==="exness"||selected==="oanda"||selected==="deriv")?"none":"block";$("oandaTokenField").style.display=selected==="oanda"?"block":"none";if(selected==="derivmt5")$("accountId").placeholder="MetaApi account ID (UUID)";
   $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION"; $("verifyBtn").style.display=selected==="deriv"?"none":"inline-flex"; $("executionMode").value=selectedExecution;
   if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
   textFor();showDrawer();
@@ -475,7 +489,7 @@ $("verifyBtn").addEventListener("click",async()=>{
       ? {provider:"exness",accountId,apiKey:$("apiKey").value.trim(),secretKey:$("secretKey").value,baseUrl:$("apiHost").value.trim(),executionMode:$("executionMode").value}
       : selected==="oanda"
         ? {provider:"oanda",accountId,accountToken:$("oandaToken").value.trim(),baseUrl:$("apiHost").value.trim(),executionMode:$("executionMode").value}
-        : {provider:"metaapi",accountId,accountToken:token,executionMode:$("executionMode").value};
+        : {provider:selected==="derivmt5"?"deriv-mt5":"metaapi",accountId,accountToken:token,executionMode:$("executionMode").value};
     const r=await fetch(API_BASE+"/broker/account",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify(body)});
     const d=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(d.error||d.reason||"Broker credential mapping failed.");
