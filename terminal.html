@@ -1138,6 +1138,31 @@ overscroll-behavior:none;}
         width: fit-content;
       }
     }
+
+    /* ================= BROKER + ENGINE PROJECTION ================= */
+    .projection-grid{display:grid;grid-template-columns:1fr 1.35fr;gap:14px;margin-top:14px}
+    .projection-card{padding:18px;min-height:220px}
+    .projection-card .projection-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:13px}
+    .projection-kicker{color:var(--cyan);font:800 8px "JetBrains Mono";letter-spacing:.15em}
+    .projection-title{margin-top:6px;font:800 14px Orbitron;letter-spacing:.06em}
+    .projection-state{color:#71809b;font:700 8px "JetBrains Mono";text-transform:uppercase;letter-spacing:.08em}
+    .projection-grid-inner{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+    .projection-metric{padding:12px;border-radius:12px;background:rgba(255,255,255,.026);border:1px solid rgba(255,255,255,.065);min-width:0}
+    .projection-metric span{display:block;color:#5f6b84;font:700 8px "JetBrains Mono";letter-spacing:.08em}
+    .projection-metric strong{display:block;margin-top:6px;color:#e3ebfb;font:800 13px "JetBrains Mono";overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .projection-metric strong.live{color:var(--green)}
+    .projection-metric strong.gold{color:var(--gold)}
+    .projection-metric strong.cyan{color:var(--cyan)}
+    .projection-metric strong.pink{color:var(--pink)}
+    .engine-projection-list{display:flex;flex-direction:column;gap:8px;max-height:300px;overflow:auto;padding-right:2px}
+    .engine-row{display:grid;grid-template-columns:1.2fr .8fr .8fr .75fr .75fr .65fr;gap:8px;align-items:center;padding:11px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.022)}
+    .engine-row div{min-width:0}
+    .engine-row span{display:block;color:#5f6b84;font:700 7px "JetBrains Mono";letter-spacing:.07em;text-transform:uppercase}
+    .engine-row strong{display:block;margin-top:5px;color:#dbe5f8;font:800 9px "JetBrains Mono";overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .engine-row strong.signal{color:var(--green)}
+    .projection-empty{padding:25px 10px;text-align:center;color:#69758c;font:700 9px "JetBrains Mono";border:1px dashed rgba(255,255,255,.08);border-radius:12px}
+    @media(max-width:980px){.projection-grid{grid-template-columns:1fr}.engine-row{grid-template-columns:1.3fr 1fr 1fr 1fr}}
+    @media(max-width:680px){.projection-grid-inner{grid-template-columns:repeat(2,1fr)}.engine-row{grid-template-columns:1fr 1fr}.projection-card{min-height:0}}
   </style>
 </head>
 
@@ -1221,6 +1246,34 @@ overscroll-behavior:none;}
       <div class="card metric"><div class="metric-label">Open Orders</div><div class="metric-value" id="orderCount">0</div><div class="metric-note">Broker orders</div></div>
       <div class="card metric"><div class="metric-label">Leverage</div><div class="metric-value" id="accountLeverage">—</div><div class="metric-note">When broker supplies</div></div>
       <div class="card metric"><div class="metric-label">Last Sync</div><div class="metric-value" id="accountSync" style="font-size:12px">—</div><div class="metric-note" id="accountTelemetryState">Awaiting broker</div></div>
+    </div>
+
+    <div class="projection-grid">
+      <div class="card projection-card">
+        <div class="projection-head">
+          <div><div class="projection-kicker">BROKER MARKET TELEMETRY</div><div class="projection-title">LIVE MARKET</div></div>
+          <div class="projection-state" id="brokerMarketProjectionState">WAITING</div>
+        </div>
+        <div class="projection-grid-inner">
+          <div class="projection-metric"><span>BROKER</span><strong id="projectionBroker">—</strong></div>
+          <div class="projection-metric"><span>MARKET</span><strong class="gold" id="projectionSymbol">—</strong></div>
+          <div class="projection-metric"><span>BID</span><strong id="projectionBid">—</strong></div>
+          <div class="projection-metric"><span>ASK</span><strong id="projectionAsk">—</strong></div>
+          <div class="projection-metric"><span>SPREAD</span><strong class="cyan" id="projectionSpread">—</strong></div>
+          <div class="projection-metric"><span>MARKET TIME</span><strong id="projectionMarketTime">—</strong></div>
+        </div>
+        <div class="metric-note" id="projectionMarketNote" style="margin-top:11px">Waiting for an active broker market selected by the Bot Engine.</div>
+      </div>
+
+      <div class="card projection-card">
+        <div class="projection-head">
+          <div><div class="projection-kicker">TRADE PLAN TELEMETRY</div><div class="projection-title">ENGINE PLANS</div></div>
+          <div class="projection-state" id="engineProjectionState">WAITING</div>
+        </div>
+        <div id="engineProjectionList" class="engine-projection-list">
+          <div class="projection-empty">No running engine trade-plan telemetry yet.</div>
+        </div>
+      </div>
     </div>
 
   </section>
@@ -2786,6 +2839,79 @@ function formatCompact(value) {
 }
 
 
+async function loadBrokerMarketProjection(symbol,brokerHint=""){
+  if(!symbol)return false;
+  try{
+    const d=await fetchApi("/api/broker/quote?symbol="+encodeURIComponent(symbol),{timeoutMs:7000});
+    const m=d.market||{};
+    const q=m.data||{};
+    const spec=m.spec||{};
+    $("projectionBroker").textContent=String(d.broker||brokerHint||"BROKER").toUpperCase();
+    $("projectionSymbol").textContent=String(m.symbol||symbol).toUpperCase();
+    $("projectionBid").textContent=Number.isFinite(Number(q.bid))?formatPrice(Number(q.bid)):"—";
+    $("projectionAsk").textContent=Number.isFinite(Number(q.ask))?formatPrice(Number(q.ask)):"—";
+    const spread=Number(q.ask)-Number(q.bid);
+    $("projectionSpread").textContent=Number.isFinite(spread)&&spread>=0?formatPrice(spread):"—";
+    $("projectionMarketTime").textContent=q.time?new Date(q.time).toLocaleTimeString([], {hour12:false}):"—";
+    $("projectionMarketNote").textContent=spec?.tradeable===false?"Broker reports this market as non-tradeable.":"Live broker quote and symbol specification projected from the connected account.";
+    $("brokerMarketProjectionState").textContent="LIVE / "+String(d.broker||brokerHint||"BROKER").toUpperCase();
+    return true;
+  }catch(error){
+    $("brokerMarketProjectionState").textContent="UNAVAILABLE";
+    $("projectionMarketNote").textContent="Broker market telemetry could not be synchronized for "+symbol+"."; 
+    return false;
+  }
+}
+function parseSignal(value){
+ let x=value;
+ if(typeof x==="string"){try{x=JSON.parse(x)}catch{return null}}
+ return x&&typeof x==="object"?x:null;
+}
+function renderEngineProjection(bots=[]){
+ const running=Array.isArray(bots)?bots.filter(x=>String(x.runtime||x.state||"STOPPED").toUpperCase()==="RUNNING"):[];
+ const list=$("engineProjectionList");
+ if(!running.length){
+   list.innerHTML='<div class="projection-empty">No running engine trade-plan telemetry. Start an entitled bot from Bot Control OS.</div>';
+   $("engineProjectionState").textContent="NO RUNNING ENGINES";
+   return null;
+ }
+ $("engineProjectionState").textContent=running.length+" RUNNING";
+ list.innerHTML=running.map(b=>{
+   const signal=parseSignal(b.lastSignal);
+   const livePlan=signal?.tradePlan||{};
+   const configured=b.tradePlan||{};
+   const sl=Number.isFinite(Number(livePlan.stopLoss))?Number(livePlan.stopLoss):(Number.isFinite(Number(configured.slAtr))?configured.slAtr+" ATR":"—");
+   const tp=Number.isFinite(Number(livePlan.takeProfit))?Number(livePlan.takeProfit):(Number.isFinite(Number(configured.tpAtr))?configured.tpAtr+" ATR":"—");
+   const rr=Number.isFinite(Number(livePlan.riskReward))?Number(livePlan.riskReward):(configured.slAtr&&configured.tpAtr?(Number(configured.tpAtr)/Number(configured.slAtr)).toFixed(2):"—");
+   const trail=Number.isFinite(Number(livePlan.trailingTriggerR))?Number(livePlan.trailingTriggerR).toFixed(2)+"R":(configured.trailingTriggerR?configured.trailingTriggerR+"R":"—");
+   return '<div class="engine-row">'
+     +'<div><span>ENGINE / MARKET</span><strong>'+escapeHtml(String(b.name||b.botId||"ENGINE"))+' · '+escapeHtml(String(b.symbol||"—").toUpperCase())+'</strong></div>'
+     +'<div><span>SIGNAL</span><strong class="signal">'+escapeHtml(String(signal?.signal||"WAITING"))+'</strong></div>'
+     +'<div><span>SCORE</span><strong>'+escapeHtml(Number.isFinite(Number(signal?.score))?Number(signal.score).toFixed(1):"—")+'</strong></div>'
+     +'<div><span>STOP LOSS</span><strong>'+escapeHtml(String(sl))+'</strong></div>'
+     +'<div><span>TAKE PROFIT</span><strong>'+escapeHtml(String(tp))+'</strong></div>'
+     +'<div><span>R:R / TRAIL</span><strong>'+escapeHtml(String(rr)+" · "+String(trail))+'</strong></div>'
+     +'</div>';
+ }).join("");
+ const first=running.find(x=>x.symbol)||running[0];
+ return {symbol:first?.symbol||"",broker:first?.broker||""};
+}
+async function loadTerminalEngineProjection(){
+ try{
+   const d=await fetchApi("/runtime",{timeoutMs:7000});
+   const info=renderEngineProjection(d.bots||[]);
+   if(info?.symbol)await loadBrokerMarketProjection(info.symbol,info.broker||"");
+   else{
+     $("brokerMarketProjectionState").textContent="WAITING";
+     $("projectionMarketNote").textContent="No running bot has selected a broker market yet.";
+   }
+   return true;
+ }catch{
+   $("engineProjectionState").textContent="UNAVAILABLE";
+   return false;
+ }
+}
+
 /* =========================================================
    STARTUP
 ========================================================= */
@@ -2815,6 +2941,7 @@ function formatCompact(value) {
 
   // Market history loads in the background.
   void loadCandles();
+  void loadTerminalEngineProjection();
 
   await accountBoot;
 
@@ -2823,6 +2950,9 @@ function formatCompact(value) {
   setTimeout(async()=>{try{await checkBackend();}catch{}},800);
   setTimeout(async()=>{try{await checkBackend();}catch{}},2500);
   setTimeout(async()=>{try{await checkBackend();}catch{}},5000);
+
+  clearInterval(window.__KINGBOT_ENGINE_PROJECTION_REFRESH);
+  window.__KINGBOT_ENGINE_PROJECTION_REFRESH=setInterval(()=>{void loadTerminalEngineProjection()},5000);
 
   clearInterval(window.__KINGBOT_ACCOUNT_REFRESH);
   window.__KINGBOT_ACCOUNT_REFRESH=setInterval(async()=>{
