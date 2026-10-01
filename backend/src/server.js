@@ -427,6 +427,7 @@ app.get("/api/account", async (req,res)=>{
     };
     const sumPnl=(list)=>{
       if(!Array.isArray(list))return null;
+      if(list.length===0)return 0;
       let total=0,count=0;
       for(const item of list){
         const value=pnlFromRecord(item);
@@ -436,42 +437,48 @@ app.get("/api/account", async (req,res)=>{
     };
 
     const realizedPnl=sumPnl(deals.length?deals:ordersFromHistory);
-    const floatingPnl=equity!==null && balance!==null ? equity-balance : null;
+    const positionFloatingPnl=sumPnl(positionData);
+    const effectiveEquity=(String(connection.broker||"").toLowerCase()==="deriv" && balance!==null && positionFloatingPnl!==null)
+      ? balance+positionFloatingPnl
+      : equity;
+    const effectiveFloatingPnl=effectiveEquity!==null && balance!==null
+      ? effectiveEquity-balance
+      : null;
 
-    let dayStartEquity=equity;
-    let peakEquity=equity;
+    let dayStartEquity=effectiveEquity;
+    let peakEquity=effectiveEquity;
     try{
-      if(user.id && connection.broker && connection.accountId && equity!==null){
+      if(user.id && connection.broker && connection.accountId && effectiveEquity!==null){
         const q=await pool.query(
           "SELECT baseline_date,day_start_equity,peak_equity FROM kingbot_account_risk_state WHERE user_id=$1 AND provider=$2 AND account_id=$3",
           [user.id,connection.broker,connection.accountId]
         );
         if(q.rowCount && q.rows[0].baseline_date===now.toISOString().slice(0,10)){
-          dayStartEquity=finiteOrNull(q.rows[0].day_start_equity) ?? equity;
-          peakEquity=Math.max(finiteOrNull(q.rows[0].peak_equity) ?? equity,equity);
-        }else if(equity!==null){
-          dayStartEquity=equity;
-          peakEquity=equity;
+          dayStartEquity=finiteOrNull(q.rows[0].day_start_equity) ?? effectiveEquity;
+          peakEquity=Math.max(finiteOrNull(q.rows[0].peak_equity) ?? effectiveEquity,effectiveEquity);
+        }else if(effectiveEquity!==null){
+          dayStartEquity=effectiveEquity;
+          peakEquity=effectiveEquity;
           await pool.query(
             "INSERT INTO kingbot_account_risk_state(user_id,provider,account_id,baseline_date,day_start_equity,peak_equity,updated_at) VALUES($1,$2,$3,$4,$5,$6,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET baseline_date=EXCLUDED.baseline_date,day_start_equity=EXCLUDED.day_start_equity,peak_equity=EXCLUDED.peak_equity,updated_at=NOW()",
-            [user.id,connection.broker,connection.accountId,now.toISOString().slice(0,10),equity,equity]
+            [user.id,connection.broker,connection.accountId,now.toISOString().slice(0,10),effectiveEquity,effectiveEquity]
           );
         }
-        if(equity!==null){
+        if(effectiveEquity!==null){
           await pool.query(
             "UPDATE kingbot_account_risk_state SET peak_equity=GREATEST(peak_equity,$4),updated_at=NOW() WHERE user_id=$1 AND provider=$2 AND account_id=$3 AND baseline_date=$5",
-            [user.id,connection.broker,connection.accountId,equity,now.toISOString().slice(0,10)]
+            [user.id,connection.broker,connection.accountId,effectiveEquity,now.toISOString().slice(0,10)]
           );
-          peakEquity=Math.max(peakEquity,equity);
+          peakEquity=Math.max(peakEquity,effectiveEquity);
         }
       }
     }catch(error){
       // Risk baseline is supplementary telemetry; account values remain authoritative.
     }
 
-    const dailyPnl=equity!==null && dayStartEquity!==null ? equity-dayStartEquity : null;
-    const dailyDrawdownPct=equity!==null && dayStartEquity>0 ? Math.max(0,((dayStartEquity-equity)/dayStartEquity)*100) : null;
-    const totalDrawdownPct=equity!==null && peakEquity>0 ? Math.max(0,((peakEquity-equity)/peakEquity)*100) : null;
+    const dailyPnl=effectiveEquity!==null && dayStartEquity!==null ? effectiveEquity-dayStartEquity : null;
+    const dailyDrawdownPct=effectiveEquity!==null && dayStartEquity>0 ? Math.max(0,((dayStartEquity-effectiveEquity)/dayStartEquity)*100) : null;
+    const totalDrawdownPct=effectiveEquity!==null && peakEquity>0 ? Math.max(0,((peakEquity-effectiveEquity)/peakEquity)*100) : null;
     const accountType=String(raw.accountType||raw.account_type||"").trim().toUpperCase()
       || (connection.executionMode==="LIVE" ? "REAL" : "DEMO");
     const currency=String(raw.currency||"").trim().slice(0,12)||null;
@@ -490,8 +497,8 @@ app.get("/api/account", async (req,res)=>{
         accountType,
         currency,
         balance,
-        equity,
-        floatingPnl,
+        equity:effectiveEquity,
+        floatingPnl:effectiveFloatingPnl,
         realizedPnl,
         dailyPnl,
         dailyDrawdownPct,
