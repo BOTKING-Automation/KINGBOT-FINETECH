@@ -1,6 +1,8 @@
 import WebSocket from "ws";
 
 const API_BASE = "https://api.derivws.com";
+const DERIV_PUBLIC_WS = "wss://api.derivws.com/trading/v1/options/ws/public";
+const DERIV_PUBLIC_WS_LEGACY = "wss://ws.binaryws.com/websockets/v3";
 
 function finite(value){
   const n = Number(value);
@@ -109,10 +111,10 @@ export class DerivTraderClient {
     ws.on("error",()=>{});
   }
 
-  async publicConnect(){
+  async publicConnect(endpoint=DERIV_PUBLIC_WS){
     if(this.marketWs&&this.marketConnected)return;
     await new Promise((resolve,reject)=>{
-      const ws=new WebSocket("wss://ws.binaryws.com/websockets/v3");
+      const ws=new WebSocket(endpoint);
       let settled=false;
       const fail=(error)=>{if(settled)return;settled=true;try{ws.close();}catch{};reject(error instanceof Error?error:new Error(String(error)))};
       ws.once("open",()=>{if(settled)return;settled=true;this.marketWs=ws;this.marketConnected=true;this.attachMarket(ws);resolve();});
@@ -172,7 +174,23 @@ export class DerivTraderClient {
   async publicMarkets(){
     const now=Date.now();
     if(this.marketSymbolCache&&now-this.marketSymbolCacheAt<30000)return this.marketSymbolCache;
-    const response=await this.marketRequest({active_symbols:"full"},{timeoutMs:12000});
+
+    let response;
+    let lastError=null;
+    const endpoints=[DERIV_PUBLIC_WS,DERIV_PUBLIC_WS_LEGACY];
+    for(const endpoint of endpoints){
+      try{
+        if(this.marketWs&&this.marketConnected)await this.closePublic();
+        await this.publicConnect(endpoint);
+        response=await this.marketRequest({active_symbols:endpoint===DERIV_PUBLIC_WS?"full":"brief"},{timeoutMs:12000});
+        if(!Array.isArray(response?.active_symbols)||response.active_symbols.length===0)throw new Error("DERIV_MARKET_DISCOVERY_EMPTY");
+        break;
+      }catch(error){
+        lastError=error;
+        await this.closePublic();
+      }
+    }
+    if(!response)throw new Error("DERIV_MARKET_DISCOVERY_FAILED:"+(lastError?.message||"UNKNOWN_ERROR"));
     const list=Array.isArray(response?.active_symbols)?response.active_symbols:[];
     this.marketSymbolCache=list.map(item=>({
       symbol:String(item?.underlying_symbol||item?.symbol||"").trim(),
