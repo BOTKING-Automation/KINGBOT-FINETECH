@@ -454,8 +454,16 @@ export class UserBrokerManager {
 
   async getAccount(userId){
     const entry=await this.connectionFor(userId);
-    if(entry.provider==="deriv" && entry.accountInfo && entry.accountInfoAt && Date.now()-entry.accountInfoAt<3000){
-      const raw=entry.accountInfo||{};
+    if(entry.provider==="deriv"){
+      // Prefer the adapter's live balance stream snapshot. Deriv pushes a
+      // balance message whenever the authorized account balance changes.
+      // This avoids serving an older manager-level cache to the terminal.
+      const streamed=entry.api?.accountBalance;
+      const raw=streamed||entry.accountInfo||{};
+      if(streamed){
+        entry.accountInfo=streamed;
+        entry.accountInfoAt=entry.api.accountBalanceAt||Date.now();
+      }
       const loginid=String(raw.loginid||entry.accountId||"");
       const accountType=String(raw.accountType||entry.accountType||"").toUpperCase() || (loginid.startsWith("VR")||loginid.includes("_VRTC")?"DEMO":"REAL");
       return {connected:true,data:{
@@ -466,7 +474,9 @@ export class UserBrokerManager {
         loginid:raw.loginid||entry.accountId,
         tradeAllowed:raw.tradeAllowed!==false,
         provider:"deriv",
-        accountType
+        accountType,
+        balanceUpdatedAt:entry.api?.accountBalanceAt?new Date(entry.api.accountBalanceAt).toISOString():null,
+        balanceStreamActive:Boolean(entry.api?.balanceSubscriptionId)
       }};
     }
     if(entry.provider==="exness"){
