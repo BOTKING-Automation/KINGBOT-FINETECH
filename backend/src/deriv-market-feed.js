@@ -21,6 +21,7 @@ export class DerivMarketFeed {
     this.desired = new Set();
     this.ticks = new Map();
     this.waiters = new Map();
+    this.requestWaiters = new Map();
     this.connectPromise = null;
     this.reconnectTimer = null;
     this.retryDelayMs = 1000;
@@ -55,7 +56,7 @@ export class DerivMarketFeed {
 
     this.connectPromise = (async()=>{
       let lastError = null;
-      for (const endpoint of [DERIV_LEGACY_WS, DERIV_NEW_WS]) {
+      for (const endpoint of [DERIV_NEW_WS, DERIV_LEGACY_WS]) {
         try {
           await this.openEndpoint(endpoint);
           this.retryDelayMs = 1000;
@@ -112,21 +113,30 @@ export class DerivMarketFeed {
       let data;
       try { data = JSON.parse(String(raw)); } catch { return; }
 
+      const reqId = finite(data?.req_id ?? data?.echo_req?.req_id);
+
       if (data?.error) {
         const symbol = String(data?.echo_req?.ticks||"").trim();
-        if (symbol) this.rejectWaiters(symbol,new Error(data.error.message||"DERIV_MARKET_API_ERROR"));
+        const error = new Error(data.error.message||"DERIV_MARKET_API_ERROR");
+        if (reqId !== null) this.rejectRequestWaiter(reqId,error);
+        if (symbol) this.rejectWaiters(symbol,error);
         return;
       }
 
-      if (data?.msg_type !== "tick" || !data?.tick) return;
+      if (data?.msg_type !== "tick" || !data?.tick) {
+        if (reqId !== null && data?.msg_type) this.resolveRequestWaiter(reqId,data);
+        return;
+      }
 
-      const symbol = String(data.tick.symbol||data?.echo_req?.ticks||"").trim();
+      const rawSymbol = String(data.tick.symbol||data?.echo_req?.ticks||"").trim();
       const quote = finite(data.tick.quote);
       const epoch = finite(data.tick.epoch);
-      if (!symbol || quote === null) return;
+      if (!rawSymbol || quote === null) return;
 
+      const symbol = this.normalize(rawSymbol);
       const tick = {
         symbol,
+        brokerSymbol: rawSymbol,
         bid: finite(data.tick.bid) ?? quote,
         ask: finite(data.tick.ask) ?? quote,
         price: quote,
@@ -137,11 +147,14 @@ export class DerivMarketFeed {
         endpoint: this.endpoint
       };
       this.ticks.set(symbol,tick);
-      const waiters = this.waiters.get(symbol);
+      this.ticks.set(rawSymbol,tick);
+      const waiters = this.waiters.get(symbol)||this.waiters.get(rawSymbol);
       if (waiters) {
         this.waiters.delete(symbol);
+        this.waiters.delete(rawSymbol);
         for (const waiter of waiters) waiter.resolve(tick);
       }
+      if (reqId !== null) this.resolveRequestWaiter(reqId,tick);
     });
 
     ws.on("close",()=>{
@@ -208,24 +221,134 @@ export class DerivMarketFeed {
   }
 
   rejectWaiters(symbol,error) {
-    const waiters = this.waiters.get(symbol);
+    let normalized = symbol;
+    try { normalized = this.normalize(symbol); } catch {}
+    const waiters = this.waiters.get(normalized)||this.waiters.get(symbol);
     if (!waiters) return;
+    this.waiters.delete(normalized);
     this.waiters.delete(symbol);
     for (const waiter of waiters) waiter.reject(error);
   }
 
+  resolveRequestWaiter(reqId,value) {
+    const waiter = this.requestWaiters.get(reqId);
+    if (!waiter) return;
+    this.requestWaiters.delete(reqId);
+    waiter.resolve(value);
+  }
+
+  rejectRequestWaiter(reqId,error) {
+    const waiter = this.requestWaiters.get(reqId);
+    if (!waiter) return;
+    this.requestWaiters.delete(reqId);
+    waiter.reject(error);
+  }
+
+  nextReqId() {
+    this.reqId += 1;
+    return this.reqId;
+  }
+
+  send(message) {
+    if (!this.ws || !this.connected) throw new Error("DERIV_MARKET_FEED_NOT_CONNECTED");
+    this.ws.send(JSON.stringify(message));
+  }
+
+  async requestSnapshot(symbol,{timeoutMs=5000}={}) {
+    const s = this.normalize(symbol);
+    await this.connect();
+    const reqId = this.nextReqId();
+
+    return new Promise((resolve,reject)=>{
+      const timer = setTimeout(()=>{
+        this.requestWaiters.delete(reqId);
+        reject(new Error("DERIV_MARKET_SNAPSHOT_TIMEOUT"));
+      },Math.max(1500,Number(timeoutMs)||5000));
+
+      this.requestWaiters.set(reqId,{
+        resolve:(value)=>{
+          clearTimeout(timer);
+          this.requestWaiters.delete(reqId);
+          if (value?.tick) {
+            const quote = finite(value.tick.quote);
+            const epoch = finite(value.tick.epoch);
+            if (quote !== null) {
+              const rawSymbol = String(value.tick.symbol||s).trim();
+              const tick = {
+                symbol:this.normalize(rawSymbol),
+                brokerSymbol:rawSymbol,
+                bid:finite(value.tick.bid) ?? quote,
+                ask:finite(value.tick.ask) ?? quote,
+                price:quote,
+                epoch,
+                time:epoch!==null?new Date(epoch*1000).toISOString():new Date().toISOString(),
+                receivedAt:Date.now(),
+                source:"deriv-one-shot-live-snapshot",
+                endpoint:this.endpoint
+              };
+              this.ticks.set(this.normalize(rawSymbol),tick);
+              this.ticks.set(rawSymbol,tick);
+              resolve(tick);
+              return;
+            }
+          }
+          resolve(value);
+        },
+        reject:(error)=>{
+          clearTimeout(timer);
+          this.requestWaiters.delete(reqId);
+          reject(error);
+        }
+      });
+
+      try {
+        this.send({ticks:s,req_id:reqId});
+      } catch (error) {
+        clearTimeout(timer);
+        this.requestWaiters.delete(reqId);
+        reject(error);
+      }
+    });
+  }
+
+  async forceReconnect() {
+    if (this.closed) this.closed = false;
+    this.destroySocket();
+    return this.connect();
+  }
+
   async getQuote(symbol,{maxAgeMs=this.maxAgeMs,timeoutMs=8000}={}) {
     const s = await this.subscribe(symbol);
+
     const cached = this.ticks.get(s);
     const age = cached ? Date.now()-cached.receivedAt : Infinity;
     if (cached && age <= maxAgeMs) return {...cached,ageMs:Math.max(0,age)};
+
+    // A persistent subscription can remain connected while its stream becomes
+    // stale. Request a fresh one-shot tick before failing the trading cycle.
+    try {
+      const snapshot = await this.requestSnapshot(s,{timeoutMs:Math.min(4500,timeoutMs)});
+      if (snapshot?.price !== undefined) {
+        return {...snapshot,ageMs:Math.max(0,Date.now()-snapshot.receivedAt)};
+      }
+    } catch {}
+
+    // If the socket is unhealthy, rebuild it once and retry the snapshot.
+    try {
+      await this.forceReconnect();
+      await this.subscribe(s);
+      const snapshot = await this.requestSnapshot(s,{timeoutMs:Math.min(4500,timeoutMs)});
+      if (snapshot?.price !== undefined) {
+        return {...snapshot,ageMs:Math.max(0,Date.now()-snapshot.receivedAt)};
+      }
+    } catch {}
 
     return new Promise((resolve,reject)=>{
       const timer = setTimeout(()=>{
         const list = this.waiters.get(s)||[];
         this.waiters.set(s,list.filter(item=>item!==entry));
         reject(new Error("DERIV_MARKET_QUOTE_STALE"));
-      },timeoutMs);
+      },Math.max(2000,Number(timeoutMs)||8000));
       const entry = {
         resolve:(tick)=>{clearTimeout(timer);resolve({...tick,ageMs:Math.max(0,Date.now()-tick.receivedAt)});},
         reject:(error)=>{clearTimeout(timer);reject(error);}
@@ -237,12 +360,15 @@ export class DerivMarketFeed {
   }
 
   status(symbol="") {
-    const s = String(symbol||"").trim();
+    const requested = String(symbol||"").trim();
+    let s = requested;
+    try { s = requested ? this.normalize(requested) : ""; } catch {}
     const tick = s ? this.ticks.get(s) : null;
     return {
       connected:this.connected,
       endpoint:this.endpoint,
-      symbol:s||null,
+      symbol:requested||null,
+      normalizedSymbol:s||null,
       subscribed:s ? this.subscribed.has(s) : this.subscribed.size,
       desired:s ? this.desired.has(s) : this.desired.size,
       price:tick?.price??null,
@@ -259,6 +385,7 @@ export class DerivMarketFeed {
     this.destroySocket();
     this.desired.clear();
     this.ticks.clear();
+    this.requestWaiters.clear();
   }
 }
 
