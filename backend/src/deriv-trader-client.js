@@ -423,7 +423,12 @@ export class DerivTraderClient {
       bidPrice:finite(c?.bid_price),
       payout:finite(c?.payout),
       multiplier:finite(c?.multiplier),
+      stopLoss:finite(c?.limit_order?.stop_loss||c?.stop_loss),
+      takeProfit:finite(c?.limit_order?.take_profit||c?.take_profit),
+      swap:null,
+      commission:null,
       expiryTime:finite(c?.date_expiry),
+      openTime:finite(c?.date_start),
       time:finite(c?.date_start),
       status:String(c?.status||"open").toUpperCase()
     };
@@ -444,6 +449,10 @@ export class DerivTraderClient {
           bidPrice:finite(open?.bid_price??mapped.bidPrice),
           stake:finite(open?.buy_price??mapped.stake),
           volume:finite(open?.buy_price??mapped.volume),
+          stopLoss:finite(open?.limit_order?.stop_loss||open?.stop_loss||mapped.stopLoss),
+          takeProfit:finite(open?.limit_order?.take_profit||open?.take_profit||mapped.takeProfit),
+          openTime:finite(open?.date_start||mapped.openTime),
+          time:finite(open?.date_start||mapped.time),
           status:String(open?.status||mapped.status||"OPEN").toUpperCase()
         };
       }catch{}
