@@ -79,14 +79,18 @@ function directionFromCandidate(signal){
 }
 
 function snapshotFingerprint({botId,market,analysis}={}){
+  // Do not fingerprint raw bid/ask/price: those change every tick and would defeat
+  // the short-lived AI cache. Deterministic validation still runs on every worker cycle.
+  const atr=Math.max(Number(market?.atr||0),1e-12);
+  const price=Number(market?.price||0);
+  const priceBucket=Math.round(price/(atr*0.20));
+  const spreadBucket=Math.round(Number(market?.spread||0)/(atr*0.05));
   return JSON.stringify({
     botId,
     symbol:market?.symbol,
     timeframe:market?.timeframe,
-    price:Number(market?.price||0),
-    bid:Number(market?.bid||0),
-    ask:Number(market?.ask||0),
-    spread:Number(market?.spread||0),
+    priceBucket,
+    spreadBucket,
     atr:Number(market?.atr||0),
     volatility:Number(market?.volatility||0),
     trend:Number(market?.trend||0),
@@ -105,7 +109,7 @@ function snapshotFingerprint({botId,market,analysis}={}){
     emaSlow:Number(market?.emaSlow||0),
     velocityPoints:Number(market?.velocityPoints||0),
     deterministicSignal:String(analysis?.signal||"NO_SIGNAL"),
-    deterministicScore:Number(analysis?.score||0),
+    deterministicScoreBucket:Math.round(Number(analysis?.score||0)/2),
     deterministicReason:String(analysis?.reason||"")
   });
 }
