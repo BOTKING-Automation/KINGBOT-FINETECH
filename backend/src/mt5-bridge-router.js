@@ -7,8 +7,9 @@ export function createMt5BridgeRouter({pool,broker}={}){
   router.post("/token",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
     try{
-      const mode=String(req.body?.executionMode||"PAPER").toUpperCase();
-      if(!["PAPER","LIVE"].includes(mode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+      const requestedMode=String(req.body?.executionMode||"DEMO").toUpperCase();
+      if(!["DEMO","PAPER","LIVE"].includes(requestedMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+      const mode=requestedMode==="DEMO"?"PAPER":requestedMode;
       res.status(201).json(await mt5BridgeRegistry.issueToken({userId:user.id,mode,label:req.body?.label}));
     }catch(error){
       res.status(error?.message==="BROKER_ALREADY_CONNECTED"?409:500).json({ok:false,error:error?.message||"MT5_BRIDGE_TOKEN_CREATE_FAILED"});
@@ -54,7 +55,7 @@ export function createMt5BridgeRouter({pool,broker}={}){
       res.status(result.ok?200:(result.status||404)).json(result);
     }catch(error){res.status(503).json({ok:false,error:"MT5_BRIDGE_ACK_FAILED",reason:error?.message||"MT5_BRIDGE_ACK_FAILED"});}
   });
-  router.get("/manifest",(_req,res)=>res.json({ok:true,name:"KINGBOT MT5 EA Bridge",protocol:"HTTP/JSON",endpoint:"/api/mt5/bridge/poll",ackEndpoint:"/api/mt5/bridge/ack",pollIntervalMs:500,telemetryIntervalMs:1000,tokenTtlDays:TOKEN_TTL_DAYS,execution:"native MT5",sizeModel:"LOTS",modes:["PAPER","LIVE"]}));
+  router.get("/manifest",(_req,res)=>res.json({ok:true,name:"KINGBOT MT5 EA Bridge",protocol:"HTTP/JSON",endpoint:"/api/mt5/bridge/poll",ackEndpoint:"/api/mt5/bridge/ack",pollIntervalMs:500,telemetryIntervalMs:1000,tokenTtlDays:TOKEN_TTL_DAYS,execution:"native MT5 broker execution",sizeModel:"LOTS",modes:["DEMO","LIVE"],demoMode:"Deriv broker-side MT5 demo account"}));
   return router;
 }
 export async function ensureMt5BridgeSchema(pool){await mt5BridgeRegistry.ensureSchema();}
