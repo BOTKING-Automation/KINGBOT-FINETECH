@@ -538,7 +538,7 @@ void PollBridge()
    body+="\"login\":\""+LongToString(AccountInfoInteger(ACCOUNT_LOGIN))+"\",";
    body+="\"server\":\""+JsonEscape(AccountInfoString(ACCOUNT_SERVER))+"\",";
    body+="\"accountType\":\""+AccountType()+"\",";
-   body+="\"mode\":\""+(AccountType()=="REAL"?"LIVE":"PAPER")+"\",";
+   body+="\"mode\":\""+(AccountType()=="REAL"?"LIVE":"DEMO")+"\",";
    body+="\"state\":"+BuildState(withHistory)+"}";
    string response;int code=0;
    if(!HttpPost(BridgeURL,body,response,code))return;
