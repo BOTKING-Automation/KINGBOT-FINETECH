@@ -88,6 +88,7 @@ export class OandaTraderClient{
         positions.push({
           id:p.instrument+"_"+side,
           symbol:p.instrument,
+          tradeIds:Array.isArray(leg?.tradeIDs)?leg.tradeIDs.map(String):[],
           type:side.toUpperCase(),
           side:side.toUpperCase(),
           volume:Math.abs(units),
@@ -104,7 +105,18 @@ export class OandaTraderClient{
     let q="state="+encodeURIComponent(state)+"&count=500";
     if(instrument)q+="&instrument="+encodeURIComponent(normalizeInstrument(instrument));
     const trades=(await this.request("/v3/accounts/"+encodeURIComponent(this.accountId)+"/trades?"+q)).trades||[];
-    return {orders:[],deals:trades};
+    return {orders:[],deals:trades.map(t=>({
+      ...t,
+      id:String(t.id||""),
+      tradeId:String(t.id||""),
+      symbol:String(t.instrument||""),
+      side:Number(t.currentUnits)>=0?"BUY":"SELL",
+      volume:Math.abs(Number(t.currentUnits)||0),
+      openPrice:Number(t.price),
+      stopLoss:t.stopLossOrder?.price!=null?Number(t.stopLossOrder.price):null,
+      takeProfit:t.takeProfitOrder?.price!=null?Number(t.takeProfitOrder.price):null,
+      profit:Number(t.unrealizedPL||0)
+    }))};
   }
   async getMarkets(){
     const data=await this.request("/v3/accounts/"+encodeURIComponent(this.accountId)+"/instruments");
@@ -138,6 +150,17 @@ export class OandaTraderClient{
       stopsLevel:0
     };
   }
+  async modifyTradeStops(tradeId,{stopLoss,takeProfit}={}){
+    const id=String(tradeId||"").trim();
+    if(!id)throw new Error("OANDA_TRADE_ID_REQUIRED");
+    const body={};
+    if(stopLoss!==undefined&&stopLoss!==null)body.stopLoss={timeInForce:"GTC",price:Number(stopLoss).toFixed(10)};
+    else if(stopLoss===null)body.stopLoss=null;
+    if(takeProfit!==undefined&&takeProfit!==null)body.takeProfit={timeInForce:"GTC",price:Number(takeProfit).toFixed(10)};
+    else if(takeProfit===null)body.takeProfit=null;
+    return this.request("/v3/accounts/"+encodeURIComponent(this.accountId)+"/trades/"+encodeURIComponent(id)+"/orders",{method:"PUT",body:JSON.stringify(body)});
+  }
+
   async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId}={}){
     const instrument=normalizeInstrument(symbol);
     const units=(String(side).toUpperCase()==="BUY"?1:-1)*Number(volume);
