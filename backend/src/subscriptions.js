@@ -274,7 +274,7 @@ export function createSubscriptionRouter({pool,broker}) {
         SELECT r.user_id,u.first_name,u.last_name,u.email,
                r.bot_id,r.state,r.symbol,r.timeframe,r.last_signal,r.last_run_at,r.last_error,r.updated_at,
                COALESCE(s.plan_id,'') AS plan_id,
-               COALESCE(rs.execution_mode,'PAPER') AS execution_mode,
+               COALESCE(rs.execution_mode,'DEMO') AS execution_mode,
                COALESCE(rs.kill_switch,FALSE) AS kill_switch,
                COALESCE(rs.max_risk_per_trade_pct,0) AS max_risk_per_trade_pct,
                COALESCE(rs.daily_drawdown_pct,5) AS daily_drawdown_pct,
