@@ -119,15 +119,15 @@ async function execute(row){
   if(!status.configured){await pool.query("UPDATE kingbot_bot_runtime SET state='ERROR',last_error='BROKER_ACCOUNT_NOT_MAPPED',updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);return;}
   if(!status.connected){const connected=await broker.connect(userId,s.executionMode);if(!connected.connected)throw new Error(connected.reason||"BROKER_CONNECTION_FAILED");}
   const account=(await broker.getAccount(userId)).data||{};
-  if(status.broker==="exness"){
+  const brokerName=String(status.broker||"").toLowerCase();
+  if(brokerName==="exness"){
     if(s.executionMode==="PAPER")throw new Error("EXNESS_PAPER_MODE_REQUIRES_DEMO_API_ACCOUNT");
     if(account.trade_mode==="trading_disabled")throw new Error("EXNESS_TRADING_DISABLED");
     if(account.account_status==="close_only")throw new Error("EXNESS_ACCOUNT_CLOSE_ONLY");
-  }else{
-    const type=String(account.type||"");
-    if(s.executionMode==="PAPER"&&type!=="ACCOUNT_TRADE_MODE_DEMO")throw new Error("PAPER_REQUIRES_DEMO_ACCOUNT");
-    if(s.executionMode==="LIVE"&&type!=="ACCOUNT_TRADE_MODE_REAL")throw new Error("LIVE_REQUIRES_REAL_ACCOUNT");
   }
+  const accountType=String(account.accountType||account.account_type||(brokerName==="oanda"?(s.executionMode==="LIVE"?"REAL":"DEMO"):"")||(String(account.type||"").toUpperCase().includes("DEMO")?"DEMO":"")||(String(account.type||"").toUpperCase().includes("REAL")?"REAL":"")).trim().toUpperCase();
+  if(s.executionMode==="PAPER"&&accountType!=="DEMO")throw new Error("PAPER_REQUIRES_DEMO_ACCOUNT");
+  if(s.executionMode==="LIVE"&&accountType!=="REAL")throw new Error("LIVE_REQUIRES_REAL_ACCOUNT");
   if(account.tradeAllowed===false)throw new Error("BROKER_TRADING_NOT_ALLOWED");
   const quote=(await broker.getQuote(config.symbol,userId)).data||{};
   const bid=Number(quote.bid),ask=Number(quote.ask),quoteTime=new Date(quote.time||0).getTime();
@@ -229,8 +229,9 @@ async function cycle(){
     await Promise.allSettled(batch.map(async row=>{
       try{await execute(row);}
       catch(error){
-        await pool.query("UPDATE kingbot_bot_runtime SET state='ERROR',last_error=$3,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[row.user_id,row.bot_id,String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500)]);
-        await audit(row.user_id,"BOT_WORKER_ERROR",{botId:row.bot_id,error:String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500)});
+        const message=String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500);
+        await pool.query("UPDATE kingbot_bot_runtime SET state='RUNNING',last_error=$3,last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[row.user_id,row.bot_id,message]);
+        await audit(row.user_id,"BOT_WORKER_ERROR",{botId:row.bot_id,error:message,retryable:true});
       }
     }));
   }
