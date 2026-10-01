@@ -803,7 +803,7 @@ async function execute(row){
 
   if(botId==="ladder-flip"){
     const specResult=await broker.getSymbolSpecification(config.symbol,userId);
-    const rawSpec=specResult?.data||{};
+    const rawSpec=specResult?.data??specResult??{};
     const spec=ladderSpec(rawSpec,quote);
     if(!Number.isFinite(spec.point)||spec.point<=0)throw new Error("LADDER_V8_BROKER_POINT_UNAVAILABLE");
     const state=await getLadderState(userId,botId);
