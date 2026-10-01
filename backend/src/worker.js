@@ -8,7 +8,7 @@ import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
 import { monitorBotDecision } from "./ai-bot-supervisor.js";
 import { getAiStrategySignal, warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } from "./ai-trade-gate.js";
 import { authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
-import { calculateLadderV8Indicators, ladderRungLot, normalizeLot, ladderLockStepPrice, ladderLockPrice, updateVelocitySamples, velocityPoints, withinLadderSession, ladderBasketRisk, LADDER_V8_DEFAULTS } from "./ladder-v8.js";
+import { calculateLadderV8Indicators, ladderRungLot, brokerLadderLots, normalizeLot, ladderLockStepPrice, ladderLockPrice, updateVelocitySamples, velocityPoints, withinLadderSession, ladderBasketRisk, LADDER_V8_DEFAULTS } from "./ladder-v8.js";
 import { ensureAuthSchema } from "./auth.js";
 import { ensureSubscriptionSchema, expireStaleSubscriptions } from "./subscriptions.js";
 import { isAdminUser } from "./admin-access.js";
@@ -527,15 +527,24 @@ async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,pos
   const anchor=side==="BUY"?Number(quote.ask):Number(quote.bid);
   const stopDistance=Math.max(Number(ind.v8Atr)*cfg.atrSLMult,ls.stopsLevel*ls.point*1.1);
   if(!Number.isFinite(stopDistance)||stopDistance<=0)throw new Error("LADDER_V8_STOP_DISTANCE_UNAVAILABLE");
-  const rawLots=[];
-  const rungCount=Math.min(cfg.fixedRungCount,cfg.maxTotalRungs);
-  for(let i=0;i<rungCount;i++)rawLots.push(ladderRungLot(i,cfg));
   const budget=Number(account.equity)*(Number(s.maxRiskPerTradePct)/100);
-  const rawRisk=ladderRiskForLots(rawLots,stopDistance,ls);
-  const lotScale=rawRisk>budget&&rawRisk>0?budget/rawRisk:1;
-  const volumes=rawLots.map(lot=>normalizeLot(lot*lotScale,{minLot:ls.minVolume,maxLot:ls.maxVolume,step:ls.volumeStep}));
-  const basketRisk=ladderRiskForLots(volumes,stopDistance,ls);
-  if(!Number.isFinite(basketRisk)||basketRisk>budget*1.000001)return {action:"LADDER_RISK_BUDGET_BLOCKED",state:null,details:{budget,rawRisk,basketRisk,lotScale,volumes}};
+  const rungCount=Math.min(cfg.fixedRungCount,cfg.maxTotalRungs);
+  const plannedLots=brokerLadderLots({
+    minLot:ls.minVolume,
+    maxLot:Math.min(ls.maxVolume,Number(cfg.maxLadderLot)||ls.maxVolume),
+    step:ls.volumeStep,
+    maxRungs:rungCount,
+    growthFactor:Number(cfg.lotGrowthFactor)||2.0
+  });
+  const volumes=[];
+  let basketRisk=0;
+  for(const lot of plannedLots){
+    const candidateRisk=ladderRiskForLots([...volumes,lot],stopDistance,ls);
+    if(!Number.isFinite(candidateRisk)||candidateRisk>budget*1.000001)break;
+    volumes.push(lot);
+    basketRisk=candidateRisk;
+  }
+  if(!volumes.length)return {action:"LADDER_RISK_BUDGET_BLOCKED",state:null,details:{budget,plannedLots,basketRisk}};
   const positionCap=Math.min(cfg.maxTotalRungs,Math.max(cfg.fixedRungCount,Number(s.maxPositions)||cfg.fixedRungCount));
   if(positions.length+rungCount>positionCap)return {action:"LADDER_MAX_POSITION_CAP",state:null,details:{positionCap}};
   const cycleId="kbv8_"+crypto.randomUUID();
@@ -598,7 +607,7 @@ async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,pos
     cycleId,lotScale,lastAction:"LADDER_V8_STARTED"
   };
   await saveLadderState(userId,botId,state);
-  await audit(userId,"LADDER_V8_STARTED",{botId,symbol:config.symbol,side,rungsOpened:opened,lotScale,requestedLots:rawLots,executedLots:openedLots,stepPrice,cycleId});
+  await audit(userId,"LADDER_V8_STARTED",{botId,symbol:config.symbol,side,rungsOpened:opened,plannedLots,executedLots:openedLots,lotGrowthFactor:Number(cfg.lotGrowthFactor)||2,brokerMinLot:ls.minVolume,brokerMaxLot:ls.maxVolume,brokerLotStep:ls.volumeStep,stepPrice,cycleId});
   return {action:"LADDER_V8_STARTED",state};
 }
 async function executeLadderV8Manage({userId,botId,config,s,account,quote,positions,ind,spec,state,velocity,riskAllowed}){
@@ -872,7 +881,7 @@ async function execute(row){
     }
     let action="NO_ACTION";
     let started=null;
-    if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&spreadOk){
+    if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&spreadOk&&(!aiExecutionGateEnabled()||aiTradeGate?.confirm)){
       const start=await executeLadderV8Start({userId,botId,config,s,account,quote,ind,positions,spec,velocity});
       action=start.action;started=start.state;
     }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!spreadOk)action="V8_SPREAD_FILTER_BLOCKED";
