@@ -683,7 +683,7 @@ async function execute(row){
     if(account.trade_mode==="trading_disabled")throw new Error("EXNESS_TRADING_DISABLED");
     if(account.account_status==="close_only")throw new Error("EXNESS_ACCOUNT_CLOSE_ONLY");
   }
-  const accountType=String(account.accountType||account.account_type||(brokerName==="oanda"?(s.executionMode==="LIVE"?"REAL":"DEMO"):"")||(String(account.type||"").toUpperCase().includes("DEMO")?"DEMO":"")||(String(account.type||"").toUpperCase().includes("REAL")?"REAL":"")).trim().toUpperCase();
+  const accountType=String(account.accountType||account.account_type||status.accountSnapshot?.accountType||(brokerName==="oanda"?(s.executionMode==="LIVE"?"REAL":"DEMO"):"")||(String(account.type||"").toUpperCase().includes("DEMO")?"DEMO":"")||(String(account.type||"").toUpperCase().includes("REAL")?"REAL":"")).trim().toUpperCase();
   if(s.executionMode==="PAPER"&&accountType!=="DEMO")throw new Error("PAPER_REQUIRES_DEMO_ACCOUNT");
   if(s.executionMode==="LIVE"&&accountType!=="REAL")throw new Error("LIVE_REQUIRES_REAL_ACCOUNT");
   if(account.tradeAllowed===false)throw new Error("BROKER_TRADING_NOT_ALLOWED");
