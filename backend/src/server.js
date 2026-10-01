@@ -336,7 +336,9 @@ app.get("/api/connection", async (req,res)=>{
 });
 app.post("/api/broker/connect", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
-  const mode=String(req.body?.executionMode||"PAPER").toUpperCase();
+  const requestedMode=String(req.body?.executionMode||"DEMO").toUpperCase();
+  const mode=requestedMode==="PAPER"?"DEMO":requestedMode;
+  if(!["DEMO","LIVE"].includes(mode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
   try{
     const result=await broker.connect(user.id,mode);
     if(!result.connected)return res.status(503).json({ok:false,...result});
