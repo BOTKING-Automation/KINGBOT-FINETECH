@@ -239,8 +239,17 @@ export class DerivTraderClient {
     throw new Error("DERIV_CONTRACT_SPECIFICATION_REQUIRES_OPTIONS_MODEL");
   }
 
-  async getHistoricalCandles(){
-    throw new Error("DERIV_CANDLES_ADAPTER_NOT_ENABLED");
+  async getHistoricalCandles(symbol,timeframe="1m",limit=100){
+    const s=String(symbol||"").trim();
+    if(!/^[A-Za-z0-9._-]{2,30}$/.test(s))throw new Error("INVALID_DERIV_SYMBOL");
+    const granularityMap={"1m":60,"2m":120,"3m":180,"4m":240,"5m":300,"6m":360,"10m":600,"12m":720,"15m":900,"20m":1200,"30m":1800,"1h":3600,"2h":7200,"3h":10800,"4h":14400,"6h":21600,"8h":28800,"12h":43200,"1d":86400,"1w":604800,"1mn":2592000};
+    const granularity=granularityMap[String(timeframe||"1m")]||60;
+    const count=Math.max(20,Math.min(1000,Number(limit)||100));
+    const response=await this.request({ticks_history:s,end:"latest",count,style:"candles",granularity,adjust_start_time:1,subscribe:0},{timeoutMs:15000});
+    const candles=Array.isArray(response?.candles)?response.candles:[];
+    const rows=candles.map(c=>({time:c?.epoch?new Date(Number(c.epoch)*1000).toISOString():null,open:finite(c?.open),high:finite(c?.high),low:finite(c?.low),close:finite(c?.close),volume:finite(c?.tick_count)})).filter(c=>c.time&&[c.open,c.high,c.low,c.close].every(Number.isFinite));
+    if(rows.length<20)throw new Error("INSUFFICIENT_HISTORICAL_CANDLES");
+    return rows;
   }
 
   async placeOrder(){
