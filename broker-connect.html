@@ -385,6 +385,7 @@ async function disconnectCurrentBroker(){
     const d=await r.json().catch(()=>({}));
     if(!r.ok||d.connected)throw new Error(d.error||"Unable to disconnect the current broker.");
     activeConnection=null;
+    try{localStorage.removeItem("KINGBOT_BROKER_IDENTITY");}catch{}
     selected=null;selectedAccount=null;verified=false;
     document.querySelectorAll(".broker").forEach(el=>el.classList.remove("selected"));
     applyExecutionMode();
