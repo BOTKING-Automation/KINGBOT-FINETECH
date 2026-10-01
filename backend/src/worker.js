@@ -229,7 +229,9 @@ async function getWorkerCandles(userId,symbol,timeframe,limit=100){
   const ttl=Math.max(CANDLE_CACHE_MIN_MS,Math.min(60000,Math.max(5000,Number(timeframeMinutes[timeframe]||1)*2500)));
   const cached=workerCandleCache.get(key);
   if(cached && Date.now()-cached.at<ttl)return cached.data;
-  const data=(await broker.getHistoricalCandles(symbol,timeframe,userId,limit)).data||[];
+  const response=await broker.getHistoricalCandles(symbol,timeframe,userId,limit);
+  const data=Array.isArray(response)?response:(Array.isArray(response?.data)?response.data:[]);
+  if(data.length===0)throw new Error("EMPTY_HISTORICAL_CANDLES");
   workerCandleCache.set(key,{at:Date.now(),data});
   return data;
 }
