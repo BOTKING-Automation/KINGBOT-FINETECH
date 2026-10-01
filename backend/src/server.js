@@ -11,6 +11,7 @@ import { createAuthRouter, ensureAuthSchema } from "./auth.js";
 import { createSubscriptionRouter, ensureSubscriptionSchema } from "./subscriptions.js";
 import { createBotEngineRouter, ensureBotEngineSchema } from "./bot-engines.js";
 import { UserBrokerManager } from "./user-broker-manager.js";
+import { DerivTraderClient } from "./deriv-trader-client.js";
 import { PartnerManager } from "./partner-manager.js";
 import { requireUser } from "./subscriptions.js";
 import { isAdminEmail } from "./admin-access.js";
@@ -361,6 +362,28 @@ app.get("/api/broker/markets", async (req,res)=>{
   }catch(error){
     console.error("[KINGBOT BROKER] market discovery failed:",error?.message||error);
     res.status(503).json({ok:false,error:"Broker market catalog unavailable.",reason:error?.message||"BROKER_MARKETS_UNAVAILABLE"});
+  }
+});
+
+app.get("/api/market/quote", async (req,res)=>{
+  const symbol=String(req.query?.symbol||"").trim().toUpperCase();
+  if(!symbol)return res.status(400).json({ok:false,error:"MARKET_SYMBOL_REQUIRED"});
+  try{
+    const publicDeriv=new DerivTraderClient({executionMode:"PAPER"});
+    const result=await publicDeriv.getQuote(symbol);
+    return res.json({
+      ok:true,
+      broker:"deriv",
+      market:result?.data||null,
+      syncedAt:new Date().toISOString()
+    });
+  }catch(error){
+    console.error("[KINGBOT MARKET] public quote failed:",error?.message||error);
+    return res.status(503).json({
+      ok:false,
+      error:"Live market feed unavailable.",
+      reason:error?.message||"DERIV_PUBLIC_MARKET_UNAVAILABLE"
+    });
   }
 });
 
