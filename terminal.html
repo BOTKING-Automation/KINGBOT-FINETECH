@@ -1,3290 +1,554 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#050816" />
-  <title>KINGBOT — Trading Command Center</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@500;600;700;800;900&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="system/platform.css">
-  
-  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
-
-  <style>
-    :root {
-      --bg: #03050d;
-      --bg2: #070b18;
-      --panel: rgba(10, 15, 32, .78);
-      --panel2: rgba(15, 21, 43, .82);
-      --line: rgba(255,255,255,.09);
-      --text: #f5f7ff;
-      --muted: #7f8ba8;
-
-      --gold: #ffc84a;
-      --gold2: #ff9f1a;
-      --cyan: #19e6ff;
-      --blue: #4787ff;
-      --violet: #9b5cff;
-      --pink: #ff4fd8;
-      --green: #23f7a3;
-      --red: #ff4d6d;
-      --orange: #ff7a18;
-
-      --shadow: 0 25px 80px rgba(0,0,0,.48);
-      --radius: 20px;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    html{
-      scroll-behavior:auto;
-    
-overscroll-behavior:none;}
-
-    body {
-      min-height: 100vh;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 8% 10%, rgba(25,230,255,.09), transparent 28%),
-        radial-gradient(circle at 90% 10%, rgba(155,92,255,.11), transparent 28%),
-        radial-gradient(circle at 50% 100%, rgba(255,200,74,.07), transparent 32%),
-        var(--bg);
-      font-family: Inter, sans-serif;
-      overflow-x: hidden;
-    }
-
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: -2;
-      background-image:
-        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
-      background-size: 44px 44px;
-      mask-image: linear-gradient(to bottom, black, transparent 90%);
-    }
-
-    body::after {
-      content: "";
-      position: fixed;
-      width: 600px;
-      height: 600px;
-      left: -220px;
-      top: 25%;
-      border-radius: 50%;
-      background: rgba(25,230,255,.06);
-      filter: blur(100px);
-      pointer-events: none;
-      z-index: -1;
-      animation: floatGlow 12s ease-in-out infinite alternate;
-    }
-
-    @keyframes floatGlow {
-      from { transform: translate(0,0); }
-      to { transform: translate(100px,-80px); }
-    }
-
-    a {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    button,
-    input,
-    select {
-      font: inherit;
-    }
-
-    button {
-      cursor: pointer;
-      border: 0;
-    }
-
-    .mono {
-      font-family: "JetBrains Mono", monospace;
-    }
-
-    .orbitron {
-      font-family: Orbitron, sans-serif;
-    }
-
-    /* ================= HEADER ================= */
-
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-      height: 76px;
-      border-bottom: 1px solid rgba(255,255,255,.08);
-      background: rgba(3,5,13,.78);
-      backdrop-filter: blur(22px);
-    }
-
-    .nav {
-      max-width: 1600px;
-      height: 100%;
-      margin: auto;
-      padding: 0 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 220px;
-    }
-
-    .brand-mark {
-      width: 42px;
-      height: 42px;
-      border-radius: 13px;
-      display: grid;
-      place-items: center;
-      font-family: Orbitron;
-      font-weight: 900;
-      color: #05070e;
-      background: linear-gradient(135deg, var(--gold), var(--orange), var(--pink));
-      box-shadow:
-        0 0 22px rgba(255,200,74,.35),
-        inset 0 0 15px rgba(255,255,255,.3);
-    }
-
-    .brand-title {
-      font-family: Orbitron;
-      font-size: 15px;
-      font-weight: 800;
-      letter-spacing: .12em;
-    }
-
-    .brand-sub {
-      color: var(--muted);
-      font-size: 9px;
-      letter-spacing: .22em;
-      margin-top: 3px;
-    }
-
-    .nav-links {
-      display: flex;
-      gap: 6px;
-    }
-
-    .nav-links a {
-      color: #9ca8c1;
-      padding: 10px 13px;
-      border-radius: 10px;
-      font-size: 12px;
-      transition: .2s;
-    }
-
-    .nav-links a:hover,
-    .nav-links a.active {
-      color: white;
-      background: rgba(255,255,255,.06);
-    }
-
-    .nav-right {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .status-pill {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 12px;
-      border: 1px solid rgba(35,247,163,.18);
-      border-radius: 999px;
-      background: rgba(35,247,163,.06);
-      font-size: 10px;
-      color: #b5ffdF;
-    }
-
-    .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 12px var(--green);
-    }
-
-    .clock {
-      color: #8894af;
-      font-size: 11px;
-    }
-
-    /* ================= MAIN ================= */
-
-    main {
-      max-width: 1600px;
-      margin: auto;
-      padding: 28px 24px 70px;
-    }
-
-    .hero {
-      position: relative;
-      overflow: hidden;
-      min-height: 245px;
-      padding: 38px;
-      border: 1px solid rgba(255,255,255,.08);
-      border-radius: 28px;
-      background:
-        radial-gradient(circle at 80% 30%, rgba(155,92,255,.18), transparent 32%),
-        radial-gradient(circle at 55% 100%, rgba(25,230,255,.1), transparent 28%),
-        linear-gradient(135deg, rgba(255,200,74,.055), rgba(255,255,255,.015));
-      box-shadow: var(--shadow);
-    }
-
-    .hero::before {
-      content: "";
-      position: absolute;
-      width: 360px;
-      height: 360px;
-      right: -130px;
-      top: -160px;
-      border-radius: 50%;
-      border: 1px solid rgba(25,230,255,.15);
-      box-shadow:
-        0 0 80px rgba(25,230,255,.08),
-        inset 0 0 80px rgba(155,92,255,.06);
-    }
-
-    .hero::after {
-      content: "";
-      position: absolute;
-      width: 260px;
-      height: 2px;
-      right: 8%;
-      bottom: 25px;
-      background: linear-gradient(90deg, transparent, var(--cyan), var(--violet), transparent);
-      box-shadow: 0 0 20px var(--cyan);
-      transform: rotate(-5deg);
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 10px;
-      border: 1px solid rgba(255,200,74,.18);
-      border-radius: 999px;
-      color: var(--gold);
-      background: rgba(255,200,74,.055);
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: .15em;
-    }
-
-    .hero h1 {
-      margin-top: 20px;
-      max-width: 900px;
-      font-family: Orbitron;
-      font-size: clamp(30px, 4vw, 62px);
-      line-height: 1.03;
-      letter-spacing: -.04em;
-    }
-
-    .hero h1 span {
-      background: linear-gradient(
-        90deg,
-        var(--gold),
-        var(--cyan),
-        var(--violet),
-        var(--pink)
-      );
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      background-size: 300%;
-      animation: gradientFlow 7s ease infinite;
-    }
-
-    @keyframes gradientFlow {
-      0%,100% { background-position: 0%; }
-      50% { background-position: 100%; }
-    }
-
-    .hero p {
-      max-width: 760px;
-      margin-top: 14px;
-      color: #9ba7c0;
-      line-height: 1.7;
-      font-size: 13px;
-    }
-
-    .hero-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 9px;
-      margin-top: 23px;
-    }
-
-    .hero-badge {
-      padding: 8px 11px;
-      border-radius: 10px;
-      font-size: 9px;
-      letter-spacing: .08em;
-      border: 1px solid rgba(255,255,255,.08);
-      background: rgba(255,255,255,.035);
-      color: #b4bed2;
-    }
-
-    .hero-badge.public {
-      color: var(--cyan);
-      border-color: rgba(25,230,255,.2);
-    }
-
-    .hero-badge.offline {
-      color: var(--orange);
-      border-color: rgba(255,122,24,.2);
-    }
-
-    /* ================= GRID ================= */
-
-    .section {
-      margin-top: 28px;
-    }
-
-    .section-head {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 15px;
-      margin-bottom: 14px;
-    }
-
-    .section-title {
-      font-family: Orbitron;
-      font-size: 15px;
-      letter-spacing: .08em;
-    }
-
-    .section-desc {
-      color: var(--muted);
-      font-size: 10px;
-      margin-top: 5px;
-    }
-
-    .section-tag {
-      color: #73809b;
-      font-size: 9px;
-      letter-spacing: .15em;
-    }
-
-    .verified-account-strip{
-      display:grid;
-      grid-template-columns:minmax(240px,1.5fr) repeat(6,minmax(110px,1fr));
-      gap:10px;
-      align-items:stretch;
-      margin:0 0 12px;
-      padding:13px;
-      border:1px solid rgba(25,230,255,.2);
-      border-radius:20px;
-      background:
-        radial-gradient(circle at 12% 20%,rgba(25,230,255,.09),transparent 28%),
-        radial-gradient(circle at 88% 20%,rgba(155,92,255,.08),transparent 28%),
-        linear-gradient(115deg,rgba(10,18,38,.96),rgba(7,10,24,.96));
-      box-shadow:0 18px 55px rgba(0,0,0,.24),0 0 34px rgba(25,230,255,.045);
-    }
-    .verified-account-main{
-      min-width:0;
-      padding:8px 10px;
-      border-right:1px solid rgba(255,255,255,.07);
-    }
-    .verified-account-kicker{
-      color:var(--cyan);
-      font:700 8px "JetBrains Mono";
-      letter-spacing:.16em;
-    }
-    .verified-account-status{
-      margin-top:7px;
-      color:var(--gold);
-      font:800 15px Orbitron;
-      letter-spacing:.05em;
-    }
-    .verified-account-note{
-      margin-top:6px;
-      color:#73809a;
-      font-size:9px;
-      line-height:1.45;
-    }
-    .verified-account-item{
-      min-width:0;
-      padding:8px 9px;
-      border:1px solid rgba(255,255,255,.06);
-      border-radius:12px;
-      background:rgba(255,255,255,.022);
-    }
-    .verified-account-item span{
-      display:block;
-      color:#5f6b84;
-      font-size:8px;
-      text-transform:uppercase;
-      letter-spacing:.1em;
-    }
-    .verified-account-item strong{
-      display:block;
-      margin-top:7px;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-      color:#dbe4f7;
-      font:700 10px "JetBrains Mono";
-    }
-    .verified-account-item strong.live{color:var(--green);}
-    .verified-account-item strong.warn{color:var(--orange);}
-    
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 12px;
-    }
-
-    .card {
-      position: relative;
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,.08);
-      border-radius: var(--radius);
-      background: linear-gradient(145deg, rgba(17,23,45,.82), rgba(5,8,19,.86));
-      box-shadow: 0 15px 45px rgba(0,0,0,.22);
-    }
-
-    .card::before {
-      content: "";
-      position: absolute;
-      inset: -1px;
-      padding: 1px;
-      border-radius: inherit;
-      background: conic-gradient(
-        from var(--angle, 0deg),
-        transparent 0deg,
-        rgba(25,230,255,.0) 40deg,
-        rgba(25,230,255,.5) 80deg,
-        rgba(155,92,255,.4) 120deg,
-        rgba(255,79,216,.45) 180deg,
-        transparent 230deg,
-        transparent 360deg
-      );
-      -webkit-mask:
-        linear-gradient(#000 0 0) content-box,
-        linear-gradient(#000 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      pointer-events: none;
-      animation: borderSpin 8s linear infinite;
-    }
-
-    @property --angle {
-      syntax: "<angle>";
-      initial-value: 0deg;
-      inherits: false;
-    }
-
-    @keyframes borderSpin {
-      to { --angle: 360deg; }
-    }
-
-    .metric {
-      padding: 18px;
-      min-height: 112px;
-    }
-
-    .metric-label {
-      color: #76829d;
-      font-size: 9px;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-    }
-
-    .metric-value {
-      margin-top: 13px;
-      font-family: "JetBrains Mono";
-      font-size: 21px;
-      font-weight: 700;
-      color: #dfe7ff;
-    }
-
-    .metric-value.gold { color: var(--gold); }
-    .metric-value.cyan { color: var(--cyan); }
-    .metric-value.green { color: var(--green); }
-    .metric-value.red { color: var(--red); }
-
-    .metric-note {
-      margin-top: 8px;
-      color: #56617a;
-      font-size: 9px;
-    }
-
-    /* ================= COMMAND GRID ================= */
-
-    .terminal-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.75fr) minmax(320px, .75fr);
-      gap: 14px;
-    }
-
-    .chart-panel {
-      min-height: 610px;
-    }
-
-    .panel-head {
-      min-height: 67px;
-      padding: 15px 17px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      border-bottom: 1px solid rgba(255,255,255,.07);
-    }
-
-    .panel-title {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .instrument {
-      font-family: Orbitron;
-      font-size: 14px;
-      font-weight: 700;
-    }
-
-    .price {
-      font-family: "JetBrains Mono";
-      font-size: 13px;
-      color: var(--gold);
-    }
-
-    .change {
-      font-family: "JetBrains Mono";
-      font-size: 10px;
-    }
-
-    .positive { color: var(--green); }
-    .negative { color: var(--red); }
-
-    .chart-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-    }
-
-    .chart-btn {
-      padding: 7px 9px;
-      color: #77839d;
-      background: rgba(255,255,255,.035);
-      border: 1px solid rgba(255,255,255,.06);
-      border-radius: 8px;
-      font-size: 9px;
-    }
-
-    .chart-btn.active,
-    .chart-btn:hover {
-      color: white;
-      border-color: rgba(25,230,255,.3);
-      background: rgba(25,230,255,.07);
-    }
-
-    #chart {
-      width: 100%;
-      height: 465px;
-    }
-
-    .chart-footer {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      border-top: 1px solid rgba(255,255,255,.06);
-    }
-
-    .chart-stat {
-      padding: 13px;
-      border-right: 1px solid rgba(255,255,255,.06);
-    }
-
-    .chart-stat:last-child {
-      border-right: 0;
-    }
-
-    .chart-stat span {
-      display: block;
-      color: #59647c;
-      font-size: 8px;
-      text-transform: uppercase;
-      letter-spacing: .1em;
-    }
-
-    .chart-stat strong {
-      display: block;
-      margin-top: 6px;
-      font-family: "JetBrains Mono";
-      font-size: 11px;
-      color: #b9c3d8;
-    }
-
-    /* ================= RIGHT PANEL ================= */
-
-    .stack {
-      display: grid;
-      gap: 14px;
-    }
-
-    .connection {
-      padding: 19px;
-      min-height: 205px;
-      background:
-        radial-gradient(circle at 90% 20%, rgba(255,122,24,.09), transparent 35%),
-        linear-gradient(145deg, rgba(18,24,46,.92), rgba(5,8,18,.9));
-    }
-
-    .connection-state {
-      margin-top: 18px;
-      padding: 15px;
-      border: 1px solid rgba(255,122,24,.16);
-      border-radius: 13px;
-      background: rgba(255,122,24,.045);
-    }
-
-    .state-label {
-      color: #68748e;
-      font-size: 8px;
-      letter-spacing: .14em;
-    }
-
-    .state-value {
-      margin-top: 6px;
-      font-family: Orbitron;
-      font-size: 14px;
-      color: var(--orange);
-    }
-
-    .connection p {
-      margin-top: 10px;
-      color: #707c96;
-      line-height: 1.6;
-      font-size: 10px;
-    }
-
-    .btn {
-      padding: 11px 14px;
-      border-radius: 10px;
-      color: #070910;
-      font-weight: 800;
-      font-size: 10px;
-      letter-spacing: .04em;
-      background: linear-gradient(135deg, var(--gold), var(--orange));
-      box-shadow: 0 0 25px rgba(255,200,74,.15);
-      transition: .2s;
-    }
-
-    .btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 0 30px rgba(255,200,74,.3);
-    }
-
-    .btn:disabled {
-      cursor: not-allowed;
-      opacity: .38;
-      transform: none;
-      box-shadow: none;
-    }
-
-    .btn.secondary {
-      color: #b8c2d9;
-      background: rgba(255,255,255,.055);
-      border: 1px solid rgba(255,255,255,.08);
-      box-shadow: none;
-    }
-
-    .orderbook {
-      min-height: 390px;
-    }
-
-    .book-body {
-      padding: 10px 14px 14px;
-    }
-
-    .book-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-      padding: 5px 0;
-      font-family: "JetBrains Mono";
-      font-size: 9px;
-    }
-
-    .book-row span:nth-child(2) {
-      text-align: right;
-    }
-
-    .book-row span:last-child {
-      text-align: right;
-      color: #67738e;
-    }
-
-    .ask {
-      color: #ff7187;
-    }
-
-    .bid {
-      color: #35f2ae;
-    }
-
-    .spread {
-      margin: 9px 0;
-      padding: 8px;
-      text-align: center;
-      border-top: 1px solid rgba(255,255,255,.05);
-      border-bottom: 1px solid rgba(255,255,255,.05);
-      color: #7d89a2;
-      font-size: 9px;
-    }
-
-    /* ================= TICKER ================= */
-
-    .ticker-wrap {
-      overflow: hidden;
-      margin-top: 14px;
-      border: 1px solid rgba(255,255,255,.07);
-      border-radius: 14px;
-      background: rgba(7,10,21,.82);
-    }
-
-    .ticker {
-      display: flex;
-      width: max-content;
-      animation: tickerMove 45s linear infinite;
-    }
-
-    .ticker:hover {
-      animation-play-state: paused;
-    }
-
-    @keyframes tickerMove {
-      from { transform: translateX(0); }
-      to { transform: translateX(-50%); }
-    }
-
-    .ticker-item {
-      min-width: 145px;
-      padding: 11px 15px;
-      border-right: 1px solid rgba(255,255,255,.05);
-    }
-
-    .ticker-symbol {
-      color: #d6dded;
-      font-family: Orbitron;
-      font-size: 9px;
-    }
-
-    .ticker-price {
-      margin-top: 4px;
-      color: #8290ab;
-      font-family: "JetBrains Mono";
-      font-size: 9px;
-    }
-    .runtime-grid {
-      display:grid;
-      grid-template-columns:repeat(5,minmax(0,1fr));
-      gap:13px;
-    }
-    .runtime-card {
-      position:relative;
-      overflow:hidden;
-      min-height:190px;
-      padding:18px;
-      border:1px solid rgba(25,230,255,.13);
-      border-radius:18px;
-      background:
-        radial-gradient(circle at 100% 0%,rgba(155,92,255,.13),transparent 42%),
-        linear-gradient(145deg,rgba(12,19,42,.92),rgba(4,8,19,.94));
-      box-shadow:0 12px 45px rgba(0,0,0,.28),0 0 28px rgba(25,230,255,.035);
-      transition:.25s ease;
-    }
-    .runtime-card:hover {
-      transform:translateY(-3px);
-      border-color:rgba(25,230,255,.32);
-      box-shadow:0 18px 55px rgba(0,0,0,.35),0 0 32px rgba(25,230,255,.09),0 0 38px rgba(155,92,255,.06);
-    }
-    .runtime-card::after {
-      content:"";
-      position:absolute;
-      left:0;right:0;top:0;height:2px;
-      background:linear-gradient(90deg,var(--gold),var(--cyan),var(--violet),var(--pink));
-      box-shadow:0 0 16px rgba(25,230,255,.45);
-    }
-    .runtime-top { display:flex;align-items:flex-start;justify-content:space-between;gap:10px; }
-    .runtime-code { color:var(--cyan);font:700 8px "JetBrains Mono";letter-spacing:.16em; }
-    .runtime-name { margin-top:7px;font:800 11px Orbitron;line-height:1.35; }
-    .runtime-mode { margin-top:10px;color:#697691;font-size:9px;letter-spacing:.09em; }
-    .runtime-state {
-      flex:none;padding:6px 8px;border-radius:999px;
-      color:var(--orange);background:rgba(255,122,24,.06);
-      border:1px solid rgba(255,122,24,.16);font:700 8px "JetBrains Mono";
-      white-space:nowrap;
-    }
-    .runtime-state.running { color:var(--green);border-color:rgba(35,247,163,.22);background:rgba(35,247,163,.06);box-shadow:0 0 18px rgba(35,247,163,.08); }
-    .runtime-actions { display:flex;gap:7px;margin-top:25px; }
-    .runtime-actions .btn { flex:1;padding:9px 7px;font-size:8px; }
-    @media (max-width:1100px){ .runtime-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
-    @media (max-width:560px){ .runtime-grid{grid-template-columns:1fr;} }
-
-    /* ================= LOWER PANELS ================= */
-
-    .lower-grid {
-      display: grid;
-      grid-template-columns: 1.2fr .8fr;
-      gap: 14px;
-    }
-
-    .table-panel {
-      min-height: 300px;
-    }
-
-    .table-wrap {
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 680px;
-    }
-
-    th,
-    td {
-      padding: 13px 15px;
-      text-align: left;
-      border-bottom: 1px solid rgba(255,255,255,.05);
-      font-size: 9px;
-    }
-
-    th {
-      color: #59647d;
-      font-size: 8px;
-      text-transform: uppercase;
-      letter-spacing: .1em;
-    }
-
-    td {
-      color: #a8b3c9;
-      font-family: "JetBrains Mono";
-    }
-
-    .empty {
-      text-align: center;
-      padding: 55px 20px;
-      color: #58647d;
-      font-size: 10px;
-    }
-
-    .empty strong {
-      display: block;
-      color: #8b97af;
-      font-family: Orbitron;
-      font-size: 11px;
-      margin-bottom: 7px;
-    }
-
-    /* ================= RISK ================= */
-
-    .risk-panel {
-      padding-bottom: 17px;
-    }
-
-    .risk-list {
-      padding: 15px;
-      display: grid;
-      gap: 13px;
-    }
-
-    .risk-row {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 12px;
-      align-items: center;
-    }
-
-    .risk-name {
-      color: #9ba6bd;
-      font-size: 10px;
-    }
-
-    .risk-bar {
-      height: 5px;
-      margin-top: 7px;
-      overflow: hidden;
-      border-radius: 999px;
-      background: rgba(255,255,255,.06);
-    }
-
-    .risk-fill {
-      height: 100%;
-      width: 0;
-      border-radius: inherit;
-      background: linear-gradient(90deg, var(--cyan), var(--violet));
-      box-shadow: 0 0 10px rgba(25,230,255,.3);
-    }
-
-    .risk-limit {
-      color: var(--gold);
-      font-family: "JetBrains Mono";
-      font-size: 9px;
-    }
-
-    .kill {
-      margin: 0 15px;
-      width: calc(100% - 30px);
-      padding: 13px;
-      border-radius: 10px;
-      color: #ff758a;
-      border: 1px solid rgba(255,77,109,.18);
-      background: rgba(255,77,109,.06);
-      font-size: 9px;
-      font-weight: 800;
-      letter-spacing: .08em;
-    }
-
-    .kill:hover {
-      background: rgba(255,77,109,.1);
-    }
-
-    /* ================= ACTIVITY ================= */
-
-    .activity {
-      max-height: 300px;
-      overflow: auto;
-      padding: 5px 15px 15px;
-    }
-
-    .activity-item {
-      display: grid;
-      grid-template-columns: 75px 1fr;
-      gap: 10px;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(255,255,255,.05);
-    }
-
-    .activity-time {
-      color: #56617a;
-      font-family: "JetBrains Mono";
-      font-size: 8px;
-    }
-
-    .activity-message {
-      color: #8995ad;
-      font-size: 9px;
-      line-height: 1.5;
-    }
-
-    /* ================= FOOTER ================= */
-
-    footer {
-      margin-top: 30px;
-      padding: 20px 5px;
-      display: flex;
-      justify-content: space-between;
-      gap: 15px;
-      color: #515c73;
-      font-size: 8px;
-      border-top: 1px solid rgba(255,255,255,.06);
-    }
-
-    footer span {
-      color: #75819a;
-    }
-
-    /* ================= TOAST ================= */
-
-    .toast {
-      position: fixed;
-      right: 20px;
-      bottom: 20px;
-      z-index: 2000;
-      min-width: 260px;
-      padding: 14px 16px;
-      border: 1px solid rgba(25,230,255,.2);
-      border-radius: 12px;
-      background: rgba(8,13,28,.94);
-      backdrop-filter: blur(20px);
-      box-shadow: 0 20px 50px rgba(0,0,0,.45);
-      transform: translateY(130px);
-      opacity: 0;
-      transition: .3s;
-    }
-
-    .toast.show {
-      transform: translateY(0);
-      opacity: 1;
-    }
-
-    .toast-title {
-      color: var(--cyan);
-      font-family: Orbitron;
-      font-size: 9px;
-      letter-spacing: .1em;
-    }
-
-    .toast-message {
-      margin-top: 5px;
-      color: #8793ad;
-      font-size: 9px;
-    }
-
-    /* ================= RESPONSIVE ================= */
-
-    @media (max-width: 1250px) {
-      .verified-account-strip{grid-template-columns:repeat(3,minmax(0,1fr));}
-      .verified-account-main{grid-column:1/-1;border-right:0;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:11px;}
-      
-      .cards {
-        grid-template-columns: repeat(3, 1fr);
-      }
-    }
-
-    @media (max-width: 1000px) {
-      .nav-links {
-        display: none;
-      }
-
-      .terminal-grid,
-      .lower-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .chart-panel {
-        min-height: auto;
-      }
-    }
-
-    @media (max-width: 720px) {
-      main {
-        padding: 16px 12px 50px;
-      }
-
-      .nav {
-        padding: 0 12px;
-      }
-
-      .brand {
-        min-width: auto;
-      }
-
-      .brand-sub,
-      .clock {
-        display: none;
-      }
-
-      .status-pill {
-        padding: 7px 9px;
-      }
-
-      .hero {
-        padding: 25px 20px;
-        border-radius: 20px;
-      }
-
-      .hero h1 {
-        font-size: 31px;
-      }
-
-      .verified-account-strip{grid-template-columns:1fr 1fr;}
-      
-      .cards {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .chart-footer {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      #chart {
-        height: 370px;
-      }
-
-      .panel-head {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-
-      footer {
-        flex-direction: column;
-      }
-    }
-
-    @media (max-width: 430px) {
-      .cards {
-        grid-template-columns: 1fr;
-      }
-
-      .hero-badges {
-        display: grid;
-      }
-
-      .hero-badge {
-        width: fit-content;
-      }
-    }
-
-    /* ================= BROKER + ENGINE PROJECTION ================= */
-    .projection-grid{display:grid;grid-template-columns:1fr 1.35fr;gap:14px;margin-top:14px}
-    .projection-card{padding:18px;min-height:220px}
-    .projection-card .projection-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:13px}
-    .projection-kicker{color:var(--cyan);font:800 8px "JetBrains Mono";letter-spacing:.15em}
-    .projection-title{margin-top:6px;font:800 14px Orbitron;letter-spacing:.06em}
-    .projection-state{color:#71809b;font:700 8px "JetBrains Mono";text-transform:uppercase;letter-spacing:.08em}
-    .projection-grid-inner{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
-    .projection-metric{padding:12px;border-radius:12px;background:rgba(255,255,255,.026);border:1px solid rgba(255,255,255,.065);min-width:0}
-    .projection-metric span{display:block;color:#5f6b84;font:700 8px "JetBrains Mono";letter-spacing:.08em}
-    .projection-metric strong{display:block;margin-top:6px;color:#e3ebfb;font:800 13px "JetBrains Mono";overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .projection-metric strong.live{color:var(--green)}
-    .projection-metric strong.gold{color:var(--gold)}
-    .projection-metric strong.cyan{color:var(--cyan)}
-    .projection-metric strong.pink{color:var(--pink)}
-    .engine-projection-list{display:flex;flex-direction:column;gap:8px;max-height:300px;overflow:auto;padding-right:2px}
-    .engine-row{display:grid;grid-template-columns:1.2fr .8fr .8fr .75fr .75fr .65fr;gap:8px;align-items:center;padding:11px;border:1px solid rgba(255,255,255,.06);border-radius:12px;background:rgba(255,255,255,.022)}
-    .engine-row div{min-width:0}
-    .engine-row span{display:block;color:#5f6b84;font:700 7px "JetBrains Mono";letter-spacing:.07em;text-transform:uppercase}
-    .engine-row strong{display:block;margin-top:5px;color:#dbe5f8;font:800 9px "JetBrains Mono";overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .engine-row strong.signal{color:var(--green)}
-    .projection-empty{padding:25px 10px;text-align:center;color:#69758c;font:700 9px "JetBrains Mono";border:1px dashed rgba(255,255,255,.08);border-radius:12px}
-    @media(max-width:980px){.projection-grid{grid-template-columns:1fr}.engine-row{grid-template-columns:1.3fr 1fr 1fr 1fr}}
-    @media(max-width:680px){.projection-grid-inner{grid-template-columns:repeat(2,1fr)}.engine-row{grid-template-columns:1fr 1fr}.projection-card{min-height:0}}
-  
-/* ================= LIVE SYNCHRONIZATION COMMAND LAYER ================= */
-.live-sync{
-  position:relative;
-  display:grid;
-  grid-template-columns:1.25fr .9fr .9fr .9fr;
-  gap:1px;
-  margin:18px 0 6px;
-  border:1px solid rgba(25,230,255,.12);
-  border-radius:18px;
-  overflow:hidden;
-  background:rgba(25,230,255,.035);
-  box-shadow:0 18px 55px rgba(0,0,0,.24);
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#050812">
+<meta name="description" content="KINGBOT live trading terminal">
+<title>KINGBOT — Live Trading Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#04060d;--panel:#0a0f1c;--panel2:#0d1424;--panel3:#111a2c;--line:rgba(255,255,255,.075);
+  --text:#f3f7ff;--muted:#7f8aa1;--dim:#566176;--cyan:#22e6ff;--gold:#f7c55b;
+  --green:#28efab;--red:#ff5b73;--orange:#ff9c42;--violet:#9f6cff;--blue:#5c8dff;
+  --shadow:0 24px 80px rgba(0,0,0,.38);--radius:18px;
 }
-.live-sync::before{
-  content:"";
-  position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(90deg,rgba(25,230,255,.04),transparent 28%,rgba(155,92,255,.04) 66%,rgba(255,200,74,.03));
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg);scroll-behavior:auto}
+body{
+  min-height:100vh;color:var(--text);font-family:Inter,sans-serif;background:
+  radial-gradient(circle at 15% -5%,rgba(34,230,255,.11),transparent 29%),
+  radial-gradient(circle at 92% 4%,rgba(159,108,255,.1),transparent 28%),
+  radial-gradient(circle at 70% 100%,rgba(247,197,91,.055),transparent 30%),var(--bg);
+  overflow-x:hidden
 }
-.sync-cell{
-  position:relative;padding:13px 14px;background:rgba(4,9,20,.9);min-width:0;
+body:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:38px 38px;mask-image:linear-gradient(to bottom,#000,transparent 88%)}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
+.mono{font-family:"JetBrains Mono",monospace}.orbitron{font-family:Orbitron,sans-serif}
+.shell{width:min(1640px,calc(100% - 30px));margin:0 auto;padding:18px 0 55px}
+.topbar{
+  position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line);
+  background:rgba(4,6,13,.84);backdrop-filter:blur(20px)
 }
-.sync-kicker{
-  color:#586780;font:800 7px "JetBrains Mono";letter-spacing:.12em;
+.topbar-inner{width:min(1640px,calc(100% - 30px));min-height:70px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:18px}
+.brand{display:flex;align-items:center;gap:11px;min-width:205px}
+.brand-mark{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,var(--gold),var(--orange),var(--pink));color:#05070e;font:900 19px Orbitron;box-shadow:0 0 24px rgba(247,197,91,.2)}
+.brand-text strong{display:block;font:900 12px Orbitron;letter-spacing:.13em}.brand-text span{display:block;margin-top:4px;color:var(--dim);font:700 8px "JetBrains Mono";letter-spacing:.17em}
+.nav{display:flex;gap:5px;align-items:center}.nav a{padding:9px 11px;border-radius:9px;color:#8792a9;font-size:11px}.nav a:hover,.nav a.active{color:#fff;background:rgba(255,255,255,.05)}
+.top-actions{display:flex;align-items:center;gap:8px}
+.live-status{display:flex;align-items:center;gap:7px;padding:8px 11px;border:1px solid rgba(40,239,171,.16);border-radius:999px;background:rgba(40,239,171,.05);font:800 8px "JetBrains Mono";color:#bfffe9}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 12px rgba(40,239,171,.9);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.45;transform:scale(.8)}}.clock{color:var(--dim);font:700 9px "JetBrains Mono"}
+
+.hero{
+  display:grid;grid-template-columns:minmax(0,1.5fr) minmax(350px,.8fr);gap:14px;margin-top:14px
 }
-.sync-value{
-  margin-top:6px;color:#eef5ff;font:900 10px Orbitron;letter-spacing:.02em;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.sync-note{
-  margin-top:4px;color:#64728a;font:700 6.5px "JetBrains Mono";
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.sync-live-dot{
-  display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;
-  background:#23f7a3;box-shadow:0 0 11px rgba(35,247,163,.85);
-  animation:syncPulse 1.5s ease-in-out infinite;
-}
-.sync-live-dot.warn{background:#ffc84a;box-shadow:0 0 11px rgba(255,200,74,.8)}
-.sync-live-dot.off{background:#ff4d6d;box-shadow:0 0 11px rgba(255,77,109,.75);animation:none}
-@keyframes syncPulse{0%,100%{opacity:.45;transform:scale(.9)}50%{opacity:1;transform:scale(1.15)}}
-.sync-footer{
-  grid-column:1/-1;
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:9px 13px;border-top:1px solid rgba(255,255,255,.055);
-  background:rgba(2,6,14,.96);
-}
-.sync-footer span{
-  color:#55647c;font:700 6.5px "JetBrains Mono";letter-spacing:.07em;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.sync-footer strong{color:#9eb0c9}
-.sync-now{
-  border:1px solid rgba(25,230,255,.18);border-radius:8px;padding:7px 9px;
-  background:rgba(25,230,255,.045);color:#19e6ff;font:900 6.5px "JetBrains Mono";
-  cursor:pointer;white-space:nowrap;
-}
-.sync-now:hover{background:rgba(25,230,255,.09)}
-.live-sync.changed{box-shadow:0 0 0 1px rgba(25,230,255,.08),0 0 35px rgba(25,230,255,.055),0 18px 55px rgba(0,0,0,.24)}
-.engine-row{
-  transition:background .2s ease,transform .2s ease,box-shadow .2s ease;
-}
-.engine-row:hover{background:rgba(25,230,255,.028);transform:translateY(-1px)}
-.engine-row .engine-status{
-  display:inline-flex;align-items:center;gap:5px;
-}
-.engine-row .engine-status i{
-  width:5px;height:5px;border-radius:50%;background:#23f7a3;box-shadow:0 0 9px rgba(35,247,163,.7);
-}
-.engine-row .engine-status.error i{background:#ffc84a;box-shadow:0 0 9px rgba(255,200,74,.7)}
-@media(max-width:1100px){.live-sync{grid-template-columns:1fr 1fr}.sync-footer{grid-column:1/-1}}
-@media(max-width:650px){.live-sync{grid-template-columns:1fr}.sync-footer{grid-column:auto;align-items:flex-start;flex-direction:column}.sync-now{width:100%}}
+.hero-main,.hero-engine{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:24px;background:linear-gradient(145deg,rgba(15,22,38,.92),rgba(5,9,18,.98));box-shadow:var(--shadow)}
+.hero-main{padding:27px}.hero-main:after{content:"";position:absolute;width:430px;height:430px;right:-190px;top:-210px;border-radius:50%;border:1px solid rgba(34,230,255,.11);box-shadow:inset 0 0 80px rgba(34,230,255,.05),0 0 80px rgba(159,108,255,.05)}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;color:var(--cyan);font:900 9px "JetBrains Mono";letter-spacing:.17em}.eyebrow i{width:5px;height:5px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+.hero h1{max-width:900px;margin-top:14px;font:900 clamp(28px,4vw,55px)/1.03 Orbitron;letter-spacing:-.03em}.gradient{background:linear-gradient(100deg,var(--gold),var(--cyan) 50%,var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-copy{max-width:760px;margin-top:13px;color:#8995ac;font-size:12px;line-height:1.75}.hero-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 13px;border-radius:10px;border:1px solid rgba(255,255,255,.08);font:800 9px "JetBrains Mono";letter-spacing:.06em}
+.btn.primary{background:linear-gradient(135deg,var(--gold),var(--orange));color:#080a10;box-shadow:0 10px 30px rgba(247,197,91,.13)}
+.btn.secondary{background:rgba(255,255,255,.035);color:#dbe3f3}.btn.secondary:hover{border-color:rgba(34,230,255,.22);background:rgba(34,230,255,.05)}
+.hero-tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:18px}.hero-tag{padding:6px 8px;border:1px solid rgba(255,255,255,.06);border-radius:8px;color:#7f8aa0;background:rgba(255,255,255,.02);font:700 7px "JetBrains Mono";letter-spacing:.08em}
+
+.hero-engine{padding:22px;background:
+  radial-gradient(circle at 92% 12%,rgba(40,239,171,.11),transparent 26%),
+  radial-gradient(circle at 10% 95%,rgba(34,230,255,.08),transparent 32%),linear-gradient(145deg,rgba(8,15,27,.98),rgba(4,8,17,.99))}
+.engine-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.kicker{color:#5f6c84;font:800 7px "JetBrains Mono";letter-spacing:.15em}.state-pill{display:inline-flex;align-items:center;gap:7px;padding:7px 9px;border-radius:999px;background:rgba(40,239,171,.07);border:1px solid rgba(40,239,171,.17);color:var(--green);font:900 8px "JetBrains Mono"}
+.state-pill .mini-dot{width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}
+.engine-name{margin-top:14px;font:900 22px Orbitron;letter-spacing:.025em}.engine-lock{margin-top:6px;color:var(--cyan);font:800 8px "JetBrains Mono";letter-spacing:.1em}
+.engine-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:18px}.engine-cell{padding:10px;border:1px solid rgba(255,255,255,.06);border-radius:11px;background:rgba(255,255,255,.02)}
+.engine-cell span{display:block;color:#566277;font:700 7px "JetBrains Mono";letter-spacing:.09em;text-transform:uppercase}.engine-cell strong{display:block;margin-top:6px;color:#dbe5f5;font:800 10px "JetBrains Mono";white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.engine-foot{display:flex;justify-content:space-between;gap:10px;margin-top:15px;padding-top:13px;border-top:1px solid rgba(255,255,255,.06);color:#667289;font:700 7px "JetBrains Mono"}.engine-foot strong{color:#aeb9cb}
+
+.sync-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:12px}
+.sync{min-height:78px;padding:11px 12px;border:1px solid var(--line);border-radius:13px;background:rgba(8,13,24,.8)}
+.sync-top{display:flex;justify-content:space-between;gap:8px;align-items:center}.sync-label{color:#58647a;font:800 7px "JetBrains Mono";letter-spacing:.1em}.sync-state{font:900 7px "JetBrains Mono"}.sync-state.live{color:var(--green)}.sync-state.syncing{color:var(--gold)}.sync-state.down{color:var(--red)}.sync-state.idle{color:#748098}
+.sync-main{margin-top:8px;color:#d5deee;font:800 9px "JetBrains Mono";white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sync-time{margin-top:5px;color:#4f5c70;font:700 7px "JetBrains Mono"}
+
+.section{margin-top:13px}.section-head{display:flex;align-items:end;justify-content:space-between;gap:10px;margin:0 2px 9px}.section-title{font:900 12px Orbitron;letter-spacing:.08em}.section-sub{margin-top:4px;color:#68748a;font-size:9px}.section-code{color:#4d5b70;font:700 7px "JetBrains Mono";letter-spacing:.12em}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.metric{padding:15px;border:1px solid var(--line);border-radius:15px;background:linear-gradient(145deg,rgba(13,20,35,.9),rgba(7,11,20,.98));box-shadow:0 12px 34px rgba(0,0,0,.18)}
+.metric-top{display:flex;justify-content:space-between;gap:8px}.metric-label{color:#5d697f;font:800 7px "JetBrains Mono";letter-spacing:.1em;text-transform:uppercase}.metric-icon{color:#56647a;font:900 10px Orbitron}.metric-value{margin-top:12px;font:800 22px "JetBrains Mono";letter-spacing:-.035em}.metric-value.gold{color:var(--gold)}.metric-value.cyan{color:var(--cyan)}.metric-value.green{color:var(--green)}.metric-value.red{color:var(--red)}.metric-note{margin-top:5px;color:#515e73;font:700 7px "JetBrains Mono"}
+
+.main-grid{display:grid;grid-template-columns:minmax(0,1.38fr) minmax(350px,.72fr);gap:10px}
+.panel{border:1px solid var(--line);border-radius:17px;background:linear-gradient(145deg,rgba(11,17,30,.94),rgba(5,9,17,.99));box-shadow:0 12px 38px rgba(0,0,0,.2);overflow:hidden}.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 15px;border-bottom:1px solid var(--line)}
+.panel-head-left .section-sub{margin-top:3px}.panel-badge{padding:5px 7px;border-radius:7px;background:rgba(34,230,255,.05);border:1px solid rgba(34,230,255,.1);color:#6ddcf0;font:800 7px "JetBrains Mono"}
+.engine-dashboard{padding:14px}
+.engine-status-hero{display:grid;grid-template-columns:1.2fr .8fr;gap:9px}
+.big-status{padding:17px;border:1px solid rgba(40,239,171,.13);border-radius:14px;background:radial-gradient(circle at 100% 0,rgba(40,239,171,.08),transparent 35%),rgba(255,255,255,.018)}
+.big-status.paused{border-color:rgba(255,156,66,.17)}.big-status.error{border-color:rgba(255,91,115,.18)}.big-status.stopped{border-color:rgba(255,255,255,.08)}
+.status-line{display:flex;align-items:center;gap:8px}.status-line .ring{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 15px rgba(40,239,171,.8)}.big-status.paused .ring{background:var(--orange);box-shadow:0 0 15px rgba(255,156,66,.7)}.big-status.error .ring{background:var(--red);box-shadow:0 0 15px rgba(255,91,115,.7)}.big-status.stopped .ring{background:#5c6677;box-shadow:none}
+.status-word{font:900 11px Orbitron}.status-note{margin-top:9px;color:#6d7890;font:700 8px "JetBrains Mono";line-height:1.55}
+.signal-box{padding:17px;border:1px solid rgba(34,230,255,.11);border-radius:14px;background:rgba(34,230,255,.025)}.signal-label{color:#56647a;font:800 7px "JetBrains Mono";letter-spacing:.1em}.signal-name{margin-top:10px;font:900 21px Orbitron;color:var(--cyan)}.signal-score{margin-top:4px;color:#7c8aa0;font:700 8px "JetBrains Mono"}
+.telemetry-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:9px}.telemetry-cell{padding:10px;border:1px solid rgba(255,255,255,.05);border-radius:11px;background:rgba(255,255,255,.018)}.telemetry-cell span{display:block;color:#556176;font:700 7px "JetBrains Mono";text-transform:uppercase}.telemetry-cell strong{display:block;margin-top:6px;color:#d5ddeb;font:800 10px "JetBrains Mono";white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plan{margin-top:9px;padding:12px;border:1px solid rgba(255,255,255,.05);border-radius:12px;background:rgba(255,255,255,.015)}.plan-title{font:800 7px "JetBrains Mono";color:#68748a;letter-spacing:.1em}.plan-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:9px}.plan-item span{display:block;color:#4f5b70;font:700 6px "JetBrains Mono"}.plan-item strong{display:block;margin-top:5px;color:#c8d2e3;font:800 9px "JetBrains Mono"}.strategy-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}.tag{padding:5px 7px;border-radius:7px;background:rgba(159,108,255,.05);border:1px solid rgba(159,108,255,.11);color:#a9a0d7;font:700 6.5px "JetBrains Mono"}
+
+.side-stack{display:grid;gap:10px}.account-card{padding:14px}.identity{display:grid;grid-template-columns:1.2fr 1fr;gap:7px}.identity-main{padding:14px;border:1px solid rgba(40,239,171,.12);border-radius:13px;background:rgba(40,239,171,.025)}.identity-state{font:900 18px Orbitron;color:var(--green)}.identity-note{margin-top:5px;color:#68748a;font:700 7px "JetBrains Mono";line-height:1.5}
+.identity-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.id-cell{padding:10px;border:1px solid rgba(255,255,255,.05);border-radius:10px}.id-cell span{display:block;color:#4f5b70;font:700 6.5px "JetBrains Mono";text-transform:uppercase}.id-cell strong{display:block;margin-top:5px;color:#c8d2e2;font:800 8px "JetBrains Mono";white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.market{padding:14px}.market-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.market-symbol{font:900 20px Orbitron}.market-price{margin-top:4px;color:var(--gold);font:800 18px "JetBrains Mono"}.quote-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}.quote{padding:10px;border:1px solid rgba(255,255,255,.05);border-radius:10px}.quote span{display:block;color:#4f5b70;font:700 6.5px "JetBrains Mono"}.quote strong{display:block;margin-top:6px;color:#d4ddec;font:800 10px "JetBrains Mono"}.quote strong.green{color:var(--green)}.quote strong.red{color:var(--red)}
+.market-foot{display:flex;justify-content:space-between;gap:10px;margin-top:10px;color:#5d687d;font:700 7px "JetBrains Mono"}.market-foot strong{color:#9eabbe}
+
+.tables{display:grid;grid-template-columns:1fr 1fr;gap:10px}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse;min-width:650px}.table th{padding:9px 11px;text-align:left;color:#515d71;border-bottom:1px solid var(--line);font:800 6.5px "JetBrains Mono";letter-spacing:.08em;text-transform:uppercase}.table td{padding:11px;color:#bec8d8;border-bottom:1px solid rgba(255,255,255,.045);font:700 7.5px "JetBrains Mono";white-space:nowrap}.table tbody tr:hover td{background:rgba(34,230,255,.018)}.pill{display:inline-flex;padding:4px 6px;border-radius:6px;font:800 6.5px "JetBrains Mono";background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}.pill.green{color:var(--green);border-color:rgba(40,239,171,.13);background:rgba(40,239,171,.04)}.pill.red{color:var(--red);border-color:rgba(255,91,115,.13);background:rgba(255,91,115,.04)}
+
+.risk-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:10px}.risk-card,.activity-card{padding:14px}.risk-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.045)}.risk-row:last-child{border-bottom:0}.risk-name{color:#aeb8c9;font:800 8px "JetBrains Mono"}.risk-detail{margin-top:4px;color:#5a667b;font:700 7px "JetBrains Mono"}.risk-meter{height:5px;margin-top:8px;border-radius:99px;background:#111827;overflow:hidden}.risk-meter i{display:block;width:18%;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--cyan),var(--violet))}.risk-value{font:900 10px "JetBrains Mono";color:#d2dbe9}
+.activity-list{max-height:258px;overflow:auto}.activity{display:grid;grid-template-columns:58px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}.activity time{color:#4e5a6f;font:700 6.5px "JetBrains Mono"}.activity span{color:#9eabbe;font:700 7px "JetBrains Mono";line-height:1.5}
+
+.empty{padding:30px;text-align:center;color:#566176}.empty strong{display:block;color:#7c889d;font:900 9px Orbitron;letter-spacing:.08em}.empty span{display:block;margin-top:7px;font:700 7px "JetBrains Mono";line-height:1.55}
+.footer-sync{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding:12px 14px;border:1px solid var(--line);border-radius:13px;background:rgba(8,13,24,.8);color:#59667b;font:700 7px "JetBrains Mono"}.footer-sync strong{color:#aeb9ca}.sync-button{padding:8px 10px;border-radius:8px;border:1px solid rgba(34,230,255,.14);background:rgba(34,230,255,.045);color:var(--cyan);font:900 7px "JetBrains Mono"}
+
+.toast{position:fixed;right:18px;bottom:18px;z-index:100;max-width:390px;padding:13px 14px;border:1px solid rgba(255,255,255,.09);border-radius:13px;background:rgba(9,14,25,.96);box-shadow:var(--shadow);transform:translateY(18px);opacity:0;pointer-events:none;transition:.22s}.toast.show{transform:none;opacity:1}.toast strong{display:block;font:900 8px Orbitron}.toast span{display:block;margin-top:5px;color:#8390a5;font:700 7px "JetBrains Mono";line-height:1.5}
+
+@media(max-width:1180px){.nav{display:none}.hero{grid-template-columns:1fr}.sync-grid{grid-template-columns:repeat(3,1fr)}.main-grid{grid-template-columns:1fr}.grid-4{grid-template-columns:repeat(2,1fr)}.risk-grid,.tables{grid-template-columns:1fr}}
+@media(max-width:760px){.shell,.topbar-inner{width:min(100% - 18px,1640px)}.brand{min-width:auto}.brand-text span,.clock{display:none}.hero-main{padding:20px}.sync-grid{grid-template-columns:repeat(2,1fr)}.engine-status-hero{grid-template-columns:1fr}.telemetry-grid{grid-template-columns:repeat(2,1fr)}.plan-grid{grid-template-columns:repeat(3,1fr)}.identity{grid-template-columns:1fr}.grid-4{grid-template-columns:1fr 1fr}.top-actions .btn{display:none}}
+@media(max-width:480px){.grid-4{grid-template-columns:1fr}.sync-grid{grid-template-columns:1fr}.hero h1{font-size:28px}.plan-grid{grid-template-columns:repeat(2,1fr)}.quote-grid{grid-template-columns:1fr 1fr}.hero-actions .btn{width:100%}}
 </style>
 </head>
-
 <body>
-
 <div data-kingbot-navigation></div>
 
-<script src="system/session.js?v=20260930-3"></script>
-
-<main>
-
-  <!-- HERO -->
-  <section class="hero">
-
-    <div class="eyebrow">
-      <span>◆</span>
-      KINGBOT COMMAND CENTER
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html" aria-label="KINGBOT home">
+      <div class="brand-mark">K</div>
+      <div class="brand-text"><strong>KINGBOT TERMINAL</strong><span>LIVE TRADING COMMAND CENTER</span></div>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="bots.html">BOT CONTROL</a>
+      <a href="broker-connect.html">BROKER</a>
+      <a href="terminal.html" class="active">TERMINAL</a>
+    </nav>
+    <div class="top-actions">
+      <div class="live-status"><i class="live-dot"></i><span id="topStatus">CONNECTING</span></div>
+      <span class="clock mono" id="clock">--:--:--</span>
     </div>
-
-    <h1>
-      Intelligent Trading
-      <span>Infrastructure.</span>
-    </h1>
-
-    <p>
-      A focused command environment for verified account telemetry, live market data,
-      positions, orders and risk controls. Public market data is active now. Account and execution information
-      appears only after a real backend connection is established.
-    </p>
-
-    <div class="hero-badges">
-      <div class="hero-badge public">● PUBLIC MARKET DATA ACTIVE</div>
-      <div class="hero-badge" id="heroBrokerBadge">● VERIFYING VERIFIED ACCOUNT…</div>
-      <div class="hero-badge">◆ RISK ENGINE READY</div>
-      <div class="hero-badge">◆ API BACKEND READY</div>
-    </div>
-
-  </section>
-
-  <section class="live-sync" id="liveSyncPanel" aria-live="polite">
-    <div class="sync-cell">
-      <div class="sync-kicker">SYSTEM SYNC</div>
-      <div class="sync-value"><span class="sync-live-dot" id="syncDot"></span><span id="syncState">INITIALIZING LIVE TELEMETRY</span></div>
-      <div class="sync-note" id="syncNote">Connecting account, runtime and broker streams independently.</div>
-    </div>
-    <div class="sync-cell">
-      <div class="sync-kicker">SELECTED ENGINE</div>
-      <div class="sync-value" id="syncEngine">NO ENGINE</div>
-      <div class="sync-note" id="syncEngineNote">Reading saved Bot Control selection…</div>
-    </div>
-    <div class="sync-cell">
-      <div class="sync-kicker">BROKER MARKET</div>
-      <div class="sync-value" id="syncMarket">—</div>
-      <div class="sync-note" id="syncMarketNote">Waiting for a running engine market.</div>
-    </div>
-    <div class="sync-cell">
-      <div class="sync-kicker">LATEST ENGINE EVENT</div>
-      <div class="sync-value" id="syncEvent">—</div>
-      <div class="sync-note" id="syncEventNote">No engine event received yet.</div>
-    </div>
-    <div class="sync-footer">
-      <span>BACKEND: <strong id="syncBackendAt">—</strong> · ACCOUNT: <strong id="syncAccountAt">—</strong> · RUNTIME: <strong id="syncRuntimeAt">—</strong> · MARKET: <strong id="syncMarketAt">—</strong></span>
-      <button class="sync-now" id="syncNowBtn" type="button">SYNC NOW</button>
-    </div>
-  </section>
-
-  <!-- ACCOUNT METRICS -->
-  <section class="section">
-
-    <div class="section-head">
-      <div>
-        <div class="section-title">ACCOUNT COMMAND METRICS</div>
-        <div class="section-desc">
-          Live broker telemetry is authoritative and refreshes automatically while connected.
-          The account identity below is read from the secured KINGBOT broker connection.
-        </div>
-      </div>
-
-      <div class="section-tag mono">BROKER_LAYER / ACCOUNT</div>
-    </div>
-
-    <div id="accountIdentity" class="verified-account-strip">
-      <div class="verified-account-main">
-        <div class="verified-account-kicker">VERIFIED BROKER ACCOUNT</div>
-        <div class="verified-account-status" id="accountConnectionValue">VERIFYING…</div>
-        <div class="verified-account-note" id="accountConnectionNote">Reading the authenticated broker connection from KINGBOT backend.</div>
-      </div>
-      <div class="verified-account-item"><span>Broker</span><strong id="accountBroker">—</strong></div>
-      <div class="verified-account-item"><span>Account ID</span><strong id="accountIdDisplay">—</strong></div>
-      <div class="verified-account-item"><span>Type</span><strong id="accountType">—</strong></div>
-      <div class="verified-account-item"><span>Currency</span><strong id="accountCurrency">—</strong></div>
-      <div class="verified-account-item"><span>Execution</span><strong id="accountMode">—</strong></div>
-      <div class="verified-account-item"><span>Trading</span><strong id="accountTradingStatus">—</strong></div>
-    </div>
-
-    <div class="cards">
-      <div class="card metric"><div class="metric-label">Balance</div><div class="metric-value gold" id="accountBalance">—</div><div class="metric-note">Broker authoritative</div></div>
-      <div class="card metric"><div class="metric-label">Equity</div><div class="metric-value cyan" id="accountEquity">—</div><div class="metric-note">Broker authoritative</div></div>
-      <div class="card metric"><div class="metric-label">Floating P&L</div><div class="metric-value" id="floatingPnl">—</div><div class="metric-note">Equity − balance</div></div>
-      <div class="card metric"><div class="metric-label">Realized P&L</div><div class="metric-value" id="realizedPnl">—</div><div class="metric-note">Current trading day</div></div>
-      <div class="card metric"><div class="metric-label">Day P&L</div><div class="metric-value green" id="dailyPnl">—</div><div class="metric-note">KINGBOT day baseline</div></div>
-      <div class="card metric"><div class="metric-label">Margin Used</div><div class="metric-value" id="accountMargin">—</div><div class="metric-note">Broker supplied</div></div>
-      <div class="card metric"><div class="metric-label">Free Margin</div><div class="metric-value" id="freeMargin">—</div><div class="metric-note">Broker supplied</div></div>
-      <div class="card metric"><div class="metric-label">Margin Level</div><div class="metric-value" id="marginLevel">—</div><div class="metric-note">Percentage</div></div>
-      <div class="card metric"><div class="metric-label">Daily Drawdown</div><div class="metric-value red" id="dailyDrawdown">—</div><div class="metric-note">From day baseline</div></div>
-      <div class="card metric"><div class="metric-label">Total Drawdown</div><div class="metric-value red" id="drawdown">—</div><div class="metric-note">From equity peak</div></div>
-      <div class="card metric"><div class="metric-label">Open Positions</div><div class="metric-value" id="positionCount">0</div><div class="metric-note">Broker positions</div></div>
-      <div class="card metric"><div class="metric-label">Open Orders</div><div class="metric-value" id="orderCount">0</div><div class="metric-note">Broker orders</div></div>
-      <div class="card metric"><div class="metric-label">Leverage</div><div class="metric-value" id="accountLeverage">—</div><div class="metric-note">When broker supplies</div></div>
-      <div class="card metric"><div class="metric-label">Last Sync</div><div class="metric-value" id="accountSync" style="font-size:12px">—</div><div class="metric-note" id="accountTelemetryState">Awaiting broker</div></div>
-    </div>
-
-    <div class="projection-grid">
-      <div class="card projection-card">
-        <div class="projection-head">
-          <div><div class="projection-kicker">BROKER MARKET TELEMETRY</div><div class="projection-title">LIVE MARKET</div></div>
-          <div class="projection-state" id="brokerMarketProjectionState">WAITING</div>
-        </div>
-        <div class="projection-grid-inner">
-          <div class="projection-metric"><span>BROKER</span><strong id="projectionBroker">—</strong></div>
-          <div class="projection-metric"><span>MARKET</span><strong class="gold" id="projectionSymbol">—</strong></div>
-          <div class="projection-metric"><span>BID</span><strong id="projectionBid">—</strong></div>
-          <div class="projection-metric"><span>ASK</span><strong id="projectionAsk">—</strong></div>
-          <div class="projection-metric"><span>SPREAD</span><strong class="cyan" id="projectionSpread">—</strong></div>
-          <div class="projection-metric"><span>MARKET TIME</span><strong id="projectionMarketTime">—</strong></div>
-        </div>
-        <div class="metric-note" id="projectionMarketNote" style="margin-top:11px">Waiting for an active broker market selected by the Bot Engine.</div>
-      </div>
-
-      <div class="card projection-card">
-        <div class="projection-head">
-          <div><div class="projection-kicker">TRADE PLAN TELEMETRY</div><div class="projection-title">ENGINE PLANS</div></div>
-          <div class="projection-state" id="engineProjectionState">WAITING</div>
-        </div>
-        <div id="engineProjectionList" class="engine-projection-list">
-          <div class="projection-empty">No running engine trade-plan telemetry yet.</div>
-        </div>
-      </div>
-    </div>
-
-  </section>
-
-  <!-- TICKER -->
-  <div class="ticker-wrap">
-    <div class="ticker" id="ticker"></div>
   </div>
+</header>
 
-  <!-- TERMINAL -->
-  <section class="section">
-
-    <div class="section-head">
-      <div>
-        <div class="section-title">LIVE MARKET COMMAND</div>
-        <div class="section-desc">
-          Public exchange data for market visualization and analysis.
-        </div>
+<main class="shell">
+  <section class="hero">
+    <div class="hero-main">
+      <div class="eyebrow"><i></i>AUTHORIZED EXECUTION TELEMETRY</div>
+      <h1>One account.<br><span class="gradient">One active engine.</span><br>One live terminal.</h1>
+      <p class="hero-copy">Terminal is a read-only command view of the backend. The saved Bot Control selection is authoritative: refreshes, navigation and page reloads do not choose a different bot.</p>
+      <div class="hero-actions">
+        <a class="btn primary" href="bots.html">OPEN BOT CONTROL →</a>
+        <a class="btn secondary" href="broker-connect.html">BROKER CONNECTION</a>
       </div>
-
-      <div class="section-tag mono" id="dataLatency">
-        DATA STREAM / CONNECTING
+      <div class="hero-tags">
+        <span class="hero-tag">SERVER STATE FIRST</span><span class="hero-tag">NO SYNTHETIC ACCOUNT DATA</span><span class="hero-tag">BROKER-AUTHORITATIVE QUOTES</span><span class="hero-tag">AUTO SYNC</span>
       </div>
     </div>
 
-    <div class="terminal-grid">
-
-      <!-- CHART -->
-      <div class="card chart-panel">
-
-        <div class="panel-head">
-
-          <div class="panel-title">
-            <div class="instrument" id="activeSymbol">BTCUSDT</div>
-            <div class="price" id="activePrice">—</div>
-            <div class="change" id="activeChange">—</div>
-          </div>
-
-          <div class="chart-actions">
-            <button class="chart-btn active" data-symbol="BTCUSDT">BTC</button>
-            <button class="chart-btn" data-symbol="ETHUSDT">ETH</button>
-            <button class="chart-btn" data-symbol="SOLUSDT">SOL</button>
-            <button class="chart-btn" data-symbol="BNBUSDT">BNB</button>
-            <button class="chart-btn" data-symbol="XRPUSDT">XRP</button>
-            <button class="chart-btn" data-symbol="PAXGUSDT">GOLD</button>
-            <button class="chart-btn" data-symbol="EURUSDT">EUR</button>
-            <button class="chart-btn" data-symbol="GBPUSDT">GBP</button>
-          </div>
-
-        </div>
-
-        <div id="chart"></div>
-
-        <div class="chart-footer">
-
-          <div class="chart-stat">
-            <span>Market Signal</span>
-            <strong id="signal">WAITING</strong>
-          </div>
-
-          <div class="chart-stat">
-            <span>Momentum</span>
-            <strong id="momentum">—</strong>
-          </div>
-
-          <div class="chart-stat">
-            <span>Volatility</span>
-            <strong id="volatility">—</strong>
-          </div>
-
-          <div class="chart-stat">
-            <span>Volume</span>
-            <strong id="volume">—</strong>
-          </div>
-
-        </div>
-
+    <div class="hero-engine" id="engineHero">
+      <div class="engine-head">
+        <div><div class="kicker">PERSISTENT ACTIVE ENGINE</div><div class="engine-lock">LOCKED TO SAVED ACCOUNT SELECTION</div></div>
+        <div class="state-pill" id="heroStatePill"><span class="mini-dot"></span><span id="heroState">SYNCING</span></div>
       </div>
-
-      <!-- RIGHT SIDE -->
-      <div class="stack">
-        <!-- VERIFIED ACCOUNT -->
-        <div class="card connection">
-          <div class="section-title">VERIFIED ACCOUNT</div>
-          <div class="connection-state" id="accountConnectionState">
-            <div class="state-label">CURRENT STATE</div>
-            <div class="state-value" id="terminalAccountConnectionValue">VERIFYING…</div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
-            <div><div class="state-label">BROKER</div><div class="metric-note" id="terminalBrokerName">—</div></div>
-            <div><div class="state-label">ACCOUNT ID</div><div class="metric-note" id="terminalAccountId">—</div></div>
-            <div><div class="state-label">ACCOUNT TYPE</div><div class="metric-note" id="terminalAccountType">—</div></div>
-            <div><div class="state-label">EXECUTION</div><div class="metric-note" id="terminalExecutionMode">—</div></div>
-          </div>
-          <p id="terminalAccountConnectionNote">
-            Broker connectivity is managed exclusively from the Broker Connect page.
-          </p>
-          <a class="btn secondary" href="broker-connect.html" style="display:inline-flex;margin-top:13px;align-items:center;justify-content:center;">
-            VIEW BROKER ACCOUNT →
-          </a>
-        </div>
-
-
-        <!-- ORDER BOOK -->
-        <div class="card orderbook">
-
-          <div class="panel-head">
-            <div>
-              <div class="section-title">ORDER BOOK</div>
-              <div class="section-desc" id="bookSymbol">
-                BTCUSDT / DEPTH
-              </div>
-            </div>
-
-            <div class="section-tag">PUBLIC DATA</div>
-          </div>
-
-          <div class="book-body">
-
-            <div id="asks"></div>
-
-            <div class="spread">
-              SPREAD <span id="spread">—</span>
-            </div>
-
-            <div id="bids"></div>
-
-          </div>
-
-        </div>
-
+      <div class="engine-name" id="heroEngineName">READING SAVED ENGINE…</div>
+      <div class="engine-grid">
+        <div class="engine-cell"><span>Symbol</span><strong id="heroSymbol">—</strong></div>
+        <div class="engine-cell"><span>Timeframe</span><strong id="heroTimeframe">—</strong></div>
+        <div class="engine-cell"><span>Execution</span><strong id="heroMode">—</strong></div>
+        <div class="engine-cell"><span>Last run</span><strong id="heroLastRun">—</strong></div>
       </div>
-
+      <div class="engine-foot"><span>Saved selection</span><strong id="heroSavedAt">—</strong></div>
     </div>
-
   </section>
 
-  <!-- POSITIONS + RISK -->
-  <section class="section">
-
-    <div class="lower-grid">
-
-      <div class="card table-panel">
-
-        <div class="panel-head">
-          <div>
-            <div class="section-title">LIVE POSITIONS</div>
-            <div class="section-desc">
-              Real broker positions only.
-            </div>
-          </div>
-
-          <div class="section-tag">BROKER DATA</div>
-        </div>
-
-        <div class="table-wrap">
-
-          <table>
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th>Side</th>
-                <th>Volume</th>
-                <th>Entry</th>
-                <th>Current</th>
-                <th>P&L</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-
-            <tbody id="positionsTable">
-              <tr>
-                <td colspan="7">
-                  <div class="empty">
-                    <strong>NO BROKER POSITIONS</strong>
-                    Connect a broker backend to display live positions.
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-        </div>
-
-      </div>
-
-      <div class="card risk-panel">
-
-        <div class="panel-head">
-          <div>
-            <div class="section-title">RISK COMMAND</div>
-            <div class="section-desc">
-              Configured policy limits.
-            </div>
-          </div>
-
-          <div class="section-tag">RISK ENGINE</div>
-        </div>
-
-        <div class="risk-list">
-
-          <div class="risk-row">
-            <div>
-              <div class="risk-name">Daily Drawdown Policy</div>
-              <div class="risk-bar">
-                <div class="risk-fill"></div>
-              </div>
-            </div>
-            <div class="risk-limit">5%</div>
-          </div>
-
-          <div class="risk-row">
-            <div>
-              <div class="risk-name">Total Drawdown Policy</div>
-              <div class="risk-bar">
-                <div class="risk-fill"></div>
-              </div>
-            </div>
-            <div class="risk-limit">10%</div>
-          </div>
-
-          <div class="risk-row">
-            <div>
-              <div class="risk-name">Trading-Day Policy</div>
-              <div class="risk-bar">
-                <div class="risk-fill"></div>
-              </div>
-            </div>
-            <div class="risk-limit">7 + 5</div>
-          </div>
-
-        </div>
-
-        <button class="kill" id="killSwitch">
-          ⚠ KILL SWITCH — BACKEND REQUIRED
-        </button>
-
-      </div>
-
-    </div>
-
+  <section class="sync-grid" aria-live="polite">
+    <div class="sync"><div class="sync-top"><span class="sync-label">BACKEND</span><span class="sync-state syncing" id="syncBackendState">SYNCING</span></div><div class="sync-main" id="syncBackendMain">Authoritative API</div><div class="sync-time" id="syncBackendTime">—</div></div>
+    <div class="sync"><div class="sync-top"><span class="sync-label">SELECTION</span><span class="sync-state syncing" id="syncSelectionState">SYNCING</span></div><div class="sync-main" id="syncSelectionMain">Saved engine</div><div class="sync-time" id="syncSelectionTime">—</div></div>
+    <div class="sync"><div class="sync-top"><span class="sync-label">RUNTIME</span><span class="sync-state syncing" id="syncRuntimeState">SYNCING</span></div><div class="sync-main" id="syncRuntimeMain">Worker engine state</div><div class="sync-time" id="syncRuntimeTime">—</div></div>
+    <div class="sync"><div class="sync-top"><span class="sync-label">BROKER</span><span class="sync-state syncing" id="syncBrokerState">SYNCING</span></div><div class="sync-main" id="syncBrokerMain">Verified account</div><div class="sync-time" id="syncBrokerTime">—</div></div>
+    <div class="sync"><div class="sync-top"><span class="sync-label">ACCOUNT</span><span class="sync-state syncing" id="syncAccountState">SYNCING</span></div><div class="sync-main" id="syncAccountMain">Balance / equity</div><div class="sync-time" id="syncAccountTime">—</div></div>
+    <div class="sync"><div class="sync-top"><span class="sync-label">MARKET</span><span class="sync-state syncing" id="syncMarketState">SYNCING</span></div><div class="sync-main" id="syncMarketMain">Broker quote</div><div class="sync-time" id="syncMarketTime">—</div></div>
   </section>
 
-  <!-- ORDERS / ACTIVITY -->
   <section class="section">
-
-    <div class="lower-grid">
-
-      <div class="card table-panel">
-
-        <div class="panel-head">
-          <div>
-            <div class="section-title">ORDER HISTORY</div>
-            <div class="section-desc">
-              Confirmed broker orders only.
-            </div>
-          </div>
-
-          <div class="section-tag">EXECUTION LEDGER</div>
-        </div>
-
-        <div class="table-wrap">
-
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Symbol</th>
-                <th>Side</th>
-                <th>Volume</th>
-                <th>Price</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-
-            <tbody id="ordersTable">
-              <tr>
-                <td colspan="6">
-                  <div class="empty">
-                    <strong>NO EXECUTION DATA</strong>
-                    Orders will appear after backend confirmation.
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-        </div>
-
-      </div>
-
-      <div class="card">
-
-        <div class="panel-head">
-          <div>
-            <div class="section-title">ACTIVITY STREAM</div>
-            <div class="section-desc">
-              Terminal and connection events.
-            </div>
-          </div>
-
-          <div class="section-tag">SYSTEM LOG</div>
-        </div>
-
-        <div class="activity" id="activityLog"></div>
-
-      </div>
-
+    <div class="section-head"><div><div class="section-title">ACCOUNT COMMAND METRICS</div><div class="section-sub">Fresh values from the connected broker account. No cached balance is used as the live truth.</div></div><div class="section-code">ACCOUNT / TELEMETRY</div></div>
+    <div class="grid-4">
+      <div class="metric"><div class="metric-top"><span class="metric-label">Balance</span><span class="metric-icon">$</span></div><div class="metric-value gold" id="balance">—</div><div class="metric-note">BROKER AUTHORITATIVE</div></div>
+      <div class="metric"><div class="metric-top"><span class="metric-label">Equity</span><span class="metric-icon">EQ</span></div><div class="metric-value cyan" id="equity">—</div><div class="metric-note">CURRENT ACCOUNT EQUITY</div></div>
+      <div class="metric"><div class="metric-top"><span class="metric-label">Floating P&amp;L</span><span class="metric-icon">FP</span></div><div class="metric-value" id="floatingPnl">—</div><div class="metric-note">EQUITY − BALANCE</div></div>
+      <div class="metric"><div class="metric-top"><span class="metric-label">Daily P&amp;L</span><span class="metric-icon">DAY</span></div><div class="metric-value" id="dailyPnl">—</div><div class="metric-note">CURRENT KINGBOT DAY</div></div>
+      <div class="metric"><div class="metric-top"><span class="metric-label">Margin Used</span><span class="metric-icon">MG</span></div><div class="metric-value" id="margin">—</div><div class="metric-note">BROKER SUPPLIED</div></div>
+      <div class="metric"><div class="metric-top"><span class="metric-label">Free Margin</span><span class="metric-icon">FM</span></div><div class="metric-value" id="freeMargin">—</div><div class="metric-note">BROKER SUPPLIED</div></div>
+      <div class="metric"><div class="metric-top"><span class="metric-label">Positions</span><span class="metric-icon">POS</span></div><div class="metric-value cyan" id="positionCount">—</div><div class="metric-note">OPEN BROKER POSITIONS</div></div>
+      <div class="metric"><div class="metric-top"><span class="metric-label">Drawdown</span><span class="metric-icon">DD</span></div><div class="metric-value" id="drawdown">—</div><div class="metric-note">ACCOUNT TELEMETRY</div></div>
     </div>
-
   </section>
 
-  <footer>
-    <div>
-      <span>BOT KING</span> © 2026 — FINTECH TECHNOLOGY
-    </div>
+  <section class="section">
+    <div class="main-grid">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-head-left"><div class="section-title">ENGINE TELEMETRY</div><div class="section-sub">The exact engine saved on this account, its worker state, signal and execution plan.</div></div><span class="panel-badge" id="engineBadge">READING SERVER</span></div>
+        <div class="engine-dashboard">
+          <div class="engine-status-hero">
+            <div class="big-status stopped" id="bigStatus">
+              <div class="status-line"><span class="ring"></span><span class="status-word" id="runtimeState">SYNCING</span></div>
+              <div class="status-note" id="runtimeNote">Loading persistent engine state from the backend.</div>
+            </div>
+            <div class="signal-box"><div class="signal-label">LATEST ENGINE SIGNAL</div><div class="signal-name" id="signalName">—</div><div class="signal-score" id="signalScore">Score —</div></div>
+          </div>
+          <div class="telemetry-grid">
+            <div class="telemetry-cell"><span>Active engine</span><strong id="engineName">—</strong></div>
+            <div class="telemetry-cell"><span>Market</span><strong id="engineSymbol">—</strong></div>
+            <div class="telemetry-cell"><span>Timeframe</span><strong id="engineTimeframe">—</strong></div>
+            <div class="telemetry-cell"><span>Execution mode</span><strong id="engineMode">—</strong></div>
+            <div class="telemetry-cell"><span>Last worker run</span><strong id="lastRun">—</strong></div>
+            <div class="telemetry-cell"><span>Last update</span><strong id="runtimeUpdated">—</strong></div>
+            <div class="telemetry-cell"><span>Risk / trade</span><strong id="riskPerTrade">—</strong></div>
+            <div class="telemetry-cell"><span>Max positions</span><strong id="maxPositions">—</strong></div>
+          </div>
+          <div class="plan">
+            <div class="plan-title">ENGINE TRADE PLAN</div>
+            <div class="plan-grid">
+              <div class="plan-item"><span>SIGNAL THRESHOLD</span><strong id="threshold">—</strong></div>
+              <div class="plan-item"><span>STOP LOSS</span><strong id="slAtr">—</strong></div>
+              <div class="plan-item"><span>TAKE PROFIT</span><strong id="tpAtr">—</strong></div>
+              <div class="plan-item"><span>TRAIL TRIGGER</span><strong id="trailTrigger">—</strong></div>
+              <div class="plan-item"><span>MAX HOLD</span><strong id="maxHold">—</strong></div>
+            </div>
+            <div class="strategy-tags" id="strategyTags"></div>
+          </div>
+          <div class="footer-sync"><span>Terminal never selects a different bot on refresh. <strong id="selectionTruth">Awaiting saved selection.</strong></span><a class="sync-button" href="bots.html">MANAGE ENGINE</a></div>
+        </div>
+      </div>
 
-    <div>
-      PUBLIC MARKET DATA:
-      <span>Binance Streams</span> ·
-      BROKER EXECUTION:
-      <span>Backend Required</span>
-    </div>
+      <div class="side-stack">
+        <div class="panel account-card">
+          <div class="panel-head" style="padding:0 0 12px;border:0"><div class="panel-head-left"><div class="section-title">VERIFIED BROKER ACCOUNT</div><div class="section-sub">Connection is managed from Broker Connect.</div></div><span class="panel-badge" id="accountBadge">SYNCING</span></div>
+          <div class="identity">
+            <div class="identity-main"><div class="identity-state" id="accountState">SYNCING</div><div class="identity-note" id="accountNote">Reading the secured broker mapping.</div></div>
+            <div class="identity-grid">
+              <div class="id-cell"><span>Broker</span><strong id="broker">—</strong></div>
+              <div class="id-cell"><span>Account ID</span><strong id="accountId">—</strong></div>
+              <div class="id-cell"><span>Type</span><strong id="accountType">—</strong></div>
+              <div class="id-cell"><span>Currency</span><strong id="currency">—</strong></div>
+              <div class="id-cell"><span>Execution</span><strong id="executionMode">—</strong></div>
+              <div class="id-cell"><span>Trading</span><strong id="tradingStatus">—</strong></div>
+            </div>
+          </div>
+        </div>
 
-    <div id="footerStatus">
-      TERMINAL ONLINE
+        <div class="panel market">
+          <div class="panel-head" style="padding:0 0 12px;border:0"><div class="panel-head-left"><div class="section-title">BROKER MARKET RADAR</div><div class="section-sub">Only the selected engine market is queried here.</div></div><span class="panel-badge" id="marketBadge">WAITING</span></div>
+          <div class="market-top"><div><div class="market-symbol" id="marketSymbol">—</div><div class="market-price" id="marketPrice">—</div></div><div class="kicker" id="marketBroker">—</div></div>
+          <div class="quote-grid">
+            <div class="quote"><span>BID</span><strong id="bid">—</strong></div><div class="quote"><span>ASK</span><strong id="ask">—</strong></div><div class="quote"><span>SPREAD</span><strong id="spread">—</strong></div>
+          </div>
+          <div class="market-foot"><span>QUOTE TIME <strong id="quoteTime">—</strong></span><span>SPEC <strong id="specInfo">—</strong></span></div>
+        </div>
+      </div>
     </div>
-  </footer>
+  </section>
 
+  <section class="section">
+    <div class="tables">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-head-left"><div class="section-title">LIVE POSITIONS</div><div class="section-sub">Real positions returned by the connected broker.</div></div><span class="panel-badge" id="positionsBadge">0 OPEN</span></div>
+        <div class="table-wrap"><table class="table"><thead><tr><th>Symbol</th><th>Side</th><th>Volume</th><th>Entry</th><th>Current</th><th>P&amp;L</th><th>Status</th></tr></thead><tbody id="positionsTable"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-head-left"><div class="section-title">BROKER ORDERS</div><div class="section-sub">Confirmed order records only.</div></div><span class="panel-badge" id="ordersBadge">0 ORDERS</span></div>
+        <div class="table-wrap"><table class="table"><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Volume</th><th>Price</th><th>Status</th></tr></thead><tbody id="ordersTable"></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="risk-grid">
+      <div class="panel risk-card">
+        <div class="panel-head" style="padding:0 0 10px;border:0"><div class="panel-head-left"><div class="section-title">RISK COMMAND</div><div class="section-sub">Current policy values associated with the saved engine.</div></div><span class="panel-badge" id="riskBadge">SYNCING</span></div>
+        <div class="risk-row"><div><div class="risk-name">Risk per trade</div><div class="risk-detail" id="riskPerTradeDetail">—</div><div class="risk-meter"><i id="riskMeter"></i></div></div><div class="risk-value" id="riskPct">—</div></div>
+        <div class="risk-row"><div><div class="risk-name">Daily drawdown</div><div class="risk-detail" id="dailyDdDetail">—</div><div class="risk-meter"><i id="dailyMeter"></i></div></div><div class="risk-value" id="dailyDd">—</div></div>
+        <div class="risk-row"><div><div class="risk-name">Total drawdown</div><div class="risk-detail" id="totalDdDetail">—</div><div class="risk-meter"><i id="totalMeter"></i></div></div><div class="risk-value" id="totalDd">—</div></div>
+      </div>
+
+      <div class="panel activity-card">
+        <div class="panel-head" style="padding:0 0 10px;border:0"><div class="panel-head-left"><div class="section-title">TERMINAL ACTIVITY</div><div class="section-sub">Newest backend observations appear here automatically.</div></div><button class="sync-button" id="syncNow" type="button">SYNC NOW</button></div>
+        <div class="activity-list" id="activityList"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer-sync"><span>LAST SYSTEM SYNC <strong id="lastSystemSync">—</strong> · NEXT AUTO SYNC <strong id="nextSync">3s</strong></span><span id="footerState">Terminal ready</span></div>
 </main>
 
-<div class="toast" id="toast">
-  <div class="toast-title" id="toastTitle">KINGBOT</div>
-  <div class="toast-message" id="toastMessage"></div>
-</div>
+<div class="toast" id="toast"><strong id="toastTitle">KINGBOT</strong><span id="toastMessage">—</span></div>
 
-<script>
-/* =========================================================
-   KINGBOT TERMINAL ENGINE
-   Public market data + backend-ready broker architecture
-========================================================= */
-
-const REST_HOSTS = [
-  "https://api.binance.com",
-  "https://data-api.binance.vision"
-];
-
-const WS_HOSTS = [
-  "wss://stream.binance.com:9443/stream?streams=",
-  "wss://data-stream.binance.vision/stream?streams="
-];
-
-const symbols = [
-  "BTCUSDT",
-  "ETHUSDT",
-  "SOLUSDT",
-  "BNBUSDT",
-  "XRPUSDT",
-  "DOGEUSDT",
-  "ADAUSDT",
-  "AVAXUSDT",
-  "LINKUSDT",
-  "DOTUSDT",
-  "LTCUSDT",
-  "TRXUSDT",
-  "ATOMUSDT",
-  "UNIUSDT",
-  "NEARUSDT",
-  "ARBUSDT",
-  "OPUSDT",
-  "INJUSDT",
-  "SUIUSDT",
-  "PAXGUSDT",
-  "EURUSDT",
-  "GBPUSDT"
-];
-
-const SYMBOL_ALIASES = {
-  XAUUSD: "PAXGUSDT",
-  EURUSD: "EURUSDT",
-  GBPUSD: "GBPUSDT"
-};
-
-let activeSymbol =
-  new URLSearchParams(location.search).get("s")?.toUpperCase()
-  || "BTCUSDT";
-
-activeSymbol = SYMBOL_ALIASES[activeSymbol] || activeSymbol;
-
-if (!symbols.includes(activeSymbol)) {
-  activeSymbol = "BTCUSDT";
-}
-
-let marketSocket = null;
-let reconnectTimer = null;
-let reconnectAttempt = 0;
-let chart;
-let candleSeries;
-let lastCandleTime = 0;
-let candles = [];
-let currentTicker = {};
-let backendConnected = false;
-let verificationCycle = 0;
-let brokerVerificationDelayTimer = null;
-let brokerIdentityResolved = false;
-let liveRuntimeSyncInFlight=false;
-let liveAccountSyncInFlight=false;
-let terminalSyncPulseAt=0;
-let lastRuntimeSnapshotKey="";
-let lastAccountSnapshotKey="";
-let lastEngineEventKey="";
-
-const $ = id => document.getElementById(id);
-
-function syncClockText(value){
-  if(!value)return "—";
-  const t=new Date(value);
-  return Number.isNaN(t.getTime())?"—":t.toLocaleTimeString([], {hour12:false});
-}
-function setSyncClock(id,value){if($(id))$(id).textContent=syncClockText(value)}
-function flashLiveSync(){
-  const panel=$("liveSyncPanel");
-  if(!panel)return;
-  panel.classList.remove("changed");
-  void panel.offsetWidth;
-  panel.classList.add("changed");
-  setTimeout(()=>panel.classList.remove("changed"),420);
-}
-function setLiveSyncState(state,note,tone="live"){
-  const dot=$("syncDot"),value=$("syncState");
-  if(!dot||!value)return;
-  value.textContent=String(state||"LIVE TELEMETRY");
-  dot.className="sync-live-dot"+(tone==="warn"?" warn":tone==="off"?" off":"");
-  $("syncNote").textContent=String(note||"");
-}
-function noteEngineEvent(textValue,stamp){
-  const key=String(textValue||"—")+"|"+String(stamp||"");
-  if(!textValue||key===lastEngineEventKey)return;
-  lastEngineEventKey=key;
-  $("syncEvent").textContent=String(textValue||"—").toUpperCase();
-  $("syncEventNote").textContent=stamp?("LAST EVENT · "+syncClockText(stamp)):"";
-  logActivity("ENGINE · "+String(textValue).toUpperCase());
-}
-function formatEventTime(value){
-  if(!value)return "—";
-  const t=new Date(value);
-  return Number.isNaN(t.getTime())?"—":t.toLocaleTimeString([], {hour12:false});
-}
-function showBrokerVerificationDelay(){
-  const state=$("accountConnectionValue");
-  const note=$("accountConnectionNote");
-  const badge=$("heroBrokerBadge");
-  if(state){
-    state.textContent="BROKER DETAILS TAKING LONGER TO VERIFY…";
-    state.style.color="#ffc84a";
-  }
-  if(note){
-    note.textContent="KINGBOT has not received the complete broker account snapshot yet. Verification is still running in the background; no broker connection has been changed.";
-  }
-  if(badge){
-    badge.textContent="● BROKER VERIFICATION IN PROGRESS…";
-    badge.className="hero-badge";
-  }
-}
-
-/* =========================================================
-   CLOCK
-========================================================= */
-
-function updateClock() {
-  $("clock").textContent =
-    new Date().toLocaleTimeString([], {
-      hour12: false
-    });
-}
-
-setInterval(updateClock, 1000);
-updateClock();
-
-/* =========================================================
-   TOAST
-========================================================= */
-
-let toastTimer;
-
-function toast(title, message) {
-  $("toastTitle").textContent = title;
-  $("toastMessage").textContent = message;
-
-  $("toast").classList.add("show");
-
-  clearTimeout(toastTimer);
-
-  toastTimer = setTimeout(() => {
-    $("toast").classList.remove("show");
-  }, 3500);
-}
-
-/* =========================================================
-   ACTIVITY LOG
-========================================================= */
-
-function logActivity(message) {
-  const time = new Date().toLocaleTimeString([], {
-    hour12: false
-  });
-
-  const item = document.createElement("div");
-  item.className = "activity-item";
-
-  item.innerHTML = `
-    <div class="activity-time">${time}</div>
-    <div class="activity-message">${escapeHtml(message)}</div>
-  `;
-
-  $("activityLog").prepend(item);
-
-  while ($("activityLog").children.length > 30) {
-    $("activityLog").lastElementChild.remove();
-  }
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-
-/* =========================================================
-   CHART
-========================================================= */
-
-function createChart() {
-
-  const container = $("chart");
-
-  chart = LightweightCharts.createChart(container, {
-    layout: {
-      background: {
-        color: "#050916"
-      },
-      textColor: "#69758e"
-    },
-
-    grid: {
-      vertLines: {
-        color: "rgba(255,255,255,.035)"
-      },
-      horzLines: {
-        color: "rgba(255,255,255,.035)"
-      }
-    },
-
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal
-    },
-
-    rightPriceScale: {
-      borderColor: "rgba(255,255,255,.08)"
-    },
-
-    timeScale: {
-      borderColor: "rgba(255,255,255,.08)",
-      timeVisible: true,
-      secondsVisible: false
-    },
-
-    width: container.clientWidth,
-    height: 465
-  });
-
-  candleSeries = chart.addCandlestickSeries({
-    upColor: "#23f7a3",
-    downColor: "#ff4d6d",
-    borderUpColor: "#23f7a3",
-    borderDownColor: "#ff4d6d",
-    wickUpColor: "#23f7a3",
-    wickDownColor: "#ff4d6d"
-  });
-
-  window.addEventListener("resize", () => {
-    chart.applyOptions({
-      width: container.clientWidth
-    });
-  });
-}
-
-createChart();
-
-/* =========================================================
-   REST
-========================================================= */
-
-async function restFetch(path, options = {}) {
-
-  let lastError;
-
-  for (const host of REST_HOSTS) {
-
-    try {
-
-      const controller = new AbortController();
-
-      const timeout = setTimeout(
-        () => controller.abort(),
-        7000
-      );
-
-      const response = await fetch(
-        host + path,
-        {
-          ...options,
-          signal: controller.signal
-        }
-      );
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      return await response.json();
-
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError || new Error("REST unavailable");
-}
-
-/* =========================================================
-   LOAD CANDLES
-========================================================= */
-
-async function loadCandles() {
-
-  try {
-
-    const data = await restFetch(
-      `/api/v3/klines?symbol=${activeSymbol}&interval=1m&limit=240`
-    );
-
-    candles = data.map(k => ({
-      time: Math.floor(k[0] / 1000),
-      open: Number(k[1]),
-      high: Number(k[2]),
-      low: Number(k[3]),
-      close: Number(k[4])
-    }));
-
-    candleSeries.setData(candles);
-
-    lastCandleTime =
-      candles[candles.length - 1]?.time || 0;
-
-    chart.timeScale().fitContent();
-
-    calculateSignal(data);
-
-    logActivity(
-      `${activeSymbol} 1-minute market history loaded`
-    );
-
-  } catch (error) {
-
-    logActivity(
-      `Market history unavailable: ${error.message}`
-    );
-
-  }
-}
-
-/* =========================================================
-   SIGNAL ENGINE
-========================================================= */
-
-function calculateSignal(data) {
-
-  if (!data || data.length < 40) return;
-
-  const closes = data.map(x => Number(x[4]));
-
-  const fast = ema(closes, 9);
-  const slow = ema(closes, 21);
-
-  const latest = closes[closes.length - 1];
-  const fastLatest = fast[fast.length - 1];
-  const slowLatest = slow[slow.length - 1];
-
-  let verdict = "NEUTRAL";
-
-  if (fastLatest > slowLatest && latest > fastLatest) {
-    verdict = "LONG BIAS";
-  }
-
-  if (fastLatest < slowLatest && latest < fastLatest) {
-    verdict = "SHORT BIAS";
-  }
-
-  const signalEl = $("signal");
-
-  signalEl.textContent = verdict;
-
-  if (verdict.includes("LONG")) {
-    signalEl.style.color = "#23f7a3";
-  } else if (verdict.includes("SHORT")) {
-    signalEl.style.color = "#ff4d6d";
-  } else {
-    signalEl.style.color = "#ffc84a";
-  }
-
-  const momentumValue =
-    ((fastLatest - slowLatest) / slowLatest) * 100;
-
-  $("momentum").textContent =
-    `${momentumValue >= 0 ? "+" : ""}${momentumValue.toFixed(3)}%`;
-
-  $("volatility").textContent =
-    calculateVolatility(closes).toFixed(3) + "%";
-
-  const volumes = data.map(x => Number(x[5]));
-  const recentVolume = volumes[volumes.length - 1];
-
-  $("volume").textContent =
-    formatCompact(recentVolume);
-}
-
-function ema(values, period) {
-
-  const k = 2 / (period + 1);
-  let result = [];
-
-  let previous = values[0];
-
-  result.push(previous);
-
-  for (let i = 1; i < values.length; i++) {
-
-    previous =
-      values[i] * k +
-      previous * (1 - k);
-
-    result.push(previous);
-  }
-
-  return result;
-}
-
-function calculateVolatility(values) {
-
-  if (values.length < 10) return 0;
-
-  const recent = values.slice(-20);
-
-  const mean =
-    recent.reduce((a,b) => a + b, 0) /
-    recent.length;
-
-  const variance =
-    recent.reduce(
-      (sum, value) =>
-        sum + Math.pow(value - mean, 2),
-      0
-    ) / recent.length;
-
-  return Math.sqrt(variance) / mean * 100;
-}
-
-/* =========================================================
-   TICKER TAPE
-========================================================= */
-
-function buildTicker() {
-
-  const ticker = $("ticker");
-
-  const duplicated = [...symbols, ...symbols];
-
-  ticker.innerHTML = duplicated.map(symbol => `
-    <div class="ticker-item">
-      <div class="ticker-symbol">${symbol}</div>
-      <div class="ticker-price" id="tick-${symbol}-${Math.random()}">
-        LIVE DATA
-      </div>
-    </div>
-  `).join("");
-}
-
-buildTicker();
-
-/* =========================================================
-   UPDATE TICKER
-========================================================= */
-
-function updateTicker(symbol, price, change) {
-
-  currentTicker[symbol] = {
-    price,
-    change
-  };
-
-  document.querySelectorAll(".ticker-item").forEach(item => {
-
-    const symbolEl =
-      item.querySelector(".ticker-symbol");
-
-    if (!symbolEl || symbolEl.textContent !== symbol) return;
-
-    const priceEl =
-      item.querySelector(".ticker-price");
-
-    if (!priceEl) return;
-
-    priceEl.textContent =
-      `${formatPrice(price)}  ${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
-
-    priceEl.style.color =
-      change >= 0
-        ? "#23f7a3"
-        : "#ff4d6d";
-  });
-
-  if (symbol === activeSymbol) {
-
-    $("activePrice").textContent =
-      formatPrice(price);
-
-    $("activeChange").textContent =
-      `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
-
-    $("activeChange").className =
-      "change " +
-      (change >= 0 ? "positive" : "negative");
-  }
-}
-
-/* =========================================================
-   MARKET WEBSOCKET
-========================================================= */
-
-function connectMarketSocket() {
-
-  if (marketSocket) {
-    try {
-      marketSocket.close();
-    } catch {}
-  }
-
-  const streams = symbols
-    .map(s => `${s.toLowerCase()}@miniTicker`)
-    .concat([
-      `${activeSymbol.toLowerCase()}@kline_1m`,
-      `${activeSymbol.toLowerCase()}@depth20@100ms`,
-      `${activeSymbol.toLowerCase()}@aggTrade`
-    ])
-    .join("/");
-
-  const url =
-    WS_HOSTS[reconnectAttempt % WS_HOSTS.length] +
-    streams;
-
-  marketSocket = new WebSocket(url);
-
-  marketSocket.onopen = () => {
-
-    reconnectAttempt = 0;
-
-    $("marketStatus").textContent =
-      "MARKET LIVE";
-
-    $("marketDot").style.background =
-      "#23f7a3";
-
-    $("marketDot").style.boxShadow =
-      "0 0 12px #23f7a3";
-
-    $("dataLatency").textContent =
-      "DATA STREAM / LIVE";
-
-    $("footerStatus").textContent =
-      "MARKET STREAM ONLINE";
-
-    logActivity(
-      "Public market websocket connected"
-    );
-  };
-
-  marketSocket.onmessage = event => {
-
-    try {
-
-      const packet = JSON.parse(event.data);
-
-      const stream = packet.stream || "";
-      const data = packet.data || {};
-
-      if (stream.includes("@miniticker")) {
-
-        const symbol = data.s;
-
-        const price = Number(data.c);
-
-        const open = Number(data.o);
-
-        const change =
-          open
-            ? ((price - open) / open) * 100
-            : 0;
-
-        updateTicker(
-          symbol,
-          price,
-          change
-        );
-      }
-
-      if (stream.includes("@kline")) {
-
-        const k = data.k;
-
-        const candle = {
-          time: Math.floor(k.t / 1000),
-          open: Number(k.o),
-          high: Number(k.h),
-          low: Number(k.l),
-          close: Number(k.c)
-        };
-
-        candleSeries.update(candle);
-
-        if (candle.time !== lastCandleTime) {
-
-          lastCandleTime = candle.time;
-
-          candles.push(candle);
-
-          if (candles.length > 240) {
-            candles.shift();
-          }
-        }
-      }
-
-      if (stream.includes("@depth")) {
-        renderOrderBook(data);
-      }
-
-      if (stream.includes("@aggtrade")) {
-        $("dataLatency").textContent =
-          `DATA STREAM / LIVE · ${Date.now() % 1000}ms`;
-      }
-
-    } catch {}
-  };
-
-  marketSocket.onerror = () => {
-    $("marketStatus").textContent =
-      "RECONNECTING";
-
-    $("marketDot").style.background =
-      "#ff7a18";
-
-    $("marketDot").style.boxShadow =
-      "0 0 12px #ff7a18";
-  };
-
-  marketSocket.onclose = () => {
-
-    $("marketStatus").textContent =
-      "RECONNECTING";
-
-    $("marketDot").style.background =
-      "#ff7a18";
-
-    $("marketDot").style.boxShadow =
-      "0 0 12px #ff7a18";
-
-    reconnectAttempt++;
-
-    clearTimeout(reconnectTimer);
-
-    reconnectTimer = setTimeout(
-      connectMarketSocket,
-      Math.min(
-        1000 * Math.pow(1.5, reconnectAttempt),
-        15000
-      )
-    );
-  };
-}
-
-/* =========================================================
-   ORDER BOOK
-========================================================= */
-
-function renderOrderBook(data) {
-
-  const asks = (data.a || []).slice(0, 8);
-  const bids = (data.b || []).slice(0, 8);
-
-  $("asks").innerHTML =
-    asks.reverse().map(row => `
-      <div class="book-row">
-        <span class="ask">${formatPrice(Number(row[0]))}</span>
-        <span>${formatCompact(Number(row[1]))}</span>
-        <span>ASK</span>
-      </div>
-    `).join("");
-
-  $("bids").innerHTML =
-    bids.map(row => `
-      <div class="book-row">
-        <span class="bid">${formatPrice(Number(row[0]))}</span>
-        <span>${formatCompact(Number(row[1]))}</span>
-        <span>BID</span>
-      </div>
-    `).join("");
-
-  const bestAsk =
-    Number(data.a?.[0]?.[0]);
-
-  const bestBid =
-    Number(data.b?.[0]?.[0]);
-
-  if (bestAsk && bestBid) {
-
-    $("spread").textContent =
-      formatPrice(bestAsk - bestBid);
-  }
-}
-
-/* =========================================================
-   SYMBOL SWITCH
-========================================================= */
-
-async function selectSymbol(symbol) {
-
-  activeSymbol = symbol;
-
-  $("activeSymbol").textContent =
-    symbol;
-
-  $("bookSymbol").textContent =
-    `${symbol} / DEPTH`;
-
-  document.querySelectorAll(".chart-btn")
-    .forEach(btn => {
-      btn.classList.toggle(
-        "active",
-        btn.dataset.symbol === symbol
-      );
-    });
-
-  candles = [];
-  lastCandleTime = 0;
-
-  candleSeries.setData([]);
-
-  history.replaceState(
-    null,
-    "",
-    `?s=${encodeURIComponent(symbol)}`
-  );
-
-  await loadCandles();
-
-  connectMarketSocket();
-
-  logActivity(
-    `Market instrument switched to ${symbol}`
-  );
-}
-
-document.querySelectorAll(".chart-btn")
-  .forEach(btn => {
-
-    btn.addEventListener("click", () => {
-      selectSymbol(btn.dataset.symbol);
-    });
-
-  });
-
-/* =========================================================
-   BACKEND API
-========================================================= */
-
-async function waitForKingbotApi(timeoutMs=5000){
-  const started=Date.now();
-  while(!window.KINGBOT_API && Date.now()-started<timeoutMs){
-    await new Promise(resolve=>setTimeout(resolve,50));
-  }
-  if(!window.KINGBOT_API) throw new Error("KINGBOT_API_NOT_READY");
-  return window.KINGBOT_API;
-}
-
-function getCachedBrokerIdentity(){
-  try{
-    const raw=localStorage.getItem("KINGBOT_BROKER_IDENTITY");
-    const value=raw?JSON.parse(raw):null;
-    if(value?.broker && value?.accountId)return value;
-  }catch{}
-  return null;
-}
-
-function getCachedAccountSnapshot(){
-  try{
-    const raw=localStorage.getItem("KINGBOT_ACCOUNT_SNAPSHOT");
-    const value=raw?JSON.parse(raw):null;
-    return value&&Number.isFinite(Number(value.balance))?value:null;
-  }catch{return null}
-}
-function cacheAccountSnapshot(account){
-  try{localStorage.setItem("KINGBOT_ACCOUNT_SNAPSHOT",JSON.stringify({
-    broker:account.broker||null,accountId:account.accountId||null,
-    accountType:account.accountType||null,executionMode:account.executionMode||null,
-    currency:account.currency||null,
-    balance:Number.isFinite(Number(account.balance))?Number(account.balance):null,
-    equity:Number.isFinite(Number(account.equity))?Number(account.equity):null,
-    syncedAt:account.syncedAt||new Date().toISOString()
-  }))}catch{}
-}
-function renderCachedAccountSnapshot(){
-  const s=getCachedAccountSnapshot();
-  if(!s)return false;
-  renderAccountOverview({...s,
-    floatingPnl:Number.isFinite(Number(s.equity))&&Number.isFinite(Number(s.balance))?Number(s.equity)-Number(s.balance):null,
-    realizedPnl:null,dailyPnl:null,dailyDrawdownPct:null,totalDrawdownPct:null,
-    margin:null,freeMargin:null,marginLevel:null,positionCount:null,orderCount:null,leverage:null,
-    tradingEnabled:true,accountStatus:"LAST KNOWN"
-  });
-  $("accountConnectionValue").textContent="LAST KNOWN BALANCE";
-  $("accountConnectionValue").style.color="#ffc84a";
-  $("accountConnectionNote").textContent="Latest real broker balance retained locally while KINGBOT requests a fresh broker snapshot.";
-  return true;
-}
-
-function renderCachedBrokerIdentity(){
-  const identity=getCachedBrokerIdentity();
-  if(!identity)return false;
-  $("accountBroker").textContent=String(identity.broker).toUpperCase();
-  $("accountIdDisplay").textContent=identity.accountId;
-  $("accountType").textContent=String(identity.accountType||"DEMO").toUpperCase();
-  $("accountMode").textContent=String(identity.executionMode||"PAPER").toUpperCase();
-  $("accountConnectionValue").textContent="ACCOUNT IDENTIFIED";
-  $("accountConnectionValue").style.color="#ffc84a";
-  $("accountConnectionNote").textContent="Last verified broker identity loaded locally. Live broker telemetry is being synchronized.";
-  $("heroBrokerBadge").textContent="● "+String(identity.broker).toUpperCase()+" · ACCOUNT "+identity.accountId;
-  $("heroBrokerBadge").className="hero-badge";
-  $("terminalBrokerName").textContent=String(identity.broker).toUpperCase();
-  $("terminalAccountId").textContent=identity.accountId;
-  $("terminalAccountType").textContent=String(identity.accountType||"DEMO").toUpperCase();
-  $("terminalExecutionMode").textContent=String(identity.executionMode||"PAPER").toUpperCase();
-  return true;
-}
-
-async function getTerminalAuthToken(timeoutMs=2500){
-  let firebase=window.KINGBOT_FIREBASE||null;
-  if(!firebase){
-    try{
-      await import(new URL("system/firebase-auth.js",window.location.href).href);
-      firebase=window.KINGBOT_FIREBASE||null;
-    }catch{}
-  }
-  if(!firebase) throw new Error("FIREBASE_AUTH_UNAVAILABLE");
-
-  let user=null;
-  try{
-    user=await firebase.waitForAuthReady(timeoutMs);
-  }catch{
-    user=firebase.auth?.currentUser||null;
-  }
-  if(!user) throw new Error("AUTH_TOKEN_NOT_READY");
-  const token=await firebase.getToken(false);
-  if(!token) throw new Error("AUTH_TOKEN_NOT_READY");
-  return {firebase,token};
-}
-
-async function fetchApi(path, options = {}) {
-  await waitForKingbotApi();
-  const rawPath=String(path||"").trim();
-  const normalizedPath=rawPath.replace(/^\/api(?=\/|$)/i,"") || "/";
-  const controller=new AbortController();
-  const timeoutMs=Number(options.timeoutMs)||9000;
-  const timer=setTimeout(()=>controller.abort(),timeoutMs);
-  const requestOptions={...options,signal:controller.signal};
-  delete requestOptions.timeoutMs;
-
-  try{
-    const auth=await getTerminalAuthToken(Math.min(2500,timeoutMs));
-    const headers=new Headers(requestOptions.headers||{});
-    headers.set("Accept","application/json");
-    if(requestOptions.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
-    headers.set("Authorization","Bearer "+auth.token);
-
-    let response=await fetch(window.KINGBOT_API.baseUrl+normalizedPath,{
-      ...requestOptions,
-      headers,
-      credentials:"omit",
-      cache:"no-store"
-    });
-
-    if(response.status===401){
-      try{
-        const refreshed=await auth.firebase.getToken(true);
-        if(refreshed){
-          headers.set("Authorization","Bearer "+refreshed);
-          response=await fetch(window.KINGBOT_API.baseUrl+normalizedPath,{
-            ...requestOptions,
-            headers,
-            credentials:"omit",
-            cache:"no-store"
-          });
-        }
-      }catch{}
-    }
-
-    const data=await response.json().catch(() => ({}));
-    if (!response.ok || data?.ok === false) {
-      throw new Error(data.error || data.reason || data.message || `Backend HTTP ${response.status}`);
-    }
-    return data;
-  }catch(error){
-    if(error?.name==="AbortError") throw new Error(`REQUEST_TIMEOUT: ${normalizedPath}`);
-    throw error;
-  }finally{
-    clearTimeout(timer);
-  }
-}
-
-/* =========================================================
-   BACKEND CONNECTION CHECK
-========================================================= */
-
-async function runBackendCheck() {
-  let accountLoaded=false;
-  const cycle=++verificationCycle;
-  brokerIdentityResolved=false;
-  clearTimeout(brokerVerificationDelayTimer);
-  brokerVerificationDelayTimer=setTimeout(()=>{
-    if(cycle===verificationCycle && !accountLoaded){
-      const state=$("accountConnectionValue")?.textContent||"";
-      const definitiveDisconnected=/^NOT CONNECTED$|^NO VERIFIED ACCOUNT$/i.test(state);
-      if(!definitiveDisconnected)showBrokerVerificationDelay();
-    }
-  },3000);
-
-  await waitForKingbotApi(5000);
-
-  const setConnection=(state,color,note)=>{
-    if($("accountConnectionValue")){
-      $("accountConnectionValue").textContent=state;
-      $("accountConnectionValue").style.color=color;
-    }
-    if($("accountConnectionNote")) $("accountConnectionNote").textContent=note;
-  };
-
-  // Read the persisted broker identity first. This never opens a broker socket.
-  try{
-    const identity=await fetchApi("/api/broker/identity",{timeoutMs:5000});
-    brokerIdentityResolved=true;
-    $("accountBroker").textContent=String(identity.broker||"—").toUpperCase();
-    $("accountIdDisplay").textContent=identity.accountId||"—";
-    $("accountType").textContent=String(identity.accountType||"—").toUpperCase();
-    $("accountMode").textContent=String(identity.executionMode||"—").toUpperCase();
-    $("accountCurrency").textContent="—";
-    if(identity.configured){
-      backendConnected=true;
-      setConnection("BROKER AUTHENTICATED","#23f7a3","Verified broker identity loaded. KINGBOT is requesting the fresh broker balance now.");
-      $("heroBrokerBadge").textContent="● "+String(identity.broker||"BROKER").toUpperCase()+" · ACCOUNT "+String(identity.accountId||"—");
-      $("heroBrokerBadge").className="hero-badge public";
-      $("terminalBrokerName").textContent=String(identity.broker||"—").toUpperCase();
-      $("terminalAccountId").textContent=identity.accountId||"—";
-      $("terminalExecutionMode").textContent=String(identity.executionMode||"—").toUpperCase();
-    }else{
-      clearTimeout(brokerVerificationDelayTimer);
-      brokerVerificationDelayTimer=null;
-      backendConnected=false;
-      setConnection("NOT CONNECTED","#ff7a18","No broker account is currently bound to this KINGBOT account.");
-      $("heroBrokerBadge").textContent="● NO VERIFIED ACCOUNT";
-      $("heroBrokerBadge").className="hero-badge offline";
-    }
-  }catch(error){
-    if(String(error?.message||"").includes("REQUEST_TIMEOUT"))showBrokerVerificationDelay();
-    logActivity(`Broker identity check: ${error.message}`);
-  }
-
-  // Avoid a second broker rehydration. The account endpoint performs the
-  // single live broker connection/telemetry operation for this cycle.
-
-  // Account telemetry is the authoritative source for balances and trading details.
-  try{
-    const data=await fetchApi("/api/account",{timeoutMs:10000});
-    const account=data.account||data.data||data;
-    if(!account || (!account.accountId && !account.broker)){
-      throw new Error("ACCOUNT_TELEMETRY_INCOMPLETE");
-    }
-    backendConnected=true;
-    accountLoaded=true;
-    clearTimeout(brokerVerificationDelayTimer);
-    brokerVerificationDelayTimer=null;
-
-    setConnection("CONNECTED","#23f7a3","Verified broker account is active. Live account telemetry is synchronized from the broker.");
-    $("accountConnectionValue").style.color="#23f7a3";
-    $("accountConnectionNote").textContent="Verified broker account is active. Connection controls remain on Broker Connect.";
-
-    $("heroBrokerBadge").textContent="● "+String(account.broker||"BROKER").toUpperCase()+" · ACCOUNT CONNECTED";
-    $("heroBrokerBadge").className="hero-badge public";
-    $("terminalBrokerName").textContent=String(account.broker||"—").toUpperCase();
-    $("terminalAccountId").textContent=account.accountId||"—";
-    $("terminalAccountType").textContent=String(account.accountType||"—").toUpperCase();
-    $("terminalExecutionMode").textContent=String(account.executionMode||"—").toUpperCase();
-
-    renderAccountOverview(account);
-    cacheAccountSnapshot(account);
-  }catch{
-    backendConnected=false;
-    $("accountConnectionValue").textContent="LIVE ACCOUNT DATA UNAVAILABLE";
-    $("accountConnectionValue").style.color="#ff7a18";
-    $("accountConnectionNote").textContent="KINGBOT could not verify a fresh broker snapshot. No cached balance is shown; the terminal will retry automatically.";
-  }
-
-  if(backendConnected){
-    try{ await loadPositions(); }catch{}
-    try{ await loadOrders(); }catch{}
-  }
-  try{await loadRisk();}catch{}
-  if(cycle===verificationCycle && (accountLoaded || !backendConnected)){
-    clearTimeout(brokerVerificationDelayTimer);
-    brokerVerificationDelayTimer=null;
-  }
-}
-
-let backendCheckPromise=null;
-function checkBackend(){
-  if(backendCheckPromise)return backendCheckPromise;
-  backendCheckPromise=runBackendCheck().finally(()=>{backendCheckPromise=null;});
-  return backendCheckPromise;
-}
-
-/* =========================================================
-   ACCOUNT
-========================================================= */
-
-function formatMoney(value,currency){
-  const n=Number(value);
-  if(!Number.isFinite(n))return "—";
-  return (currency ? currency+" " : "")+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-}
-function formatPct(value){
-  const n=Number(value);
-  return Number.isFinite(n) ? n.toFixed(2)+"%" : "—";
-}
-function formatSignedMoney(value,currency){
-  const n=Number(value);
-  if(!Number.isFinite(n))return "—";
-  return (n>0?"+":"")+formatMoney(n,currency);
-}
-function renderPnl(id,value,currency){
-  const el=$(id);
-  if(!el)return;
-  el.textContent=formatSignedMoney(value,currency);
-  el.style.color=Number(value)>0?"#23f7a3":Number(value)<0?"#ff4d6d":"#dfe7ff";
-}
-function renderAccountOverview(account){
-  const currency=account.currency||"";
-  $("accountBroker").textContent=String(account.broker||"—").toUpperCase();
-  $("accountIdDisplay").textContent=account.accountId||"—";
-  $("accountType").textContent=String(account.accountType||"—").toUpperCase();
-  $("accountCurrency").textContent=currency||"—";
-  $("accountMode").textContent=String(account.executionMode||"—").toUpperCase();
-  if($("terminalBrokerName"))$("terminalBrokerName").textContent=String(account.broker||"—").toUpperCase();
-  if($("terminalAccountId"))$("terminalAccountId").textContent=account.accountId||"—";
-  if($("terminalAccountType"))$("terminalAccountType").textContent=String(account.accountType||"—").toUpperCase();
-  if($("terminalExecutionMode"))$("terminalExecutionMode").textContent=String(account.executionMode||"—").toUpperCase();
-  $("accountTradingStatus").textContent=(account.tradingEnabled?"ENABLED":"DISABLED")+" · "+String(account.accountStatus||"ACTIVE").toUpperCase();
-  $("accountTradingStatus").style.color=account.tradingEnabled?"#23f7a3":"#ff4d6d";
-  $("accountTradingStatus").className=account.tradingEnabled?"live":"warn";
-
-  $("accountBalance").textContent=formatMoney(account.balance,currency);
-  $("accountEquity").textContent=formatMoney(account.equity,currency);
-  renderPnl("floatingPnl",account.floatingPnl,currency);
-  renderPnl("realizedPnl",account.realizedPnl,currency);
-  renderPnl("dailyPnl",account.dailyPnl,currency);
-  const isDeriv=String(account.broker||"").toLowerCase()==="deriv";
-  $("accountMargin").textContent=isDeriv && !Number.isFinite(Number(account.margin))?"N/A":formatMoney(account.margin,currency);
-  $("freeMargin").textContent=isDeriv && !Number.isFinite(Number(account.freeMargin))?"N/A":formatMoney(account.freeMargin,currency);
-  $("marginLevel").textContent=isDeriv && !Number.isFinite(Number(account.marginLevel))?"N/A":formatPct(account.marginLevel);
-  $("dailyDrawdown").textContent=formatPct(account.dailyDrawdownPct);
-  $("drawdown").textContent=formatPct(account.totalDrawdownPct);
-  $("positionCount").textContent=Number.isFinite(Number(account.positionCount))?String(account.positionCount):"—";
-  $("orderCount").textContent=Number.isFinite(Number(account.orderCount))?String(account.orderCount):"—";
-  $("accountLeverage").textContent=Number.isFinite(Number(account.leverage))
-    ?"1:"+Number(account.leverage).toFixed(0)
-    :(isDeriv?"N/A":"—");
-
-  if(account.syncedAt){
-    $("accountSync").textContent=new Date(account.syncedAt).toLocaleTimeString([], {hour12:false});
-  }
-  const telemetry=account.telemetry||{};
-  $("accountTelemetryState").textContent=telemetry.positions&&telemetry.orders&&telemetry.trades?"LIVE / COMPLETE":"LIVE / PARTIAL";
-
-  const badge=$("heroBrokerBadge");
-  if(badge){
-    badge.textContent="● "+String(account.broker||"BROKER").toUpperCase()+" / "+String(account.accountType||"ACCOUNT").toUpperCase()+" CONNECTED";
-    badge.className="hero-badge public";
-  }
-}
-async function loadAccount(){
-  try{
-    const data=await fetchApi("/api/account",{timeoutMs:10000});
-    if(!data)return false;
-    const account=data.account||data.data||data;
-    renderAccountOverview(account);
-    return true;
-  }catch(error){
-    logActivity("Live account telemetry unavailable: "+error.message);
-    throw error;
-  }
-}
-
-
-/* =========================================================
-   POSITIONS
-========================================================= */
-
-async function loadPositions() {
-
-  const data =
-    await fetchApi("/api/positions");
-
-  const positions =
-    Array.isArray(data)
-      ? data
-      : (data.data || data.positions || []);
-
-  $("positionCount").textContent =
-    positions.length;
-
-  const table =
-    $("positionsTable");
-
-  if (!positions.length) {
-
-    table.innerHTML = `
-      <tr>
-        <td colspan="7">
-          <div class="empty">
-            <strong>NO BROKER POSITIONS</strong>
-            No open positions were returned by the backend.
-          </div>
-        </td>
-      </tr>
-    `;
-
-    return;
-  }
-
-  table.innerHTML =
-    positions.map(position => `
-      <tr>
-        <td>${escapeHtml(position.symbol ?? "—")}</td>
-        <td>${escapeHtml(position.side ?? "—")}</td>
-        <td>${escapeHtml(position.volume ?? "—")}</td>
-        <td>${escapeHtml(position.entry ?? "—")}</td>
-        <td>${escapeHtml(position.current ?? "—")}</td>
-        <td>${escapeHtml(position.pnl ?? "—")}</td>
-        <td>${escapeHtml(position.status ?? "—")}</td>
-      </tr>
-    `).join("");
-}
-
-/* =========================================================
-   ORDERS
-========================================================= */
-
-async function loadOrders() {
-
-  const data =
-    await fetchApi("/api/orders");
-
-  const orders =
-    Array.isArray(data)
-      ? data
-      : (data.data || data.orders || []);
-
-  const table =
-    $("ordersTable");
-
-  if (!orders.length) {
-
-    table.innerHTML = `
-      <tr>
-        <td colspan="6">
-          <div class="empty">
-            <strong>NO EXECUTION DATA</strong>
-            No confirmed broker orders were returned.
-          </div>
-        </td>
-      </tr>
-    `;
-
-    return;
-  }
-
-  table.innerHTML =
-    orders.map(order => `
-      <tr>
-        <td>${escapeHtml(order.time ?? "—")}</td>
-        <td>${escapeHtml(order.symbol ?? "—")}</td>
-        <td>${escapeHtml(order.side ?? "—")}</td>
-        <td>${escapeHtml(order.volume ?? "—")}</td>
-        <td>${escapeHtml(order.price ?? "—")}</td>
-        <td>${escapeHtml(order.status ?? "—")}</td>
-      </tr>
-    `).join("");
-}
-
-/* =========================================================
-   RISK
-========================================================= */
-
-async function loadRisk() {
-  const data = await fetchApi("/api/risk");
-  if (!data) return;
-
-  const rows = Array.isArray(data.bots) ? data.bots : [];
-  const active = rows.filter(row => String(row.execution_mode || "").toUpperCase() === "LIVE");
-  const blocked = rows.filter(row => Boolean(row.kill_switch));
-
-    const riskLog = blocked.length
-    ? `Risk telemetry: ${blocked.length} kill switch${blocked.length === 1 ? "" : "es"} active`
-    : active.length
-      ? `Risk telemetry: ${active.length} LIVE profile${active.length === 1 ? "" : "s"} configured`
-      : "Risk telemetry: no LIVE profiles configured";
-
-  logActivity(riskLog);
-}
-
-/* =========================================================
-   KILL SWITCH
-========================================================= */
-
-$("killSwitch").addEventListener(
-  "click",
-  async () => {
-
-    if (!backendConnected) {
-
-      toast(
-        "RISK ENGINE",
-        "Kill switch requires a connected backend."
-      );
-
-      logActivity(
-        "Kill switch blocked — broker backend unavailable"
-      );
-
-      return;
-    }
-
-    try {
-
-      await fetchApi(
-        "/api/risk/kill-switch",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            active: true,
-            reason: "Manual emergency stop from terminal"
-          })
-        }
-      );
-
-      toast(
-        "KILL SWITCH",
-        "Emergency stop request confirmed by backend."
-      );
-
-      logActivity(
-        "Emergency kill-switch request confirmed by backend"
-      );
-
-    } catch {
-
-      toast(
-        "RISK ERROR",
-        "Backend did not confirm the kill switch."
-      );
-    }
-
-  }
-);
-
-/* =========================================================
-   FORMATTING
-========================================================= */
-
-function formatPrice(value) {
-
-  if (!Number.isFinite(value)) return "—";
-
-  if (value >= 10000) {
-    return value.toLocaleString(
-      undefined,
-      {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }
-    );
-  }
-
-  if (value >= 100) {
-    return value.toFixed(2);
-  }
-
-  if (value >= 1) {
-    return value.toFixed(4);
-  }
-
-  return value.toFixed(6);
-}
-
-function formatCompact(value) {
-
-  if (!Number.isFinite(value)) return "—";
-
-  if (Math.abs(value) >= 1e9)
-    return (value / 1e9).toFixed(2) + "B";
-
-  if (Math.abs(value) >= 1e6)
-    return (value / 1e6).toFixed(2) + "M";
-
-  if (Math.abs(value) >= 1e3)
-    return (value / 1e3).toFixed(2) + "K";
-
-  return value.toFixed(2);
-}
-
-
-async function loadBrokerMarketProjection(symbol,brokerHint=""){
-  if(!symbol)return false;
-  try{
-    const d=await fetchApi("/api/broker/quote?symbol="+encodeURIComponent(symbol),{timeoutMs:7000});
-    const m=d.market||{};
-    const q=m.data||{};
-    const spec=m.spec||{};
-    $("projectionBroker").textContent=String(d.broker||brokerHint||"BROKER").toUpperCase();
-    $("projectionSymbol").textContent=String(m.symbol||symbol).toUpperCase();
-    $("projectionBid").textContent=Number.isFinite(Number(q.bid))?formatPrice(Number(q.bid)):"—";
-    $("projectionAsk").textContent=Number.isFinite(Number(q.ask))?formatPrice(Number(q.ask)):"—";
-    const spread=Number(q.ask)-Number(q.bid);
-    $("projectionSpread").textContent=Number.isFinite(spread)&&spread>=0?formatPrice(spread):"—";
-    $("projectionMarketTime").textContent=q.time?new Date(q.time).toLocaleTimeString([], {hour12:false}):"—";
-    $("projectionMarketNote").textContent=spec?.tradeable===false?"Broker reports this market as non-tradeable.":"Live broker quote and symbol specification projected from the connected account.";
-    $("brokerMarketProjectionState").textContent="LIVE / "+String(d.broker||brokerHint||"BROKER").toUpperCase();
-    return true;
-  }catch(error){
-    $("brokerMarketProjectionState").textContent="UNAVAILABLE";
-    $("projectionMarketNote").textContent="Broker market telemetry could not be synchronized for "+symbol+"."; 
-    return false;
-  }
-}
-function parseSignal(value){
- let x=value;
- if(typeof x==="string"){try{x=JSON.parse(x)}catch{return null}}
- return x&&typeof x==="object"?x:null;
-}
-function renderEngineProjection(bots=[],selectedRuntime=null){
- const all=Array.isArray(bots)?bots:[];
- const entitled=all.filter(x=>x.entitled!==false);
- const running=entitled.filter(x=>String(x.runtime||x.state||x.status||"STOPPED").trim().toUpperCase()==="RUNNING");
- const list=$("engineProjectionList");
- const selectedId=String(selectedRuntime?.botId||"");
- const visible=entitled.length?entitled:(selectedId ? all.filter(x=>String(x.botId||"")===selectedId) : []);
- if(!visible.length){
-   list.innerHTML='<div class="projection-empty">No subscribed engine is currently active. Bot Control state is synchronized from the account backend.</div>';
-   $("engineProjectionState").textContent="0 ACTIVE";
-   return null;
- }
- $("engineProjectionState").textContent=running.length?running.length+" RUNNING":String(visible.length)+" SYSTEMS";
- list.innerHTML=visible.map(b=>{
-   const signal=parseSignal(b.lastSignal);
-   const livePlan=signal?.tradePlan||{};
-   const configured=b.tradePlan||{};
-   const state=String(b.runtime||b.state||"STOPPED").toUpperCase();
-   const sl=Number.isFinite(Number(livePlan.stopLoss))?Number(livePlan.stopLoss):(Number.isFinite(Number(configured.slAtr))?configured.slAtr+" ATR":"—");
-   const tp=Number.isFinite(Number(livePlan.takeProfit))?Number(livePlan.takeProfit):(Number.isFinite(Number(configured.tpAtr))?configured.tpAtr+" ATR":"—");
-   const rr=Number.isFinite(Number(livePlan.riskReward))?Number(livePlan.riskReward):(configured.slAtr&&configured.tpAtr?(Number(configured.tpAtr)/Number(configured.slAtr)).toFixed(2):"—");
-   const trail=Number.isFinite(Number(livePlan.trailingTriggerR))?Number(livePlan.trailingTriggerR).toFixed(2)+"R":(configured.trailingTriggerR?configured.trailingTriggerR+"R":"—");
-   const lastRun=b.lastRunAt||signal?.updatedAt||null;
-   const err=b.lastError||"";
-   const statusClass=err?"error":"";
-   return '<div class="engine-row">'
-     +'<div><span>ENGINE / MARKET</span><strong>'+escapeHtml(String(b.name||b.botId||"ENGINE"))+' · '+escapeHtml(String(b.symbol||"—").toUpperCase())+'</strong></div>'
-     +'<div><span>STATE</span><strong class="engine-status '+statusClass+'"><i></i>'+escapeHtml(state)+'</strong></div>'
-     +'<div><span>SIGNAL / SCORE</span><strong class="signal">'+escapeHtml(String(signal?.signal||"WAITING"))+' · '+escapeHtml(Number.isFinite(Number(signal?.score))?Number(signal.score).toFixed(1):"—")+'</strong></div>'
-     +'<div><span>STOP LOSS</span><strong>'+escapeHtml(String(sl))+'</strong></div>'
-     +'<div><span>TAKE PROFIT</span><strong>'+escapeHtml(String(tp))+'</strong></div>'
-     +'<div><span>R:R / TRAIL</span><strong>'+escapeHtml(String(rr)+" · "+String(trail))+'</strong></div>'
-     +'<div><span>LAST RUN</span><strong>'+escapeHtml(formatEventTime(lastRun))+'</strong></div>'
-     +(err?'<div><span>TELEMETRY</span><strong>'+escapeHtml(err)+'</strong></div>':'')
-     +'</div>';
- }).join("");
- const first=visible.find(x=>x.symbol)||visible[0];
- return {symbol:first?.symbol||"",broker:first?.broker||"",state:String(first?.runtime||first?.state||"STOPPED").toUpperCase(),lastRunAt:first?.lastRunAt||null,botId:first?.botId||""};
-}
-async function loadTerminalEngineProjection({force=false}={}){
- if(liveRuntimeSyncInFlight&&!force)return false;
- liveRuntimeSyncInFlight=true;
- try{
-   const [runtimeResult,selectionResult]=await Promise.allSettled([
-     fetchApi("/runtime",{timeoutMs:7000}),
-     fetchApi("/runtime/selection/current",{timeoutMs:7000})
-   ]);
-   const runtimeBots=runtimeResult.status==="fulfilled" && Array.isArray(runtimeResult.value?.bots)
-     ? runtimeResult.value.bots : [];
-   const selection=selectionResult.status==="fulfilled"?selectionResult.value:null;
-   const selectedId=String(selection?.selectedBotId||selection?.bot?.botId||"").trim();
-
-   // Terminal must not hide a running engine just because the aggregate
-   // runtime list is delayed. The persisted selection endpoint is a second
-   // authoritative backend source and is safe to project independently.
-   let selectedBot=runtimeBots.find(x=>String(x.botId||"")===selectedId)||null;
-   if(!selectedBot && selection?.bot){
-     selectedBot={
-       ...selection.bot,
-       botId:String(selection.bot.botId||selectedId),
-       name:selection.bot.name||selection.bot.botId||"ENGINE",
-       runtime:String(selection.bot.state||"STOPPED").toUpperCase(),
-       executionMode:selection.bot.executionMode||"NOT_SET",
-       symbol:selection.bot.symbol||null,
-       timeframe:selection.bot.timeframe||"1m",
-       lastSignal:selection.bot.lastSignal||null,
-       lastRunAt:selection.bot.lastRunAt||null,
-       lastError:selection.bot.lastError||null
-     };
-   }
-   const aggregateRunning=runtimeBots.find(x=>String(x.runtime||x.state||x.status||"STOPPED").trim().toUpperCase()==="RUNNING");
-   const preferred=selectedBot?.runtime==="RUNNING"?selectedBot:(aggregateRunning||selectedBot);
-   const info=renderEngineProjection(runtimeBots,preferred);
-   const now=new Date().toISOString();
-   setSyncClock("syncRuntimeAt",now);
-
-   if(preferred){
-     const preferredState=String(preferred.runtime||preferred.state||"STOPPED").toUpperCase();
-     $("syncEngine").textContent=String(preferred.name||preferred.botId||"ENGINE").toUpperCase();
-     $("syncEngineNote").textContent=preferredState+" · "+String(preferred.executionMode||"NOT SET").toUpperCase()+" · SERVER AUTHORITATIVE";
-     $("syncMarket").textContent=String(preferred.symbol||info?.symbol||"—").toUpperCase();
-     $("syncMarketNote").textContent=preferred.timeframe?String(preferred.timeframe).toUpperCase()+" · BROKER-VERIFIED MARKET":"BROKER MARKET NOT CONFIGURED";
-     const sig=parseSignal(preferred.lastSignal);
-     noteEngineEvent(sig?.signal||preferred.lastError||preferredState||"ENGINE SYNC",sig?.updatedAt||preferred.lastRunAt||selection?.updatedAt||now);
-
-     if(preferredState==="RUNNING"&&preferred.symbol){
-       await loadBrokerMarketProjection(preferred.symbol,String(preferred.broker||info?.broker||""));
-       setSyncClock("syncMarketAt",new Date().toISOString());
-     }else if(!preferred.symbol){
-       $("brokerMarketProjectionState").textContent="WAITING";
-       $("projectionMarketNote").textContent="Selected engine has no saved broker market.";
-     }
-   }else{
-     $("syncEngine").textContent="NO ENGINE";
-     $("syncEngineNote").textContent=runtimeResult.status==="rejected"
-       ?"Runtime endpoint delayed; no persisted selected engine was returned."
-       :"No saved entitled engine was returned by Bot Control.";
-     $("syncMarket").textContent="—";
-     $("syncMarketNote").textContent="Waiting for a saved broker market.";
-     noteEngineEvent("NO ACTIVE ENGINE",now);
-     $("brokerMarketProjectionState").textContent="WAITING";
-   }
-
-   const source=selectionResult.status==="fulfilled"&&selection?.bot?"PERSISTED SELECTION":"RUNTIME LIST";
-   const syncText=runtimeResult.status==="fulfilled"
-     ?runtimeBots.length+" engine records · "+source+" · backend authoritative."
-     :"Runtime list delayed · persisted engine selection checked independently.";
-   setLiveSyncState(
-     preferred?.runtime==="RUNNING"?"ENGINE LIVE · TELEMETRY SYNCHRONIZED":"LIVE TELEMETRY SYNCHRONIZED",
-     syncText,
-     preferred?.runtime==="RUNNING"?"live":"warn"
-   );
-   flashLiveSync();
-   return true;
- }catch(error){
-   setLiveSyncState("RUNTIME SYNC DELAYED",error?.message||"Runtime telemetry temporarily unavailable. Automatic retry remains active.","warn");
-   return false;
- }finally{
-   liveRuntimeSyncInFlight=false;
- }
-}
-async function refreshTerminalAccount({force=false}={}){
- if(liveAccountSyncInFlight&&!force)return false;
- liveAccountSyncInFlight=true;
- try{
-   const result=await checkBackend();
-   setSyncClock("syncBackendAt",new Date().toISOString());
-   if(result!==false){
-     setSyncClock("syncAccountAt",new Date().toISOString());
-     setLiveSyncState("LIVE TELEMETRY SYNCHRONIZED","Account, positions and risk data refreshed from the authenticated KINGBOT backend.","live");
-   }
-   return result;
- }catch(error){
-   setLiveSyncState("ACCOUNT SYNC DELAYED",error?.message||"Account telemetry temporarily unavailable. Automatic retry remains active.","warn");
-   return false;
- }finally{
-   liveAccountSyncInFlight=false;
- }
-}
-
-/* =========================================================
-   STARTUP
-========================================================= */
-(async function init() {
-
-  logActivity(
-    "KINGBOT terminal initialized"
-  );
-
-  logActivity(
-    "Broker execution layer awaiting backend connection"
-  );
-
-  logActivity(
-    "Public market-data layer starting"
-  );
-
-  // Broker identity is independent from public market data.
-  // Do not let a broker wake-up or chart request block account visibility.
-  const accountBoot=checkBackend().catch(error=>{
-    logActivity(`Account bootstrap deferred: ${error.message}`);
-  });
-
-  connectMarketSocket();
-
-  // Market history loads in the background.
-  void loadCandles();
-  void loadTerminalEngineProjection();
-
-  void accountBoot;
-
-  await Promise.allSettled([
-    refreshTerminalAccount({force:true}),
-    loadTerminalEngineProjection({force:true})
-  ]);
-
-  clearInterval(window.__KINGBOT_ENGINE_PROJECTION_REFRESH);
-  window.__KINGBOT_ENGINE_PROJECTION_REFRESH=setInterval(()=>{void loadTerminalEngineProjection()},2500);
-
-  clearInterval(window.__KINGBOT_ACCOUNT_REFRESH);
-  window.__KINGBOT_ACCOUNT_REFRESH=setInterval(async()=>{
-    if(!liveAccountSyncInFlight){
-      await refreshTerminalAccount();
-      if(backendConnected){
-        try{await loadPositions();}catch{}
-        try{await loadOrders();}catch{}
-      }
-    }
-  },5000);
-
-  $("syncNowBtn").addEventListener("click",async()=>{
-    $("syncNowBtn").disabled=true;
-    $("syncNowBtn").textContent="SYNCING…";
-    try{
-      await Promise.allSettled([
-        refreshTerminalAccount({force:true}),
-        loadTerminalEngineProjection({force:true})
-      ]);
-      toast("TERMINAL SYNC","Account and engine telemetry refreshed.");
-    }finally{
-      $("syncNowBtn").disabled=false;
-      $("syncNowBtn").textContent="SYNC NOW";
-    }
-  });
-
-  document.addEventListener("visibilitychange",()=>{
-    if(document.visibilityState==="visible"){
-      void refreshTerminalAccount({force:true});
-      void loadTerminalEngineProjection({force:true});
-    }
-  });
-  window.addEventListener("focus",()=>{
-    void refreshTerminalAccount({force:true});
-    void loadTerminalEngineProjection({force:true});
-  });
-
-})();
-</script>
-
+<script src="system/session.js?v=20261001-terminal"></script>
 <script>
 (function(){
-  const source=document.getElementById("accountConnectionValue");
-  const target=document.getElementById("terminalAccountConnectionValue");
-  const note=document.getElementById("accountConnectionNote");
-  const noteTarget=document.getElementById("terminalAccountConnectionNote");
-  if(!source||!target)return;
-  const sync=()=>{
-    target.textContent=source.textContent;
-    target.style.color=source.style.color;
-    if(note&&noteTarget)noteTarget.textContent=note.textContent;
-  };
-  const observer=new MutationObserver(sync);
-  observer.observe(source,{subtree:true,childList:true,characterData:true,attributes:true});
-  if(note)observer.observe(note,{subtree:true,childList:true,characterData:true});
-  sync();
+  "use strict";
+
+  const $=(id)=>document.getElementById(id);
+  const esc=(v)=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+  const state={selection:null,engine:null,runtimeBots:[],account:null,quote:null,risk:null,cycle:0,lastSyncAt:null,marketSymbol:null};
+  let refreshRunning=false;
+
+  function fmtTime(v){
+    if(!v)return "—";
+    const d=new Date(v); if(Number.isNaN(d.getTime()))return "—";
+    return d.toLocaleTimeString([], {hour12:false});
+  }
+  function fmtNumber(v,dec=2){
+    const n=Number(v); if(!Number.isFinite(n))return "—";
+    return n.toLocaleString(undefined,{minimumFractionDigits:dec,maximumFractionDigits:dec});
+  }
+  function fmtMoney(v,currency){
+    const n=Number(v); if(!Number.isFinite(n))return "—";
+    const cur=currency?String(currency).toUpperCase():"";
+    return (cur?cur+" ":"")+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+  function classForPnl(v){const n=Number(v);return Number.isFinite(n)&&n<0?"red":Number.isFinite(n)&&n>0?"green":""}
+  function parseSignal(v){
+    if(!v)return null;
+    if(typeof v==="object")return v;
+    try{return JSON.parse(v)}catch{return {signal:String(v)}}
+  }
+  function addActivity(msg){
+    const list=$("activityList"); if(!list)return;
+    const row=document.createElement("div"); row.className="activity";
+    row.innerHTML="<time>"+esc(fmtTime(new Date().toISOString()))+"</time><span>"+esc(msg)+"</span>";
+    list.prepend(row);
+    while(list.children.length>18)list.lastElementChild.remove();
+  }
+  function setSync(name,stateText,main,time){
+    const map={backend:["syncBackendState","syncBackendMain","syncBackendTime"],selection:["syncSelectionState","syncSelectionMain","syncSelectionTime"],runtime:["syncRuntimeState","syncRuntimeMain","syncRuntimeTime"],broker:["syncBrokerState","syncBrokerMain","syncBrokerTime"],account:["syncAccountState","syncAccountMain","syncAccountTime"],market:["syncMarketState","syncMarketMain","syncMarketTime"]};
+    const ids=map[name]; if(!ids)return;
+    const s=$(ids[0]);s.textContent=stateText;s.className="sync-state "+(stateText==="LIVE"||stateText==="RUNNING"?"live":stateText==="SYNCING"?"syncing":stateText==="ERROR"||stateText==="OFFLINE"?"down":"idle");
+    $(ids[1]).textContent=main||"—";$(ids[2]).textContent=time?fmtTime(time):"—";
+  }
+  function showToast(title,msg){
+    $("toastTitle").textContent=title;$("toastMessage").textContent=msg;$("toast").classList.add("show");
+    clearTimeout(showToast.t);showToast.t=setTimeout(()=>$("toast").classList.remove("show"),3200);
+  }
+  function stateInfo(s){
+    const x=String(s||"STOPPED").toUpperCase();
+    if(x==="RUNNING")return {cls:"",color:"var(--green)",label:"RUNNING"};
+    if(x==="PAUSED")return {cls:"paused",color:"var(--orange)",label:"PAUSED"};
+    if(x==="ERROR")return {cls:"error",color:"var(--red)",label:"ERROR"};
+    if(x==="SYNCING")return {cls:"",color:"var(--gold)",label:"SYNCING"};
+    return {cls:"stopped",color:"#7d8799",label:"STOPPED"};
+  }
+
+  async function getAuth(timeoutMs=3500){
+    let fb=window.KINGBOT_FIREBASE;
+    if(!fb){
+      try{await import(new URL("system/firebase-auth.js",location.href).href);fb=window.KINGBOT_FIREBASE}catch{}
+    }
+    if(!fb)throw new Error("AUTH_SERVICE_UNAVAILABLE");
+    let user=null;try{user=await fb.waitForAuthReady(timeoutMs)}catch{user=fb.auth?.currentUser||null}
+    if(!user)throw new Error("AUTH_NOT_READY");
+    const token=await fb.getToken(false);if(!token)throw new Error("AUTH_TOKEN_NOT_READY");
+    return {fb,token};
+  }
+
+  async function waitApi(timeoutMs=6000){
+    const end=Date.now()+timeoutMs;
+    while(!window.KINGBOT_API?.baseUrl && Date.now()<end)await new Promise(r=>setTimeout(r,80));
+    if(!window.KINGBOT_API?.baseUrl)throw new Error("API_NOT_READY");
+  }
+
+  async function api(path,options={}){
+    await waitApi();
+    const raw=String(path||"").trim();
+    const normalized=raw.replace(/^\/api(?=\/|$)/i,"")||"/";
+    const controller=new AbortController();
+    const timeout=Number(options.timeoutMs)||8500;
+    const timer=setTimeout(()=>controller.abort(),timeout);
+    const opts={...options,signal:controller.signal};delete opts.timeoutMs;
+    try{
+      const auth=await getAuth(Math.min(2800,timeout));
+      const headers=new Headers(opts.headers||{});
+      headers.set("Accept","application/json");
+      if(opts.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
+      headers.set("Authorization","Bearer "+auth.token);
+      let r=await fetch(window.KINGBOT_API.baseUrl+normalized,{...opts,headers,credentials:"omit",cache:"no-store"});
+      if(r.status===401){
+        const fresh=await auth.fb.getToken(true).catch(()=>null);
+        if(fresh){headers.set("Authorization","Bearer "+fresh);r=await fetch(window.KINGBOT_API.baseUrl+normalized,{...opts,headers,credentials:"omit",cache:"no-store"})}
+      }
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok||data?.ok===false)throw new Error(data.error||data.reason||data.message||("HTTP "+r.status));
+      return data;
+    }catch(e){
+      if(e?.name==="AbortError")throw new Error("TIMEOUT "+normalized);
+      throw e;
+    }finally{clearTimeout(timer)}
+  }
+
+  function renderEngine(engine,selection){
+    const name=engine?.name||selection?.bot?.name||"NO SAVED ENGINE";
+    const runtime=String(engine?.state||"STOPPED").toUpperCase();
+    const info=stateInfo(runtime);
+    $("heroEngineName").textContent=name.replace(/^KINGBOT\s*/,"");
+    $("heroState").textContent=info.label;$("heroStatePill").style.color=info.color;$("heroStatePill").style.borderColor=runtime==="RUNNING"?"rgba(40,239,171,.18)":"rgba(255,255,255,.09)";
+    $("heroSymbol").textContent=engine?.symbol||"—";$("heroTimeframe").textContent=engine?.timeframe||"—";$("heroMode").textContent=engine?.executionMode||"—";$("heroLastRun").textContent=fmtTime(engine?.lastRunAt);
+    $("heroSavedAt").textContent=fmtTime(selection?.updatedAt);
+    $("engineBadge").textContent=runtime==="RUNNING"?"ENGINE LIVE":"ENGINE "+runtime;
+    $("runtimeState").textContent=info.label;$("runtimeNote").textContent=runtime==="RUNNING"?"Worker engine is active independently of this page. Refreshing Terminal does not restart or replace it.":(engine?.lastError||"No active execution engine is currently running.");
+    $("bigStatus").className="big-status "+(info.cls||"");
+    const sig=parseSignal(engine?.lastSignal);$("signalName").textContent=sig?.signal||"NO SIGNAL";$("signalScore").textContent="Score "+(Number.isFinite(Number(sig?.score))?Number(sig.score).toFixed(1):"—");
+    $("engineName").textContent=name.replace(/^KINGBOT\s*/,"");$("engineSymbol").textContent=engine?.symbol||"—";$("engineTimeframe").textContent=engine?.timeframe||"—";$("engineMode").textContent=engine?.executionMode||"—";$("lastRun").textContent=fmtTime(engine?.lastRunAt);$("runtimeUpdated").textContent=fmtTime(engine?.updatedAt||selection?.updatedAt);
+    $("selectionTruth").textContent=selection?.selectedBotId?("SAVED: "+String(selection.selectedBotId).toUpperCase()):"NO SAVED ENGINE";
+    const plan=engine?.tradePlan||{};$("threshold").textContent=engine?.signalThreshold?engine.signalThreshold+"%":"—";$("slAtr").textContent=plan.slAtr?plan.slAtr+" ATR":"—";$("tpAtr").textContent=plan.tpAtr?plan.tpAtr+" ATR":"—";$("trailTrigger").textContent=plan.trailingTriggerR?plan.trailingTriggerR+"R":"—";$("maxHold").textContent=plan.maxHoldBars?plan.maxHoldBars+" bars":"—";
+    $("strategyTags").innerHTML=(engine?.strategies||[]).map(x=>"<span class=\"tag\">"+esc(x)+"</span>").join("")||"<span class=\"tag\">NO STRATEGY TELEMETRY</span>";
+    const riskRow=state.risk?.bots?.find(x=>String(x.bot_id||"")===String(engine?.botId||selection?.selectedBotId||""))||state.risk?.bots?.[0]||{};
+    $("riskPerTrade").textContent=Number.isFinite(Number(riskRow.max_risk_per_trade_pct))?riskRow.max_risk_per_trade_pct+"%":"—";
+    $("maxPositions").textContent=Number.isFinite(Number(riskRow.max_positions))?String(riskRow.max_positions):"—";
+    $("riskPerTradeDetail").textContent=Number.isFinite(Number(riskRow.max_risk_per_trade_pct))?("Maximum "+riskRow.max_risk_per_trade_pct+"% per trade"):"Policy unavailable";
+    $("riskPct").textContent=Number.isFinite(Number(riskRow.max_risk_per_trade_pct))?riskRow.max_risk_per_trade_pct+"%":"—";
+    $("dailyDdDetail").textContent=Number.isFinite(Number(riskRow.daily_drawdown_pct))?("Maximum "+riskRow.daily_drawdown_pct+"% daily"):"Policy unavailable";
+    $("dailyDd").textContent=Number.isFinite(Number(riskRow.daily_drawdown_pct))?riskRow.daily_drawdown_pct+"%":"—";
+    $("totalDdDetail").textContent=Number.isFinite(Number(riskRow.total_drawdown_pct))?("Maximum "+riskRow.total_drawdown_pct+"% total"):"Policy unavailable";
+    $("totalDd").textContent=Number.isFinite(Number(riskRow.total_drawdown_pct))?riskRow.total_drawdown_pct+"%":"—";
+    $("riskMeter").style.width=(Math.min(100,Math.max(4,Number(riskRow.max_risk_per_trade_pct||0)*20))||4)+"%";
+    $("dailyMeter").style.width=(Math.min(100,Math.max(4,Number(riskRow.daily_drawdown_pct||0)*8))||4)+"%";
+    $("totalMeter").style.width=(Math.min(100,Math.max(4,Number(riskRow.total_drawdown_pct||0)*4))||4)+"%";
+    $("riskBadge").textContent=state.risk?"POLICY LIVE":"UNAVAILABLE";
+  }
+
+  function renderAccount(a){
+    state.account=a||null;
+    if(!a){
+      $("accountState").textContent="NO ACCOUNT";$("accountState").style.color="var(--orange)";$("accountNote").textContent="No authoritative account snapshot was returned.";return;
+    }
+    const currency=a.currency||"";
+    $("balance").textContent=fmtMoney(a.balance,currency);$("equity").textContent=fmtMoney(a.equity,currency);$("floatingPnl").textContent=fmtMoney(a.floatingPnl,currency);$("dailyPnl").textContent=fmtMoney(a.dailyPnl,currency);$("margin").textContent=fmtMoney(a.margin,currency);$("freeMargin").textContent=fmtMoney(a.freeMargin,currency);$("positionCount").textContent=Number.isFinite(Number(a.positionCount))?String(a.positionCount):"—";$("drawdown").textContent=Number.isFinite(Number(a.totalDrawdownPct))?Number(a.totalDrawdownPct).toFixed(2)+"%":"—";
+    $("floatingPnl").className="metric-value "+classForPnl(a.floatingPnl);$("dailyPnl").className="metric-value "+classForPnl(a.dailyPnl);
+    $("broker").textContent=String(a.broker||"—").toUpperCase();$("accountId").textContent=a.accountId||"—";$("accountType").textContent=String(a.accountType||"—").toUpperCase();$("currency").textContent=currency||"—";$("executionMode").textContent=String(a.executionMode||"—").toUpperCase();$("tradingStatus").textContent=a.tradingEnabled===false?"DISABLED":"ENABLED";
+    $("accountState").textContent="CONNECTED";$("accountState").style.color="var(--green)";$("accountNote").textContent="Live account telemetry received from the secured broker connection.";
+    $("accountBadge").textContent="LIVE";$("syncAccountMain").textContent=(a.accountId||"ACCOUNT")+" · "+fmtMoney(a.equity,currency);$("syncAccountState").textContent="LIVE";$("syncAccountState").className="sync-state live";
+  }
+
+  function renderQuote(q){
+    state.quote=q;
+    const m=q?.market||{};const d=m.data||{};const bid=Number(d.bid),ask=Number(d.ask);const mid=Number.isFinite(bid)&&Number.isFinite(ask)?(bid+ask)/2:Number.isFinite(bid)?bid:Number.isFinite(ask)?ask:NaN;const spread=Number.isFinite(bid)&&Number.isFinite(ask)?ask-bid:NaN;
+    $("marketSymbol").textContent=m.symbol||state.marketSymbol||"—";$("marketPrice").textContent=Number.isFinite(mid)?fmtNumber(mid,mid>=100?2:5):"—";$("bid").textContent=Number.isFinite(bid)?fmtNumber(bid,mid>=100?2:5):"—";$("ask").textContent=Number.isFinite(ask)?fmtNumber(ask,mid>=100?2:5):"—";$("spread").textContent=Number.isFinite(spread)?fmtNumber(spread,mid>=100?2:5):"—";$("quoteTime").textContent=fmtTime(d.time);$("marketBroker").textContent=String(q.broker||"BROKER").toUpperCase();
+    const spec=m.spec||{};const bits=[];if(Number.isFinite(Number(spec.digits)))bits.push("DIGITS "+spec.digits);if(Number.isFinite(Number(spec.minVolume)))bits.push("MIN "+spec.minVolume);$("specInfo").textContent=bits.join(" · ")||"BROKER SPEC";
+    $("marketBadge").textContent=Number.isFinite(mid)?"LIVE QUOTE":"UNAVAILABLE";$("syncMarketMain").textContent=(m.symbol||state.marketSymbol||"NO MARKET")+" · "+(Number.isFinite(mid)?fmtNumber(mid,mid>=100?2:5):"—");$("syncMarketState").textContent=Number.isFinite(mid)?"LIVE":"ERROR";$("syncMarketState").className="sync-state "+(Number.isFinite(mid)?"live":"down");
+  }
+
+  function renderPositions(rows){
+    rows=Array.isArray(rows)?rows:[];$("positionCount").textContent=String(rows.length);$("positionsBadge").textContent=rows.length+" OPEN";
+    $("positionsTable").innerHTML=rows.length?rows.map(p=>"<tr><td>"+esc(p.symbol)+"</td><td>"+esc(p.side)+"</td><td>"+esc(p.volume)+"</td><td>"+esc(p.entry)+"</td><td>"+esc(p.current)+"</td><td class=\""+classForPnl(p.pnl)+"\">"+esc(p.pnl)+"</td><td><span class=\"pill green\">"+esc(p.status||"OPEN")+"</span></td></tr>").join(""):"<tr><td colspan=\"7\"><div class=\"empty\"><strong>NO OPEN POSITIONS</strong><span>The connected broker returned no open positions.</span></div></td></tr>";
+  }
+  function renderOrders(rows){
+    rows=Array.isArray(rows)?rows:[];$("ordersBadge").textContent=rows.length+" ORDERS";
+    $("ordersTable").innerHTML=rows.length?rows.map(o=>"<tr><td>"+esc(fmtTime(o.time))+"</td><td>"+esc(o.symbol)+"</td><td>"+esc(o.side)+"</td><td>"+esc(o.volume)+"</td><td>"+esc(o.price)+"</td><td><span class=\"pill\">"+esc(o.status||"OPEN")+"</span></td></tr>").join(""):"<tr><td colspan=\"6\"><div class=\"empty\"><strong>NO ORDER RECORDS</strong><span>No confirmed broker orders were returned.</span></div></td></tr>";
+  }
+
+  async function loadSelection(){
+    try{
+      const x=await api("/runtime/selection/current",{timeoutMs:7000});
+      state.selection=x;
+      if(x?.bot){
+        state.engine={
+          botId:x.bot.botId,name:x.bot.name,state:x.bot.state||"STOPPED",executionMode:x.bot.executionMode,symbol:x.bot.symbol,timeframe:x.bot.timeframe,lastSignal:x.bot.lastSignal,lastRunAt:x.bot.lastRunAt,lastError:x.bot.lastError,updatedAt:x.updatedAt
+        };
+        // The selection endpoint is authoritative for the Terminal's identity.
+        setSync("selection","LIVE",String(x.bot.name||x.selectedBotId).replace(/^KINGBOT\s*/,""),x.updatedAt);
+        $("syncRuntimeMain").textContent=String(x.bot.state||"STOPPED").toUpperCase()+" · "+String(x.bot.name||x.selectedBotId).replace(/^KINGBOT\s*/,"");
+        $("syncRuntimeState").textContent=String(x.bot.state||"STOPPED").toUpperCase();
+        $("syncRuntimeState").className="sync-state "+(String(x.bot.state).toUpperCase()==="RUNNING"?"live":"idle");
+      }else{
+        state.engine=null;setSync("selection","IDLE","NO SAVED ENGINE",x?.updatedAt);setSync("runtime","IDLE","NO SAVED ENGINE",x?.updatedAt);
+      }
+      renderEngine(state.engine,state.selection);
+      state.marketSymbol=state.engine?.symbol||null;
+      return x;
+    }catch(e){
+      // Do not select a first/earliest bot. This is deliberately fail-closed.
+      setSync("selection","ERROR","Saved selection unavailable",new Date().toISOString());
+      $("heroEngineName").textContent="SAVED ENGINE UNAVAILABLE";$("heroState").textContent="SYNC ERROR";$("heroStatePill").style.color="var(--orange)";
+      $("runtimeState").textContent="NO AUTHORITATIVE STATE";$("runtimeNote").textContent="Terminal did not replace the selected engine with another bot. Refresh or use Bot Control.";
+      addActivity("Selection telemetry: "+e.message);
+      throw e;
+    }
+  }
+
+  async function loadRuntime(){
+    try{
+      const x=await api("/runtime",{timeoutMs:7000});state.runtimeBots=Array.isArray(x?.bots)?x.bots:[];
+      // Aggregate runtime is telemetry only. It is never allowed to overwrite
+      // the saved selection shown above.
+      const chosen=state.runtimeBots.find(b=>String(b.botId)===String(state.selection?.selectedBotId));
+      if(chosen&&state.engine){
+        state.engine={...state.engine,state:{chosen.runtime||state.engine.state},lastSignal:chosen.lastSignal||state.engine.lastSignal,lastRunAt:chosen.lastRunAt||state.engine.lastRunAt,lastError:chosen.lastError||state.engine.lastError,updatedAt:chosen.updatedAt||state.engine.updatedAt};
+        renderEngine(state.engine,state.selection);
+      }
+      const running=state.runtimeBots.filter(b=>String(b.runtime||b.state||"").toUpperCase()==="RUNNING");
+      $("syncBackendMain").textContent=running.length+" RUNNING ENGINE"+(running.length===1?"":"S");
+      setSync("runtime",state.engine?"LIVE":"IDLE",state.engine?String(state.engine.state).toUpperCase():"NO SAVED ENGINE",x?.syncedAt||new Date().toISOString());
+    }catch(e){setSync("runtime","ERROR","Runtime telemetry unavailable",new Date().toISOString());addActivity("Runtime telemetry: "+e.message)}
+  }
+
+  async function loadAccount(){
+    try{
+      const x=await api("/account",{timeoutMs:9500});renderAccount(x.account||x.data||x);
+      setSync("backend","LIVE","API AUTHENTICATED",x.account?.syncedAt||new Date().toISOString());setSync("broker","LIVE",String(x.account?.broker||"BROKER").toUpperCase(),x.account?.syncedAt);
+      addActivity("Account telemetry synchronized.");
+    }catch(e){
+      $("accountState").textContent="UNAVAILABLE";$("accountState").style.color="var(--orange)";$("accountNote").textContent="Account telemetry is unavailable. Terminal runtime continues independently.";
+      $("accountBadge").textContent="OFFLINE";setSync("account","ERROR","ACCOUNT TELEMETRY UNAVAILABLE",new Date().toISOString());setSync("broker","ERROR","ACCOUNT CONNECTION UNAVAILABLE",new Date().toISOString());addActivity("Account telemetry: "+e.message);
+    }
+  }
+
+  async function loadQuote(){
+    if(!state.marketSymbol){setSync("market","IDLE","NO ENGINE MARKET",new Date().toISOString());return}
+    try{const x=await api("/broker/quote?symbol="+encodeURIComponent(state.marketSymbol),{timeoutMs:7500});renderQuote(x);addActivity("Broker quote updated for "+state.marketSymbol+".")}catch(e){setSync("market","ERROR","QUOTE UNAVAILABLE",new Date().toISOString());$("marketBadge").textContent="ERROR";addActivity("Market quote: "+e.message)}
+  }
+
+  async function loadPositions(){
+    try{const x=await api("/positions",{timeoutMs:7500});renderPositions(Array.isArray(x?.positions)?x.positions:(x?.data||[]));}catch(e){$("positionsTable").innerHTML="<tr><td colspan=\"7\"><div class=\"empty\"><strong>POSITION TELEMETRY UNAVAILABLE</strong><span>"+esc(e.message)+"</span></div></td></tr>";$("positionsBadge").textContent="UNAVAILABLE";addActivity("Positions telemetry: "+e.message)}
+  }
+
+  async function loadOrders(){
+    try{const x=await api("/orders",{timeoutMs:7500});renderOrders(Array.isArray(x?.orders)?x.orders:(x?.data||[]));}catch(e){$("ordersTable").innerHTML="<tr><td colspan=\"6\"><div class=\"empty\"><strong>ORDER TELEMETRY UNAVAILABLE</strong><span>"+esc(e.message)+"</span></div></td></tr>";$("ordersBadge").textContent="UNAVAILABLE";addActivity("Orders telemetry: "+e.message)}
+  }
+
+  async function loadRisk(){
+    try{state.risk=await api("/risk",{timeoutMs:7000});$("riskBadge").textContent="LIVE";renderEngine(state.engine,state.selection);}catch(e){$("riskBadge").textContent="UNAVAILABLE";addActivity("Risk telemetry: "+e.message)}
+  }
+
+  async function refreshAll(manual=false){
+    if(refreshRunning)return;
+    refreshRunning=true;
+    const cycle=++state.cycle;
+    $("topStatus").textContent=manual?"SYNC NOW":"LIVE SYNC";
+    $("footerState").textContent="Refreshing independent telemetry streams…";
+    try{
+      // Selection is fetched first and independently because it determines
+      // exactly which engine Terminal should display after every refresh.
+      let selectionOk=false;
+      try{await loadSelection();selectionOk=true}catch{}
+      await Promise.allSettled([loadRuntime(),loadAccount(),loadPositions(),loadOrders(),loadRisk()]);
+      if(cycle!==state.cycle)return;
+      await loadQuote();
+      state.lastSyncAt=new Date().toISOString();$("lastSystemSync").textContent=fmtTime(state.lastSyncAt);$("footerState").textContent=selectionOk?(state.engine?"Saved engine synchronized: "+String(state.engine.name).replace(/^KINGBOT\s*/,""):"No saved engine"):"Selection telemetry needs attention";
+      $("topStatus").textContent=selectionOk?(state.engine?.state==="RUNNING"?"ENGINE LIVE":"CONNECTED"):"DEGRADED";
+    }finally{refreshRunning=false}
+  }
+
+  $("syncNow").addEventListener("click",()=>refreshAll(true));
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshAll(true)});
+  window.addEventListener("pageshow",()=>refreshAll(true));
+  setInterval(()=>{$("clock").textContent=new Date().toLocaleTimeString([], {hour12:false})},1000);
+  setInterval(()=>{if(state.lastSyncAt){const diff=Math.max(0,3-Math.floor((Date.now()-new Date(state.lastSyncAt).getTime())/1000));$("nextSync").textContent=diff+"s"}},500);
+  setInterval(()=>refreshAll(false),3000);
+  $("clock").textContent=new Date().toLocaleTimeString([], {hour12:false});
+  refreshAll(true);
 })();
 </script>
 <script src="system/auth-gate.js"></script>
 <script src="system/access-control.js"></script>
 <script src="system/navigation.js"></script>
-
 </body>
 </html>
