@@ -336,7 +336,21 @@ app.post("/api/broker/connect", async (req,res)=>{
 });
 app.post("/api/broker/disconnect", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
-  try{res.json({ok:true,...await broker.disconnect(user.id)});}catch(error){res.status(502).json({ok:false,error:"Broker disconnect failed."});}
+  try{
+    const result=await broker.disconnect(user.id);
+    await pool.query(
+      "UPDATE kingbot_bot_runtime SET state='STOPPED',last_error=$2,updated_at=NOW() WHERE user_id=$1 AND state='RUNNING'",
+      [user.id,"BROKER_DISCONNECTED"]
+    );
+    await pool.query(
+      "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'BROKER_DISCONNECTED',$2::jsonb)",
+      [user.id,JSON.stringify({stoppedRunningBots:true})]
+    );
+    res.json({ok:true,...result,stoppedRunningBots:true});
+  }catch(error){
+    console.error("[KINGBOT BROKER] disconnect failed:",error?.message||error);
+    res.status(502).json({ok:false,error:"Broker disconnect failed.",reason:error?.message||"BROKER_DISCONNECT_FAILED"});
+  }
 });
 app.get("/api/broker/markets", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
