@@ -525,9 +525,24 @@ export class UserBrokerManager {
   }
 
   async getMarkets(userId){
-    const entry=await this.connectionFor(userId);
+    let entry=await this.connectionFor(userId);
     if(entry.provider==="exness")return {connected:true,data:await entry.api.getMarkets()};
-    if(entry.provider==="deriv")return {connected:true,data:await entry.api.getMarkets()};
+    if(entry.provider==="deriv"){
+      try{
+        return {connected:true,data:await entry.api.getMarkets()};
+      }catch(error){
+        // A Deriv socket can close between connectionFor() and the actual
+        // request. Drop the stale entry and perform one deterministic reconnect.
+        const message=String(error?.message||"");
+        if(message==="DERIV_NOT_CONNECTED" || message==="DERIV_WEBSOCKET_CLOSED"){
+          const key=String(userId)+":deriv:"+entry.accountId;
+          this.connections.delete(key);
+          entry=await this.connectionFor(userId);
+          return {connected:true,data:await entry.api.getMarkets()};
+        }
+        throw error;
+      }
+    }
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getMarkets()};
     if(typeof entry.connection.getSymbols==="function"){
       const list=await entry.connection.getSymbols();
