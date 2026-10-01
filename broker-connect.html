@@ -349,7 +349,7 @@ function textFor(){
     if(selected==="exness"){
       $("credentialHelp").textContent="Create the Exness API key in Key Management, select the trading account that this key can access, copy the API key and secret once, and paste them here. The host is optional because KINGBOT can resolve the Exness access point.";
     }else{
-      $("credentialHelp").textContent=selected==="derivmt5"?"Paste the MetaApi access token and MetaApi account ID for the Deriv MT5 account you added to the bridge. KINGBOT validates the MT5 account and uses native lot-based CFD execution.":"Bridge credentials are sent over HTTPS to the authenticated KINGBOT backend and are not stored in browser localStorage.";
+      $("credentialHelp").textContent="Bridge credentials are sent over HTTPS to the authenticated KINGBOT backend and are not stored in browser localStorage.";
     }
   }else {$("credentials").classList.remove("show");$("mt5BridgePanel").style.display="none";}
   if(step===3&&selected!=="derivmt5")$("accountSelect").classList.add("show");else $("accountSelect").classList.remove("show");
@@ -544,6 +544,7 @@ $("verifyBtn").addEventListener("click",async()=>{
   if(!selected)return;
   if(selected==="deriv"){startDerivOAuth();return;}
   const accountId=$("accountId").value.trim(),token=$("accessToken").value.trim();
+  if(selected==="derivmt5"){setStatus("Use GENERATE BRIDGE TOKEN above instead of entering broker credentials.");return;}
   if(selected==="exness"){
     if(!accountId||!$("apiKey").value.trim()||!$("secretKey").value.trim()){setStatus("Enter the Exness account ID, API key and secret key.");return}
   }else if(selected==="oanda"){
@@ -556,7 +557,7 @@ $("verifyBtn").addEventListener("click",async()=>{
       ? {provider:"exness",accountId,apiKey:$("apiKey").value.trim(),secretKey:$("secretKey").value,baseUrl:$("apiHost").value.trim(),executionMode:$("executionMode").value}
       : selected==="oanda"
         ? {provider:"oanda",accountId,accountToken:$("oandaToken").value.trim(),baseUrl:$("apiHost").value.trim(),executionMode:$("executionMode").value}
-        : {provider:selected==="derivmt5"?"deriv-mt5":"metaapi",accountId,accountToken:token,executionMode:$("executionMode").value};
+        : {provider:"metaapi",accountId,accountToken:token,executionMode:$("executionMode").value};
     const r=await fetch(API_BASE+"/broker/account",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify(body)});
     const d=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(d.error||d.reason||"Broker credential mapping failed.");
