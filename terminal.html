@@ -1459,7 +1459,7 @@ overscroll-behavior:none;}
           <div class="section-title">VERIFIED ACCOUNT</div>
           <div class="connection-state" id="accountConnectionState">
             <div class="state-label">CURRENT STATE</div>
-            <div class="state-value" id="accountConnectionValue">VERIFYING…</div>
+            <div class="state-value" id="terminalAccountConnectionValue">VERIFYING…</div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
             <div><div class="state-label">BROKER</div><div class="metric-note" id="terminalBrokerName">—</div></div>
@@ -1467,7 +1467,7 @@ overscroll-behavior:none;}
             <div><div class="state-label">ACCOUNT TYPE</div><div class="metric-note" id="terminalAccountType">—</div></div>
             <div><div class="state-label">EXECUTION</div><div class="metric-note" id="terminalExecutionMode">—</div></div>
           </div>
-          <p id="accountConnectionNote">
+          <p id="terminalAccountConnectionNote">
             Broker connectivity is managed exclusively from the Broker Connect page.
           </p>
           <a class="btn secondary" href="broker-connect.html" style="display:inline-flex;margin-top:13px;align-items:center;justify-content:center;">
@@ -2693,13 +2693,10 @@ async function runBackendCheck() {
     renderAccountOverview(account);
     cacheAccountSnapshot(account);
   }catch{
-    const cached=renderCachedAccountSnapshot();
-    backendConnected=true;
-    if(!cached){
-      $("accountConnectionValue").textContent="BROKER ACCOUNT TELEMETRY DELAYED";
-      $("accountConnectionValue").style.color="#ffc84a";
-      $("accountConnectionNote").textContent="Broker identity is verified, but the fresh account balance is temporarily unavailable. KINGBOT will retry automatically.";
-    }
+    backendConnected=false;
+    $("accountConnectionValue").textContent="LIVE ACCOUNT DATA UNAVAILABLE";
+    $("accountConnectionValue").style.color="#ff7a18";
+    $("accountConnectionNote").textContent="KINGBOT could not verify a fresh broker snapshot. No cached balance is shown; the terminal will retry automatically.";
   }
 
   if(backendConnected){
@@ -2796,30 +2793,7 @@ async function loadAccount(){
     renderAccountOverview(account);
     return true;
   }catch(error){
-    logActivity("Live account telemetry retry: "+error.message);
-    try{
-      const status=await fetchApi("/api/connection",{timeoutMs:7000});
-      if(status?.accountSnapshot){
-        const s=status.accountSnapshot;
-        renderAccountOverview({
-          accountId:status.accountId||null,
-          broker:status.broker||null,
-          executionMode:status.executionMode||"NOT_CONNECTED",
-          accountType:s.accountType||"DEMO",
-          currency:s.currency||null,
-          balance:s.balance,
-          equity:s.equity,
-          floatingPnl:Number.isFinite(Number(s.equity))&&Number.isFinite(Number(s.balance)) ? Number(s.equity)-Number(s.balance) : null,
-          tradingEnabled:s.tradingEnabled!==false,
-          accountStatus:s.accountStatus||"ACTIVE",
-          syncedAt:s.syncedAt||new Date().toISOString()
-        });
-        $("accountConnectionValue").textContent="BALANCE PROJECTED";
-        $("accountConnectionValue").style.color="#ffc84a";
-        $("accountConnectionNote").textContent="Broker account snapshot projected while live account telemetry reconnects.";
-        return true;
-      }
-    }catch{}
+    logActivity("Live account telemetry unavailable: "+error.message);
     throw error;
   }
 }
@@ -3219,9 +3193,6 @@ async function refreshTerminalAccount({force=false}={}){
     "KINGBOT terminal initialized"
   );
 
-  renderCachedBrokerIdentity();
-  renderCachedAccountSnapshot();
-
   logActivity(
     "Broker execution layer awaiting backend connection"
   );
@@ -3292,6 +3263,24 @@ async function refreshTerminalAccount({force=false}={}){
 })();
 </script>
 
+<script>
+(function(){
+  const source=document.getElementById("accountConnectionValue");
+  const target=document.getElementById("terminalAccountConnectionValue");
+  const note=document.getElementById("accountConnectionNote");
+  const noteTarget=document.getElementById("terminalAccountConnectionNote");
+  if(!source||!target)return;
+  const sync=()=>{
+    target.textContent=source.textContent;
+    target.style.color=source.style.color;
+    if(note&&noteTarget)noteTarget.textContent=note.textContent;
+  };
+  const observer=new MutationObserver(sync);
+  observer.observe(source,{subtree:true,childList:true,characterData:true,attributes:true});
+  if(note)observer.observe(note,{subtree:true,childList:true,characterData:true});
+  sync();
+})();
+</script>
 <script src="system/auth-gate.js"></script>
 <script src="system/access-control.js"></script>
 <script src="system/navigation.js"></script>
