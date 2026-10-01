@@ -381,9 +381,19 @@ export class UserBrokerManager {
         const api=new MetaApi(accountToken);
         const account=await api.metatraderAccountApi.getAccount(mapping.account_id);
         await account.waitConnected();
-        const connection=account.getRPCConnection();
+        const connection=String(mapping.provider).toLowerCase()==="deriv-mt5"
+          ? account.getStreamingConnection()
+          : account.getRPCConnection();
         await connection.connect();
         await connection.waitSynchronized();
+        if(String(mapping.provider).toLowerCase()==="deriv-mt5"){
+          try{
+            const symbols=["XAUUSD","frxXAUUSD","FRXXAUUSD"];
+            for(const symbol of symbols){
+              try{await connection.subscribeToMarketData(symbol);}catch{}
+            }
+          }catch{}
+        }
         entry={api,account,connection,accountId:mapping.account_id,executionMode:mode,provider:mapping.provider,accountInfo:null};
         this.connections.set(key,entry);
       }catch(error){
@@ -391,7 +401,9 @@ export class UserBrokerManager {
       }
     }
     try{
-      const accountInfo=await entry.connection.getAccountInformation();
+      const accountInfo=String(entry.provider).toLowerCase()==="deriv-mt5"
+        ? entry.connection.terminalState.accountInformation
+        : await entry.connection.getAccountInformation();
       entry.accountInfo=accountInfo;
       entry.accountInfoAt=Date.now();
       if(mode==="PAPER"&&accountInfo.type!=="ACCOUNT_TRADE_MODE_DEMO"){
@@ -524,6 +536,9 @@ export class UserBrokerManager {
         accountType:entry.executionMode==="LIVE"?"REAL":"DEMO"
       }};
     }
+    if(String(entry.provider).toLowerCase()==="deriv-mt5"){
+      return {connected:true,data:{...entry.connection.terminalState.accountInformation,provider:"deriv-mt5",accountType:entry.executionMode==="LIVE"?"REAL":"DEMO"}};
+    }
     return {connected:true,data:await entry.connection.getAccountInformation()};
   }
 
@@ -550,6 +565,7 @@ export class UserBrokerManager {
       }
     }
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getPositions()};
+    if(String(entry.provider).toLowerCase()==="deriv-mt5")return {connected:true,data:Array.isArray(entry.connection.terminalState.positions)?entry.connection.terminalState.positions:[]};
     return {connected:true,data:await entry.connection.getPositions()};
   }
 
@@ -558,6 +574,7 @@ export class UserBrokerManager {
     if(entry.provider==="exness")return {connected:true,data:await entry.api.getOrders()};
     if(entry.provider==="deriv")return await entry.api.getOrders();
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getOrders()};
+    if(String(entry.provider).toLowerCase()==="deriv-mt5")return {connected:true,data:Array.isArray(entry.connection.terminalState.orders)?entry.connection.terminalState.orders:[]};
     return {connected:true,data:await entry.connection.getOrders()};
   }
 
@@ -579,6 +596,12 @@ export class UserBrokerManager {
     }
     if(entry.provider==="oanda"){
       return {connected:true,data:await entry.api.getTrades({state:"CLOSE"})};
+    }
+    if(String(entry.provider).toLowerCase()==="deriv-mt5"){
+      const history=entry.connection.historyStorage;
+      const orders=history?.historyOrdersByTimeRange?history.historyOrdersByTimeRange(start,end):[];
+      const deals=history?.dealsByTimeRange?history.dealsByTimeRange(start,end):[];
+      return {connected:true,data:{orders,deals}};
     }
     const [orders,deals]=await Promise.all([entry.connection.getHistoryOrdersByTimeRange(start,end),entry.connection.getDealsByTimeRange(start,end)]);
     return {connected:true,data:{orders,deals}};
@@ -667,6 +690,11 @@ export class UserBrokerManager {
     if(entry.provider==="oanda"){
       const quote=await entry.api.getQuote(requested);
       return {connected:true,data:{...quote,lossTickValue:1}};
+    }
+    if(String(entry.provider).toLowerCase()==="deriv-mt5"){
+      const price=entry.connection.terminalState.price(requested);
+      if(!price)throw new Error("MT5_QUOTE_UNAVAILABLE:"+requested);
+      return {connected:true,data:{...price,source:"deriv-mt5-stream"}};
     }
     return {connected:true,data:await entry.connection.getSymbolPrice(requested)};
   }
