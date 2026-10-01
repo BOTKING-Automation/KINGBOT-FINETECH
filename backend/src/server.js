@@ -336,8 +336,25 @@ app.get("/api/connection", async (req,res)=>{
 app.post("/api/broker/connect", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   const mode=String(req.body?.executionMode||"PAPER").toUpperCase();
-  try{const result=await broker.connect(user.id,mode); if(!result.connected)return res.status(503).json({ok:false,...result}); res.json({ok:true,...result});}
-  catch(error){console.error("[KINGBOT BROKER] connect failed:",error?.message||error);res.status(502).json({ok:false,error:"Broker connection failed.",reason:error?.message||"BROKER_CONNECTION_FAILED"});}
+  try{
+    const result=await broker.connect(user.id,mode);
+    if(!result.connected)return res.status(503).json({ok:false,...result});
+    const provider=String(result?.broker||"").toLowerCase();
+    const partnerSlug=provider==="mt5-bridge"?"deriv":provider;
+    if(partnerSlug)await partners.recordActiveConnection({
+      userId:user.id,
+      brokerSlug:partnerSlug,
+      metadata:{
+        accountId:result?.accountId||null,
+        executionMode:result?.mode||mode,
+        bridge:provider==="mt5-bridge"
+      }
+    }).catch(error=>console.warn("[KINGBOT PARTNER] active attribution failed:",error?.message||error));
+    res.json({ok:true,...result});
+  }catch(error){
+    console.error("[KINGBOT BROKER] connect failed:",error?.message||error);
+    res.status(502).json({ok:false,error:"Broker connection failed.",reason:error?.message||"BROKER_CONNECTION_FAILED"});
+  }
 });
 app.post("/api/broker/disconnect", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
