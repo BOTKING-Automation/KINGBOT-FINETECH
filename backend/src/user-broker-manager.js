@@ -319,9 +319,22 @@ export class UserBrokerManager {
         }else{
           entry.executionMode=mode;
           entry.api.executionMode=mode;
-          if(!entry.accountInfoAt || Date.now()-entry.accountInfoAt>5000){
-            entry.accountInfo=(await entry.api.getAccount()).data;
-            entry.accountInfoAt=Date.now();
+          // Deriv rate-limits balance requests. Reuse the last verified account
+          // snapshot instead of polling balance on every status/connection call.
+          // A 30s refresh is sufficient for connection validation and keeps the
+          // authenticated session stable under dashboard polling.
+          if(!entry.accountInfoAt || Date.now()-entry.accountInfoAt>30000){
+            try{
+              entry.accountInfo=(await entry.api.getAccount()).data;
+              entry.accountInfoAt=Date.now();
+            }catch(error){
+              const message=String(error?.message||"");
+              if(/rate.?limit.*balance|balance.*rate.?limit/i.test(message) && entry.accountInfo){
+                entry.accountInfoAt=Date.now();
+              }else{
+                throw error;
+              }
+            }
           }
         }
         this.connectBackoff.delete(backoffKey);
@@ -439,10 +452,8 @@ export class UserBrokerManager {
 
   async getAccount(userId){
     const entry=await this.connectionFor(userId);
-    if(entry.accountInfo && entry.accountInfoAt && Date.now()-entry.accountInfoAt<5000){
-      if(entry.provider==="deriv"){
-        return {connected:true,data:entry.accountInfo};
-      }
+    if(entry.provider==="deriv" && entry.accountInfo && entry.accountInfoAt && Date.now()-entry.accountInfoAt<30000){
+      return {connected:true,data:entry.accountInfo};
     }
     if(entry.provider==="exness"){
       const info=await entry.api.getAccountInformation();
