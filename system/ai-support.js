@@ -226,15 +226,29 @@
     const aiReady = Boolean(h.aiReady);
     const apiReady = Boolean(h.ok);
     const dbReady = Boolean(h.accountServiceReady);
+    const provider = String(h.aiProvider || "").toLowerCase();
+    const model = String(h.aiModel || "");
 
-    setTelemetry("aiCoreStatus", aiReady ? "ONLINE" : "OFFLINE", aiReady ? "good" : "bad");
+    setTelemetry(
+      "aiCoreStatus",
+      aiReady ? (provider === "xai" ? "GROK ONLINE" : "AI ONLINE") : "OFFLINE",
+      aiReady ? "good" : "bad"
+    );
     setTelemetry("apiStatus", apiReady ? "LIVE" : "OFFLINE", apiReady ? "good" : "bad");
     setTelemetry("dataServiceStatus", dbReady ? "READY" : "WAITING", dbReady ? "good" : "warn");
 
-    setText("coreStateLabel", aiReady ? "AI CORE ONLINE" : "AI CORE UNAVAILABLE");
-    setText("coreStateSub", aiReady
-      ? "Secure intelligence endpoint is responding."
-      : "Server AI is not configured or is unavailable.");
+    setText(
+      "coreStateLabel",
+      aiReady ? (provider === "xai" ? "GROK AI CORE ONLINE" : "AI CORE ONLINE") : "AI CORE UNAVAILABLE"
+    );
+    setText(
+      "coreStateSub",
+      aiReady
+        ? (provider === "xai"
+            ? "Grok 4.7 is connected through the secured KINGBOT backend" + (model ? " · " + model : "") + "."
+            : "Secure intelligence endpoint is responding.")
+        : "Server AI is not configured or is unavailable."
+    );
   }
 
   function renderContext(data) {
