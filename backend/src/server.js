@@ -87,6 +87,14 @@ app.post("/api/broker/account", async (req,res)=>{
   const accountId=String(req.body?.accountId||"").trim();
   const executionMode=String(req.body?.executionMode||"DEMO").toUpperCase();
   if(!accountId)return res.status(400).json({ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"});
+  if(provider==="deriv"){
+    return res.status(400).json({
+      ok:false,
+      error:"DERIV_OAUTH_REQUIRED",
+      message:"Deriv access must be authorized through KINGBOT's Deriv OAuth 2.0 flow. Personal access tokens and manual Deriv credentials are not accepted here.",
+      authorizationEndpoint:"/api/broker/deriv/oauth/start"
+    });
+  }
 
   if(provider==="exness"){
     if(!/^[0-9]{1,20}$/.test(accountId))return res.status(400).json({ok:false,error:"INVALID_EXNESS_ACCOUNT_ID"});
