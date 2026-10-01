@@ -56,14 +56,8 @@ export function createBotRuntimeRouter({pool,broker}){
     const configured=await pool.query("SELECT symbol,timeframe FROM kingbot_bot_runtime WHERE user_id=$1 AND bot_id=$2",[user.id,b.id]);
     let symbol=String(configured.rows?.[0]?.symbol||"").trim().toUpperCase();
     let timeframe=String(configured.rows?.[0]?.timeframe||"5m").trim();
-    // Gold is KINGBOT's default market. Users can change the symbol in the Bot Control OS
-    // before starting; an explicit Start action persists the current/default selection.
     if(!symbol){
-      symbol="XAUUSD";
-      await pool.query(
-        "INSERT INTO kingbot_bot_runtime(user_id,bot_id,state,symbol,timeframe,last_error,updated_at) VALUES($1,$2,'STOPPED',$3,$4,NULL,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET symbol=EXCLUDED.symbol,timeframe=COALESCE(kingbot_bot_runtime.timeframe,EXCLUDED.timeframe),updated_at=NOW()",
-        [user.id,b.id,symbol,timeframe]
-      );
+      return res.status(400).json({ok:false,error:"BROKER_MARKET_REQUIRED",message:"Select a market from the connected broker catalog before starting the engine. No order was submitted."});
     }
     await pool.query("INSERT INTO kingbot_bot_runtime(user_id,bot_id,state,symbol,timeframe,last_error,updated_at) VALUES($1,$2,'RUNNING',$3,$4,NULL,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET state='RUNNING',symbol=EXCLUDED.symbol,timeframe=COALESCE(kingbot_bot_runtime.timeframe,EXCLUDED.timeframe),last_error=NULL,updated_at=NOW()",[user.id,b.id,symbol,timeframe]);
     await audit(pool,user.id,"BOT_RUNTIME_STARTED",{botId:b.id,executionMode:s.executionMode});
