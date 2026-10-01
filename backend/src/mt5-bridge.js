@@ -8,7 +8,8 @@ function hashToken(token){
   return crypto.createHash("sha256").update(String(token||""),"utf8").digest("hex");
 }
 function clean(value,max=200){return String(value??"").trim().slice(0,max);}
-function modeOf(value){return String(value||"PAPER").toUpperCase()==="LIVE"?"LIVE":"PAPER";}
+function modeOf(value){const mode=String(value||"DEMO").toUpperCase();return mode==="LIVE"?"LIVE":"PAPER";}
+function displayMode(value){return modeOf(value)==="LIVE"?"LIVE":"DEMO";}
 function terminalTypeOf(value){
   const raw=String(value||"").toUpperCase();
   if(raw==="REAL"||raw==="ACCOUNT_TRADE_MODE_REAL")return "REAL";
@@ -55,7 +56,7 @@ export class Mt5BridgeRegistry{
       "INSERT INTO kingbot_mt5_bridge_tokens(user_id,token_hash,label,expected_mode,expires_at) VALUES($1,$2,$3,$4,NOW()+INTERVAL '"+TOKEN_TTL_DAYS+" days') RETURNING id,expected_mode,expires_at",
       [userId,hashToken(token),clean(label,100),expected]
     );
-    return {ok:true,token,tokenId:q.rows[0].id,expectedMode:expected,expiresAt:q.rows[0].expires_at,
+    return {ok:true,token,tokenId:q.rows[0].id,expectedMode:expected,displayMode:displayMode(expected),expiresAt:q.rows[0].expires_at,
       endpoint:(String(process.env.PUBLIC_API_ORIGIN||"").replace(/\/$/,"")||null)};
   }
   async revokeUserTokens(userId){
@@ -119,9 +120,9 @@ export class Mt5BridgeRegistry{
     this.sessions.set(key,session);
     await this.pool.query("UPDATE kingbot_mt5_bridge_tokens SET last_seen_at=NOW(),mt5_login=$2,mt5_server=$3,account_type=$4,updated_at=NOW() WHERE id=$1",[row.id,mt5Login,mt5Server,terminalMode]);
     if(!active.rowCount){
-      return {ok:true,needsMapping:true,userId:row.user_id,tokenId:row.id,login:mt5Login,server:mt5Server,accountType:terminalMode,mode:expected,connected:true};
+      return {ok:true,needsMapping:true,userId:row.user_id,tokenId:row.id,login:mt5Login,server:mt5Server,accountType:terminalMode,mode:expected,displayMode:displayMode(expected),connected:true};
     }
-    return {ok:true,userId:row.user_id,tokenId:row.id,login:mt5Login,server:mt5Server,accountType:terminalMode,mode:expected,connected:true};
+    return {ok:true,userId:row.user_id,tokenId:row.id,login:mt5Login,server:mt5Server,accountType:terminalMode,mode:expected,displayMode:displayMode(expected),connected:true};
   }
 
   async queueCommand({userId,command}={}){
@@ -158,7 +159,7 @@ export class Mt5BridgeRegistry{
     const accepted=await this.acceptPoll({token,login,server,accountType,state});
     if(!accepted.ok)return accepted;
     const session=this.sessions.get(auth.token_hash),command=this.getCommandForToken(auth.token_hash);
-    return {ok:true,connected:true,serverTime:new Date().toISOString(),session:{login:session.login,server:session.server,accountType:session.accountType,mode:session.mode},command:command?.command||null};
+    return {ok:true,connected:true,serverTime:new Date().toISOString(),session:{login:session.login,server:session.server,accountType:session.accountType,mode:session.mode,displayMode:displayMode(session.mode)},command:command?.command||null};
   }
   async ack({token,commandId,status,result,message}={}){
     const auth=await this.authenticate(token);
@@ -174,7 +175,7 @@ export class Mt5BridgeRegistry{
     const mapping=await this.pool.query("SELECT account_id,execution_mode FROM kingbot_broker_accounts WHERE user_id=$1 AND enabled=TRUE AND provider='mt5-bridge' ORDER BY updated_at DESC LIMIT 1",[userId]);
     const state=session.state||{};
     return {connected:true,configured:mapping.rowCount>0,broker:"mt5-bridge",accountId:mapping.rows[0]?.account_id||session.login,
-      executionMode:mapping.rows[0]?.execution_mode||session.mode,accountType:session.accountType,login:session.login,server:session.server,
+      executionMode:mapping.rows[0]?.execution_mode||session.mode,displayExecutionMode:displayMode(mapping.rows[0]?.execution_mode||session.mode),accountType:session.accountType,login:session.login,server:session.server,
       lastSeenAt:new Date(session.lastSeenAt).toISOString(),latencyMs:Math.max(0,Date.now()-session.lastSeenAt),
       account:state.account||null,positions:Array.isArray(state.positions)?state.positions:[],orders:Array.isArray(state.orders)?state.orders:[],
       quotes:state.quotes&&typeof state.quotes==="object"?state.quotes:{},specs:state.specs&&typeof state.specs==="object"?state.specs:{},
