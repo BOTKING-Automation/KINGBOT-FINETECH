@@ -210,8 +210,9 @@ export class UserBrokerManager {
 
   async saveMapping({userId,provider="metaapi",accountId,accountToken,executionMode="PAPER",apiKey,secretKey,baseUrl,derivAccountType}={}){
     if(!this.pool||!userId)return {ok:false,error:"USER_CONTEXT_REQUIRED"};
-    const mode=String(executionMode).toUpperCase();
-    if(!["PAPER","LIVE"].includes(mode))return {ok:false,error:"INVALID_EXECUTION_MODE"};
+    const requestedMode=String(executionMode||"DEMO").toUpperCase();
+    if(!["DEMO","PAPER","LIVE"].includes(requestedMode))return {ok:false,error:"INVALID_EXECUTION_MODE"};
+    const mode=requestedMode==="DEMO"?"PAPER":requestedMode;
     const id=String(accountId||"").trim();
     const providerName=String(provider).toLowerCase();
     const isExness=providerName==="exness";
