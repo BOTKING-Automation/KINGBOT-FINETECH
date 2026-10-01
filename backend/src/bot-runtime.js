@@ -42,7 +42,7 @@ export function createBotRuntimeRouter({pool,broker}){
 
   router.get("/",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
-    const bots=await Promise.all(Object.values(getBotDefinitions()).map(async b=>{const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id),entitled=await entitlement(pool,user.id,b.id,user.email);return {botId:b.id,name:b.name,mode:b.mode||null,entitled,runtime:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||"1m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null,signalThreshold:b.signalThreshold||null,tradePlan:b.tradePlan||null,strategies:b.strategies||[]};}));
+    const bots=await Promise.all(Object.values(getBotDefinitions()).map(async b=>{const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id),entitled=await entitlement(pool,user.id,b.id,user.email);return {botId:b.id,name:b.name,mode:b.mode||null,entitled,runtime:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||b.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null,signalThreshold:b.signalThreshold||null,tradePlan:b.tradePlan||null,strategies:b.strategies||[]};}));
     res.json({ok:true,bots});
   });
 
@@ -67,7 +67,7 @@ export function createBotRuntimeRouter({pool,broker}){
       ok:true,
       selectedBotId,
       updatedAt:q.rows[0].updated_at,
-      bot:{botId:bot.id,name:bot.name,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||"1m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null}
+      bot:{botId:bot.id,name:bot.name,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||b.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null}
     });
   });
 
@@ -79,14 +79,14 @@ export function createBotRuntimeRouter({pool,broker}){
     await claimActiveBot(pool,user.id,botId);
     await audit(pool,user.id,"BOT_SELECTION_SAVED",{botId});
     const r=await runtime(pool,user.id,botId),s=await settings(pool,user.id,botId);
-    res.json({ok:true,selectedBotId:botId,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||"1m"});
+    res.json({ok:true,selectedBotId:botId,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||b.timeframeProfile?.execution||"5m"});
   });
   router.get("/:botId",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
     if(!(await entitlement(pool,user.id,b.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id);
-    res.json({ok:true,botId:b.id,state:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||"1m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null,signalThreshold:b.signalThreshold||null,tradePlan:b.tradePlan||null,strategies:b.strategies||[]});
+    res.json({ok:true,botId:b.id,state:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||b.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null,signalThreshold:b.signalThreshold||null,tradePlan:b.tradePlan||null,strategies:b.strategies||[]});
   });
 
   router.post("/:botId/start",async(req,res)=>{
@@ -97,12 +97,12 @@ export function createBotRuntimeRouter({pool,broker}){
     if(s.killSwitch)return res.status(409).json({ok:false,error:"KILL_SWITCH_ACTIVE"});
     if(!["PAPER","LIVE"].includes(s.executionMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
     if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before starting PAPER or LIVE execution. No order was submitted."});
-    await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS symbol TEXT, ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '1m'");
+    await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS symbol TEXT, ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '5m'");
     const configured=await pool.query("SELECT symbol,timeframe FROM kingbot_bot_runtime WHERE user_id=$1 AND bot_id=$2",[user.id,b.id]);
     const requestedSymbol=String(req.body?.symbol||"").trim().toUpperCase();
     const requestedTimeframe=String(req.body?.timeframe||"").trim();
     let symbol=requestedSymbol || String(configured.rows?.[0]?.symbol||"").trim().toUpperCase();
-    let timeframe=requestedTimeframe || String(configured.rows?.[0]?.timeframe||"5m").trim();
+    let timeframe=requestedTimeframe || String(configured.rows?.[0]?.timeframe||b.timeframeProfile?.execution||"5m").trim();
     if(!symbol){
       return res.status(400).json({ok:false,error:"BROKER_MARKET_REQUIRED",message:"Select a market from the connected broker catalog before starting the engine. No order was submitted."});
     }
@@ -137,7 +137,7 @@ export function createBotRuntimeRouter({pool,broker}){
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
     if(!(await entitlement(pool,user.id,b.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const symbol=String(req.body?.symbol||"").trim().toUpperCase();
-    const timeframe=String(req.body?.timeframe||"1m").trim();
+    const timeframe=String(req.body?.timeframe||b.timeframeProfile?.execution||"5m").trim();
     if(!/^[A-Z0-9._-]{3,30}$/.test(symbol))return res.status(400).json({ok:false,error:"INVALID_SYMBOL"});
     if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before selecting a market. No bot configuration was saved."});
     try{
@@ -148,7 +148,7 @@ export function createBotRuntimeRouter({pool,broker}){
     }
     const allowed=["1m","2m","3m","4m","5m","6m","10m","12m","15m","20m","30m","1h","2h","3h","4h","6h","8h","12h","1d","1w","1mn"];
     if(!allowed.includes(timeframe))return res.status(400).json({ok:false,error:"INVALID_TIMEFRAME"});
-    await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS symbol TEXT, ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '1m'");
+    await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS symbol TEXT, ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '5m'");
     await pool.query("INSERT INTO kingbot_bot_runtime(user_id,bot_id,state,symbol,timeframe,updated_at) VALUES($1,$2,'STOPPED',$3,$4,NOW()) ON CONFLICT(user_id,bot_id) DO UPDATE SET symbol=EXCLUDED.symbol,timeframe=EXCLUDED.timeframe,updated_at=NOW()",[user.id,b.id,symbol,timeframe]);
     await audit(pool,user.id,"BOT_RUNTIME_CONFIG_UPDATED",{botId:b.id,symbol,timeframe});
     res.json({ok:true,botId:b.id,symbol,timeframe});
@@ -271,7 +271,7 @@ export async function ensureBotRuntimeSchema(pool){
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_risk_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,baseline_date DATE NOT NULL,day_start_equity NUMERIC NOT NULL,peak_equity NUMERIC NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,bot_id))");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_account_risk_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,baseline_date DATE NOT NULL,day_start_equity NUMERIC NOT NULL,peak_equity NUMERIC NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,provider,account_id))");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_execution_journal (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,execution_mode TEXT NOT NULL,symbol TEXT NOT NULL,side TEXT NOT NULL,volume NUMERIC NOT NULL,status TEXT NOT NULL,broker_result JSONB,error_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
-  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_runtime (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'STOPPED',last_signal JSONB,last_run_at TIMESTAMPTZ,last_error TEXT,symbol TEXT,timeframe TEXT DEFAULT '1m',updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,bot_id))");
+  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_runtime (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'STOPPED',last_signal JSONB,last_run_at TIMESTAMPTZ,last_error TEXT,symbol TEXT,timeframe TEXT DEFAULT '5m',updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,bot_id))");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_user_bot_selection (user_id UUID PRIMARY KEY REFERENCES kingbot_users(id) ON DELETE CASCADE,selected_bot_id TEXT NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_ladder_v8_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,symbol TEXT NOT NULL,timeframe TEXT NOT NULL DEFAULT '5m',active BOOLEAN NOT NULL DEFAULT FALSE,direction SMALLINT NOT NULL DEFAULT 0,anchor_price NUMERIC,initial_stop_distance NUMERIC,step_price NUMERIC,lock_level INTEGER NOT NULL DEFAULT 0,last_lock_price NUMERIC,last_pyramid_price NUMERIC,rungs_opened INTEGER NOT NULL DEFAULT 0,aggressive_entry BOOLEAN NOT NULL DEFAULT FALSE,position_ids JSONB NOT NULL DEFAULT '[]'::jsonb,rung_lots JSONB NOT NULL DEFAULT '[]'::jsonb,velocity_samples JSONB NOT NULL DEFAULT '[]'::jsonb,cycle_id TEXT,last_action TEXT,last_action_at TIMESTAMPTZ,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,bot_id))");
   await pool.query("ALTER TABLE kingbot_ladder_v8_state ADD COLUMN IF NOT EXISTS symbol TEXT");
@@ -303,6 +303,6 @@ export async function ensureBotRuntimeSchema(pool){
   await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMPTZ");
   await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS last_error TEXT");
   await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS symbol TEXT");
-  await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '1m'");
+  await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '5m'");
   await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
 }
