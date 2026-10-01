@@ -197,16 +197,16 @@ app.get("/api/broker/deriv/oauth/start", async (req,res)=>{
 app.get("/api/broker/deriv/oauth/callback", async (req,res)=>{
   const state=String(req.query?.state||"").trim();
   const code=String(req.query?.code||"").trim();
-  if(!state)return derivReturnError(res,"DERIV_OAUTH_STATE_REQUIRED");
-  if(req.query?.error)return derivReturnError(res,String(req.query?.error_description||req.query?.error));
-  if(!code)return derivReturnError(res,"DERIV_OAUTH_CODE_REQUIRED");
-
-  const saved=await broker.consumeDerivOAuthState(state);
-  if(!saved)return derivReturnError(res,"DERIV_OAUTH_STATE_INVALID_OR_EXPIRED");
+  if(!state)return derivRedirectError(res,"DERIV_OAUTH_STATE_REQUIRED");
+  if(req.query?.error)return derivRedirectError(res,String(req.query?.error_description||req.query?.error));
+  if(!code)return derivRedirectError(res,"DERIV_OAUTH_CODE_REQUIRED");
 
   const clientId=derivEnv("DERIV_OAUTH_CLIENT_ID");
   const redirectUri=derivEnv("DERIV_OAUTH_REDIRECT_URI");
-  if(!clientId||!redirectUri)return derivReturnError(res,"DERIV_OAUTH_NOT_CONFIGURED");
+  if(!clientId||!redirectUri)return derivRedirectError(res,"DERIV_OAUTH_NOT_CONFIGURED");
+
+  const saved=await broker.consumeDerivOAuthState(state);
+  if(!saved)return derivRedirectError(res,"DERIV_OAUTH_STATE_INVALID_OR_EXPIRED");
 
   try{
     const tokenResponse=await fetch("https://auth.deriv.com/oauth2/token",{
@@ -252,7 +252,7 @@ app.get("/api/broker/deriv/oauth/callback", async (req,res)=>{
     return res.redirect(target.toString());
   }catch(error){
     console.error("[KINGBOT DERIV] oauth callback failed:",error?.message||error);
-    return derivReturnError(res,error?.message||"DERIV_OAUTH_CALLBACK_FAILED");
+    return derivRedirectError(res,error?.message||"DERIV_OAUTH_CALLBACK_FAILED");
   }
 });
 
