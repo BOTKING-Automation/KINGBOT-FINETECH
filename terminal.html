@@ -1678,6 +1678,7 @@ let currentTicker = {};
 let backendConnected = false;
 let verificationCycle = 0;
 let brokerVerificationDelayTimer = null;
+let brokerIdentityResolved = false;
 
 const $ = id => document.getElementById(id);
 
@@ -2443,7 +2444,9 @@ async function checkBackend() {
 
   clearTimeout(brokerVerificationDelayTimer);
   brokerVerificationDelayTimer=setTimeout(()=>{
-    if(cycle===verificationCycle && !accountLoaded)showBrokerVerificationDelay();
+    if(cycle===verificationCycle && !accountLoaded && (!brokerIdentityResolved || backendConnected)){
+      showBrokerVerificationDelay();
+    }
   },3200);
 
   await waitForKingbotApi(5000);
@@ -2459,6 +2462,7 @@ async function checkBackend() {
   // Read the persisted broker identity first. This never opens a broker socket.
   try{
     const identity=await fetchApi("/api/broker/identity",{timeoutMs:5000});
+    brokerIdentityResolved=true;
     $("accountBroker").textContent=String(identity.broker||"—").toUpperCase();
     $("accountIdDisplay").textContent=identity.accountId||"—";
     $("accountType").textContent=String(identity.accountType||"—").toUpperCase();
@@ -2479,8 +2483,8 @@ async function checkBackend() {
       $("heroBrokerBadge").className="hero-badge offline";
     }
   }catch(error){
-    logActivity(`Broker identity check: ${error.message}`);
     if(String(error?.message||"").includes("REQUEST_TIMEOUT"))showBrokerVerificationDelay();
+    logActivity(`Broker identity check: ${error.message}`);
   }
 
   // Full connection status may rehydrate a broker session, but it no longer blocks identity display.
