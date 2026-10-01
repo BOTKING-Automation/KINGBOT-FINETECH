@@ -2343,6 +2343,38 @@ function getCachedBrokerIdentity(){
   return null;
 }
 
+function getCachedAccountSnapshot(){
+  try{
+    const raw=localStorage.getItem("KINGBOT_ACCOUNT_SNAPSHOT");
+    const value=raw?JSON.parse(raw):null;
+    return value&&Number.isFinite(Number(value.balance))?value:null;
+  }catch{return null}
+}
+function cacheAccountSnapshot(account){
+  try{localStorage.setItem("KINGBOT_ACCOUNT_SNAPSHOT",JSON.stringify({
+    broker:account.broker||null,accountId:account.accountId||null,
+    accountType:account.accountType||null,executionMode:account.executionMode||null,
+    currency:account.currency||null,
+    balance:Number.isFinite(Number(account.balance))?Number(account.balance):null,
+    equity:Number.isFinite(Number(account.equity))?Number(account.equity):null,
+    syncedAt:account.syncedAt||new Date().toISOString()
+  }))}catch{}
+}
+function renderCachedAccountSnapshot(){
+  const s=getCachedAccountSnapshot();
+  if(!s)return false;
+  renderAccountOverview({...s,
+    floatingPnl:Number.isFinite(Number(s.equity))&&Number.isFinite(Number(s.balance))?Number(s.equity)-Number(s.balance):null,
+    realizedPnl:null,dailyPnl:null,dailyDrawdownPct:null,totalDrawdownPct:null,
+    margin:null,freeMargin:null,marginLevel:null,positionCount:null,orderCount:null,leverage:null,
+    tradingEnabled:true,accountStatus:"LAST KNOWN"
+  });
+  $("accountConnectionValue").textContent="LAST KNOWN BALANCE";
+  $("accountConnectionValue").style.color="#ffc84a";
+  $("accountConnectionNote").textContent="Latest real broker balance retained locally while KINGBOT requests a fresh broker snapshot.";
+  return true;
+}
+
 function renderCachedBrokerIdentity(){
   const identity=getCachedBrokerIdentity();
   if(!identity)return false;
@@ -2472,7 +2504,7 @@ async function runBackendCheck() {
     $("accountCurrency").textContent="—";
     if(identity.configured){
       backendConnected=true;
-      setConnection("ACCOUNT CONNECTED","#23f7a3","Connected broker identity verified from KINGBOT secure storage. Live balance and execution telemetry is loading separately.");
+      setConnection("BROKER AUTHENTICATED","#23f7a3","Verified broker identity loaded. KINGBOT is requesting the fresh broker balance now.");
       $("heroBrokerBadge").textContent="● "+String(identity.broker||"BROKER").toUpperCase()+" · ACCOUNT "+String(identity.accountId||"—");
       $("heroBrokerBadge").className="hero-badge public";
       $("terminalBrokerName").textContent=String(identity.broker||"—").toUpperCase();
@@ -2491,23 +2523,8 @@ async function runBackendCheck() {
     logActivity(`Broker identity check: ${error.message}`);
   }
 
-  // Full connection status may rehydrate a broker session, but it no longer blocks identity display.
-  try{
-    const status=await fetchApi("/api/connection",{timeoutMs:7000});
-    if(status.configured || status.connected){
-      $("accountBroker").textContent=String(status.broker||"—").toUpperCase();
-      $("accountIdDisplay").textContent=status.accountId||"—";
-      $("accountMode").textContent=String(status.executionMode||"—").toUpperCase();
-      if(!status.connected){
-        backendConnected=true;
-        setConnection("RECONNECTING…","#ffc84a","Verified broker account is saved. Restoring the secure broker session and requesting live account telemetry.");
-        $("heroBrokerBadge").textContent="● VERIFIED ACCOUNT SAVED · RECONNECTING…";
-        $("heroBrokerBadge").className="hero-badge";
-      }
-    }
-  }catch(error){
-    logActivity(`Broker connection check: ${error.message}`);
-  }
+  // Avoid a second broker rehydration. The account endpoint performs the
+  // single live broker connection/telemetry operation for this cycle.
 
   // Account telemetry is the authoritative source for balances and trading details.
   try{
@@ -2533,90 +2550,18 @@ async function runBackendCheck() {
     $("terminalExecutionMode").textContent=String(account.executionMode||"—").toUpperCase();
 
     renderAccountOverview(account);
+    cacheAccountSnapshot(account);
   }catch{
-    // Fall back to the connection endpoint so a saved mapping can be shown as
-    // reconnecting without falsely destroying the user's broker authorization.
-    try{
-      const data=await fetchApi("/api/connection",{timeoutMs:7000});
-      backendConnected=Boolean(data.connected);
-
-      const snapshot=data.accountSnapshot||null;
-      $("terminalBrokerName").textContent=String(data.broker||"—").toUpperCase();
-      $("terminalAccountId").textContent=data.accountId||"—";
-      $("terminalExecutionMode").textContent=String(data.executionMode||"—").toUpperCase();
-      $("terminalAccountType").textContent=String(snapshot?.accountType||"—").toUpperCase();
-      $("accountBroker").textContent=String(data.broker||"—").toUpperCase();
-      $("accountIdDisplay").textContent=data.accountId||"—";
-      $("accountMode").textContent=String(data.executionMode||"—").toUpperCase();
-      $("accountType").textContent=String(snapshot?.accountType||"—").toUpperCase();
-      $("accountCurrency").textContent=snapshot?.currency||"—";
-      if(snapshot){
-        const projected={
-          accountId:data.accountId||null,
-          broker:data.broker||null,
-          executionMode:data.executionMode||"NOT_CONNECTED",
-          accountType:snapshot.accountType||"DEMO",
-          currency:snapshot.currency||null,
-          balance:snapshot.balance,
-          equity:snapshot.equity,
-          floatingPnl:Number.isFinite(Number(snapshot.equity))&&Number.isFinite(Number(snapshot.balance))
-            ? Number(snapshot.equity)-Number(snapshot.balance) : null,
-          realizedPnl:null,
-          dailyPnl:null,
-          dailyDrawdownPct:null,
-          totalDrawdownPct:null,
-          margin:null,
-          freeMargin:null,
-          marginLevel:null,
-          positionCount:null,
-          orderCount:null,
-          leverage:null,
-          tradingEnabled:snapshot.tradingEnabled!==false,
-          accountStatus:snapshot.accountStatus||"ACTIVE",
-          syncedAt:snapshot.syncedAt||new Date().toISOString()
-        };
-        renderAccountOverview(projected);
-        accountLoaded=true;
-        $("accountConnectionValue").textContent="BALANCE PROJECTED";
-        $("accountConnectionValue").style.color="#ffc84a";
-        $("accountConnectionNote").textContent="Broker account snapshot projected while full account telemetry reconnects.";
-        $("heroBrokerBadge").textContent="● "+String(data.broker||"BROKER").toUpperCase()+" · ACCOUNT SNAPSHOT";
-        $("heroBrokerBadge").className="hero-badge";
-      }else if(data.connected){
-        $("accountConnectionValue").textContent="CONNECTED";
-        $("accountConnectionValue").style.color="#23f7a3";
-        $("accountConnectionNote").textContent="Verified broker account is active. Live account telemetry is being requested.";
-        $("heroBrokerBadge").textContent="● "+String(data.broker||"BROKER").toUpperCase()+" · ACCOUNT CONNECTED";
-        $("heroBrokerBadge").className="hero-badge public";
-      }else if(data.configured){
-        $("accountConnectionValue").textContent="ACCOUNT SAVED · RECONNECTING…";
-        $("accountConnectionValue").style.color="#ffc84a";
-        $("accountConnectionNote").textContent="Your verified broker authorization is saved. KINGBOT is restoring the secure broker session.";
-        $("heroBrokerBadge").textContent="● VERIFIED ACCOUNT SAVED · RECONNECTING…";
-        $("heroBrokerBadge").className="hero-badge";
-      }else{
-        clearTimeout(brokerVerificationDelayTimer);
-        brokerVerificationDelayTimer=null;
-        $("accountConnectionValue").textContent="NOT CONNECTED";
-        $("accountConnectionValue").style.color="#ff7a18";
-        $("accountConnectionNote").textContent="No verified broker account is active. Connect one from Broker Connect.";
-        $("heroBrokerBadge").textContent="● NO VERIFIED ACCOUNT";
-        $("heroBrokerBadge").className="hero-badge offline";
-      }
-    }catch{
-      if(backendConnected) return backendConnected;
-      if(renderCachedBrokerIdentity()) return false;
-      backendConnected=false;
-      $("accountConnectionValue").textContent="STATUS UNAVAILABLE";
+    const cached=renderCachedAccountSnapshot();
+    backendConnected=true;
+    if(!cached){
+      $("accountConnectionValue").textContent="BROKER ACCOUNT TELEMETRY DELAYED";
       $("accountConnectionValue").style.color="#ffc84a";
-      $("accountConnectionNote").textContent="KINGBOT could not verify broker telemetry at this moment. No broker connection was changed.";
-      $("heroBrokerBadge").textContent="● ACCOUNT STATUS UNAVAILABLE";
-      $("heroBrokerBadge").className="hero-badge offline";
+      $("accountConnectionNote").textContent="Broker identity is verified, but the fresh account balance is temporarily unavailable. KINGBOT will retry automatically.";
     }
   }
 
   if(backendConnected){
-    try{ if(!accountLoaded) await loadAccount(); }catch{}
     try{ await loadPositions(); }catch{}
     try{ await loadOrders(); }catch{}
   }
@@ -3040,6 +2985,7 @@ async function loadTerminalEngineProjection(){
   );
 
   renderCachedBrokerIdentity();
+  renderCachedAccountSnapshot();
 
   logActivity(
     "Broker execution layer awaiting backend connection"
