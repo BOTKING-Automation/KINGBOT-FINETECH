@@ -34,6 +34,7 @@ export class UserBrokerManager {
   constructor({pool}={}) {
     this.pool=pool;
     this.connections=new Map();
+    this.connectBackoff=new Map();
   }
 
   async ensureSchema(){
@@ -260,6 +261,9 @@ export class UserBrokerManager {
 
   async connect(userId,executionMode="PAPER"){
     if(!userId)return {connected:false,mode:"NOT_CONNECTED",reason:"USER_CONTEXT_REQUIRED"};
+    const backoffKey=String(userId);
+    const blockedUntil=Number(this.connectBackoff.get(backoffKey)||0);
+    if(blockedUntil>Date.now())return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_RECONNECT_BACKOFF",retryAt:new Date(blockedUntil).toISOString()};
     const mapping=await this.getMapping(userId);
     if(!mapping)return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_ACCOUNT_NOT_CONFIGURED"};
     const mode=String(executionMode||mapping.execution_mode).toUpperCase();
@@ -321,8 +325,10 @@ export class UserBrokerManager {
         entry.executionMode=mode;
         return {connected:true,mode,broker:"deriv",accountId:mapping.account_id,account:entry.accountInfo};
       }catch(error){
+        const retryAt=Date.now()+5000;
+        this.connectBackoff.set(backoffKey,retryAt);
         console.error("[KINGBOT DERIV] connect failed:",error?.message||error);
-        return {connected:false,mode:"NOT_CONNECTED",reason:error?.message||"DERIV_CONNECTION_FAILED"};
+        return {connected:false,mode:"NOT_CONNECTED",reason:error?.message||"DERIV_CONNECTION_FAILED",retryAt:new Date(retryAt).toISOString()};
       }
     }
 
@@ -430,6 +436,11 @@ export class UserBrokerManager {
 
   async getAccount(userId){
     const entry=await this.connectionFor(userId);
+    if(entry.accountInfo && entry.accountInfoAt && Date.now()-entry.accountInfoAt<5000){
+      if(entry.provider==="deriv"){
+        return {connected:true,data:entry.accountInfo};
+      }
+    }
     if(entry.provider==="exness"){
       const info=await entry.api.getAccountInformation();
       let state={};
@@ -455,10 +466,14 @@ export class UserBrokerManager {
     }
     if(entry.provider==="deriv"){
       const info=await entry.api.getAccount();
+      entry.accountInfo=info?.data||entry.accountInfo||null;
+      entry.accountInfoAt=Date.now();
       return info;
     }
     if(entry.provider==="oanda"){
       const info=await entry.api.getAccountSummary();
+      entry.accountInfo=info;
+      entry.accountInfoAt=Date.now();
       return {connected:true,data:{
         ...info,
         balance:info.balance,
