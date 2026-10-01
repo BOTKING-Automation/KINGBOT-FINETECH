@@ -182,7 +182,7 @@ async function saveLadderState(userId,botId,state){
   );
 }
 async function closeLadderState(userId,botId,state,action="LADDER_CYCLE_CLOSED"){
-  await saveLadderState(userId,botId,{...state,active:false,direction:0,positionIds:[],rungLots:[],velocitySamples:[],rungsOpened:0,lockLevel:0,anchorPrice:null,stepPrice:null,lastLockPrice:null,lastPyramidPrice:null,aggressiveEntry:false,lastAction:action});
+  await saveLadderState(userId,botId,{...state,active:false,direction:0,positionIds:[],rungLots:[],lockedProfits:[],velocitySamples:[],rungsOpened:0,lockLevel:0,anchorPrice:null,stepPrice:null,lastLockPrice:null,lastPyramidPrice:null,aggressiveEntry:false,derivContractType:null,derivMultiplier:null,lastAction:action});
 }
 function positionIdentities(position){
   const ids=[];
@@ -247,6 +247,182 @@ function ladderPriceSide(position,state){
   const side=Number(state?.direction)>0?"BUY":"SELL";
   return String(position?.side||position?.type||"").toUpperCase()===side;
 }
+function collectDerivContractTypes(value,out=new Set(),depth=0){
+  if(depth>8||value==null)return out;
+  if(Array.isArray(value)){for(const x of value)collectDerivContractTypes(x,out,depth+1);return out;}
+  if(typeof value!=="object")return out;
+  for(const [k,v] of Object.entries(value)){
+    if(k.toLowerCase().includes("contract_type")&&typeof v==="string")out.add(v.toUpperCase());
+    if(typeof v==="object")collectDerivContractTypes(v,out,depth+1);
+    if(typeof v==="string"&&/^(MULTUP|MULTDOWN|CALL|PUT|CALLE|PUTE|HIGHER|LOWER)$/.test(v.toUpperCase()))out.add(v.toUpperCase());
+  }
+  return out;
+}
+function derivStakePlan(rawLots,budget){
+  const totalWeight=rawLots.reduce((sum,x)=>sum+Number(x||0),0);
+  if(!(budget>0)||!(totalWeight>0))return [];
+  return rawLots.map(x=>budget*(Number(x||0)/totalWeight));
+}
+async function executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity}){
+  const cfg=getBotDefinitions()[botId].v8||LADDER_V8_DEFAULTS;
+  if(!withinLadderSession(new Date(),cfg))return {action:"SESSION_BLOCKED",state:null};
+  const side=ind.v8Direction>0?"BUY":"SELL";
+  const contractType=side==="BUY"?"MULTUP":"MULTDOWN";
+  const contracts=await (async()=>{
+    const entry=await broker.connectionFor(userId);
+    if(entry.provider!=="deriv")throw new Error("DERIV_LADDER_EXECUTOR_PROVIDER_MISMATCH");
+    return entry.api.getContractsFor(config.symbol);
+  })();
+  const types=collectDerivContractTypes(contracts);
+  if(types.size>0&&!types.has(contractType))return {action:"DERIV_V8_CONTRACT_TYPE_UNAVAILABLE",state:null,details:{requested:contractType,available:[...types].slice(0,30)}};
+  const point=Number(spec.point);
+  if(!Number.isFinite(point)||point<=0)throw new Error("DERIV_V8_POINT_SIZE_UNAVAILABLE");
+  const multiplier=10;
+  const accountCurrency=String(account.currency||"USD").toUpperCase();
+  const budget=Number(account.equity)*(Number(s.maxRiskPerTradePct)/100);
+  const rawLots=[];
+  const rungCount=Math.min(cfg.fixedRungCount,cfg.maxTotalRungs);
+  for(let i=0;i<rungCount;i++)rawLots.push(ladderRungLot(i,cfg));
+  const desiredStakes=derivStakePlan(rawLots,budget);
+  if(!desiredStakes.length)return {action:"DERIV_V8_STAKE_BUDGET_BLOCKED",state:null};
+  const probeIndex=desiredStakes.findIndex(x=>Number(x)>0);
+  if(probeIndex<0)return {action:"DERIV_V8_STAKE_BUDGET_BLOCKED",state:null};
+
+  const stakes=[];
+  const contractIds=[];
+  let opened=0;
+  const entryPrice=Number((Number(quote.bid)+Number(quote.ask))/2);
+  const atrStop=Math.max(Number(ind.v8Atr||ind.atr)*cfg.atrSLMult,point);
+  const baseStake=desiredStakes[0];
+  const lockedProfits=[];
+  const cycleId="kbv8d_"+crypto.randomUUID();
+
+  for(let i=0;i<desiredStakes.length;i++){
+    const rawStake=Math.max(0,Number(desiredStakes[i]));
+    const stake=Number(rawStake.toFixed(2));
+    if(!(stake>0))continue;
+    const clientId="kbv8d_"+crypto.randomUUID();
+    const sideName=side;
+    const stopLoss=Math.max(0.01,Math.min(stake*0.9,atrStop*multiplier));
+    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,s.executionMode,config.symbol,sideName,stake]);
+    if(!journal.rowCount)continue;
+    try{
+      const order=await broker.placeOrder({side:sideName,symbol:config.symbol,volume:stake,stopLoss,takeProfit:null,comment:"KINGBOT V8 DERIV R"+i,clientId,userId,currency:accountCurrency,multiplier,derivContractType:contractType});
+      await pool.query("UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,JSON.stringify(order)]);
+      if(order?.contractId)contractIds.push(String(order.contractId));
+      stakes.push(stake);
+      lockedProfits.push(0);
+      opened++;
+      await audit(userId,"LADDER_V8_DERIV_RUNG_OPENED",{botId,symbol:config.symbol,side:sideName,rung:i+1,stake,stopLoss,contractId:order?.contractId,cycleId,contractType,multiplier});
+    }catch(error){
+      await pool.query("UPDATE kingbot_execution_journal SET status='REJECTED',error_message=$2,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,String(error?.message||"DERIV_ORDER_REJECTED").slice(0,500)]);
+      if(opened===0)throw error;
+      break;
+    }
+  }
+  if(opened===0)return {action:"DERIV_V8_NO_CONTRACT_OPENED",state:null};
+  const state={
+    symbol:config.symbol,timeframe:config.timeframe,active:true,direction:side==="BUY"?1:-1,anchorPrice:entryPrice,
+    initialStopDistance:atrStop,stepPrice:point*cfg.pyramidStepPoints,lockLevel:0,lastLockPrice:null,lastPyramidPrice:entryPrice,
+    rungsOpened:opened,aggressiveEntry:velocity>=cfg.velocityHighPoints,positionIds:[...new Set(contractIds)],rungLots:stakes,
+    lockedProfits,velocitySamples:updateVelocitySamples([],entryPrice,Date.now(),cfg),cycleId,lotScale:baseStake>0?baseStake/Math.max(rawLots[0],0.0000001):1,
+    derivContractType:contractType,derivMultiplier:multiplier,lastAction:"DERIV_V8_STARTED"
+  };
+  await saveLadderState(userId,botId,state);
+  await audit(userId,"LADDER_V8_DERIV_STARTED",{botId,symbol:config.symbol,side,rungsOpened:opened,stakes,cycleId,contractType,multiplier,budget});
+  return {action:"LADDER_V8_DERIV_STARTED",state};
+}
+async function executeLadderV8DerivManage({userId,botId,config,s,account,quote,positions,ind,spec,state,velocity,riskAllowed}){
+  const cfg=getBotDefinitions()[botId].v8||LADDER_V8_DEFAULTS;
+  const tracked=positions.filter(p=>String(p?.symbol||"").toUpperCase()===String(state.symbol||config.symbol).toUpperCase()
+    &&state.positionIds.includes(String(p?.contractId||p?.id||""))
+    &&String(p?.status||"open").toLowerCase()==="open");
+  if(!tracked.length){
+    await closeLadderState(userId,botId,state,"DERIV_V8_CYCLE_CLOSED");
+    await audit(userId,"LADDER_V8_DERIV_CLOSED",{botId,symbol:state.symbol,cycleId:state.cycle_id});
+    return {action:"DERIV_V8_CYCLE_CLOSED",state:{...state,active:false}};
+  }
+  const mid=(Number(quote.bid)+Number(quote.ask))/2;
+  const key=ladderKey(userId,botId);
+  const samples=updateVelocitySamples(ladderVelocityBuffers.get(key)||state.velocitySamples||[],mid,Date.now(),cfg);
+  ladderVelocityBuffers.set(key,samples);
+  const v=velocityPoints(samples,spec.point,cfg);
+  let lockLevel=Number(state.lock_level||0);
+  const stakes=Array.isArray(state.rung_lots)?state.rung_lots.map(Number):[];
+  const locks=Array.isArray(state.locked_profits)?state.locked_profits.map(Number):stakes.map(()=>0);
+  const nextLocks=locks.slice();
+  let action="DERIV_V8_MONITORING";
+  let anyClosed=false;
+
+  // Cash-based staircase for Deriv multiplier contracts. Deriv's contract_update
+  // supports monetary stop/take-profit limits; a true ratcheting profit floor
+  // is enforced by the worker with market sell when a previously achieved floor
+  // is lost.
+  for(let i=0;i<state.positionIds.length;i++){
+    const id=String(state.positionIds[i]);
+    const p=positions.find(x=>String(x?.contractId||x?.id||"")===id);
+    if(!p)continue;
+    const profit=Number(p.profit);
+    const stake=Number(stakes[i]||0);
+    const stepCash=cfg.profitLockUSD*(stake>0?(stake/Math.max(stakes[0]||stake,0.0000001)):1);
+    if(!Number.isFinite(profit)||stake<=0||stepCash<=0)continue;
+    const newLevel=Math.floor(profit/stepCash);
+    if(newLevel>lockLevel)lockLevel=newLevel;
+    const desiredLock=Math.max(0,newLevel)*stepCash;
+    if(desiredLock>Number(nextLocks[i]||0))nextLocks[i]=desiredLock;
+    const floor=Number(nextLocks[i]||0);
+    if(floor>0&&profit<=floor-0.01){
+      try{
+        await (async()=>{
+          const entry=await broker.connectionFor(userId);
+          if(entry.provider!=="deriv")throw new Error("DERIV_LADDER_EXECUTOR_PROVIDER_MISMATCH");
+          await entry.api.sellContract(Number(id),0);
+        })();
+        anyClosed=true;
+        action="DERIV_V8_PROFIT_LOCK_EXIT";
+        await audit(userId,"LADDER_V8_DERIV_PROFIT_LOCK_EXIT",{botId,symbol:config.symbol,contractId:id,profit,lockedProfit:floor,cycleId:state.cycle_id});
+      }catch(error){
+        console.warn("[KINGBOT LADDER V8] Deriv profit-lock exit failed:",error?.message||error);
+      }
+    }
+  }
+
+  const positionCap=Math.min(cfg.maxTotalRungs,Math.max(cfg.fixedRungCount,Number(s.maxPositions)||cfg.fixedRungCount));
+  const extendedSince=Number(state.direction)>0?Number(quote.bid)-Number(state.last_pyramid_price||state.anchor_price):Number(state.last_pyramid_price||state.anchor_price)-Number(quote.ask);
+  const highMomentum=v>=cfg.velocityHighPoints;
+  const emergency=Number(ind.volatility)>0.95;
+  const currentStakeRisk=stakes.reduce((a,b)=>a+Math.max(0,Number(b)||0),0);
+  const budget=Number(account.equity)*(Number(s.maxRiskPerTradePct)/100);
+  if(highMomentum&&!emergency&&riskAllowed&&state.rungs_opened<positionCap&&extendedSince>=cfg.pyramidStepPoints*spec.point){
+    const raw=ladderRungLot(state.rungs_opened,cfg)*Number(state.lot_scale||1);
+    const nextStake=Number(Math.max(0,raw).toFixed(2));
+    if(nextStake>0&&currentStakeRisk+nextStake<=budget*1.000001){
+      const side=Number(state.direction)>0?"BUY":"SELL";
+      try{
+        const clientId="kbv8d_"+crypto.randomUUID();
+        const order=await broker.placeOrder({side,symbol:config.symbol,volume:nextStake,stopLoss:Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||10))),takeProfit:null,comment:"KINGBOT V8 DERIV PYRAMID R"+state.rungs_opened,clientId,userId,currency:String(account.currency||"USD"),multiplier:Number(state.deriv_multiplier||10),derivContractType:state.deriv_contract_type});
+        if(order?.contractId){
+          state.positionIds=[...state.positionIds.map(String),String(order.contractId)];
+          stakes.push(nextStake);
+          nextLocks.push(0);
+          state.rungs_opened++;
+          state.last_pyramid_price=Number(state.direction)>0?Number(quote.bid):Number(quote.ask);
+          action="DERIV_V8_PYRAMID";
+          await audit(userId,"LADDER_V8_DERIV_PYRAMID",{botId,symbol:config.symbol,rung:state.rungs_opened,stake:nextStake,contractId:order.contractId,velocity:v,cycleId:state.cycle_id});
+        }
+      }catch(error){
+        action="DERIV_V8_PYRAMID_REJECTED";
+      }
+    }else if(nextStake>0){
+      action="DERIV_V8_PYRAMID_RISK_GATED";
+    }
+  }
+
+  const nextState={...state,rungLots:stakes,lockedProfits:nextLocks,lockLevel,lastLockPrice:Math.max(...nextLocks,0),velocitySamples:samples,lastAction:action,lastActionAt:new Date().toISOString()};
+  await saveLadderState(userId,botId,nextState);
+  return {action,state:nextState,velocity:v};
+}
+
 async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,positions,spec,velocity}){
   const cfg=getBotDefinitions()[botId].v8||LADDER_V8_DEFAULTS;
   if(!withinLadderSession(new Date(),cfg))return {action:"SESSION_BLOCKED",state:null};
@@ -476,8 +652,31 @@ async function execute(row){
     const specResult=await broker.getSymbolSpecification(config.symbol,userId);
     const rawSpec=specResult?.data||{};
     const spec=ladderSpec(rawSpec,quote);
-    if(![spec.point,spec.tickSize,spec.minVolume,spec.maxVolume,spec.volumeStep].every(Number.isFinite)||spec.point<=0||spec.tickSize<=0||spec.minVolume<=0||spec.maxVolume<spec.minVolume||spec.volumeStep<=0)throw new Error("LADDER_V8_BROKER_SPECIFICATION_INCOMPLETE");
+    if(!Number.isFinite(spec.point)||spec.point<=0)throw new Error("LADDER_V8_BROKER_POINT_UNAVAILABLE");
     const state=await getLadderState(userId,botId);
+    if(String(status.broker||"").toLowerCase()==="deriv"){
+      const sampleList=ladderVelocityBuffers.get(velocityKey)||[];
+      const velocity=velocityPoints(sampleList,spec.point,ladderCfg);
+      if(state?.active){
+        const managed=await executeLadderV8DerivManage({userId,botId,config,s,account,quote,positions,ind,spec,state,velocity,riskAllowed:risk.allowed});
+        const v8d={contractType:state.deriv_contract_type||null,multiplier:state.deriv_multiplier||null,contractsTracked:managed.state?.positionIds?.length||0,rungsOpened:managed.state?.rungsOpened||0,lockLevel:managed.state?.lockLevel||0,lockedProfit:Number(managed.state?.lastLockPrice||0),velocityPoints:managed.velocity??velocity,ema20:ind.emaFast,ema50:ind.emaSlow,adx14:ind.adx,rsi14:ind.rsi};
+        const signalPayload={signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action:managed.action,executionMode:s.executionMode,strategy:botId,tradePlan:null,riskAllowed:risk.allowed,analysisReason:analysis.reason,riskReason:risk.reason||risk.blockedReasons,v8:v8d,updatedAt:new Date().toISOString()};
+        await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify(signalPayload)]);
+        await audit(userId,"BOT_WORKER_TICK",{botId,executionMode:s.executionMode,symbol:config.symbol,timeframe:config.timeframe,signal:analysis.signal,score:analysis.score,action:managed.action,v8:v8d,riskAllowed:risk.allowed});
+        return;
+      }
+      let action="NO_ACTION",started=null;
+      if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&Number(spread/spec.point)<=ladderCfg.maxSpreadPoints){
+        const start=await executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity});
+        action=start.action;started=start.state;
+      }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&Number(spread/spec.point)>ladderCfg.maxSpreadPoints)action="V8_SPREAD_FILTER_BLOCKED";
+      else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!risk.allowed)action="RISK_BLOCKED";
+      const v8d={contractType:started?.derivContractType||null,multiplier:started?.derivMultiplier||null,entryQualified:Boolean(ind.v8EntryQualified),rungsOpened:started?.rungsOpened||0,lotScale:started?.lotScale||null,ema20:ind.emaFast,ema50:ind.emaSlow,adx14:ind.adx,rsi14:ind.rsi,velocityPoints:velocity};
+      const signalPayload={signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action,executionMode:s.executionMode,strategy:botId,tradePlan:null,riskAllowed:risk.allowed,analysisReason:analysis.reason,riskReason:risk.reason||risk.blockedReasons,v8:v8d,updatedAt:new Date().toISOString()};
+      await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify(signalPayload)]);
+      await audit(userId,"BOT_WORKER_TICK",{botId,executionMode:s.executionMode,symbol:config.symbol,timeframe:config.timeframe,signal:analysis.signal,score:analysis.score,action,v8:v8d,riskAllowed:risk.allowed});
+      return;
+    }
     const sampleList=ladderVelocityBuffers.get(velocityKey)||[];
     const velocity=velocityPoints(sampleList,spec.point,ladderCfg);
     const spreadPoints=spread/spec.point;
