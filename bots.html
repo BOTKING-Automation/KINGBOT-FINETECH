@@ -70,7 +70,7 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 <p class="desc" id="botDesc">Choose an entitled bot to configure its independent risk profile.</p><div class="bot-symbol-default"><span>BROKER MARKET</span><strong>LIVE CATALOG</strong><span>· selected from your connected account</span></div>
 <div class="risk-grid">
 <div class="field"><label>Execution mode <em>ENGINE</em></label><select id="executionMode"><option value="PAPER">PAPER</option><option value="LIVE">LIVE</option></select></div><div class="field"><label>Broker market <em>BROKER CATALOG</em></label><select id="symbol"><option value="">CONNECT BROKER TO LOAD MARKETS…</option></select></div><div class="field"><label>Timeframe <em>MARKET</em></label><select id="timeframe"><option>1m</option><option>2m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
-<div class="field"><label>Max risk / trade <em>%</em></label><input id="maxRisk" type="number" min=".1" max="5" step=".05"></div>
+<div class="field"><label>Max risk / trade <em>%</em></label><input id="maxRisk" type="number" min=".1" max="5" step=".05"></div><div class="field"><label>Base lot size <em>VOLUME</em></label><input id="lotSize" type="number" min=".01" max="100" step=".01" value=".01"></div>
 <div class="field"><label>Daily drawdown limit <em>%</em></label><input id="dailyDd" type="number" min=".5" max="20" step=".1"></div>
 <div class="field"><label>Total drawdown limit <em>%</em></label><input id="totalDd" type="number" min="1" max="30" step=".1"></div>
 <div class="field"><label>Maximum open positions <em>COUNT</em></label><input id="maxPositions" type="number" min="1" max="50" step="1"></div>
@@ -85,7 +85,7 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 </section>
 <aside class="panel">
 <h2>Engine Status</h2><p class="desc">Authoritative state only. No simulated account values are displayed here.</p>
-<div class="status-card"><div class="status-line"><strong>RISK PROFILE</strong><span class="pill" id="riskPill">NOT LOADED</span></div><div class="metric-grid"><div class="metric"><b>MAX RISK</b><span id="mRisk">—</span></div><div class="metric"><b>DAILY DD</b><span id="mDaily">—</span></div><div class="metric"><b>TOTAL DD</b><span id="mTotal">—</span></div><div class="metric"><b>POSITIONS</b><span id="mPositions">—</span></div></div></div>
+<div class="status-card"><div class="status-line"><strong>RISK PROFILE</strong><span class="pill" id="riskPill">NOT LOADED</span></div><div class="metric-grid"><div class="metric"><b>LOT SIZE</b><span id="mLot">—</span></div><div class="metric"><b>MAX RISK</b><span id="mRisk">—</span></div><div class="metric"><b>DAILY DD</b><span id="mDaily">—</span></div><div class="metric"><b>TOTAL DD</b><span id="mTotal">—</span></div><div class="metric"><b>POSITIONS</b><span id="mPositions">—</span></div></div></div>
 <div class="status-card"><div class="status-line"><strong>BOT ENGINE</strong><span class="pill" id="enginePill">UNKNOWN</span></div><div class="metric-grid"><div class="metric"><b>MODE</b><span id="mMode">—</span></div><div class="metric"><b>RUNTIME</b><span id="mRuntime">—</span></div><div class="metric"><b>SYMBOL</b><span id="mSymbol">—</span></div><div class="metric"><b>TIMEFRAME</b><span id="mTimeframe">—</span></div></div><div class="strategy-list" id="strategies"></div></div>
 <div class="status-card">
   <div class="status-line"><strong>STRATEGY EXECUTION PROFILE</strong><span class="pill" id="strategyPill">AUTO</span></div>
@@ -107,7 +107,7 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
   </div>
   <div id="aiMonitorNote" class="telemetry-note" style="margin-top:12px">AI supervision runs asynchronously so execution speed is not gated by the AI request.</div>
 </div>
-<div class="telemetry-note"><strong>REAL EXECUTION RULE:</strong> saving settings does not create trades. PAPER/LIVE authorization requires a connected broker, verified market/account telemetry, entitlement, and every risk gate to pass. Until then the platform must remain explicitly disconnected.</div>
+<div class="telemetry-note"><strong>POSITION SIZE RULE:</strong> Each bot now has an explicit base lot size. On CFD/MT5-style brokers this is the order volume; on Deriv multiplier contracts, Deriv uses a monetary stake instead of MT5 lots, so V8 translates the configured base lot into its broker-valid stake plan and still respects the account risk budget.</div><div class="telemetry-note"><strong>REAL EXECUTION RULE:</strong> saving settings does not create trades. PAPER/LIVE authorization requires a connected broker, verified market/account telemetry, entitlement, and every risk gate to pass. Until then the platform must remain explicitly disconnected.</div>
 </aside>
 </div>
 </section>
@@ -134,7 +134,7 @@ function syncChangeBotVisibility(){
    btn.textContent="CHANGE BOT";
  }
 }
-const fields={executionMode:$("executionMode"),symbol:$("symbol"),timeframe:$("timeframe"),maxRisk:$("maxRisk"),dailyDd:$("dailyDd"),totalDd:$("totalDd"),maxPositions:$("maxPositions"),spreadRatio:$("spreadRatio"),staleMs:$("staleMs"),lossStreak:$("lossStreak"),autoPause:$("autoPause"),killSwitch:$("killSwitch")};
+const fields={executionMode:$("executionMode"),symbol:$("symbol"),timeframe:$("timeframe"),lotSize:$("lotSize"),maxRisk:$("maxRisk"),dailyDd:$("dailyDd"),totalDd:$("totalDd"),maxPositions:$("maxPositions"),spreadRatio:$("spreadRatio"),staleMs:$("staleMs"),lossStreak:$("lossStreak"),autoPause:$("autoPause"),killSwitch:$("killSwitch")};
 function msg(t,kind=""){const e=$("message");e.textContent=t;e.className="message "+kind}
 function setTelemetry(a,d){$("telemetryState").textContent=a;$("telemetryDetail").textContent=d}
 async function refreshBrokerExecutionStatus(){
@@ -269,8 +269,8 @@ function renderAiMonitor(lastSignal){
  $("aiMonitorNote").textContent=ai?.note||"AI supervision runs asynchronously so execution speed is not gated by the AI request.";
 }
 function putSettings(s,mode,kill){
- fields.executionMode.value=mode||"PAPER";fields.maxRisk.value=s.maxRiskPerTradePct;fields.dailyDd.value=s.dailyDrawdownPct;fields.totalDd.value=s.totalDrawdownPct;fields.maxPositions.value=s.maxPositions;fields.spreadRatio.value=s.maxSpreadAtrRatio;fields.staleMs.value=s.staleDataMs;fields.lossStreak.value=s.maxConsecutiveLosses;fields.autoPause.checked=Boolean(s.autoPauseOnLossStreak);fields.killSwitch.checked=Boolean(kill);
- $("mRisk").textContent=s.maxRiskPerTradePct+"%";$("mDaily").textContent=s.dailyDrawdownPct+"%";$("mTotal").textContent=s.totalDrawdownPct+"%";$("mPositions").textContent=s.maxPositions;
+ fields.executionMode.value=mode||"PAPER";fields.lotSize.value=Number(s.lotSize||0.01).toFixed(2);fields.maxRisk.value=s.maxRiskPerTradePct;fields.dailyDd.value=s.dailyDrawdownPct;fields.totalDd.value=s.totalDrawdownPct;fields.maxPositions.value=s.maxPositions;fields.spreadRatio.value=s.maxSpreadAtrRatio;fields.staleMs.value=s.staleDataMs;fields.lossStreak.value=s.maxConsecutiveLosses;fields.autoPause.checked=Boolean(s.autoPauseOnLossStreak);fields.killSwitch.checked=Boolean(kill);
+ $("mLot").textContent=(Number(s.lotSize)||0.01).toFixed(2); $("mRisk").textContent=s.maxRiskPerTradePct+"%";$("mDaily").textContent=s.dailyDrawdownPct+"%";$("mTotal").textContent=s.totalDrawdownPct+"%";$("mPositions").textContent=s.maxPositions;
  $("mMode").textContent=mode||"NOT_CONNECTED";$("mRuntime").textContent=selected?.runtime||"STOPPED";$("mSymbol").textContent=selected?.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected?.timeframe||"—";
  $("riskPill").textContent=fields.killSwitch.checked?"KILL SWITCH":"CONFIGURED";$("enginePill").textContent=selected?.entitled?"ENTITLED":"LOCKED";
  $("symbol").value=selected?.symbol||"";$("timeframe").value=selected?.timeframe||"1m";$("strategies").innerHTML=(selected?.strategies||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join("");
@@ -464,7 +464,7 @@ $("startBtn").addEventListener("click",async()=>{
 $("stopBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/stop",{method:"POST",body:"{}"});selected.runtime=d.state;$("mRuntime").textContent=d.state;$("enginePill").textContent="STOPPED";msg("Engine stopped. No new autonomous orders will be submitted.","ok")}catch(e){msg(e.message,"error")}});
 $("saveBtn").addEventListener("click",async()=>{
  if(!selected)return msg("Select a bot first.","error");
- const payload={executionMode:fields.executionMode.value,maxRiskPerTradePct:Number(fields.maxRisk.value),dailyDrawdownPct:Number(fields.dailyDd.value),totalDrawdownPct:Number(fields.totalDd.value),maxPositions:Number(fields.maxPositions.value),maxSpreadAtrRatio:Number(fields.spreadRatio.value),staleDataMs:Number(fields.staleMs.value),maxConsecutiveLosses:Number(fields.lossStreak.value),autoPauseOnLossStreak:fields.autoPause.checked,killSwitch:fields.killSwitch.checked};
+ const payload={executionMode:fields.executionMode.value,lotSize:Number(fields.lotSize.value),maxRiskPerTradePct:Number(fields.maxRisk.value),dailyDrawdownPct:Number(fields.dailyDd.value),totalDrawdownPct:Number(fields.totalDd.value),maxPositions:Number(fields.maxPositions.value),maxSpreadAtrRatio:Number(fields.spreadRatio.value),staleDataMs:Number(fields.staleMs.value),maxConsecutiveLosses:Number(fields.lossStreak.value),autoPauseOnLossStreak:fields.autoPause.checked,killSwitch:fields.killSwitch.checked};
  if(payload.totalDrawdownPct<payload.dailyDrawdownPct)return msg("Total drawdown must be at least the daily drawdown limit.","error");
  msg("Saving…");
  try{const d=await api("/bots/"+encodeURIComponent(selected.id)+"/risk",{method:"PUT",body:JSON.stringify(payload)});putSettings(d.settings,d.executionMode,d.killSwitch);msg("Saved and enforced by the server-side risk engine.","ok")}catch(e){msg(e.message,"error")}
