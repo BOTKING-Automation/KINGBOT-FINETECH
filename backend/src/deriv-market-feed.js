@@ -42,7 +42,10 @@ export class DerivMarketFeed {
       USDCHF:"frxUSDCHF",
       NZDUSD:"frxNZDUSD"
     };
-    return aliases[upper] || value;
+    // Browser/broker catalog symbols such as frxXAUUSD become FRXXAUUSD
+    // after upper-casing. Strip exactly one FRX prefix before alias lookup.
+    const base = upper.startsWith("FRX") ? upper.slice(3) : upper;
+    return aliases[base] || aliases[upper] || value;
   }
 
   async connect() {
