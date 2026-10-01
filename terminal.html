@@ -2441,13 +2441,15 @@ async function fetchApi(path, options = {}) {
 async function runBackendCheck() {
   let accountLoaded=false;
   const cycle=++verificationCycle;
-
+  brokerIdentityResolved=false;
   clearTimeout(brokerVerificationDelayTimer);
   brokerVerificationDelayTimer=setTimeout(()=>{
-    if(cycle===verificationCycle && !accountLoaded && (!brokerIdentityResolved || backendConnected)){
-      showBrokerVerificationDelay();
+    if(cycle===verificationCycle && !accountLoaded){
+      const state=$("accountConnectionValue")?.textContent||"";
+      const definitiveDisconnected=/^NOT CONNECTED$|^NO VERIFIED ACCOUNT$/i.test(state);
+      if(!definitiveDisconnected)showBrokerVerificationDelay();
     }
-  },3200);
+  },3000);
 
   await waitForKingbotApi(5000);
 
@@ -2477,6 +2479,8 @@ async function runBackendCheck() {
       $("terminalAccountId").textContent=identity.accountId||"—";
       $("terminalExecutionMode").textContent=String(identity.executionMode||"—").toUpperCase();
     }else{
+      clearTimeout(brokerVerificationDelayTimer);
+      brokerVerificationDelayTimer=null;
       backendConnected=false;
       setConnection("NOT CONNECTED","#ff7a18","No broker account is currently bound to this KINGBOT account.");
       $("heroBrokerBadge").textContent="● NO VERIFIED ACCOUNT";
@@ -2554,6 +2558,8 @@ async function runBackendCheck() {
         $("heroBrokerBadge").textContent="● VERIFIED ACCOUNT SAVED · RECONNECTING…";
         $("heroBrokerBadge").className="hero-badge";
       }else{
+        clearTimeout(brokerVerificationDelayTimer);
+        brokerVerificationDelayTimer=null;
         $("accountConnectionValue").textContent="NOT CONNECTED";
         $("accountConnectionValue").style.color="#ff7a18";
         $("accountConnectionNote").textContent="No verified broker account is active. Connect one from Broker Connect.";
@@ -2578,7 +2584,7 @@ async function runBackendCheck() {
     try{ await loadOrders(); }catch{}
   }
   try{await loadRisk();}catch{}
-  if(cycle===verificationCycle && accountLoaded){
+  if(cycle===verificationCycle && (accountLoaded || !backendConnected)){
     clearTimeout(brokerVerificationDelayTimer);
     brokerVerificationDelayTimer=null;
   }
