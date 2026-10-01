@@ -2655,11 +2655,12 @@ overscroll-behavior:none;}
 
           <div class="source-description">
 
-            Charts are powered by TradingView's embedded market
-            visualization. Crypto ticker statistics use public
-            exchange market data. Broker balances, positions and
-            trade execution belong to the authenticated KINGBOT
-            terminal/API layer.
+            Charts remain powered by TradingView for visualization, while
+            KINGBOT FX/metals quotes are sourced from the shared
+            Deriv live market feed used by the execution engine.
+            Crypto ticker statistics use public exchange data.
+            Account balances, positions and trade execution remain
+            account-scoped through the KINGBOT terminal/API.
 
           </div>
 
@@ -3276,6 +3277,41 @@ overscroll-behavior:none;}
 
     }
 
+
+    /* =========================================================
+       KINGBOT DERIV LIVE DATA
+    ========================================================== */
+
+    const DERIV_MARKETS = MARKETS.filter(m => !m.binance);
+
+    async function fetchDerivData() {
+      if (!DERIV_MARKETS.length) return;
+      await Promise.allSettled(
+        DERIV_MARKETS.map(async market => {
+          try {
+            const response = await fetch(
+              "https://kingbot-fintech-api-etfv.onrender.com/api/market/quote?symbol=" +
+              encodeURIComponent(market.id),
+              { cache: "no-store" }
+            );
+            if (!response.ok) return;
+            const payload = await response.json().catch(() => ({}));
+            const quote = payload?.market;
+            if (!quote || !Number.isFinite(Number(quote.price))) return;
+
+            state.data[market.id] = {
+              ...(state.data[market.id] || {}),
+              price: Number(quote.price),
+              updated: Date.now(),
+              source: quote.source || "deriv-shared-live-feed",
+              feedAgeMs: Number(quote.ageMs || 0)
+            };
+          } catch {}
+        })
+      );
+      state.lastUpdate = Date.now();
+      renderAll();
+    }
 
     /* =========================================================
        BINANCE REST DATA
@@ -4585,7 +4621,8 @@ overscroll-behavior:none;}
             "↻ Refreshing...";
 
 
-          await fetchCryptoData();
+          await fetchDerivData().catch(()=>{});
+      await fetchCryptoData();
 
 
           setTimeout(
@@ -4648,6 +4685,11 @@ overscroll-behavior:none;}
       setInterval(
         fetchCryptoData,
         15000
+      );
+
+      setInterval(
+        fetchDerivData,
+        2000
       );
 
 
