@@ -375,6 +375,8 @@ function selectBroker(slug){
   if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
   textFor();showDrawer();
   if(selected==="exness")trackExnessPartner();
+  else if(selected!=="deriv")trackBrokerPartner(selected);
+  else trackBrokerPartner("deriv");
 }
 
 async function generateMt5BridgeToken(){
@@ -421,18 +423,30 @@ async function copyMt5Token(){
   catch{setStatus("Copy was blocked by the browser. Select and copy the token manually.");}
 }
 
-async function trackExnessPartner(){
+async function trackBrokerPartner(slug){
   try{
     const t=await firebaseToken();
-    const r=await fetch(API_BASE+"/partners/click",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify({brokerSlug:"exness",landingUrl:window.location.href,metadata:{source:"broker-connect",surface:"exness-native"}})});
+    const r=await fetch(API_BASE+"/partners/click",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},
+      body:JSON.stringify({
+        brokerSlug:slug,
+        landingUrl:window.location.href,
+        metadata:{source:"broker-connect",surface:"broker-card",executionMode:selectedExecution}
+      })
+    });
     const d=await r.json().catch(()=>({}));
     if(r.ok&&d.redirectUrl){
       $("brokerLogin").href=d.redirectUrl;
       partnerOpened=Boolean(d.tracked);
-      if(d.tracked)setStatus("Your Exness partner route is ready. Open it to register/sign in, then create the API key in Key Management.");
+      if(d.tracked){
+        setStatus(String(slug).toUpperCase()+" partner route ready. Use the tracked broker link for new-account attribution.");
+      }
     }
-  }catch{}
+    return d;
+  }catch(error){return {tracked:false,redirectUrl:null};}
 }
+async function trackExnessPartner(){return trackBrokerPartner("exness");}
 async function firebaseToken(){
   if(!window.KINGBOT_FIREBASE)await import("./system/firebase-auth.js");
   const fb=window.KINGBOT_FIREBASE;
