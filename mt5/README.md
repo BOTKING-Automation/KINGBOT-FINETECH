@@ -13,7 +13,7 @@ The EA runs inside the user's MT5 terminal. KINGBOT sends controlled commands to
 4. Copy KINGBOT_MT5_BRIDGE.mq5 into MQL5/Experts/KINGBOT/.
 5. Open the file in MetaEditor and compile it.
 6. Open KINGBOT Broker Connect and choose KINGBOT MT5 BRIDGE.
-7. Select DEMO/PAPER or LIVE/REAL.
+7. Select DEMO or LIVE. DEMO means the broker-side Deriv MT5 demo account; it is not a KINGBOT paper/sandbox account.
 8. Generate the bridge token and paste it into the EA BridgeToken input.
 9. Attach the EA to an MT5 chart and enable Algo Trading.
 10. Keep the MT5 terminal connected while the bridge is required.
