@@ -1163,7 +1163,79 @@ overscroll-behavior:none;}
     .projection-empty{padding:25px 10px;text-align:center;color:#69758c;font:700 9px "JetBrains Mono";border:1px dashed rgba(255,255,255,.08);border-radius:12px}
     @media(max-width:980px){.projection-grid{grid-template-columns:1fr}.engine-row{grid-template-columns:1.3fr 1fr 1fr 1fr}}
     @media(max-width:680px){.projection-grid-inner{grid-template-columns:repeat(2,1fr)}.engine-row{grid-template-columns:1fr 1fr}.projection-card{min-height:0}}
-  </style>
+  
+/* ================= LIVE SYNCHRONIZATION COMMAND LAYER ================= */
+.live-sync{
+  position:relative;
+  display:grid;
+  grid-template-columns:1.25fr .9fr .9fr .9fr;
+  gap:1px;
+  margin:18px 0 6px;
+  border:1px solid rgba(25,230,255,.12);
+  border-radius:18px;
+  overflow:hidden;
+  background:rgba(25,230,255,.035);
+  box-shadow:0 18px 55px rgba(0,0,0,.24);
+}
+.live-sync::before{
+  content:"";
+  position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg,rgba(25,230,255,.04),transparent 28%,rgba(155,92,255,.04) 66%,rgba(255,200,74,.03));
+}
+.sync-cell{
+  position:relative;padding:13px 14px;background:rgba(4,9,20,.9);min-width:0;
+}
+.sync-kicker{
+  color:#586780;font:800 7px "JetBrains Mono";letter-spacing:.12em;
+}
+.sync-value{
+  margin-top:6px;color:#eef5ff;font:900 10px Orbitron;letter-spacing:.02em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sync-note{
+  margin-top:4px;color:#64728a;font:700 6.5px "JetBrains Mono";
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sync-live-dot{
+  display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;
+  background:#23f7a3;box-shadow:0 0 11px rgba(35,247,163,.85);
+  animation:syncPulse 1.5s ease-in-out infinite;
+}
+.sync-live-dot.warn{background:#ffc84a;box-shadow:0 0 11px rgba(255,200,74,.8)}
+.sync-live-dot.off{background:#ff4d6d;box-shadow:0 0 11px rgba(255,77,109,.75);animation:none}
+@keyframes syncPulse{0%,100%{opacity:.45;transform:scale(.9)}50%{opacity:1;transform:scale(1.15)}}
+.sync-footer{
+  grid-column:1/-1;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 13px;border-top:1px solid rgba(255,255,255,.055);
+  background:rgba(2,6,14,.96);
+}
+.sync-footer span{
+  color:#55647c;font:700 6.5px "JetBrains Mono";letter-spacing:.07em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sync-footer strong{color:#9eb0c9}
+.sync-now{
+  border:1px solid rgba(25,230,255,.18);border-radius:8px;padding:7px 9px;
+  background:rgba(25,230,255,.045);color:#19e6ff;font:900 6.5px "JetBrains Mono";
+  cursor:pointer;white-space:nowrap;
+}
+.sync-now:hover{background:rgba(25,230,255,.09)}
+.live-sync.changed{box-shadow:0 0 0 1px rgba(25,230,255,.08),0 0 35px rgba(25,230,255,.055),0 18px 55px rgba(0,0,0,.24)}
+.engine-row{
+  transition:background .2s ease,transform .2s ease,box-shadow .2s ease;
+}
+.engine-row:hover{background:rgba(25,230,255,.028);transform:translateY(-1px)}
+.engine-row .engine-status{
+  display:inline-flex;align-items:center;gap:5px;
+}
+.engine-row .engine-status i{
+  width:5px;height:5px;border-radius:50%;background:#23f7a3;box-shadow:0 0 9px rgba(35,247,163,.7);
+}
+.engine-row .engine-status.error i{background:#ffc84a;box-shadow:0 0 9px rgba(255,200,74,.7)}
+@media(max-width:1100px){.live-sync{grid-template-columns:1fr 1fr}.sync-footer{grid-column:1/-1}}
+@media(max-width:650px){.live-sync{grid-template-columns:1fr}.sync-footer{grid-column:auto;align-items:flex-start;flex-direction:column}.sync-now{width:100%}}
+</style>
 </head>
 
 <body>
@@ -1200,6 +1272,33 @@ overscroll-behavior:none;}
       <div class="hero-badge">◆ API BACKEND READY</div>
     </div>
 
+  </section>
+
+  <section class="live-sync" id="liveSyncPanel" aria-live="polite">
+    <div class="sync-cell">
+      <div class="sync-kicker">SYSTEM SYNC</div>
+      <div class="sync-value"><span class="sync-live-dot" id="syncDot"></span><span id="syncState">INITIALIZING LIVE TELEMETRY</span></div>
+      <div class="sync-note" id="syncNote">Connecting account, runtime and broker streams independently.</div>
+    </div>
+    <div class="sync-cell">
+      <div class="sync-kicker">SELECTED ENGINE</div>
+      <div class="sync-value" id="syncEngine">NO ENGINE</div>
+      <div class="sync-note" id="syncEngineNote">Reading saved Bot Control selection…</div>
+    </div>
+    <div class="sync-cell">
+      <div class="sync-kicker">BROKER MARKET</div>
+      <div class="sync-value" id="syncMarket">—</div>
+      <div class="sync-note" id="syncMarketNote">Waiting for a running engine market.</div>
+    </div>
+    <div class="sync-cell">
+      <div class="sync-kicker">LATEST ENGINE EVENT</div>
+      <div class="sync-value" id="syncEvent">—</div>
+      <div class="sync-note" id="syncEventNote">No engine event received yet.</div>
+    </div>
+    <div class="sync-footer">
+      <span>BACKEND: <strong id="syncBackendAt">—</strong> · ACCOUNT: <strong id="syncAccountAt">—</strong> · RUNTIME: <strong id="syncRuntimeAt">—</strong> · MARKET: <strong id="syncMarketAt">—</strong></span>
+      <button class="sync-now" id="syncNowBtn" type="button">SYNC NOW</button>
+    </div>
   </section>
 
   <!-- ACCOUNT METRICS -->
@@ -1679,9 +1778,49 @@ let backendConnected = false;
 let verificationCycle = 0;
 let brokerVerificationDelayTimer = null;
 let brokerIdentityResolved = false;
+let liveRuntimeSyncInFlight=false;
+let liveAccountSyncInFlight=false;
+let terminalSyncPulseAt=0;
+let lastRuntimeSnapshotKey="";
+let lastAccountSnapshotKey="";
+let lastEngineEventKey="";
 
 const $ = id => document.getElementById(id);
 
+function syncClockText(value){
+  if(!value)return "—";
+  const t=new Date(value);
+  return Number.isNaN(t.getTime())?"—":t.toLocaleTimeString([], {hour12:false});
+}
+function setSyncClock(id,value){if($(id))$(id).textContent=syncClockText(value)}
+function flashLiveSync(){
+  const panel=$("liveSyncPanel");
+  if(!panel)return;
+  panel.classList.remove("changed");
+  void panel.offsetWidth;
+  panel.classList.add("changed");
+  setTimeout(()=>panel.classList.remove("changed"),420);
+}
+function setLiveSyncState(state,note,tone="live"){
+  const dot=$("syncDot"),value=$("syncState");
+  if(!dot||!value)return;
+  value.textContent=String(state||"LIVE TELEMETRY");
+  dot.className="sync-live-dot"+(tone==="warn"?" warn":tone==="off"?" off":"");
+  $("syncNote").textContent=String(note||"");
+}
+function noteEngineEvent(textValue,stamp){
+  const key=String(textValue||"—")+"|"+String(stamp||"");
+  if(!textValue||key===lastEngineEventKey)return;
+  lastEngineEventKey=key;
+  $("syncEvent").textContent=String(textValue||"—").toUpperCase();
+  $("syncEventNote").textContent=stamp?("LAST EVENT · "+syncClockText(stamp)):"";
+  logActivity("ENGINE · "+String(textValue).toUpperCase());
+}
+function formatEventTime(value){
+  if(!value)return "—";
+  const t=new Date(value);
+  return Number.isNaN(t.getTime())?"—":t.toLocaleTimeString([], {hour12:false});
+}
 function showBrokerVerificationDelay(){
   const state=$("accountConnectionValue");
   const note=$("accountConnectionNote");
@@ -2932,50 +3071,108 @@ function parseSignal(value){
  if(typeof x==="string"){try{x=JSON.parse(x)}catch{return null}}
  return x&&typeof x==="object"?x:null;
 }
-function renderEngineProjection(bots=[]){
- const running=Array.isArray(bots)?bots.filter(x=>String(x.runtime||x.state||x.status||"STOPPED").trim().toUpperCase()==="RUNNING"):[];
+function renderEngineProjection(bots=[],selectedRuntime=null){
+ const all=Array.isArray(bots)?bots:[];
+ const running=all.filter(x=>String(x.runtime||x.state||x.status||"STOPPED").trim().toUpperCase()==="RUNNING");
  const list=$("engineProjectionList");
- if(!running.length){
-   list.innerHTML='<div class="projection-empty">No running engine trade-plan telemetry. Start an entitled bot from Bot Control OS.</div>';
-   $("engineProjectionState").textContent="NO RUNNING ENGINES";
+ const selectedId=String(selectedRuntime?.botId||"");
+ const visible=running.length?running:(selectedId ? all.filter(x=>String(x.botId||"")===selectedId) : []);
+ if(!visible.length){
+   list.innerHTML='<div class="projection-empty">No subscribed engine is currently active. Bot Control state is synchronized from the account backend.</div>';
+   $("engineProjectionState").textContent="0 ACTIVE";
    return null;
  }
- $("engineProjectionState").textContent=running.length+" RUNNING";
- list.innerHTML=running.map(b=>{
+ $("engineProjectionState").textContent=running.length?running.length+" RUNNING":String(visible[0]?.runtime||visible[0]?.state||"STOPPED").toUpperCase();
+ list.innerHTML=visible.map(b=>{
    const signal=parseSignal(b.lastSignal);
    const livePlan=signal?.tradePlan||{};
    const configured=b.tradePlan||{};
+   const state=String(b.runtime||b.state||"STOPPED").toUpperCase();
    const sl=Number.isFinite(Number(livePlan.stopLoss))?Number(livePlan.stopLoss):(Number.isFinite(Number(configured.slAtr))?configured.slAtr+" ATR":"—");
    const tp=Number.isFinite(Number(livePlan.takeProfit))?Number(livePlan.takeProfit):(Number.isFinite(Number(configured.tpAtr))?configured.tpAtr+" ATR":"—");
    const rr=Number.isFinite(Number(livePlan.riskReward))?Number(livePlan.riskReward):(configured.slAtr&&configured.tpAtr?(Number(configured.tpAtr)/Number(configured.slAtr)).toFixed(2):"—");
    const trail=Number.isFinite(Number(livePlan.trailingTriggerR))?Number(livePlan.trailingTriggerR).toFixed(2)+"R":(configured.trailingTriggerR?configured.trailingTriggerR+"R":"—");
+   const lastRun=b.lastRunAt||signal?.updatedAt||null;
+   const err=b.lastError||"";
+   const statusClass=err?"error":"";
    return '<div class="engine-row">'
      +'<div><span>ENGINE / MARKET</span><strong>'+escapeHtml(String(b.name||b.botId||"ENGINE"))+' · '+escapeHtml(String(b.symbol||"—").toUpperCase())+'</strong></div>'
-     +'<div><span>SIGNAL</span><strong class="signal">'+escapeHtml(String(signal?.signal||"WAITING"))+'</strong></div>'
-     +'<div><span>SCORE</span><strong>'+escapeHtml(Number.isFinite(Number(signal?.score))?Number(signal.score).toFixed(1):"—")+'</strong></div>'
+     +'<div><span>STATE</span><strong class="engine-status '+statusClass+'"><i></i>'+escapeHtml(state)+'</strong></div>'
+     +'<div><span>SIGNAL / SCORE</span><strong class="signal">'+escapeHtml(String(signal?.signal||"WAITING"))+' · '+escapeHtml(Number.isFinite(Number(signal?.score))?Number(signal.score).toFixed(1):"—")+'</strong></div>'
      +'<div><span>STOP LOSS</span><strong>'+escapeHtml(String(sl))+'</strong></div>'
      +'<div><span>TAKE PROFIT</span><strong>'+escapeHtml(String(tp))+'</strong></div>'
      +'<div><span>R:R / TRAIL</span><strong>'+escapeHtml(String(rr)+" · "+String(trail))+'</strong></div>'
+     +'<div><span>LAST RUN</span><strong>'+escapeHtml(formatEventTime(lastRun))+'</strong></div>'
+     +(err?'<div><span>TELEMETRY</span><strong>'+escapeHtml(err)+'</strong></div>':'')
      +'</div>';
  }).join("");
- const first=running.find(x=>x.symbol)||running[0];
- return {symbol:first?.symbol||"",broker:first?.broker||""};
+ const first=visible.find(x=>x.symbol)||visible[0];
+ return {symbol:first?.symbol||"",broker:first?.broker||"",state:String(first?.runtime||first?.state||"STOPPED").toUpperCase(),lastRunAt:first?.lastRunAt||null,botId:first?.botId||""};
 }
-async function loadTerminalEngineProjection(){
+async function loadTerminalEngineProjection({force=false}={}){
+ if(liveRuntimeSyncInFlight&&!force)return false;
+ liveRuntimeSyncInFlight=true;
  try{
-   const d=await fetchApi("/runtime",{timeoutMs:7000});
-   const runtimeBots=Array.isArray(d?.bots)?d.bots:[];
-   const info=renderEngineProjection(runtimeBots);
-   $("engineProjectionState").dataset.syncedAt=new Date().toISOString();
-   if(info?.symbol)await loadBrokerMarketProjection(info.symbol,info.broker||"");
-   else{
+   const [runtime,selection]=await Promise.all([
+     fetchApi("/runtime",{timeoutMs:7000}),
+     fetchApi("/runtime/selection/current",{timeoutMs:7000}).catch(()=>({selectedBotId:null}))
+   ]);
+   const runtimeBots=Array.isArray(runtime?.bots)?runtime.bots:[];
+   const selectedId=String(selection?.selectedBotId||"").trim();
+   const selectedBot=runtimeBots.find(x=>String(x.botId||"")===selectedId)||runtimeBots.find(x=>String(x.runtime||x.state||"").toUpperCase()==="RUNNING")||null;
+   const info=renderEngineProjection(runtimeBots,selectedBot);
+   const now=new Date().toISOString();
+   setSyncClock("syncRuntimeAt",now);
+   lastRuntimeSnapshotKey=JSON.stringify(runtimeBots.map(x=>[x.botId,x.runtime||x.state,x.symbol,x.lastRunAt,x.lastError,x.lastSignal?.signal||null,x.lastSignal?.updatedAt||null]));
+   if(selectedBot){
+     $("syncEngine").textContent=String(selectedBot.name||selectedBot.botId||"ENGINE").toUpperCase();
+     $("syncEngineNote").textContent=String(selectedBot.runtime||selectedBot.state||"STOPPED").toUpperCase()+" · "+String(selectedBot.executionMode||"NOT SET").toUpperCase()+" · SAVED ACCOUNT SELECTION";
+     $("syncMarket").textContent=String(selectedBot.symbol||info?.symbol||"—").toUpperCase();
+     $("syncMarketNote").textContent=selectedBot.timeframe?String(selectedBot.timeframe).toUpperCase()+" · BROKER-VERIFIED MARKET":"BROKER MARKET NOT CONFIGURED";
+     const sig=parseSignal(selectedBot.lastSignal);
+     noteEngineEvent(sig?.signal||selectedBot.lastError||selectedBot.runtime||"ENGINE SYNC",sig?.updatedAt||selectedBot.lastRunAt||now);
+     if(selectedBot.symbol){
+       await loadBrokerMarketProjection(selectedBot.symbol,String(selectedBot.broker||info?.broker||""));
+       setSyncClock("syncMarketAt",new Date().toISOString());
+     }else{
+       $("brokerMarketProjectionState").textContent="WAITING";
+       $("projectionMarketNote").textContent="Selected engine has no saved broker market.";
+     }
+   }else{
+     $("syncEngine").textContent="NO ENGINE";
+     $("syncEngineNote").textContent="No saved entitled engine was returned by Bot Control.";
+     $("syncMarket").textContent="—";
+     $("syncMarketNote").textContent="Waiting for a saved broker market.";
+     noteEngineEvent("NO ACTIVE ENGINE",now);
      $("brokerMarketProjectionState").textContent="WAITING";
-     $("projectionMarketNote").textContent="No running bot has selected a broker market yet.";
    }
+   setLiveSyncState("LIVE TELEMETRY SYNCHRONIZED",runtimeBots.length+" engine records · account selection restored · worker state read from backend.","live");
+   flashLiveSync();
+   lastTerminalSyncAt=now;
    return true;
- }catch{
-   $("engineProjectionState").textContent="UNAVAILABLE";
+ }catch(error){
+   setLiveSyncState("RUNTIME SYNC DELAYED",error?.message||"Runtime telemetry temporarily unavailable. Automatic retry remains active.","warn");
    return false;
+ }finally{
+   liveRuntimeSyncInFlight=false;
+ }
+}
+async function refreshTerminalAccount({force=false}={}){
+ if(liveAccountSyncInFlight&&!force)return false;
+ liveAccountSyncInFlight=true;
+ try{
+   const result=await checkBackend();
+   setSyncClock("syncBackendAt",new Date().toISOString());
+   if(result!==false){
+     setSyncClock("syncAccountAt",new Date().toISOString());
+     setLiveSyncState("LIVE TELEMETRY SYNCHRONIZED","Account, positions and risk data refreshed from the authenticated KINGBOT backend.","live");
+   }
+   return result;
+ }catch(error){
+   setLiveSyncState("ACCOUNT SYNC DELAYED",error?.message||"Account telemetry temporarily unavailable. Automatic retry remains active.","warn");
+   return false;
+ }finally{
+   liveAccountSyncInFlight=false;
  }
 }
 
@@ -3013,21 +3210,50 @@ async function loadTerminalEngineProjection(){
 
   void accountBoot;
 
+  await Promise.allSettled([
+    refreshTerminalAccount({force:true}),
+    loadTerminalEngineProjection({force:true})
+  ]);
+
   clearInterval(window.__KINGBOT_ENGINE_PROJECTION_REFRESH);
-  window.__KINGBOT_ENGINE_PROJECTION_REFRESH=setInterval(()=>{void loadTerminalEngineProjection()},3000);
-  void loadTerminalEngineProjection();
+  window.__KINGBOT_ENGINE_PROJECTION_REFRESH=setInterval(()=>{void loadTerminalEngineProjection()},2500);
 
   clearInterval(window.__KINGBOT_ACCOUNT_REFRESH);
   window.__KINGBOT_ACCOUNT_REFRESH=setInterval(async()=>{
-    try{
-      const state=await checkBackend();
-      if(state===false && !backendConnected) return;
-    }catch{}
-    if(backendConnected){
-      try{await loadPositions();}catch{}
-      try{await loadOrders();}catch{}
+    if(!liveAccountSyncInFlight){
+      await refreshTerminalAccount();
+      if(backendConnected){
+        try{await loadPositions();}catch{}
+        try{await loadOrders();}catch{}
+      }
     }
   },5000);
+
+  $("syncNowBtn").addEventListener("click",async()=>{
+    $("syncNowBtn").disabled=true;
+    $("syncNowBtn").textContent="SYNCING…";
+    try{
+      await Promise.allSettled([
+        refreshTerminalAccount({force:true}),
+        loadTerminalEngineProjection({force:true})
+      ]);
+      toast("TERMINAL SYNC","Account and engine telemetry refreshed.");
+    }finally{
+      $("syncNowBtn").disabled=false;
+      $("syncNowBtn").textContent="SYNC NOW";
+    }
+  });
+
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState==="visible"){
+      void refreshTerminalAccount({force:true});
+      void loadTerminalEngineProjection({force:true});
+    }
+  });
+  window.addEventListener("focus",()=>{
+    void refreshTerminalAccount({force:true});
+    void loadTerminalEngineProjection({force:true});
+  });
 
 })();
 </script>
