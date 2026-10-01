@@ -590,7 +590,7 @@ export class DerivTraderClient {
     const granularity=granularityMap[String(timeframe||"1m")]||60;
     const count=Math.max(20,Math.min(1000,Number(limit)||100));
     const resolved=await this.resolveMarketSymbol(s);
-    const response=await this.marketOneShot({ticks_history:resolved,end:"latest",count,style:"candles",granularity,adjust_start_time:0},{timeoutMs:15000});
+    const response=await this.marketOneShot({ticks_history:resolved,end:"latest",count,style:"candles",granularity},{timeoutMs:15000});
     const candles=Array.isArray(response?.candles)?response.candles:[];
     const rows=candles.map(c=>({time:c?.epoch?new Date(Number(c.epoch)*1000).toISOString():null,open:finite(c?.open),high:finite(c?.high),low:finite(c?.low),close:finite(c?.close),volume:finite(c?.tick_count)})).filter(c=>c.time&&[c.open,c.high,c.low,c.close].every(Number.isFinite));
     if(rows.length<20)throw new Error("INSUFFICIENT_HISTORICAL_CANDLES");
