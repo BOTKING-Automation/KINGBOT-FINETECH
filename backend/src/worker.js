@@ -734,6 +734,7 @@ async function execute(row){
   const account=await getWorkerAccount(userId);
   trace("ACCOUNT_READY",{broker:status.broker,accountId:status.accountId,executionMode:s.executionMode});
   const brokerName=String(status.broker||"").toLowerCase();
+  if(brokerName==="deriv")throw new Error("DERIV_OPTIONS_NOT_VALID_FOR_MT5_BOTS");
   if(brokerName==="exness"){
     if(s.executionMode==="PAPER")s.executionMode="DEMO";
     if(account.trade_mode==="trading_disabled")throw new Error("EXNESS_TRADING_DISABLED");
