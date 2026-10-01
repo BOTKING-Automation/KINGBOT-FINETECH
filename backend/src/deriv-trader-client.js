@@ -591,7 +591,7 @@ export class DerivTraderClient {
       const message=String(error?.message||"");
       const match=message.match(/Accepts?\\s+([0-9,\\s]+)/i);
       const candidates=match
-        ? [...new Set((match[1].match(/\\d+(?:\\.\\d+)?/g)||[]).map(Number).filter(Number.isFinite&&((n)=>n>0)))]
+        ? [...new Set((match[1].match(/\\d+(?:\\.\\d+)?/g)||[]).map(Number).filter(n=>Number.isFinite(n)&&n>0))]
         : [];
       const fallback=candidates.sort((a,b)=>a-b)[0];
       if(!fallback||fallback===resolvedMultiplier)throw error;
