@@ -102,7 +102,6 @@ Confirm whether the candidate direction is consistent with the supplied strategy
         contents:prompt,
         config:{
           systemInstruction:SYSTEM,
-          temperature:0,
           maxOutputTokens:220,
           responseMimeType:"application/json",
           thinkingConfig:{thinkingLevel:"low"}
