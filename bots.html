@@ -68,7 +68,7 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 <div id="botHero" class="bot-detail-hero"><div class="detail-image"><img id="detailImage" src="assets/images/hero-bot.png" alt="Selected KINGBOT bot"></div><div class="detail-copy"><span id="detailCode" class="bot-chip">BOT ENGINE / READY</span><h2 id="botTitle">Select a bot</h2><p id="detailRole">Choose an engine to inspect its architecture.</p></div></div>
 <p class="desc" id="botDesc">Choose an entitled bot to configure its independent risk profile.</p><div class="bot-symbol-default"><span>DEFAULT MARKET</span><strong>XAUUSD</strong><span>· editable before start</span></div>
 <div class="risk-grid">
-<div class="field"><label>Execution mode <em>ENGINE</em></label><select id="executionMode"><option value="PAPER">PAPER</option><option value="LIVE">LIVE</option></select></div><div class="field"><label>Broker symbol <em>REQUIRED</em></label><input id="symbol" type="text" placeholder="XAUUSD (or your broker symbol, e.g. XAUUSDm)" maxlength="30"></div><div class="field"><label>Timeframe <em>MARKET</em></label><select id="timeframe"><option>1m</option><option>2m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
+<div class="field"><label>Execution mode <em>ENGINE</em></label><select id="executionMode"><option value="PAPER">PAPER</option><option value="LIVE">LIVE</option></select></div><div class="field"><label>Broker market <em>BROKER CATALOG</em></label><select id="symbol"><option value="">CONNECT BROKER TO LOAD MARKETS…</option></select></div><div class="field"><label>Timeframe <em>MARKET</em></label><select id="timeframe"><option>1m</option><option>2m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
 <div class="field"><label>Max risk / trade <em>%</em></label><input id="maxRisk" type="number" min=".1" max="5" step=".05"></div>
 <div class="field"><label>Daily drawdown limit <em>%</em></label><input id="dailyDd" type="number" min=".5" max="20" step=".1"></div>
 <div class="field"><label>Total drawdown limit <em>%</em></label><input id="totalDd" type="number" min="1" max="30" step=".1"></div>
@@ -148,6 +148,68 @@ async function refreshBrokerExecutionStatus(){
  }
 }
 function esc(s){return String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]))}
+let brokerMarkets=[];
+let brokerMarketsLoaded=false;
+function normalizeMarket(item){
+ const symbol=String(item?.symbol||"").trim().toUpperCase();
+ if(!symbol)return null;
+ return {symbol,name:String(item?.name||symbol).trim(),category:String(item?.category||"").trim(),submarket:String(item?.submarket||"").trim(),tradeable:item?.tradeable!==false};
+}
+function preferredMarket(){
+ const usable=brokerMarkets.filter(x=>x.tradeable!==false);
+ return usable.find(x=>/^XAUUSD(?:[._-].*)?$/.test(x.symbol))
+   || usable.find(x=>x.symbol.includes("XAUUSD"))
+   || usable.find(x=>x.symbol.includes("PAXG"))
+   || usable[0]
+   || brokerMarkets[0]
+   || null;
+}
+function renderBrokerMarkets(selectedSymbol=""){
+ const select=$("symbol");
+ const wanted=String(selectedSymbol||"").trim().toUpperCase();
+ select.innerHTML="";
+ if(!brokerMarkets.length){
+   select.innerHTML='<option value="">NO BROKER MARKETS AVAILABLE</option>';
+   select.disabled=true;
+   return;
+ }
+ select.disabled=false;
+ const groups=new Map();
+ for(const m of brokerMarkets){
+   const key=(m.category||"BROKER MARKETS").toUpperCase();
+   if(!groups.has(key))groups.set(key,[]);
+   groups.get(key).push(m);
+ }
+ for(const [group,items] of groups){
+   const og=document.createElement("optgroup"); og.label=group;
+   for(const m of items){
+     const o=document.createElement("option");
+     o.value=m.symbol;
+     o.textContent=m.name && m.name!==m.symbol ? m.symbol+" · "+m.name : m.symbol;
+     if(m.tradeable===false)o.disabled=true;
+     og.appendChild(o);
+   }
+   select.appendChild(og);
+ }
+ if(wanted && brokerMarkets.some(x=>x.symbol===wanted)){select.value=wanted;}
+ else {const fallback=preferredMarket(); if(fallback)select.value=fallback.symbol;}
+ $("brokerExecutionNote").dataset.marketCount=String(brokerMarkets.length);
+}
+async function refreshBrokerMarkets(){
+ try{
+   const d=await api("/broker/markets",{timeoutMs:10000});
+   brokerMarkets=(Array.isArray(d.markets)?d.markets:[]).map(normalizeMarket).filter(Boolean);
+   brokerMarketsLoaded=brokerMarkets.length>0;
+   renderBrokerMarkets($("symbol")?.value||selected?.symbol||"");
+   const title=$("brokerExecutionTitle");
+   if(title && brokerMarketsLoaded) title.textContent=String(d.broker||"BROKER").toUpperCase()+" · "+brokerMarkets.length+" MARKETS AVAILABLE";
+   return true;
+ }catch(error){
+   brokerMarkets=[]; brokerMarketsLoaded=false; renderBrokerMarkets("");
+   return false;
+ }
+}
+
 function renderBots(){
  const imageMap={"strategic":"assets/images/bots/strategic.png","flipper":"assets/images/bots/flipper.png","breakout":"assets/images/bots/breakout.png","smc-pro":"assets/images/bots/smc-pro.png","ladder-flip":"assets/images/bots/ladder-flip.png"};
  const roleMap={"strategic":"MULTI-STRATEGY ENGINE","flipper":"HIGH-SPEED FLIPPING","breakout":"BREAKOUT & MOMENTUM","smc-pro":"SMART MONEY CONCEPTS","ladder-flip":"ADAPTIVE LADDER SYSTEM"};
@@ -267,16 +329,17 @@ async function selectBot(id){
    const [d,r]=await Promise.all([api("/bots/"+encodeURIComponent(id)+"/risk"),api("/runtime/"+encodeURIComponent(id))]);
    selected.runtime=r.state||"STOPPED";
    selected.executionMode=r.executionMode;
-   selected.symbol=r.symbol||"XAUUSD";
+   selected.symbol=r.symbol||"";
    selected.timeframe=r.timeframe||"5m";
    selected.lastSignal=r.lastSignal||null;
    putSettings(d.settings,d.executionMode||"NOT_CONNECTED",d.killSwitch);
    if(!r.symbol){
-     $("symbol").value="XAUUSD";
-     $("timeframe").value=selected.timeframe;
-     $("mSymbol").textContent="XAUUSD · DEFAULT";
-     msg("No market symbol was saved for this bot. XAUUSD is loaded as the editable default; change it for your broker before starting if needed.","ok");
+     renderBrokerMarkets(preferredMarket()?.symbol||"");
+     selected.symbol=$("symbol").value||"";
+     $("mSymbol").textContent=selected.symbol?selected.symbol+" · BROKER MARKET":"SELECT MARKET";
+     msg(selected.symbol?"No market was saved for this bot. A broker-supported market has been selected as the starting market.":"No broker market is available yet. Connect your broker and reload the Bot Engine.","ok");
    }else{
+     renderBrokerMarkets(r.symbol);
      msg("Authoritative bot configuration loaded.","ok");
    }
  }catch(e){msg(e.message,"error")}
@@ -288,8 +351,9 @@ async function load(){
   const [d,rt,sub]=await Promise.all([
     api("/bots"),
     api("/runtime"),
-    api("/subscription/me")
+    api("/subscription/me"),
   ]);
+  await refreshBrokerMarkets();
   const entitledIds=new Set((sub.entitlements||[]).map(x=>String(x.botId||"").toLowerCase()));
   bots=(d.bots||[]).map(b=>{
     const x=(rt.bots||[]).find(z=>z.botId===b.id)||{};
@@ -324,7 +388,8 @@ $("startBtn").addEventListener("click",async()=>{
  if(!selected)return msg("Select a bot first.","error");
  msg("Preparing market configuration…");
  try{
-   let symbol=fields.symbol.value.trim().toUpperCase()||selected.symbol||"XAUUSD";
+   let symbol=fields.symbol.value.trim().toUpperCase()||selected.symbol||"";
+   if(!symbol)return msg("Select a market from the connected broker market list first.","error");
    let timeframe=fields.timeframe.value||selected.timeframe||"5m";
    if(!selected.symbol){
      const cfg=await api("/runtime/"+encodeURIComponent(selected.id)+"/config",{method:"POST",body:JSON.stringify({symbol,timeframe})});
