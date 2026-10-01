@@ -180,11 +180,25 @@ export class DerivTraderClient {
     if(startTime)body.date_from=Math.floor(new Date(startTime).getTime()/1000);
     if(endTime)body.date_to=Math.floor(new Date(endTime).getTime()/1000);
     const response=await this.request(body);
+    const transactions=Array.isArray(response?.profit_table?.transactions)?response.profit_table.transactions:[];
+    const deals=transactions.map(item=>{
+      const buy=finite(item?.buy_price);
+      const payout=finite(item?.payout);
+      const sell=finite(item?.sell_price);
+      const profit=buy!==null && payout!==null
+        ? payout-buy
+        : (buy!==null && sell!==null ? sell-buy : null);
+      return {
+        ...item,
+        profit,
+        realizedPnl:profit
+      };
+    });
     return {
       connected:true,
       data:{
         orders:[],
-        deals:Array.isArray(response?.profit_table?.transactions)?response.profit_table.transactions:[]
+        deals
       }
     };
   }
