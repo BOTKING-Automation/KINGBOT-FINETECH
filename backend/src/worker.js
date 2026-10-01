@@ -260,11 +260,17 @@ function collectDerivContractTypes(value,out=new Set(),depth=0){
 }
 function derivStakePlan(rawLots,budget,minStake=0.35){
   const totalWeight=rawLots.reduce((sum,x)=>sum+Number(x||0),0);
-  const count=rawLots.length;
   const floor=Math.max(0.01,Number(minStake)||0.35);
-  if(!(budget>0)||!(totalWeight>0)||count<1||budget<floor*count)return [];
-  const distributable=budget-floor*count;
-  return rawLots.map(x=>floor+distributable*(Number(x||0)/totalWeight));
+  if(!(budget>0)||!(totalWeight>0)||!rawLots.length)return [];
+  // A small account must be allowed to open the first affordable rung.
+  // Do not require the full ladder budget up front; later rungs are added
+  // only when the available risk budget supports them.
+  const maxAffordable=Math.min(rawLots.length,Math.floor(budget/floor+1e-9));
+  if(maxAffordable<1)return [];
+  const lots=rawLots.slice(0,maxAffordable);
+  const weight=lots.reduce((sum,x)=>sum+Number(x||0),0);
+  const distributable=Math.max(0,budget-floor*maxAffordable);
+  return lots.map(x=>floor+distributable*(Number(x||0)/Math.max(weight,1e-12)));
 }
 async function executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity}){
   const cfg=getBotDefinitions()[botId].v8||LADDER_V8_DEFAULTS;
@@ -634,7 +640,9 @@ async function execute(row){
     const sampleList=updateVelocitySamples(ladderVelocityBuffers.get(velocityKey)||[],(bid+ask)/2,Date.now(),ladderCfg);
     ladderVelocityBuffers.set(velocityKey,sampleList);
   }
-  const v8Velocity=0;
+  const v8Velocity=botId==="ladder-flip"
+    ? velocityPoints(ladderVelocityBuffers.get(velocityKey)||[],Math.max(Number(ind.v8Atr||ind.atr)/1000,1e-12),ladderCfg)
+    : 0;
 
   const analysis=evaluateBot(botId,{
     symbol:config.symbol,timeframe:config.timeframe,price:(bid+ask)/2,entryPrice:(bid+ask)/2,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,
@@ -669,14 +677,17 @@ async function execute(row){
         await audit(userId,"BOT_WORKER_TICK",{botId,executionMode:s.executionMode,symbol:config.symbol,timeframe:config.timeframe,signal:analysis.signal,score:analysis.score,action:managed.action,v8:v8d,riskAllowed:risk.allowed});
         return;
       }
-      let action="NO_ACTION",started=null;
-      if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&Number(spread/spec.point)<=ladderCfg.maxSpreadPoints){
+      let action="NO_ACTION",started=null,startDetails=null;
+      const spreadPoints=spec.point>0?spread/spec.point:Infinity;
+      if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&spreadPoints<=ladderCfg.maxSpreadPoints){
         const start=await executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity});
-        action=start.action;started=start.state;
-      }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&Number(spread/spec.point)>ladderCfg.maxSpreadPoints)action="V8_SPREAD_FILTER_BLOCKED";
-      else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!risk.allowed)action="RISK_BLOCKED";
-      const v8d={contractType:started?.derivContractType||null,multiplier:started?.derivMultiplier||null,entryQualified:Boolean(ind.v8EntryQualified),rungsOpened:started?.rungsOpened||0,lotScale:started?.lotScale||null,ema20:ind.emaFast,ema50:ind.emaSlow,adx14:ind.adx,rsi14:ind.rsi,velocityPoints:velocity};
-      const signalPayload={signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action,executionMode:s.executionMode,strategy:botId,tradePlan:null,riskAllowed:risk.allowed,analysisReason:analysis.reason,riskReason:risk.reason||risk.blockedReasons,v8:v8d,updatedAt:new Date().toISOString()};
+        action=start.action;started=start.state;startDetails=start.details||null;
+      }else if(!analysis.ok)action="SIGNAL_GATE_BLOCKED";
+      else if(analysis.signal==="NO_SIGNAL")action="SIGNAL_BELOW_THRESHOLD";
+      else if(!risk.allowed)action="RISK_BLOCKED";
+      else if(spreadPoints>ladderCfg.maxSpreadPoints)action="V8_SPREAD_FILTER_BLOCKED";
+      const v8d={contractType:started?.derivContractType||null,multiplier:started?.derivMultiplier||null,entryQualified:Boolean(ind.v8EntryQualified),rungsOpened:started?.rungsOpened||0,lotScale:started?.lotScale||null,velocityPoints:velocity,spreadPoints,spreadMaxPoints:ladderCfg.maxSpreadPoints,startDetails};
+      const signalPayload={signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action,executionMode:s.executionMode,strategy:botId,tradePlan:null,riskAllowed:risk.allowed,riskBlockedReasons:risk.blockedReasons||[],analysisReason:analysis.reason,riskReason:risk.reason||risk.blockedReasons,v8:v8d,updatedAt:new Date().toISOString()};
       await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify(signalPayload)]);
       await audit(userId,"BOT_WORKER_TICK",{botId,executionMode:s.executionMode,symbol:config.symbol,timeframe:config.timeframe,signal:analysis.signal,score:analysis.score,action,v8:v8d,riskAllowed:risk.allowed});
       return;
