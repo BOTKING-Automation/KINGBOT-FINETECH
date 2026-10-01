@@ -18,6 +18,12 @@ export class DerivTraderClient {
     this.connected=false;
     this.requestId=0;
     this.pending=new Map();
+    this.marketWs=null;
+    this.marketConnected=false;
+    this.marketRequestId=0;
+    this.marketPending=new Map();
+    this.marketSymbolCache=null;
+    this.marketSymbolCacheAt=0;
   }
 
   configured(){
@@ -101,6 +107,105 @@ export class DerivTraderClient {
       this.ws=null;
     });
     ws.on("error",()=>{});
+  }
+
+  async publicConnect(){
+    if(this.marketWs&&this.marketConnected)return;
+    await new Promise((resolve,reject)=>{
+      const ws=new WebSocket("wss://ws.binaryws.com/websockets/v3");
+      let settled=false;
+      const fail=(error)=>{if(settled)return;settled=true;try{ws.close();}catch{};reject(error instanceof Error?error:new Error(String(error)))};
+      ws.once("open",()=>{if(settled)return;settled=true;this.marketWs=ws;this.marketConnected=true;this.attachMarket(ws);resolve();});
+      ws.once("error",fail);
+      ws.once("close",()=>{if(!settled)fail(new Error("DERIV_PUBLIC_WEBSOCKET_CLOSED_DURING_CONNECT"));});
+    });
+  }
+
+  attachMarket(ws){
+    ws.on("message",raw=>{
+      let data;
+      try{data=JSON.parse(String(raw));}catch{return;}
+      const reqId=data?.req_id;
+      if(reqId&&this.marketPending.has(reqId)){
+        const item=this.marketPending.get(reqId);
+        this.marketPending.delete(reqId);
+        if(data.error)item.reject(new Error(data.error.message||"DERIV_MARKET_API_ERROR"));
+        else item.resolve(data);
+      }
+    });
+    ws.on("close",()=>{
+      this.marketConnected=false;
+      for(const item of this.marketPending.values())item.reject(new Error("DERIV_PUBLIC_WEBSOCKET_CLOSED"));
+      this.marketPending.clear();
+      this.marketWs=null;
+    });
+    ws.on("error",()=>{});
+  }
+
+  async marketRequest(payload,{timeoutMs=10000}={}){
+    if(!this.marketWs||!this.marketConnected)await this.publicConnect();
+    const req_id=++this.marketRequestId;
+    const message={...payload,req_id};
+    return await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{
+        this.marketPending.delete(req_id);
+        reject(new Error("DERIV_MARKET_REQUEST_TIMEOUT"));
+      },timeoutMs);
+      this.marketPending.set(req_id,{
+        resolve:value=>{clearTimeout(timer);resolve(value);},
+        reject:error=>{clearTimeout(timer);reject(error);}
+      });
+      try{this.marketWs.send(JSON.stringify(message));}
+      catch(error){clearTimeout(timer);this.marketPending.delete(req_id);reject(error);}
+    });
+  }
+
+  async closePublic(){
+    try{if(this.marketWs)this.marketWs.close();}finally{
+      this.marketWs=null;
+      this.marketConnected=false;
+      for(const item of this.marketPending.values())item.reject(new Error("DERIV_PUBLIC_DISCONNECTED"));
+      this.marketPending.clear();
+    }
+  }
+
+  async publicMarkets(){
+    const now=Date.now();
+    if(this.marketSymbolCache&&now-this.marketSymbolCacheAt<30000)return this.marketSymbolCache;
+    const response=await this.marketRequest({active_symbols:"full"},{timeoutMs:12000});
+    const list=Array.isArray(response?.active_symbols)?response.active_symbols:[];
+    this.marketSymbolCache=list.map(item=>({
+      symbol:String(item?.underlying_symbol||item?.symbol||"").trim(),
+      name:String(item?.underlying_symbol_name||item?.display_name||item?.underlying_symbol||item?.symbol||"").trim(),
+      category:String(item?.market||item?.underlying_symbol_type||"").trim(),
+      submarket:String(item?.submarket||item?.subgroup||"").trim(),
+      pipSize:finite(item?.pip_size),
+      tradeable:Number(item?.exchange_is_open)===1&&Number(item?.is_trading_suspended)!==1,
+      source:"deriv-public"
+    })).filter(x=>x.symbol);
+    this.marketSymbolCacheAt=now;
+    return this.marketSymbolCache;
+  }
+
+  async resolveMarketSymbol(symbol){
+    const requested=String(symbol||"").trim();
+    if(!requested)throw new Error("DERIV_SYMBOL_REQUIRED");
+    const markets=await this.publicMarkets();
+    const upper=requested.toUpperCase();
+    const exact=markets.find(x=>String(x.symbol).toUpperCase()===upper);
+    if(exact)return exact.symbol;
+    const clean=upper.replace(/[^A-Z0-9]/g,"");
+    const aliases=[
+      clean,
+      clean.startsWith("FRX")?clean.slice(3):clean,
+      clean.startsWith("1HZ")?clean.slice(3):clean
+    ];
+    const match=markets.find(x=>{
+      const s=String(x.symbol).toUpperCase().replace(/[^A-Z0-9]/g,"");
+      return aliases.includes(s)||s.endsWith(clean)||s.endsWith(aliases[1]||clean);
+    });
+    if(match)return match.symbol;
+    throw new Error("DERIV_MARKET_NOT_AVAILABLE:"+requested);
   }
 
   async request(payload,{timeoutMs=12000}={}){
@@ -210,9 +315,9 @@ export class DerivTraderClient {
   }
 
   async getQuote(symbol){
-    const s=String(symbol||"").trim();
-    if(!/^[A-Za-z0-9._-]{2,30}$/.test(s))throw new Error("INVALID_DERIV_SYMBOL");
-    const response=await this.request({ticks:s});
+    const requested=String(symbol||"").trim();
+    const s=await this.resolveMarketSymbol(requested);
+    const response=await this.marketRequest({ticks:s},{timeoutMs:10000});
     const tick=response?.tick||{};
     const quote=finite(tick.quote);
     if(quote===null)throw new Error("DERIV_QUOTE_UNAVAILABLE");
@@ -220,32 +325,23 @@ export class DerivTraderClient {
       connected:true,
       data:{
         symbol:s,
+        requestedSymbol:requested,
         bid:quote,
         ask:quote,
         price:quote,
-        time:tick.epoch?new Date(Number(tick.epoch)*1000).toISOString():new Date().toISOString()
+        time:tick.epoch?new Date(Number(tick.epoch)*1000).toISOString():new Date().toISOString(),
+        source:"deriv-public-market-feed"
       }
     };
   }
 
   async getMarkets(){
-    const response=await this.request({active_symbols:"full"});
-    const list=Array.isArray(response?.active_symbols)?response.active_symbols:[];
-    return list.map(item=>({
-      symbol:String(item?.underlying_symbol||item?.symbol||"").trim(),
-      name:String(item?.underlying_symbol_name||item?.display_name||item?.underlying_symbol||item?.symbol||"").trim(),
-      category:String(item?.market||item?.underlying_symbol_type||"").trim(),
-      submarket:String(item?.submarket||item?.subgroup||"").trim(),
-      pipSize:finite(item?.pip_size),
-      tradeable:Number(item?.exchange_is_open)===0||Number(item?.is_trading_suspended)===1?false:true,
-      source:"broker"
-    })).filter(x=>x.symbol);
+    return await this.publicMarkets();
   }
 
   async getContractsFor(symbol){
-    const s=String(symbol||"").trim();
-    if(!/^[A-Za-z0-9._-]{2,30}$/.test(s))throw new Error("INVALID_DERIV_SYMBOL");
-    const response=await this.request({contracts_for:s});
+    const s=await this.resolveMarketSymbol(symbol);
+    const response=await this.marketRequest({contracts_for:s},{timeoutMs:10000});
     return response?.contracts_for||response?.contracts||{};
   }
 
@@ -335,7 +431,8 @@ export class DerivTraderClient {
     const granularityMap={"1m":60,"2m":120,"3m":180,"4m":240,"5m":300,"6m":360,"10m":600,"12m":720,"15m":900,"20m":1200,"30m":1800,"1h":3600,"2h":7200,"3h":10800,"4h":14400,"6h":21600,"8h":28800,"12h":43200,"1d":86400,"1w":604800,"1mn":2592000};
     const granularity=granularityMap[String(timeframe||"1m")]||60;
     const count=Math.max(20,Math.min(1000,Number(limit)||100));
-    const response=await this.request({ticks_history:s,end:"latest",count,style:"candles",granularity,adjust_start_time:1,subscribe:0},{timeoutMs:15000});
+    const resolved=await this.resolveMarketSymbol(s);
+    const response=await this.marketRequest({ticks_history:resolved,end:"latest",count,style:"candles",granularity,adjust_start_time:1,subscribe:0},{timeoutMs:15000});
     const candles=Array.isArray(response?.candles)?response.candles:[];
     const rows=candles.map(c=>({time:c?.epoch?new Date(Number(c.epoch)*1000).toISOString():null,open:finite(c?.open),high:finite(c?.high),low:finite(c?.low),close:finite(c?.close),volume:finite(c?.tick_count)})).filter(c=>c.time&&[c.open,c.high,c.low,c.close].every(Number.isFinite));
     if(rows.length<20)throw new Error("INSUFFICIENT_HISTORICAL_CANDLES");
