@@ -288,7 +288,7 @@ function cacheBrokerIdentity(connection){
     localStorage.setItem("KINGBOT_BROKER_IDENTITY",JSON.stringify({
       broker:String(connection.broker),
       accountId:String(connection.accountId),
-      executionMode:String(connection.executionMode||"PAPER"),
+      executionMode:String(connection.executionMode||"DEMO"),
       accountType:String(connection.accountType||(
         String(connection.executionMode||"PAPER").toUpperCase()==="LIVE"?"REAL":"DEMO"
       )),
@@ -606,7 +606,7 @@ $("authorizeBtn").addEventListener("click",async()=>{
       setStatus("DERIV CONNECTED ✓ · "+(accountType==="real"?"LIVE / REAL":"DEMO · LIVE BROKER")+" · "+selectedAccount);
       btn.textContent="CONNECTED ✓";
       window.__KINGBOT_DERIV_PENDING=null;
-      applyConnectionLock({connected:true,broker:"deriv",accountId:selectedAccount,executionMode:accountType==="real"?"LIVE":"PAPER"});
+      applyConnectionLock({connected:true,broker:"deriv",accountId:selectedAccount,executionMode:accountType==="real"?"LIVE":"DEMO"});
       return;
     }
     const r=await fetch(API_BASE+"/connection",{headers:{Authorization:"Bearer "+t}});
