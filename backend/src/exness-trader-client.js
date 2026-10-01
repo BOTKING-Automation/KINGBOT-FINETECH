@@ -293,6 +293,17 @@ export class ExnessTraderClient{
     return this.request("POST","/v1/trading/accounts/"+this.accountId+"/positions",payload,{idempotencyKey:clientRequestId||crypto.randomUUID().replace(/-/g,"")});
   }
 
+  async modifyPositionStops({positionId,stopLoss,takeProfit}={}){
+    await this.ensureReady();
+    const id=String(positionId||"").trim();
+    if(!id)throw new Error("EXNESS_POSITION_ID_REQUIRED");
+    const payload={};
+    if(stopLoss!==undefined)payload.stop_loss_price=stopLoss===null?null:String(stopLoss);
+    if(takeProfit!==undefined)payload.take_profit_price=takeProfit===null?null:String(takeProfit);
+    if(!Object.keys(payload).length)throw new Error("EXNESS_POSITION_STOP_UPDATE_REQUIRED");
+    return this.request("PUT","/v1/trading/accounts/"+this.accountId+"/positions/"+encodeURIComponent(id),payload,{idempotencyKey:crypto.randomUUID().replace(/-/g,"")});
+  }
+
   async modifyOrder(orderId,patch={}){
     await this.ensureReady();
     const id=String(orderId||"").trim();
