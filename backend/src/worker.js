@@ -83,6 +83,8 @@ function indicators(candles=[]){
 }
 
 async function consecutiveLosses(userId){
+  const cached=workerLossCache.get(String(userId));
+  if(cached && Date.now()-cached.at<LOSS_CACHE_MS)return cached.value;
   try{
     const trades=await broker.getTrades({userId,startTime:new Date(Date.now()-7*86400000),endTime:new Date()});
     const deals=Array.isArray(trades?.data?.deals)?trades.data.deals:[];
@@ -92,8 +94,12 @@ async function consecutiveLosses(userId){
       if(!Number.isFinite(profit)||profit===0)continue;
       if(profit<0)count++; else break;
     }
+    workerLossCache.set(String(userId),{at:Date.now(),value:count});
     return count;
-  }catch{return 0;}
+  }catch{
+    if(cached)return cached.value;
+    return 0;
+  }
 }
 
 async function settings(userId,botId){
@@ -103,7 +109,7 @@ async function settings(userId,botId){
   const base=!q.rowCount
     ? {...normalizeRiskSettings(bot.risk),executionMode:"PAPER",killSwitch:false}
     : (()=>{const x=q.rows[0];return {...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:String(x.execution_mode||"PAPER"),killSwitch:Boolean(x.kill_switch)};})();
-  if(botId==="ladder-flip")base.maxPositions=Math.max(LADDER_V8_DEFAULTS.maxTotalRungs,base.maxPositions);
+  if(botId==="ladder-flip")base.maxPositions=Math.min(LADDER_V8_DEFAULTS.maxTotalRungs,Math.max(LADDER_V8_DEFAULTS.fixedRungCount,base.maxPositions));
   return base;
 }
 
@@ -115,8 +121,12 @@ async function entitled(userId,botId){
 
 const ladderVelocityBuffers=new Map();
 const workerAccountCache=new Map();
+const workerPositionCache=new Map();
 const workerCandleCache=new Map();
+const workerLossCache=new Map();
 const ACCOUNT_CACHE_MS=1500;
+const POSITION_CACHE_MS=1200;
+const LOSS_CACHE_MS=5000;
 const CANDLE_CACHE_MIN_MS=5000;
 
 function ladderKey(userId,botId){return String(userId)+":"+String(botId);}
@@ -128,6 +138,14 @@ async function getWorkerAccount(userId){
   if(cached && Date.now()-cached.at<ACCOUNT_CACHE_MS)return cached.data;
   const data=(await broker.getAccount(userId)).data||{};
   workerAccountCache.set(key,{at:Date.now(),data});
+  return data;
+}
+async function getWorkerPositions(userId){
+  const key=String(userId);
+  const cached=workerPositionCache.get(key);
+  if(cached && Date.now()-cached.at<POSITION_CACHE_MS)return cached.data;
+  const data=(await broker.getPositions(userId)).data||[];
+  workerPositionCache.set(key,{at:Date.now(),data});
   return data;
 }
 async function getWorkerCandles(userId,symbol,timeframe,limit=100){
@@ -245,7 +263,8 @@ async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,pos
   const volumes=rawLots.map(lot=>normalizeLot(lot*lotScale,{minLot:ls.minVolume,maxLot:ls.maxVolume,step:ls.volumeStep}));
   const basketRisk=ladderRiskForLots(volumes,stopDistance,ls);
   if(!Number.isFinite(basketRisk)||basketRisk>budget*1.000001)return {action:"LADDER_RISK_BUDGET_BLOCKED",state:null,details:{budget,rawRisk,basketRisk,lotScale,volumes}};
-  if(positions.length+rungCount>Math.max(Number(s.maxPositions),cfg.maxTotalRungs))return {action:"LADDER_MAX_POSITION_CAP",state:null};
+  const positionCap=Math.min(cfg.maxTotalRungs,Math.max(cfg.fixedRungCount,Number(s.maxPositions)||cfg.fixedRungCount));
+  if(positions.length+rungCount>positionCap)return {action:"LADDER_MAX_POSITION_CAP",state:null,details:{positionCap}};
   const cycleId="kbv8_"+crypto.randomUUID();
   let opened=0;
   const positionIds=[];
@@ -341,7 +360,8 @@ async function executeLadderV8Manage({userId,botId,config,s,account,quote,positi
   let rungsOpened=Number(state.rungs_opened||0);
   let rungLots=Array.isArray(state.rung_lots)?state.rung_lots.map(Number):[];
   let positionIds=[...state.positionIds];
-  if(highMomentum&&!emergency&&rungsOpened<cfg.maxTotalRungs&&extendedSince>=cfg.pyramidStepPoints*spec.point&&riskAllowed){
+  const positionCap=Math.min(cfg.maxTotalRungs,Math.max(cfg.fixedRungCount,Number(s.maxPositions)||cfg.fixedRungCount));
+  if(highMomentum&&!emergency&&rungsOpened<positionCap&&extendedSince>=cfg.pyramidStepPoints*spec.point&&riskAllowed){
     const nextRaw=ladderRungLot(rungsOpened,cfg)*(Number(state.lot_scale||1));
     const nextLot=normalizeLot(nextRaw,{minLot:spec.minVolume,maxLot:spec.maxVolume,step:spec.volumeStep});
     const existingRisk=ladderRiskForLots(rungLots,Number(state.initial_stop_distance),spec);
@@ -439,7 +459,7 @@ async function execute(row){
     liquiditySweep:ind.liquiditySweep,orderBlock:ind.orderBlock,fairValueGap:ind.fairValueGap,displacement:ind.displacement,breakout:ind.breakout,retest:ind.retest,
     emaFast:ind.emaFast,emaSlow:ind.emaSlow,adx:ind.adx,rsi:ind.rsi,velocityPoints:v8Velocity,brokerPoint:0
   });
-  const positions=(await broker.getPositions(userId)).data||[];
+  const positions=await getWorkerPositions(userId);
 
   const riskStateQ=await pool.query("SELECT baseline_date,day_start_equity,peak_equity FROM kingbot_account_risk_state WHERE user_id=$1 AND provider=$2 AND account_id=$3",[userId,status.broker,status.accountId]);
   const today=new Date().toISOString().slice(0,10);
