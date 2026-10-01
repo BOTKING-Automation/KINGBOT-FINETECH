@@ -1,4 +1,5 @@
 import WebSocket from "ws";
+import { getDerivMarketFeed } from "./deriv-market-feed.js";
 
 const API_BASE = "https://api.derivws.com";
 const DERIV_PUBLIC_WS = "wss://api.derivws.com/trading/v1/options/ws/public";
@@ -149,7 +150,7 @@ export class DerivTraderClient {
   }
 
   async marketOneShot(payload,{timeoutMs=10000}={}){
-    const endpoints=[DERIV_PUBLIC_WS,DERIV_PUBLIC_WS_LEGACY];
+    const endpoints=[DERIV_PUBLIC_WS_LEGACY,DERIV_PUBLIC_WS];
     let lastError=null;
     for(const endpoint of endpoints){
       let ws=null;
@@ -443,20 +444,22 @@ export class DerivTraderClient {
   async getQuote(symbol){
     const requested=String(symbol||"").trim();
     const s=await this.resolveMarketSymbol(requested);
-    const response=await this.marketOneShot({ticks:s,subscribe:0},{timeoutMs:10000});
-    const tick=response?.tick||{};
-    const quote=finite(tick.quote);
+    const tick=await getDerivMarketFeed().getQuote(s,{maxAgeMs:5000,timeoutMs:8000});
+    const quote=finite(tick.price);
     if(quote===null)throw new Error("DERIV_QUOTE_UNAVAILABLE");
     return {
       connected:true,
       data:{
         symbol:s,
         requestedSymbol:requested,
-        bid:quote,
-        ask:quote,
+        bid:finite(tick.bid)??quote,
+        ask:finite(tick.ask)??quote,
         price:quote,
-        time:tick.epoch?new Date(Number(tick.epoch)*1000).toISOString():new Date().toISOString(),
-        source:"deriv-public-market-feed"
+        time:tick.time,
+        epoch:tick.epoch,
+        ageMs:tick.ageMs,
+        fresh:tick.ageMs<=5000,
+        source:"deriv-shared-live-feed"
       }
     };
   }
@@ -471,7 +474,7 @@ export class DerivTraderClient {
     return response?.contracts_for||response?.contracts||{};
   }
 
-  async getProposal({symbol,contractType,stake,currency,multiplier,subscribe=0}={}){
+  async getProposal({symbol,contractType,stake,currency,multiplier,subscribe=0,stopLoss,takeProfit}={}){
     const s=String(symbol||"").trim();
     const type=String(contractType||"").trim().toUpperCase();
     if(!s||!type)throw new Error("DERIV_PROPOSAL_INPUT_REQUIRED");
@@ -484,6 +487,13 @@ export class DerivTraderClient {
       underlying_symbol:s,
       subscribe:subscribe?1:0
     };
+    const sl=finite(stopLoss);
+    const tp=finite(takeProfit);
+    if(sl!==null||tp!==null){
+      payload.limit_order={};
+      if(sl!==null)payload.limit_order.stop_loss=sl;
+      if(tp!==null)payload.limit_order.take_profit=tp;
+    }
     if(multiplier!==undefined&&multiplier!==null)payload.multiplier=Number(multiplier);
     const response=await this.request(payload,{timeoutMs:12000});
     const proposal=response?.proposal;
@@ -571,11 +581,17 @@ export class DerivTraderClient {
     const direction=String(side||"").toUpperCase();
     const contractType=String(derivContractType||"").trim().toUpperCase()||(direction==="BUY"?"MULTUP":direction==="SELL"?"MULTDOWN":"");
     if(!contractType)throw new Error("INVALID_DERIV_SIDE");
-    const proposal=await this.getProposal({symbol:s,contractType,stake:Number(volume),currency:resolvedCurrency,multiplier:Number(multiplier),subscribe:0});
+    const proposal=await this.getProposal({symbol:s,contractType,stake:Number(volume),currency:resolvedCurrency,multiplier:Number(multiplier),subscribe:0,stopLoss,takeProfit});
     const bought=await this.buyContract({proposalId:proposal.proposalId,price:Number(proposal.askPrice),subscribe:0,reference:clientId||comment||""});
+    let protection=null;
     if(stopLoss!==undefined||takeProfit!==undefined){
-      try{await this.updateContract(bought.contractId,{stopLoss,takeProfit});}catch{}
+      try{
+        protection=await this.updateContract(bought.contractId,{stopLoss,takeProfit});
+      }catch(error){
+        try{await this.sellContract(bought.contractId,0);}catch{}
+        throw new Error("DERIV_PROTECTION_ATTACH_FAILED:"+(error?.message||"UNKNOWN_ERROR"));
+      }
     }
-    return {provider:"deriv",contractId:bought.contractId,proposalId:proposal.proposalId,contractType,stake:Number(volume),multiplier:Number(multiplier),comment:comment||"KINGBOT",buy:bought.buy};
+    return {provider:"deriv",contractId:bought.contractId,proposalId:proposal.proposalId,contractType,stake:Number(volume),multiplier:Number(multiplier),comment:comment||"KINGBOT",buy:bought.buy,protection};
   }
 }
