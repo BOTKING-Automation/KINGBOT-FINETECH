@@ -119,13 +119,22 @@ export class UserBrokerManager {
 
   async isConnected(userId){
     const prefix=String(userId)+":";
-    for(const [key] of this.connections){
-      if(key.startsWith(prefix))return true;
+    for(const [key,entry] of this.connections){
+      if(!key.startsWith(prefix))continue;
+
+      // Deriv is WebSocket-backed. A stale entry can remain in the process
+      // map after the broker closes the socket, so never report that entry as
+      // connected unless the underlying adapter explicitly says it is alive.
+      if(entry?.provider==="deriv" && entry?.api?.connected!==true){
+        this.connections.delete(key);
+        continue;
+      }
+      return true;
     }
 
     // Broker connection objects live in process memory, while the verified
     // account mapping is persistent. Rehydrate the connection after a
-    // Render restart, idle wake-up, or worker/page transition.
+    // Render restart, idle wake-up, broker socket close, or worker/page transition.
     const mapping=await this.getMapping(userId);
     if(!mapping)return false;
 
@@ -400,6 +409,14 @@ export class UserBrokerManager {
     if(!mapping)throw new Error("BROKER_ACCOUNT_NOT_CONFIGURED");
     const key=userId+":"+mapping.provider+":"+mapping.account_id;
     let entry=this.connections.get(key);
+
+    // Reconnect stale in-memory broker sessions. This is especially important
+    // for Deriv because its WebSocket can close while the persistent broker
+    // authorization remains valid.
+    if(entry?.provider==="deriv" && entry?.api?.connected!==true){
+      this.connections.delete(key);
+      entry=null;
+    }
 
     if(!entry){
       const result=await this.connect(userId,mapping.execution_mode);
