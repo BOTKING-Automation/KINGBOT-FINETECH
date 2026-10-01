@@ -266,7 +266,9 @@ export class DerivTraderClient {
     const response=await this.request(payload,{timeoutMs:12000});
     const proposal=response?.proposal;
     if(!proposal?.id)throw new Error("DERIV_PROPOSAL_ID_MISSING");
-    return {proposalId:String(proposal.id),askPrice:finite(proposal.ask_price),payout:finite(proposal.payout),spot:finite(proposal.spot),proposal};
+    const askPrice=finite(proposal.ask_price);
+    if(askPrice===null||askPrice<=0)throw new Error("DERIV_PROPOSAL_ASK_PRICE_UNAVAILABLE");
+    return {proposalId:String(proposal.id),askPrice,payout:finite(proposal.payout),spot:finite(proposal.spot),proposal};
   }
 
   async buyContract({proposalId,price,subscribe=0,reference=""}={}){
@@ -347,7 +349,7 @@ export class DerivTraderClient {
     const contractType=String(derivContractType||"").trim().toUpperCase()||(direction==="BUY"?"MULTUP":direction==="SELL"?"MULTDOWN":"");
     if(!contractType)throw new Error("INVALID_DERIV_SIDE");
     const proposal=await this.getProposal({symbol:s,contractType,stake:Number(volume),currency:resolvedCurrency,multiplier:Number(multiplier),subscribe:0});
-    const bought=await this.buyContract({proposalId:proposal.proposalId,price:Number(proposal.askPrice||volume),subscribe:0,reference:clientId||comment||""});
+    const bought=await this.buyContract({proposalId:proposal.proposalId,price:Number(proposal.askPrice),subscribe:0,reference:clientId||comment||""});
     if(stopLoss!==undefined||takeProfit!==undefined){
       try{await this.updateContract(bought.contractId,{stopLoss,takeProfit});}catch{}
     }
