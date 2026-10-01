@@ -274,34 +274,41 @@ export class DerivTraderClient {
     };
   }
 
-  async getPositions(){
-    const response=await this.request({portfolio:1});
-    const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
+  mapContract(c){
+    const type=String(c?.contract_type||c?.type||"").toUpperCase();
+    const side=type.includes("DOWN")||type.includes("PUT")||type.includes("SHORT")?"SELL":"BUY";
     return {
-      connected:true,
-      data:contracts.map(c=>({
-        id:c.contract_id,
-        contractId:c.contract_id,
-        symbol:c.underlying_symbol||c.symbol||null,
-        type:c.contract_type||c.type||null,
-        side:(String(c.contract_type||"").toUpperCase().includes("DOWN")||String(c.contract_type||"").toUpperCase().includes("PUT")||String(c.contract_type||"").toUpperCase().includes("SHORT"))?"SELL":"BUY",
-        contractType:c.contract_type||c.type||null,
-        volume:finite(c.buy_price),
-        stake:finite(c.buy_price),
-        openPrice:finite(c.entry_spot||c.entry_tick),
-        currentPrice:finite(c.current_spot||c.current_tick),
-        profit:finite(c.profit),
-        bidPrice:finite(c.bid_price),
-        payout:finite(c.payout),
-        multiplier:finite(c.multiplier),
-        expiryTime:finite(c.date_expiry),
-        status:c.status||"open"
-      }))
+      id:c?.contract_id||null,
+      contractId:c?.contract_id||null,
+      symbol:c?.underlying_symbol||c?.symbol||null,
+      type:c?.contract_type||c?.type||null,
+      side,
+      contractType:c?.contract_type||c?.type||null,
+      volume:finite(c?.buy_price),
+      stake:finite(c?.buy_price),
+      entry:finite(c?.entry_spot||c?.entry_tick),
+      openPrice:finite(c?.entry_spot||c?.entry_tick),
+      currentPrice:finite(c?.current_spot||c?.current_tick),
+      profit:finite(c?.profit),
+      bidPrice:finite(c?.bid_price),
+      payout:finite(c?.payout),
+      multiplier:finite(c?.multiplier),
+      expiryTime:finite(c?.date_expiry),
+      time:finite(c?.date_start),
+      status:String(c?.status||"open").toUpperCase()
     };
   }
 
+  async getPositions(){
+    const response=await this.request({portfolio:1});
+    const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
+    return {connected:true,data:contracts.map(c=>this.mapContract(c))};
+  }
+
   async getOrders(){
-    return {connected:true,data:[]};
+    const response=await this.request({portfolio:1});
+    const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
+    return {connected:true,data:contracts.map(c=>this.mapContract(c))};
   }
 
   async getTrades({startTime,endTime}={}){
