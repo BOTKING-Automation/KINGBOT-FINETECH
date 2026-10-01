@@ -273,10 +273,11 @@ export class UserBrokerManager {
           });
           await api.ensureReady();
           const accountInfo=await api.getAccountInformation();
-          entry={api,accountInfo,accountId:mapping.account_id,executionMode:mode,provider:"exness",connectedAt:Date.now()};
+          entry={api,accountInfo,accountId:mapping.account_id,executionMode:mode,provider:"exness",connectedAt:Date.now(),accountInfoAt:Date.now()};
           this.connections.set(key,entry);
         }else{
           entry.accountInfo=await entry.api.getAccountInformation();
+          entry.accountInfoAt=Date.now();
         }
         const info=entry.accountInfo||{};
         if(info.trade_mode==="trading_disabled")return {connected:false,mode:"NOT_CONNECTED",reason:"EXNESS_TRADING_DISABLED"};
@@ -300,12 +301,13 @@ export class UserBrokerManager {
             accountType:parsed.accountType
           });
           const result=await api.connect();
-          entry={api,accountId:mapping.account_id,executionMode:mode,provider:"deriv",connectedAt:Date.now(),accountInfo:result.account};
+          entry={api,accountId:mapping.account_id,executionMode:mode,provider:"deriv",connectedAt:Date.now(),accountInfo:result.account,accountInfoAt:Date.now()};
           this.connections.set(key,entry);
         }else{
           entry.executionMode=mode;
           entry.api.executionMode=mode;
           entry.accountInfo=(await entry.api.getAccount()).data;
+          entry.accountInfoAt=Date.now();
         }
         entry.executionMode=mode;
         return {connected:true,mode,broker:"deriv",accountId:mapping.account_id,account:entry.accountInfo};
@@ -326,10 +328,11 @@ export class UserBrokerManager {
             baseUrl:parsed.baseUrl
           });
           const accountInfo=await api.ensureReady();
-          entry={api,accountId:mapping.account_id,executionMode:mode,provider:"oanda",connectedAt:Date.now(),accountInfo};
+          entry={api,accountId:mapping.account_id,executionMode:mode,provider:"oanda",connectedAt:Date.now(),accountInfo,accountInfoAt:Date.now()};
           this.connections.set(key,entry);
         }else{
           entry.accountInfo=await entry.api.getAccountSummary();
+          entry.accountInfoAt=Date.now();
         }
         entry.executionMode=mode;
         return {connected:true,mode,broker:"oanda",accountId:mapping.account_id,account:entry.accountInfo};
