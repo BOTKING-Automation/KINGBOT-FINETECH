@@ -755,7 +755,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     $("syncMarketState").className="sync-state live";
     $("syncMarketMain").textContent=symbol+" · "+(Number.isFinite(mid)?fmtNumber(mid,dec):"—");
     $("syncMarketTime").textContent=fmtTime(new Date().toISOString());
-    state.quote={data:{...d,bid:Number.isFinite(bid)?bid:mid,ask:Number.isFinite(ask)?ask:mid}};$("itTapeSymbol").textContent=symbol;$("itTapeBid").textContent=Number.isFinite(bid)?fmtNumber(bid,dec):"—";$("itTapeAsk").textContent=Number.isFinite(ask)?fmtNumber(ask,dec):"—";$("itTapeEvent").textContent="TICK #"+(++state.live.lastQuoteCount);$("itTapePositions").textContent=state.account?.positionCount??$("positionCount").textContent||"0";if(q?.serverReceivedAt){state.live.lastQuoteServerAt=q.serverReceivedAt;}$("itQuoteAge").textContent="0ms";
+    state.quote={data:{...d,bid:Number.isFinite(bid)?bid:mid,ask:Number.isFinite(ask)?ask:mid}};$("itTapeSymbol").textContent=symbol;$("itTapeBid").textContent=Number.isFinite(bid)?fmtNumber(bid,dec):"—";$("itTapeAsk").textContent=Number.isFinite(ask)?fmtNumber(ask,dec):"—";$("itTapeEvent").textContent="TICK #"+(++state.live.lastQuoteCount);$("itTapePositions").textContent=String(state.account?.positionCount ?? ($("positionCount").textContent || "0"));if(q?.serverReceivedAt){state.live.lastQuoteServerAt=q.serverReceivedAt;}$("itQuoteAge").textContent="0ms";
     state.live.lastQuoteAt=Date.now();
     const age=Number.isFinite(Number(d.ageMs))?Math.max(0,Number(d.ageMs)):0;
     $("footerState").textContent="LIVE STREAM · TICK AGE "+Math.round(age)+"ms";
