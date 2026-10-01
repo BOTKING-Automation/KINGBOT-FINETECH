@@ -112,11 +112,11 @@ async function execute(row){
     return;
   }
   const config=(await pool.query("SELECT symbol,timeframe FROM kingbot_bot_runtime WHERE user_id=$1 AND bot_id=$2",[userId,botId])).rows[0];
-  if(!config?.symbol){await pool.query("UPDATE kingbot_bot_runtime SET state='ERROR',last_error='SYMBOL_NOT_CONFIGURED',updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);return;}
+  if(!config?.symbol){await pool.query("UPDATE kingbot_bot_runtime SET state='RUNNING',last_error='SYMBOL_NOT_CONFIGURED_RETRYING',last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);return;}
   const s=await settings(userId,botId);
   if(s.killSwitch){await pool.query("UPDATE kingbot_bot_runtime SET state='PAUSED',last_error='KILL_SWITCH_ACTIVE',updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);return;}
   const status=await broker.getStatus(userId);
-  if(!status.configured){await pool.query("UPDATE kingbot_bot_runtime SET state='ERROR',last_error='BROKER_ACCOUNT_NOT_MAPPED',updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);return;}
+  if(!status.configured){await pool.query("UPDATE kingbot_bot_runtime SET state='RUNNING',last_error='BROKER_ACCOUNT_NOT_MAPPED_RETRYING',last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);return;}
   if(!status.connected){const connected=await broker.connect(userId,s.executionMode);if(!connected.connected)throw new Error(connected.reason||"BROKER_CONNECTION_FAILED");}
   const account=(await broker.getAccount(userId)).data||{};
   const brokerName=String(status.broker||"").toLowerCase();
