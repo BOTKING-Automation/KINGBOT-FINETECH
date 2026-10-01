@@ -638,6 +638,11 @@ export class UserBrokerManager {
       }
     }
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getMarkets()};
+    if(String(entry.provider).toLowerCase()==="deriv-mt5" && entry.connection.terminalState?.specifications){
+      const specs=entry.connection.terminalState.specifications;
+      const list=Array.isArray(specs)?specs:Object.values(specs||{});
+      return {connected:true,data:list.map(item=>({symbol:String(item?.symbol||"").toUpperCase(),name:String(item?.description||item?.symbol||"").trim(),category:"CFD",submarket:String(item?.path||"").trim(),tradeable:true,source:"deriv-mt5-stream",minVolume:Number(item?.minVolume)||null,maxVolume:Number(item?.maxVolume)||null,volumeStep:Number(item?.volumeStep)||null,digits:Number(item?.digits)||null,contractSize:Number(item?.contractSize)||null})).filter(x=>x.symbol)};
+    }
     if(typeof entry.connection.getSymbols==="function"){
       const list=await entry.connection.getSymbols();
       return {connected:true,data:(Array.isArray(list)?list:[]).map(item=>typeof item==="string"?({symbol:item.toUpperCase(),name:item,category:"",submarket:"",tradeable:true,source:"broker"}):({symbol:String(item?.symbol||item?.name||"").toUpperCase(),name:String(item?.displayName||item?.name||item?.symbol||"").trim(),category:String(item?.type||item?.category||"").trim(),submarket:String(item?.group||"").trim(),tradeable:item?.tradeable!==false,source:"broker"})).filter(x=>x.symbol)};
@@ -650,6 +655,11 @@ export class UserBrokerManager {
     if(entry.provider==="exness")return {connected:true,data:await entry.api.getInstrumentConditions(String(symbol).trim().toUpperCase())};
     if(entry.provider==="deriv")return await entry.api.getSymbolSpecification(String(symbol).trim().toUpperCase());
     if(entry.provider==="oanda")return {connected:true,data:await entry.api.getInstrumentSpecification(String(symbol).trim().toUpperCase())};
+    if(String(entry.provider).toLowerCase()==="deriv-mt5"){
+      const spec=entry.connection.terminalState.specification(String(symbol).trim().toUpperCase());
+      if(!spec)throw new Error("MT5_SYMBOL_NOT_AVAILABLE:"+String(symbol).trim().toUpperCase());
+      return {connected:true,data:spec};
+    }
     return {connected:true,data:await entry.connection.getSymbolSpecification(String(symbol).trim().toUpperCase())};
   }
 
