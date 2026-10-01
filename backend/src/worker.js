@@ -897,23 +897,25 @@ async function cycle(){
     console.log("[KINGBOT WORKER] heartbeat",JSON.stringify({runningBots:q.rows.length,bots:q.rows.map(x=>String(x.bot_id)).slice(0,25),pollMs:WORKER_POLL_MS}));
   }
 
-  for(let i=0;i<q.rows.length;i+=MAX_PARALLEL_BOTS){
-    if(stopping)break;
-    const batch=q.rows.slice(i,i+MAX_PARALLEL_BOTS);
-    await Promise.allSettled(batch.map(async row=>{
-      const executionKey=String(row.user_id)+":"+String(row.bot_id);
-      if(activeExecutionKeys.has(executionKey))return;
-      activeExecutionKeys.add(executionKey);
-      try{await execute(row);}
-      catch(error){
-        console.error("[KINGBOT WORKER] execution error",JSON.stringify({botId:row.bot_id,error:String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500),at:new Date().toISOString()}));
-        const message=String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500);
+  let launched=0;
+  for(const row of q.rows){
+    if(stopping||launched>=MAX_PARALLEL_BOTS)break;
+    const executionKey=String(row.user_id)+":"+String(row.bot_id);
+    if(activeExecutionKeys.has(executionKey))continue;
+    activeExecutionKeys.add(executionKey);
+    launched++;
+    void execute(row).catch(async error=>{
+      console.error("[KINGBOT WORKER] execution error",JSON.stringify({botId:row.bot_id,error:String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500),at:new Date().toISOString()}));
+      const message=String(error?.message||"WORKER_EXECUTION_FAILED").slice(0,500);
+      try{
         await pool.query("UPDATE kingbot_bot_runtime SET state='RUNNING',last_error=$3,last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[row.user_id,row.bot_id,message]);
         await audit(row.user_id,"BOT_WORKER_ERROR",{botId:row.bot_id,error:message,retryable:true});
-      }finally{
-        activeExecutionKeys.delete(executionKey);
+      }catch(dbError){
+        console.error("[KINGBOT WORKER] failure state persistence error",dbError?.message||dbError);
       }
-    }));
+    }).finally(()=>{
+      activeExecutionKeys.delete(executionKey);
+    });
   }
 }
 
