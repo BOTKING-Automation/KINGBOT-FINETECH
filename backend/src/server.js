@@ -18,6 +18,8 @@ import { requireUser } from "./subscriptions.js";
 import { isAdminEmail } from "./admin-access.js";
 import { createBotRuntimeRouter, ensureBotRuntimeSchema } from "./bot-runtime.js";
 import { startWorker } from "./worker.js";
+import { createMt5BridgeRouter, ensureMt5BridgeSchema } from "./mt5-bridge-router.js";
+import { mt5BridgeRegistry } from "./mt5-bridge.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -31,7 +33,7 @@ const partners = new PartnerManager({pool});
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
-app.use(express.json({ limit: "16kb" }));
+app.use(express.json({ limit: "64kb" }));
 const allowedOrigin = process.env.FRONTEND_ORIGIN?.trim();
 app.use(cors({ origin: allowedOrigin || true, credentials: true, methods: ["GET","POST","OPTIONS"], allowedHeaders: ["Content-Type","Authorization"] }));
 
@@ -40,6 +42,7 @@ app.use("/api/auth", createAuthRouter({ pool, sessionTtlHours: Number(process.en
 app.use("/api/subscription", createSubscriptionRouter({ pool, broker }));
 app.use("/api/bots", createBotEngineRouter({ pool }));
 app.use("/api/runtime", createBotRuntimeRouter({ pool, broker }));
+app.use("/api/mt5/bridge", createMt5BridgeRouter({ pool, broker }));
 
 app.get("/api/risk", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
@@ -340,6 +343,7 @@ app.post("/api/broker/disconnect", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   try{
     const result=await broker.disconnect(user.id);
+    await mt5BridgeRegistry.revokeUserTokens(user.id).catch(()=>{});
     await pool.query(
       "UPDATE kingbot_bot_runtime SET state='STOPPED',last_error=$2,updated_at=NOW() WHERE user_id=$1 AND state='RUNNING'",
       [user.id,"BROKER_DISCONNECTED"]
@@ -1454,7 +1458,7 @@ app.use((_req, res) => {
   });
 });
 
-ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => partners.ensureSchema()).then(() => {
+ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => partners.ensureSchema()).then(() => {
   app.listen(PORT, () => {
     console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
     void startWorker().then(() => {
