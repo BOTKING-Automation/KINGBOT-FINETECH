@@ -380,18 +380,60 @@ function selectBroker(slug){
 }
 
 async function generateMt5BridgeToken(){
+  const btn=$("generateMt5Token");
   try{
-    const btn=$("generateMt5Token");btn.disabled=true;btn.textContent="GENERATING…";
+    btn.disabled=true;btn.textContent="GENERATING…";
+    $("mt5BridgeStatus").textContent="AUTHENTICATING KINGBOT SESSION…";
+    $("mt5SwitchAction")?.remove();
     const t=await firebaseToken();
-    const r=await fetch(API_BASE+"/mt5/bridge/token",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify({executionMode:selectedExecution,label:"KINGBOT MT5 Bridge"})});
+    const payload={executionMode:selectedExecution,label:"KINGBOT MT5 Bridge"};
+    const r=await fetch(API_BASE+"/mt5/bridge/token",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify(payload),credentials:"omit",cache:"no-store"});
     const d=await r.json().catch(()=>({}));
-    if(!r.ok||!d.token)throw new Error(d.error||d.reason||"Unable to generate the MT5 bridge token.");
+    if(r.status===409&&d.switchRequired){
+      const provider=String(d.currentProvider||"broker").toUpperCase();
+      $("mt5BridgeStatus").textContent="CURRENT "+provider+" CONNECTION ACTIVE · SWITCH REQUIRED";
+      const action=document.createElement("button");
+      action.id="mt5SwitchAction";
+      action.type="button";
+      action.className="modal-btn";
+      action.style.marginTop="8px";
+      action.textContent="SWITCH CURRENT BROKER → MT5";
+      action.addEventListener("click",switchToMt5Bridge);
+      $("mt5BridgeStatus").insertAdjacentElement("afterend",action);
+      setStatus("Another broker is still active. Switching is explicit: it will disable that connection and stop any KINGBOT bots using it before issuing the MT5 bridge token.");
+      return;
+    }
+    if(!r.ok||!d.token)throw new Error(d.error||d.reason||d.message||("MT5 token request failed (HTTP "+r.status+")."));
     $("mt5BridgeToken").value=d.token;
-    $("mt5BridgeStatus").textContent="TOKEN READY · "+(d.expectedMode==="LIVE"?"LIVE / REAL":"DEMO · LIVE BROKER")+" · COPY INTO THE EA NOW";
+    $("mt5BridgeStatus").textContent="TOKEN READY · "+(d.expectedMode==="LIVE"?"LIVE / REAL":"DEMO · BROKER MT5")+" · COPY INTO THE EA NOW";
     setStatus("Bridge token generated. Paste it into KINGBOT_MT5_BRIDGE.mq5, compile the EA, attach it to MT5, and enable Algo Trading.");
     startMt5BridgeWatch();
-  }catch(e){$("mt5BridgeStatus").textContent="TOKEN ERROR";setStatus(e.message||"MT5 bridge token generation failed.");}
-  finally{$("generateMt5Token").disabled=false;$("generateMt5Token").textContent="GENERATE BRIDGE TOKEN";}
+  }catch(e){
+    $("mt5BridgeStatus").textContent="TOKEN ERROR · "+String(e.message||"REQUEST FAILED").slice(0,180);
+    setStatus(e.message||"MT5 bridge token generation failed.");
+  }finally{btn.disabled=false;btn.textContent="GENERATE BRIDGE TOKEN";}
+}
+async function switchToMt5Bridge(){
+  const action=$("mt5SwitchAction"),btn=$("generateMt5Token");
+  try{
+    action&&(action.disabled=true,action.textContent="SWITCHING…");
+    btn.disabled=true;
+    $("mt5BridgeStatus").textContent="SWITCHING BROKER ROUTE…";
+    const t=await firebaseToken();
+    const r=await fetch(API_BASE+"/mt5/bridge/switch",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify({executionMode:selectedExecution,label:"KINGBOT MT5 Bridge"}),credentials:"omit",cache:"no-store"});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.token)throw new Error(d.error||d.reason||d.message||("MT5 switch failed (HTTP "+r.status+")."));
+    $("mt5BridgeToken").value=d.token;
+    $("mt5BridgeStatus").textContent="TOKEN READY · "+(d.expectedMode==="LIVE"?"LIVE / REAL":"DEMO · BROKER MT5")+" · CURRENT BROKER SWITCHED";
+    $("mt5SwitchAction")?.remove();
+    setStatus((d.stoppedRunningBots||0)>0
+      ?"MT5 route active. "+d.stoppedRunningBots+" running KINGBOT bot(s) were stopped with the previous broker. Paste the new bridge token into KINGBOT_MT5_BRIDGE.mq5 and enable Algo Trading."
+      :"MT5 route active. Paste the new bridge token into KINGBOT_MT5_BRIDGE.mq5, compile it, attach it to the exact Deriv MT5 account, and enable Algo Trading.");
+    startMt5BridgeWatch();
+  }catch(e){
+    $("mt5BridgeStatus").textContent="SWITCH ERROR · "+String(e.message||"REQUEST FAILED").slice(0,180);
+    setStatus(e.message||"MT5 bridge switch failed.");
+  }finally{btn.disabled=false;}
 }
 async function checkMt5Bridge(){
   try{
@@ -450,10 +492,16 @@ async function trackExnessPartner(){return trackBrokerPartner("exness");}
 async function firebaseToken(){
   if(!window.KINGBOT_FIREBASE)await import("./system/firebase-auth.js");
   const fb=window.KINGBOT_FIREBASE;
-  const u=await fb.waitForAuthReady(10000).catch(()=>fb?.auth?.currentUser||null);
-  if(!u)throw new Error("Please sign in to KINGBOT first.");
+  if(!fb)throw new Error("Firebase Authentication is unavailable. Refresh the page and sign in again.");
+  let u=fb.auth?.currentUser||null;
+  if(!u)u=await fb.waitForAuthReady(12000).catch(()=>fb.auth?.currentUser||null);
+  if(!u)throw new Error("KINGBOT session is not available. Sign in again, then return to Broker Connect.");
+  try{await fb.auth?.currentUser?.reload?.();}catch{}
+  u=fb.auth?.currentUser||u;
   if(!u.emailVerified)throw new Error("Verify your email before connecting a broker.");
-  return u.getIdToken(true);
+  const token=await u.getIdToken(true);
+  if(!token)throw new Error("KINGBOT authentication token could not be issued. Sign in again.");
+  return token;
 }
 async function startDerivOAuth(){
   try{
