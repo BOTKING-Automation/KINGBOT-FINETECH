@@ -592,7 +592,7 @@ export class DerivTraderClient {
       point:Number(market?.pipSize)||0.00001,
       tickSize:Number(market?.pipSize)||0.00001,
       tickValue:1,
-      minVolume:0.35,
+      minVolume:1,
       maxVolume:100000,
       volumeStep:0.01,
       stopsLevel:0,
