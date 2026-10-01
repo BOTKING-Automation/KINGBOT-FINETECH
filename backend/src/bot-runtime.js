@@ -61,6 +61,12 @@ export function createBotRuntimeRouter({pool,broker}){
     if(!symbol){
       return res.status(400).json({ok:false,error:"BROKER_MARKET_REQUIRED",message:"Select a market from the connected broker catalog before starting the engine. No order was submitted."});
     }
+    try{
+      const marketCheck=await broker.validateMarket(user.id,symbol);
+      if(!marketCheck.ok)return res.status(400).json({ok:false,error:marketCheck.error,message:"The selected market is not available for the connected broker account. Choose a market from the broker catalog. No order was submitted."});
+    }catch(error){
+      return res.status(503).json({ok:false,error:"BROKER_MARKET_VALIDATION_UNAVAILABLE",reason:error?.message||"BROKER_MARKET_VALIDATION_FAILED",message:"KINGBOT could not verify the selected market against the connected broker. No order was submitted."});
+    }
     const allowedTimeframes=["1m","2m","3m","4m","5m","6m","10m","12m","15m","20m","30m","1h","2h","3h","4h","6h","8h","12h","1d","1w","1mn"];
     if(!allowedTimeframes.includes(timeframe))return res.status(400).json({ok:false,error:"INVALID_TIMEFRAME"});
     if(requestedSymbol || requestedTimeframe){
@@ -87,6 +93,13 @@ export function createBotRuntimeRouter({pool,broker}){
     const symbol=String(req.body?.symbol||"").trim().toUpperCase();
     const timeframe=String(req.body?.timeframe||"1m").trim();
     if(!/^[A-Z0-9._-]{3,30}$/.test(symbol))return res.status(400).json({ok:false,error:"INVALID_SYMBOL"});
+    if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before selecting a market. No bot configuration was saved."});
+    try{
+      const marketCheck=await broker.validateMarket(user.id,symbol);
+      if(!marketCheck.ok)return res.status(400).json({ok:false,error:marketCheck.error,message:"The selected market is not available for the connected broker account. Choose a market from the broker catalog."});
+    }catch(error){
+      return res.status(503).json({ok:false,error:"BROKER_MARKET_VALIDATION_UNAVAILABLE",reason:error?.message||"BROKER_MARKET_VALIDATION_FAILED",message:"KINGBOT could not verify the selected market against the connected broker. No bot configuration was saved."});
+    }
     const allowed=["1m","2m","3m","4m","5m","6m","10m","12m","15m","20m","30m","1h","2h","3h","4h","6h","8h","12h","1d","1w","1mn"];
     if(!allowed.includes(timeframe))return res.status(400).json({ok:false,error:"INVALID_TIMEFRAME"});
     await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS symbol TEXT, ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '1m'");
