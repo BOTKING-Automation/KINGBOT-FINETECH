@@ -8,7 +8,7 @@ function hashToken(token){
   return crypto.createHash("sha256").update(String(token||""),"utf8").digest("hex");
 }
 function clean(value,max=200){return String(value??"").trim().slice(0,max);}
-function modeOf(value){const mode=String(value||"DEMO").toUpperCase();return mode==="LIVE"?"LIVE":"PAPER";}
+function modeOf(value){const mode=String(value||"DEMO").toUpperCase();return mode==="LIVE"?"LIVE":"DEMO";}
 function displayMode(value){return modeOf(value)==="LIVE"?"LIVE":"DEMO";}
 function terminalTypeOf(value){
   const raw=String(value||"").toUpperCase();
@@ -32,7 +32,7 @@ export class Mt5BridgeRegistry{
       user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,
       token_hash TEXT NOT NULL UNIQUE,
       label TEXT NOT NULL DEFAULT 'KINGBOT MT5 Bridge',
-      expected_mode TEXT NOT NULL DEFAULT 'PAPER' CHECK(expected_mode IN ('PAPER','LIVE')),
+      expected_mode TEXT NOT NULL DEFAULT 'DEMO' CHECK(expected_mode IN ('DEMO','LIVE')),
       expires_at TIMESTAMPTZ NOT NULL,
       revoked BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -42,10 +42,13 @@ export class Mt5BridgeRegistry{
       account_type TEXT,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+    await this.pool.query("UPDATE kingbot_mt5_bridge_tokens SET expected_mode='DEMO' WHERE expected_mode='PAPER'");
+    await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens DROP CONSTRAINT IF EXISTS kingbot_mt5_bridge_tokens_expected_mode_check");
+    await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens ADD CONSTRAINT kingbot_mt5_bridge_tokens_expected_mode_check CHECK(expected_mode IN ('DEMO','LIVE'))");
     await this.pool.query("CREATE INDEX IF NOT EXISTS kingbot_mt5_bridge_tokens_user_idx ON kingbot_mt5_bridge_tokens(user_id,revoked,expires_at)");
     await this.pool.query("CREATE INDEX IF NOT EXISTS kingbot_mt5_bridge_tokens_seen_idx ON kingbot_mt5_bridge_tokens(last_seen_at)");
   }
-  async issueToken({userId,mode="PAPER",label="KINGBOT MT5 Bridge"}={}){
+  async issueToken({userId,mode="DEMO",label="KINGBOT MT5 Bridge"}={}){
     if(!this.pool||!userId)throw new Error("USER_CONTEXT_REQUIRED");
     const expected=modeOf(mode);
     const active=await this.pool.query("SELECT provider FROM kingbot_broker_accounts WHERE user_id=$1 AND enabled=TRUE ORDER BY updated_at DESC LIMIT 1",[userId]);
