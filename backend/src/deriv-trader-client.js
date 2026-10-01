@@ -412,7 +412,7 @@ export class DerivTraderClient {
       stake:finite(c?.buy_price),
       entry:finite(c?.entry_spot||c?.entry_tick),
       openPrice:finite(c?.entry_spot||c?.entry_tick),
-      currentPrice:finite(c?.current_spot||c?.current_tick),
+      currentPrice:finite(c?.current_spot||c?.current_tick||c?.bid_price),
       profit:finite(c?.profit),
       bidPrice:finite(c?.bid_price),
       payout:finite(c?.payout),
@@ -470,12 +470,18 @@ export class DerivTraderClient {
     return await this.portfolioInflight;
   }
 
-  async getPositions(){
-    return {connected:true,data:await this.getPortfolioSnapshot()};
+  async getLivePositions(){
+    const response=await this.request({portfolio:1},{timeoutMs:6000});
+    const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
+    return contracts.map(contract=>this.mapContract(contract));
   }
 
-  async getOrders(){
-    return {connected:true,data:await this.getPortfolioSnapshot()};
+  async getPositions({force=false}={}){
+    return {connected:true,data:await this.getPortfolioSnapshot({force})};
+  }
+
+  async getOrders({force=false}={}){
+    return {connected:true,data:await this.getPortfolioSnapshot({force})};
   }
 
   async getTrades({startTime,endTime}={}){
