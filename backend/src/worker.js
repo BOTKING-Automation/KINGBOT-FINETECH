@@ -200,8 +200,8 @@ const workerAccountCache=new Map();
 const workerPositionCache=new Map();
 const workerCandleCache=new Map();
 const workerLossCache=new Map();
-const ACCOUNT_CACHE_MS=1500;
-const POSITION_CACHE_MS=1200;
+const ACCOUNT_CACHE_MS=2500;
+const POSITION_CACHE_MS=5000;
 const LOSS_CACHE_MS=5000;
 const CANDLE_CACHE_MIN_MS=5000;
 
