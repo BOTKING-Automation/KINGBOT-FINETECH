@@ -470,6 +470,18 @@ export class UserBrokerManager {
     return {connected:true,data:{orders,deals}};
   }
 
+  async getMarkets(userId){
+    const entry=await this.connectionFor(userId);
+    if(entry.provider==="exness")return {connected:true,data:await entry.api.getMarkets()};
+    if(entry.provider==="deriv")return {connected:true,data:await entry.api.getMarkets()};
+    if(entry.provider==="oanda")return {connected:true,data:await entry.api.getMarkets()};
+    if(typeof entry.connection.getSymbols==="function"){
+      const list=await entry.connection.getSymbols();
+      return {connected:true,data:(Array.isArray(list)?list:[]).map(item=>typeof item==="string"?({symbol:item.toUpperCase(),name:item,category:"",submarket:"",tradeable:true,source:"broker"}):({symbol:String(item?.symbol||item?.name||"").toUpperCase(),name:String(item?.displayName||item?.name||item?.symbol||"").trim(),category:String(item?.type||item?.category||"").trim(),submarket:String(item?.group||"").trim(),tradeable:item?.tradeable!==false,source:"broker"})).filter(x=>x.symbol)};
+    }
+    return {connected:true,data:[]};
+  }
+
   async getSymbolSpecification(symbol,userId){
     const entry=await this.connectionFor(userId);
     if(entry.provider==="exness")return {connected:true,data:await entry.api.getInstrumentConditions(String(symbol).trim().toUpperCase())};
