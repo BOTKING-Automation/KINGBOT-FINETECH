@@ -132,13 +132,13 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
         </div>
       </article>
 
-      <article class="broker deriv" data-broker="derivmt5" data-mode="bridge" data-cap-demo="yes" data-cap-live="yes" data-native="no" data-search="deriv mt5 cfd forex gold xauusd mt5 metaapi bridge demo real">
+      <article class="broker deriv" data-broker="derivmt5" data-mode="bridge" data-cap-demo="yes" data-cap-live="yes" data-native="yes" data-search="deriv mt5 cfd forex gold xauusd native bridge demo real">
         <div class="broker-inner">
-          <div class="broker-top"><div class="brand"><div class="logo"><img src="https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg" alt="Deriv MT5"></div><div><div class="broker-name">DERIV MT5</div><div class="broker-code">CFD · MT5 · CLOUD BRIDGE</div></div></div><span class="availability live">MT5</span></div>
-          <div class="broker-copy">Use the dedicated Deriv MT5 account for native CFD execution. KINGBOT will receive MT5 lot volume, entry/current price, floating profit, commission, swap and protective levels.</div>
-          <div class="broker-specs"><div class="spec"><b>CONNECTION</b><span>MT5 CLOUD BRIDGE</span></div><div class="spec"><b>EXECUTION</b><span>NATIVE CFD · LOTS</span></div></div>
-          <div class="meta"><span>XAUUSD</span><span>CFDs</span><span>LOTS</span><span>MT5</span></div><div class="environment"><span class="demo">● DEMO</span><span class="live">● LIVE / REAL</span></div><div class="connection-diagnostics"><div class="diag ok"><b>AUTH</b><span>BRIDGE</span></div><div class="diag ok"><b>POSITIONS</b><span>MT5</span></div><div class="diag ok"><b>MARKET DATA</b><span>STREAM</span></div><div class="diag build"><b>EXECUTION</b><span>MT5 LOTS</span></div></div>
-          <div class="broker-action"><button class="connect" data-open="derivmt5">CONNECT DERIV MT5</button><a class="docs" href="https://app.metaapi.cloud/" target="_blank" rel="noopener">OPEN MT5 BRIDGE ↗</a></div><div class="status-line">Setup: add the Deriv MT5 account to MetaApi, then enter the MetaApi account ID and access token below.</div>
+          <div class="broker-top"><div class="brand"><div class="logo"><img src="https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg" alt="Deriv MT5"></div><div><div class="broker-name">DERIV MT5</div><div class="broker-code">CFD · MT5 · NATIVE EA BRIDGE</div></div></div><span class="availability live">MT5</span></div>
+          <div class="broker-copy">Connect the dedicated Deriv MT5 account through the KINGBOT MT5 EA Bridge. Execution remains inside MT5 and KINGBOT receives broker-native lots, prices, floating P/L, S/L, T/P and account telemetry.</div>
+          <div class="broker-specs"><div class="spec"><b>CONNECTION</b><span>KINGBOT EA BRIDGE</span></div><div class="spec"><b>EXECUTION</b><span>NATIVE CFD · LOTS</span></div></div>
+          <div class="meta"><span>XAUUSD</span><span>CFDs</span><span>LOTS</span><span>MT5</span></div><div class="environment"><span class="demo">● DEMO</span><span class="live">● LIVE / REAL</span></div><div class="connection-diagnostics"><div class="diag ok"><b>AUTH</b><span>BRIDGE</span></div><div class="diag ok"><b>POSITIONS</b><span>MT5</span></div><div class="diag ok"><b>MARKET DATA</b><span>STREAM</span></div><div class="diag ok"><b>EXECUTION</b><span>NATIVE LOTS</span></div></div>
+          <div class="broker-action"><button class="connect" data-open="derivmt5">CONNECT DERIV MT5</button><a class="docs" href="https://deriv.com/trading-platforms/mt5/web-terminal" target="_blank" rel="noopener">OPEN DERIV MT5 ↗</a></div><div class="status-line">Setup: sign into Deriv MT5, install the KINGBOT EA Bridge, generate a KINGBOT token, then paste it into the EA.</div>
         </div>
       </article>
 
@@ -237,6 +237,13 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
 <div class="field" id="oandaTokenField" style="grid-column:1/-1;display:none"><label>OANDA PERSONAL API TOKEN</label><input id="oandaToken" type="password" autocomplete="off" placeholder="Paste the OANDA token from Manage API Access"></div>
         </div>
         <div class="status-line" id="credentialHelp">Exness flow: create the API key in Exness Key Management, select the trading account that the key may access, copy the secret once, and paste the values here. KINGBOT signs requests on the server; credentials are encrypted and never stored in browser localStorage.</div>
+<div id="mt5BridgePanel" style="display:none;margin-top:16px;padding:16px;border:1px solid rgba(34,230,255,.22);border-radius:16px;background:linear-gradient(135deg,rgba(10,18,36,.96),rgba(15,10,28,.92));box-shadow:0 0 28px rgba(34,230,255,.08)">
+<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><div style="font-size:11px;font-weight:800;letter-spacing:.14em;color:#22e6ff">KINGBOT MT5 EA BRIDGE</div><div style="margin-top:4px;font-size:12px;color:#aeb9ca">Execution stays inside your MT5 terminal.</div></div><div id="mt5BridgeMode" style="font-size:11px;font-weight:800;color:#ffc84a">DEMO / PAPER</div></div>
+<div style="margin-top:14px;font-size:12px;line-height:1.65;color:#aeb9ca">1. Sign into the exact Deriv MT5 account. 2. Install and compile <b>KINGBOT_MT5_BRIDGE.mq5</b>. 3. Add the KINGBOT API host to MT5 WebRequest allowed URLs. 4. Generate a token below and paste it into the EA.</div>
+<div style="margin-top:14px;display:grid;grid-template-columns:1fr auto;gap:8px"><input id="mt5BridgeToken" readonly type="text" autocomplete="off" placeholder="Generate a secure bridge token" style="width:100%;box-sizing:border-box;font-family:monospace;letter-spacing:.04em"><button class="modal-btn alt" id="copyMt5Token" type="button">COPY</button></div>
+<div class="modal-actions" style="margin-top:10px"><button class="modal-btn" id="generateMt5Token" type="button">GENERATE BRIDGE TOKEN</button></div>
+<div id="mt5BridgeStatus" class="status-line">TOKEN NOT GENERATED</div>
+</div>
         <div class="modal-actions"><button class="modal-btn" id="verifyBtn" type="button">VERIFY EXNESS CONNECTION</button></div>
       </div>
 
@@ -259,7 +266,7 @@ const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbo
 const cfg={
   oanda:{name:"OANDA",login:"https://fxtrade.oanda.com/",api:"https://developer.oanda.com/rest-live-v20/authentication/",native:true,mode:"oanda"},
   deriv:{name:"DERIV",login:"https://app.deriv.com/",api:"https://auth.deriv.com/oauth2/auth",native:true,mode:"oauth"},
-  derivmt5:{name:"DERIV MT5",login:"https://deriv.com/trading-platforms/mt5/web-terminal",api:"https://app.metaapi.cloud/",native:false,mode:"metaapi"},
+  derivmt5:{name:"KINGBOT MT5 BRIDGE",login:"https://deriv.com/trading-platforms/mt5/web-terminal",api:"https://deriv.com/trading-platforms/mt5/web-terminal",native:true,mode:"mt5-bridge"},
   exness:{name:"EXNESS",login:"https://my.exness.com/",api:"https://my.exness.com/",native:false,mode:"exness"},
   ig:{name:"IG",login:"https://my.ig.com/",api:"https://labs.ig.com/gettingstarted",native:false,mode:"metaapi"},
   fxcm:{name:"FXCM",login:"https://www.fxcm.com/",api:"https://www.fxcm.com/markets/help/api-trading-what-api-interfaces-does-fxcm-have/",native:false,mode:"metaapi"},
@@ -273,7 +280,7 @@ const logos={
   fxcm:"https://fxcmpy.tpq.io/_static/fxcm_logo_bg.png",
   ibkr:"https://rankia.com.br/_next/image/?q=100&url=https%3A%2F%2Frankia.com.br%2Fapp%2Fuploads%2F2024%2F09%2Finteractivebrokers_logo_corretora.webp&w=768"
 };
-let selected=null,step=1,verified=false,selectedAccount=null,partnerOpened=false,activeConnection=null;
+let selected=null,step=1,verified=false,selectedAccount=null,partnerOpened=false,activeConnection=null,mt5BridgePollTimer=null;
 const $=id=>document.getElementById(id);
 function cacheBrokerIdentity(connection){
   if(!connection?.broker || !connection?.accountId)return;
@@ -324,6 +331,19 @@ function textFor(){
     $("credentials").classList.remove("show");
     $("verifyBtn").style.display="none";
     $("flowStatus").textContent="Deriv uses secure OAuth 2.0. KINGBOT will redirect you to Deriv for sign-in and consent, then return here after verification.";
+  }else if(selected==="derivmt5"){
+    $("credentials").classList.add("show");
+    $("verifyBtn").style.display="none";
+    $("accountId").parentElement.style.display="none";
+    $("bridgeTokenField").style.display="none";
+    $("apiKeyField").style.display="none";
+    $("secretKeyField").style.display="none";
+    $("hostField").style.display="none";
+    $("oandaTokenField").style.display="none";
+    $("mt5BridgePanel").style.display="block";
+    $("mt5BridgeMode").textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO / PAPER";
+    $("credentialHelp").textContent="No MT5 password is entered here. KINGBOT issues a bridge token; the EA authenticates the terminal and executes trades locally through MQL5.";
+    $("flowStatus").textContent="Generate the bridge token, paste it into the EA, attach the EA to MT5, and keep Algo Trading enabled.";
   }else if(step===2 && (!d.native || selected==='oanda')){
     $("credentials").classList.add("show");
     if(selected==="exness"){
@@ -331,7 +351,7 @@ function textFor(){
     }else{
       $("credentialHelp").textContent=selected==="derivmt5"?"Paste the MetaApi access token and MetaApi account ID for the Deriv MT5 account you added to the bridge. KINGBOT validates the MT5 account and uses native lot-based CFD execution.":"Bridge credentials are sent over HTTPS to the authenticated KINGBOT backend and are not stored in browser localStorage.";
     }
-  }else $("credentials").classList.remove("show");
+  }else {$("credentials").classList.remove("show");$("mt5BridgePanel").style.display="none";}
   if(step===3)$("accountSelect").classList.add("show");else $("accountSelect").classList.remove("show");
   if(selected!=="deriv")$("flowStatus").textContent=step===1?"Waiting for broker account confirmation.":step===2?(selected==="exness"?"Create or manage the Exness API key in Key Management, then return with the issued credentials.":(native?"Native API authorization is selected for this broker.":"Bridge credential entry is ready.")):(step===3?"Choose one account to continue.":"Account authorization is ready.");
 }
@@ -346,16 +366,61 @@ function selectBroker(slug){
   document.querySelectorAll(".broker").forEach(el=>el.classList.toggle("selected",el.dataset.broker===slug));
   const d=cfg[slug];
   $("modalTitle").textContent=d.name;
-  $("modalSubtitle").textContent=selected==="exness"?"EXNESS PUBLIC TRADER API":selected==="deriv"?"DERIV OAUTH 2.0 · SECURE REDIRECT":selected==="derivmt5"?"DERIV MT5 · CFD · METAAPI BRIDGE":"SECURE BROKER CONNECTION FLOW";
+   $("modalSubtitle").textContent=selected==="exness"?"EXNESS PUBLIC TRADER API":selected==="deriv"?"DERIV OAUTH 2.0 · SECURE REDIRECT":selected==="derivmt5"?"KINGBOT MT5 BRIDGE · NATIVE CFD · LOTS":"SECURE BROKER CONNECTION FLOW";
   $("modalLogo").src=logos[slug];$("modalLogo").alt=d.name;
-  $("accountId").value="";$("apiKey").value="";$("secretKey").value="";$("apiHost").value="";$("accessToken").value="";$("oandaToken").value="";
+  $("accountId").value="";$("apiKey").value="";$("secretKey").value="";$("apiHost").value="";$("accessToken").value="";$("oandaToken").value="";if($("mt5BridgeToken"))$("mt5BridgeToken").value="";if($("mt5BridgeStatus"))$("mt5BridgeStatus").textContent="TOKEN NOT GENERATED";if(mt5BridgePollTimer){clearInterval(mt5BridgePollTimer);mt5BridgePollTimer=null;}
   $("accountList").innerHTML="";$("authorizeBtn").disabled=true;
   $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=(selected==="exness"||selected==="oanda")?"block":"none";$("bridgeTokenField").style.display=(selected==="exness"||selected==="oanda"||selected==="deriv")?"none":"block";$("oandaTokenField").style.display=selected==="oanda"?"block":"none";if(selected==="derivmt5")$("accountId").placeholder="MetaApi account ID (UUID)";
-  $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION"; $("verifyBtn").style.display=selected==="deriv"?"none":"inline-flex"; $("executionMode").value=selectedExecution;
+  $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION"; $("verifyBtn").style.display=(selected==="deriv"||selected==="derivmt5")?"none":"inline-flex"; $("executionMode").value=selectedExecution;
   if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
   textFor();showDrawer();
   if(selected==="exness")trackExnessPartner();
 }
+
+async function generateMt5BridgeToken(){
+  try{
+    const btn=$("generateMt5Token");btn.disabled=true;btn.textContent="GENERATING…";
+    const t=await firebaseToken();
+    const r=await fetch(API_BASE+"/mt5/bridge/token",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify({executionMode:selectedExecution,label:"KINGBOT MT5 Bridge"})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.token)throw new Error(d.error||d.reason||"Unable to generate the MT5 bridge token.");
+    $("mt5BridgeToken").value=d.token;
+    $("mt5BridgeStatus").textContent="TOKEN READY · "+(d.expectedMode==="LIVE"?"LIVE / REAL":"DEMO / PAPER")+" · COPY INTO THE EA NOW";
+    setStatus("Bridge token generated. Paste it into KINGBOT_MT5_BRIDGE.mq5, compile the EA, attach it to MT5, and enable Algo Trading.");
+    startMt5BridgeWatch();
+  }catch(e){$("mt5BridgeStatus").textContent="TOKEN ERROR";setStatus(e.message||"MT5 bridge token generation failed.");}
+  finally{$("generateMt5Token").disabled=false;$("generateMt5Token").textContent="GENERATE BRIDGE TOKEN";}
+}
+async function checkMt5Bridge(){
+  try{
+    const t=await firebaseToken();
+    const r=await fetch(API_BASE+"/mt5/bridge/status",{headers:{Authorization:"Bearer "+t},cache:"no-store"});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.connected){
+      verified=true;
+      const connection={connected:true,broker:"mt5-bridge",accountId:d.accountId||d.login,executionMode:d.executionMode,accountType:d.accountType,server:d.server};
+      activeConnection=connection;cacheBrokerIdentity(connection);applyConnectionLock(connection);
+      $("mt5BridgeStatus").textContent="MT5 ONLINE ✓ · "+String(d.login||d.accountId||"ACCOUNT")+" · "+String(d.server||"MT5");
+      setStep(4);textFor();setStatus("KINGBOT MT5 BRIDGE CONNECTED ✓ · Native MT5 execution is online.");
+      if(mt5BridgePollTimer){clearInterval(mt5BridgePollTimer);mt5BridgePollTimer=null;}
+      return true;
+    }
+    $("mt5BridgeStatus").textContent="WAITING FOR MT5 EA HEARTBEAT…";
+  }catch(e){$("mt5BridgeStatus").textContent="BRIDGE STATUS UNAVAILABLE";}
+  return false;
+}
+function startMt5BridgeWatch(){
+  if(mt5BridgePollTimer)clearInterval(mt5BridgePollTimer);
+  void checkMt5Bridge();
+  mt5BridgePollTimer=setInterval(checkMt5Bridge,1500);
+}
+async function copyMt5Token(){
+  const value=$("mt5BridgeToken").value.trim();
+  if(!value){setStatus("Generate the bridge token first.");return;}
+  try{await navigator.clipboard.writeText(value);setStatus("Bridge token copied. Paste it into the EA BridgeToken input.");}
+  catch{setStatus("Copy was blocked by the browser. Select and copy the token manually.");}
+}
+
 async function trackExnessPartner(){
   try{
     const t=await firebaseToken();
@@ -464,6 +529,8 @@ $("brokerLogin").addEventListener("click",e=>{
     startDerivOAuth();
   }
 });
+$("generateMt5Token").addEventListener("click",generateMt5BridgeToken);
+$("copyMt5Token").addEventListener("click",copyMt5Token);
 $("disconnectBtn").addEventListener("click",disconnectCurrentBroker);
 $("globalDisconnectBtn").addEventListener("click",disconnectCurrentBroker);
 $("closeModal").addEventListener("click",closeDrawer);
