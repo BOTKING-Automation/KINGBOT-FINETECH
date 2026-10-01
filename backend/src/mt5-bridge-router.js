@@ -12,7 +12,51 @@ export function createMt5BridgeRouter({pool,broker}={}){
       const mode=requestedMode;
       res.status(201).json(await mt5BridgeRegistry.issueToken({userId:user.id,mode,label:req.body?.label}));
     }catch(error){
-      res.status(error?.message==="BROKER_ALREADY_CONNECTED"?409:500).json({ok:false,error:error?.message||"MT5_BRIDGE_TOKEN_CREATE_FAILED"});
+      const message=String(error?.message||"MT5_BRIDGE_TOKEN_CREATE_FAILED");
+      if(message==="BROKER_ALREADY_CONNECTED"){
+        const active=await broker.getMapping(user.id).catch(()=>null);
+        return res.status(409).json({
+          ok:false,
+          error:"BROKER_ALREADY_CONNECTED",
+          currentProvider:active?.provider||null,
+          currentAccountId:active?.account_id||null,
+          currentExecutionMode:active?.execution_mode||null,
+          switchRequired:true
+        });
+      }
+      res.status(500).json({ok:false,error:message});
+    }
+  });
+
+  router.post("/switch",async(req,res)=>{
+    const user=await requireUser(pool,req,res);if(!user)return;
+    try{
+      const requestedMode=String(req.body?.executionMode||"DEMO").toUpperCase();
+      if(!["DEMO","LIVE"].includes(requestedMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+      const active=await broker.getMapping(user.id).catch(()=>null);
+      const provider=String(active?.provider||"").toLowerCase();
+      if(provider==="mt5-bridge"){
+        const token=await mt5BridgeRegistry.issueToken({userId:user.id,mode:requestedMode,label:req.body?.label||"KINGBOT MT5 Bridge"});
+        return res.status(201).json({ok:true,switched:false,stoppedRunningBots:0,...token});
+      }
+      let stoppedRunningBots=0;
+      if(active){
+        await broker.disconnect(user.id);
+        const stopped=await pool.query(
+          "UPDATE kingbot_bot_runtime SET state='STOPPED',last_error=$2,updated_at=NOW() WHERE user_id=$1 AND state='RUNNING'",
+          [user.id,"BROKER_SWITCHED_TO_MT5"]
+        );
+        stoppedRunningBots=Number(stopped.rowCount||0);
+        await pool.query(
+          "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'BROKER_DISCONNECTED',$2::jsonb)",
+          [user.id,JSON.stringify({reason:"MT5_BRIDGE_SWITCH",previousProvider:active.provider,stoppedRunningBots})]
+        );
+      }
+      const token=await mt5BridgeRegistry.issueToken({userId:user.id,mode:requestedMode,label:req.body?.label||"KINGBOT MT5 Bridge"});
+      res.status(201).json({ok:true,switched:Boolean(active),stoppedRunningBots,...token});
+    }catch(error){
+      console.error("[KINGBOT MT5 BRIDGE] switch failed:",error?.message||error);
+      res.status(500).json({ok:false,error:"MT5_BRIDGE_SWITCH_FAILED",reason:String(error?.message||"MT5_BRIDGE_SWITCH_FAILED").slice(0,300)});
     }
   });
   router.get("/status",async(req,res)=>{
