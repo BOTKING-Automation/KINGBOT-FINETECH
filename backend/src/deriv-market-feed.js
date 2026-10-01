@@ -22,6 +22,7 @@ export class DerivMarketFeed {
     this.ticks = new Map();
     this.waiters = new Map();
     this.requestWaiters = new Map();
+    this.tickListeners = new Map();
     this.connectPromise = null;
     this.reconnectTimer = null;
     this.retryDelayMs = 1000;
@@ -148,6 +149,12 @@ export class DerivMarketFeed {
       };
       this.ticks.set(symbol,tick);
       this.ticks.set(rawSymbol,tick);
+      const listeners = this.tickListeners.get(symbol)||this.tickListeners.get(rawSymbol);
+      if (listeners) {
+        for (const listener of [...listeners]) {
+          try { listener(tick); } catch {}
+        }
+      }
       const waiters = this.waiters.get(symbol)||this.waiters.get(rawSymbol);
       if (waiters) {
         this.waiters.delete(symbol);
@@ -207,6 +214,30 @@ export class DerivMarketFeed {
       this.subscribed.delete(s);
       throw error;
     }
+  }
+
+  async onTick(symbol,listener) {
+    const s = this.normalize(symbol);
+    if (typeof listener !== "function") throw new Error("DERIV_TICK_LISTENER_REQUIRED");
+    let listeners = this.tickListeners.get(s);
+    if (!listeners) {
+      listeners = new Set();
+      this.tickListeners.set(s,listeners);
+    }
+    listeners.add(listener);
+    try {
+      await this.subscribe(s);
+    } catch (error) {
+      listeners.delete(listener);
+      if (!listeners.size) this.tickListeners.delete(s);
+      throw error;
+    }
+    return () => {
+      const current = this.tickListeners.get(s);
+      if (!current) return;
+      current.delete(listener);
+      if (!current.size) this.tickListeners.delete(s);
+    };
   }
 
   resubscribeAll() {
@@ -386,6 +417,7 @@ export class DerivMarketFeed {
     this.desired.clear();
     this.ticks.clear();
     this.requestWaiters.clear();
+    this.tickListeners.clear();
   }
 }
 
