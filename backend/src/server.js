@@ -179,8 +179,9 @@ app.get("/api/broker/deriv/oauth/start", async (req,res)=>{
   if(!/^https:\/\//i.test(redirectUri)){
     return res.status(503).json({ok:false,error:"DERIV_OAUTH_REDIRECT_URI_MUST_USE_HTTPS"});
   }
-  const mode=String(req.query?.executionMode||"PAPER").toUpperCase();
-  if(!["PAPER","LIVE"].includes(mode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+  const requestedMode=String(req.query?.executionMode||"DEMO").toUpperCase();
+  if(!["DEMO","PAPER","LIVE"].includes(requestedMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+  const mode=requestedMode==="DEMO"?"PAPER":requestedMode;
   try{
     const {verifier,challenge}=createPkce();
     const saved=await broker.createDerivOAuthState({userId:user.id,codeVerifier:verifier,executionMode:mode});
