@@ -408,7 +408,7 @@ async function execute(row){
     const sampleList=updateVelocitySamples(ladderVelocityBuffers.get(velocityKey)||[],(bid+ask)/2,Date.now(),ladderCfg);
     ladderVelocityBuffers.set(velocityKey,sampleList);
   }
-  const v8Velocity=botId==="ladder-flip" ? velocityPoints(ladderVelocityBuffers.get(velocityKey)||[],Number((await broker.getSymbolSpecification(config.symbol,userId).catch(()=>({data:{point:0}}))).data?.point)||0,ladderCfg) : 0;
+  const v8Velocity=0;
 
   const analysis=evaluateBot(botId,{
     symbol:config.symbol,timeframe:config.timeframe,price:(bid+ask)/2,entryPrice:(bid+ask)/2,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,
@@ -434,8 +434,10 @@ async function execute(row){
     const state=await getLadderState(userId,botId);
     const sampleList=ladderVelocityBuffers.get(velocityKey)||[];
     const velocity=velocityPoints(sampleList,spec.point,ladderCfg);
+    const spreadPoints=spread/spec.point;
+    const spreadOk=Number.isFinite(spreadPoints)&&spreadPoints<=ladderCfg.maxSpreadPoints;
     if(state?.active){
-      const managed=await executeLadderV8Manage({userId,botId,config,s,account,quote,positions,ind,spec,state,velocity,riskAllowed:risk.allowed});
+      const managed=await executeLadderV8Manage({userId,botId,config,s,account,quote,positions,ind,spec,state,velocity,riskAllowed:risk.allowed&&spreadOk});
       const signalPayload={
         signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action:managed.action,executionMode:s.executionMode,strategy:botId,
         tradePlan:null,riskAllowed:risk.allowed,analysisReason:analysis.reason,riskReason:risk.reason||risk.blockedReasons,
@@ -450,13 +452,14 @@ async function execute(row){
     }
     let action="NO_ACTION";
     let started=null;
-    if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed){
+    if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&spreadOk){
       const start=await executeLadderV8Start({userId,botId,config,s,account,quote,ind,positions,spec,velocity});
       action=start.action;started=start.state;
-    }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!risk.allowed)action="RISK_BLOCKED";
+    }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!spreadOk)action="V8_SPREAD_FILTER_BLOCKED";
+    else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!risk.allowed)action="RISK_BLOCKED";
     const v8Payload={
       ema20:ind.emaFast,ema50:ind.emaSlow,adx14:ind.adx,rsi14:ind.rsi,velocityPoints:velocity,direction:ind.v8Direction>0?"BUY":ind.v8Direction<0?"SELL":"NONE",
-      entryQualified:Boolean(ind.v8EntryQualified),rungsOpened:started?.rungsOpened||0,lotScale:started?.lotScale||null
+      entryQualified:Boolean(ind.v8EntryQualified),spreadPoints,rungsOpened:started?.rungsOpened||0,lotScale:started?.lotScale||null
     };
     const signalPayload={signal:analysis.signal,score:analysis.score,threshold:analysis.threshold,action,executionMode:s.executionMode,strategy:botId,tradePlan:null,riskAllowed:risk.allowed,analysisReason:analysis.reason,riskReason:risk.reason||risk.blockedReasons,v8:v8Payload,updatedAt:new Date().toISOString()};
     await pool.query("UPDATE kingbot_bot_runtime SET last_signal=$3,last_run_at=NOW(),last_error=NULL,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,JSON.stringify(signalPayload)]);
