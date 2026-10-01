@@ -183,8 +183,8 @@ async function settings(userId,botId){
   const bot=getBotDefinitions()[botId];
   if(!bot)throw new Error("BOT_NOT_FOUND");
   const base=!q.rowCount
-    ? {...normalizeRiskSettings(bot.risk),executionMode:"PAPER",killSwitch:false}
-    : (()=>{const x=q.rows[0];return {...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,lotSize:x.lot_size,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:String(x.execution_mode||"PAPER"),killSwitch:Boolean(x.kill_switch)};})();
+    ? {...normalizeRiskSettings(bot.risk),executionMode:"DEMO",killSwitch:false}
+    : (()=>{const x=q.rows[0];return {...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,lotSize:x.lot_size,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:(String(x.execution_mode||"DEMO")==="PAPER"?"DEMO":String(x.execution_mode||"DEMO")),killSwitch:Boolean(x.kill_switch)};})();
   if(botId==="ladder-flip")base.maxPositions=Math.min(LADDER_V8_DEFAULTS.maxTotalRungs,Math.max(LADDER_V8_DEFAULTS.fixedRungCount,base.maxPositions));
   return base;
 }
@@ -735,12 +735,12 @@ async function execute(row){
   trace("ACCOUNT_READY",{broker:status.broker,accountId:status.accountId,executionMode:s.executionMode});
   const brokerName=String(status.broker||"").toLowerCase();
   if(brokerName==="exness"){
-    if(s.executionMode==="PAPER")throw new Error("EXNESS_PAPER_MODE_REQUIRES_DEMO_API_ACCOUNT");
+    if(s.executionMode==="PAPER")s.executionMode="DEMO";
     if(account.trade_mode==="trading_disabled")throw new Error("EXNESS_TRADING_DISABLED");
     if(account.account_status==="close_only")throw new Error("EXNESS_ACCOUNT_CLOSE_ONLY");
   }
   const accountType=String(account.accountType||account.account_type||status.accountSnapshot?.accountType||(brokerName==="oanda"?(s.executionMode==="LIVE"?"REAL":"DEMO"):"")||(String(account.type||"").toUpperCase().includes("DEMO")?"DEMO":"")||(String(account.type||"").toUpperCase().includes("REAL")?"REAL":"")).trim().toUpperCase();
-  if(s.executionMode==="PAPER"&&accountType!=="DEMO")throw new Error("PAPER_REQUIRES_DEMO_ACCOUNT");
+  if(s.executionMode==="DEMO"&&accountType!=="DEMO")throw new Error("DEMO_REQUIRES_DEMO_ACCOUNT");
   if(s.executionMode==="LIVE"&&accountType!=="REAL")throw new Error("LIVE_REQUIRES_REAL_ACCOUNT");
   if(account.tradeAllowed===false)throw new Error("BROKER_TRADING_NOT_ALLOWED");
 
