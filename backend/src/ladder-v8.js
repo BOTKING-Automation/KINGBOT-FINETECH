@@ -200,8 +200,7 @@ export function withinLadderSession(date=new Date(),cfg=LADDER_V8_DEFAULTS){
   const h=date.getUTCHours();
   const start=Math.max(0,Math.min(23,Number(cfg.sessionStartHour)));
   const end=Math.max(0,Math.min(23,Number(cfg.sessionEndHour)));
-  if(start===0&&end===23)return true;
-  if(start<=end)return h>=start&&h<end;
+  // 0–23 represents an unrestricted 24-hour session. Do not create an\n  // artificial block during the final UTC hour.\n  if(start===0&&end===23)return true;\n  if(start<=end)return h>=start&&h<end;
   return h>=start||h<end;
 }
 
