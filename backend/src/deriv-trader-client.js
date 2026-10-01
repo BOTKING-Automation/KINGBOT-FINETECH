@@ -421,7 +421,15 @@ export class DerivTraderClient {
     if(!force&&this.portfolioCache&&now-this.portfolioCacheAt<2500)return this.portfolioCache;
     const response=await this.request({portfolio:1});
     const contracts=Array.isArray(response?.portfolio?.contracts)?response.portfolio.contracts:[];
-    this.portfolioCache=await Promise.all(contracts.map(c=>this.enrichContract(c)));
+    const mapped=[];
+    for(const contract of contracts){
+      try{mapped.push(await this.enrichContract(contract));}
+      catch(error){
+        console.warn("[KINGBOT DERIV] position enrichment failed",JSON.stringify({contractId:contract?.contract_id||null,error:String(error?.message||"ENRICH_FAILED").slice(0,300)}));
+        mapped.push(this.mapContract(contract));
+      }
+    }
+    this.portfolioCache=mapped;
     this.portfolioCacheAt=now;
     return this.portfolioCache;
   }
