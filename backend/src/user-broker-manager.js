@@ -75,7 +75,7 @@ export class UserBrokerManager {
     if(!this.pool||!userId)throw new Error("USER_CONTEXT_REQUIRED");
     const state=crypto.randomBytes(32).toString("base64url");
     const mode=(String(executionMode||"DEMO").toUpperCase()==="PAPER"?"DEMO":String(executionMode||"DEMO").toUpperCase());
-    if(!["DEMO","PAPER","LIVE"].includes(mode))throw new Error("INVALID_EXECUTION_MODE");
+    if(!["DEMO","LIVE"].includes(mode))throw new Error("INVALID_EXECUTION_MODE");
     await this.pool.query("DELETE FROM kingbot_deriv_oauth_states WHERE expires_at<NOW()");
     await this.pool.query("INSERT INTO kingbot_deriv_oauth_states(state,user_id,code_verifier,execution_mode,expires_at) VALUES($1,$2,$3,$4,NOW()+INTERVAL '10 minutes')",[state,userId,String(codeVerifier||""),mode]);
     return {state,executionMode:mode};
@@ -215,8 +215,8 @@ export class UserBrokerManager {
   async saveMapping({userId,provider="metaapi",accountId,accountToken,executionMode="DEMO",apiKey,secretKey,baseUrl,derivAccountType}={}){
     if(!this.pool||!userId)return {ok:false,error:"USER_CONTEXT_REQUIRED"};
     const requestedMode=String(executionMode||"DEMO").toUpperCase();
-    if(!["DEMO","PAPER","LIVE"].includes(requestedMode))return {ok:false,error:"INVALID_EXECUTION_MODE"};
-    const mode=requestedMode==="PAPER"?"DEMO":requestedMode;
+    if(!["DEMO","LIVE"].includes(requestedMode))return {ok:false,error:"INVALID_EXECUTION_MODE"};
+    const mode=requestedMode;
     const id=String(accountId||"").trim();
     const providerName=String(provider).toLowerCase();
     const isExness=providerName==="exness";
@@ -457,7 +457,7 @@ export class UserBrokerManager {
       if(mode==="DEMO"&&accountInfo.type!=="ACCOUNT_TRADE_MODE_DEMO"){
         await entry.connection.close();
         this.connections.delete(key);
-        return {connected:false,mode:"NOT_CONNECTED",reason:"PAPER_REQUIRES_DEMO_ACCOUNT"};
+        return {connected:false,mode:"NOT_CONNECTED",reason:"DEMO_REQUIRES_DEMO_ACCOUNT"};
       }
       if(mode==="LIVE"&&accountInfo.type!=="ACCOUNT_TRADE_MODE_REAL"){
         await entry.connection.close();
