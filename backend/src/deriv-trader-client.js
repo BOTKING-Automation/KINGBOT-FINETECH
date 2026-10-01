@@ -208,6 +208,19 @@ export class DerivTraderClient {
     };
   }
 
+  async getMarkets(){
+    const response=await this.request({active_symbols:"full"});
+    const list=Array.isArray(response?.active_symbols)?response.active_symbols:[];
+    return list.map(item=>({
+      symbol:String(item?.underlying_symbol||item?.symbol||"").trim(),
+      name:String(item?.underlying_symbol_name||item?.display_name||item?.underlying_symbol||item?.symbol||"").trim(),
+      category:String(item?.market||item?.underlying_symbol_type||"").trim(),
+      submarket:String(item?.submarket||item?.subgroup||"").trim(),
+      tradeable:Number(item?.exchange_is_open)===0||Number(item?.is_trading_suspended)===1?false:true,
+      source:"broker"
+    })).filter(x=>x.symbol);
+  }
+
   async getSymbolSpecification(){
     throw new Error("DERIV_CONTRACT_SPECIFICATION_REQUIRES_OPTIONS_MODEL");
   }
