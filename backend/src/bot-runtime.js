@@ -38,7 +38,6 @@ export function createBotRuntimeRouter({pool,broker}){
 
   router.get("/selection/current",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
-    await ensureBotRuntimeSchema(pool);
     const q=await pool.query("SELECT selected_bot_id,updated_at FROM kingbot_user_bot_selection WHERE user_id=$1",[user.id]);
     const selectedBotId=q.rowCount?String(q.rows[0].selected_bot_id):null;
     if(!selectedBotId){
@@ -67,7 +66,6 @@ export function createBotRuntimeRouter({pool,broker}){
     const botId=String(req.body?.botId||"").trim();
     if(!getBotDefinitions()[botId])return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
     if(!(await entitlement(pool,user.id,botId,user.email)))return res.status(403).json({ok:false,error:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
-    await ensureBotRuntimeSchema(pool);
     await pool.query(
       "INSERT INTO kingbot_user_bot_selection(user_id,selected_bot_id,updated_at) VALUES($1,$2,NOW()) ON CONFLICT(user_id) DO UPDATE SET selected_bot_id=EXCLUDED.selected_bot_id,updated_at=NOW()",
       [user.id,botId]
