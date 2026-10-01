@@ -161,12 +161,31 @@ export class UserBrokerManager {
   async getStatus(userId){
     const mapping=await this.getMapping(userId);
     const connected=Boolean(mapping) ? await this.isConnected(userId) : false;
+    const key=mapping ? String(userId)+":"+mapping.provider+":"+mapping.account_id : "";
+    const entry=key ? this.connections.get(key) : null;
+    const raw=entry?.accountInfo||null;
+    const numeric=(value)=>Number.isFinite(Number(value))?Number(value):null;
+    const accountSnapshot=raw ? {
+      balance:numeric(raw.balance),
+      equity:numeric(raw.equity ?? raw.NAV ?? raw.netAssetValue ?? raw.balance),
+      currency:String(raw.currency||"").trim()||null,
+      accountType:String(raw.accountType||raw.account_type||"").trim().toUpperCase()||(
+        mapping?.execution_mode==="LIVE" ? "REAL" : "DEMO"
+      ),
+      accountStatus:String(raw.account_status||raw.status||"ACTIVE").toUpperCase(),
+      tradingEnabled:raw.tradeAllowed!==false
+        && raw.tradingEnabled!==false
+        && String(raw.account_status||"active").toLowerCase()!=="trading_disabled"
+        && String(raw.trade_mode||"enabled").toLowerCase()!=="trading_disabled",
+      syncedAt:entry?.accountInfoAt ? new Date(entry.accountInfoAt).toISOString() : null
+    } : null;
     return {
       configured:Boolean(mapping),
       connected,
       broker:mapping?.provider||null,
       accountId:mapping?.account_id||null,
-      executionMode:mapping?.execution_mode||"NOT_CONNECTED"
+      executionMode:mapping?.execution_mode||"NOT_CONNECTED",
+      accountSnapshot
     };
   }
 
@@ -329,7 +348,7 @@ export class UserBrokerManager {
         const connection=account.getRPCConnection();
         await connection.connect();
         await connection.waitSynchronized();
-        entry={api,account,connection,accountId:mapping.account_id,executionMode:mode,provider:mapping.provider};
+        entry={api,account,connection,accountId:mapping.account_id,executionMode:mode,provider:mapping.provider,accountInfo:null};
         this.connections.set(key,entry);
       }catch(error){
         return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_CONNECTION_FAILED"};
@@ -337,6 +356,8 @@ export class UserBrokerManager {
     }
     try{
       const accountInfo=await entry.connection.getAccountInformation();
+      entry.accountInfo=accountInfo;
+      entry.accountInfoAt=Date.now();
       if(mode==="PAPER"&&accountInfo.type!=="ACCOUNT_TRADE_MODE_DEMO"){
         await entry.connection.close();
         this.connections.delete(key);
