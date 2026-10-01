@@ -13,7 +13,7 @@ const BOT_DEFINITIONS = {
     timeframeProfile: { regime: "4h", setup: "1h", execution: "15m" },
     signalThreshold: 75,
     tradePlan: { slAtr: 1.6, tpAtr: 2.8, trailingTriggerR: 1.0, trailingLockR: 0.5, maxHoldBars: 30 },
-    risk: { maxRiskPerTradePct: 1, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
+    risk: { maxRiskPerTradePct: 1, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10, lotSize: 0.01 }
   },
   flipper: {
     id: "flipper",
@@ -23,7 +23,7 @@ const BOT_DEFINITIONS = {
     timeframeProfile: { regime: "15m", setup: "5m", execution: "1m" },
     signalThreshold: 76,
     tradePlan: { slAtr: 0.75, tpAtr: 1.05, trailingTriggerR: 0.7, trailingLockR: 0.2, maxHoldBars: 8 },
-    risk: { maxRiskPerTradePct: 0.5, maxPositions: 2, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
+    risk: { maxRiskPerTradePct: 0.5, maxPositions: 2, dailyDrawdownPct: 5, totalDrawdownPct: 10, lotSize: 0.01 }
   },
   breakout: {
     id: "breakout",
@@ -33,7 +33,7 @@ const BOT_DEFINITIONS = {
     timeframeProfile: { regime: "1h", setup: "15m", execution: "5m" },
     signalThreshold: 72,
     tradePlan: { slAtr: 1.25, tpAtr: 2.5, trailingTriggerR: 1.0, trailingLockR: 0.45, maxHoldBars: 18 },
-    risk: { maxRiskPerTradePct: 0.75, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10 }
+    risk: { maxRiskPerTradePct: 0.75, maxPositions: 3, dailyDrawdownPct: 5, totalDrawdownPct: 10, lotSize: 0.01 }
   },
   "smc-pro": {
     id: "smc-pro",
@@ -53,7 +53,7 @@ const BOT_DEFINITIONS = {
     timeframeProfile: { regime: "1h", setup: "15m", execution: "5m" },
     signalThreshold: 78,
     tradePlan: { slAtr: 1.5, tpAtr: 0, trailingTriggerR: null, trailingLockR: null, maxHoldBars: 0, maxLadderLevels: 20 },
-    risk: { maxRiskPerTradePct: 0.5, maxPositions: 20, dailyDrawdownPct: 6, totalDrawdownPct: 20 },
+    risk: { maxRiskPerTradePct: 0.5, maxPositions: 20, dailyDrawdownPct: 6, totalDrawdownPct: 20, lotSize: 0.01 },
     v8: { ...LADDER_V8_DEFAULTS }
   }
 };
@@ -261,16 +261,17 @@ async function hasEntitlement(pool, userId, botId, userEmail) {
 
 async function getRiskSettings(pool,userId,botId){
  if(!pool)return null;
- const q=await pool.query("SELECT daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch,updated_at FROM kingbot_bot_risk_settings WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
+ const q=await pool.query("SELECT daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,lot_size,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch,updated_at FROM kingbot_bot_risk_settings WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
  if(!q.rowCount)return null;
  const x=q.rows[0];
- const settings={...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:String(x.execution_mode||"PAPER"),killSwitch:Boolean(x.kill_switch)};
+ const settings={...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,lotSize:x.lot_size,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:String(x.execution_mode||"PAPER"),killSwitch:Boolean(x.kill_switch)};
  if(botId==="ladder-flip")settings.maxPositions=Math.min(LADDER_V8_DEFAULTS.maxTotalRungs,Math.max(LADDER_V8_DEFAULTS.fixedRungCount,settings.maxPositions));
  return settings;
 }
 function defaultRisk(bot){return normalizeRiskSettings(bot.risk);}
 function validateUserRisk(body,bot){
  const s=normalizeRiskSettings(body||{},bot.risk);
+ if(!Number.isFinite(Number(s.lotSize))||Number(s.lotSize)<=0)return {error:"INVALID_LOT_SIZE"};
  if(s.totalDrawdownPct<s.dailyDrawdownPct)return {error:"TOTAL_DRAWDOWN_MUST_BE_AT_LEAST_DAILY_DRAWDOWN"};
  if(s.maxRiskPerTradePct>bot.risk.maxRiskPerTradePct*3)return {error:"MAX_RISK_PER_TRADE_EXCEEDS_BOT_SAFETY_CEILING"};
  return {settings:s};
@@ -332,7 +333,7 @@ export function createBotEngineRouter({ pool }) {
     const mode=String(req.body?.executionMode||"PAPER").toUpperCase();
     if(!["PAPER","LIVE"].includes(mode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
     try{
-      await pool.query("INSERT INTO kingbot_bot_risk_settings(user_id,bot_id,daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(user_id,bot_id) DO UPDATE SET daily_drawdown_pct=EXCLUDED.daily_drawdown_pct,total_drawdown_pct=EXCLUDED.total_drawdown_pct,max_risk_per_trade_pct=EXCLUDED.max_risk_per_trade_pct,max_positions=EXCLUDED.max_positions,max_spread_atr_ratio=EXCLUDED.max_spread_atr_ratio,stale_data_ms=EXCLUDED.stale_data_ms,max_consecutive_losses=EXCLUDED.max_consecutive_losses,auto_pause_on_loss_streak=EXCLUDED.auto_pause_on_loss_streak,execution_mode=EXCLUDED.execution_mode,kill_switch=EXCLUDED.kill_switch,updated_at=NOW()",[user.id,bot.id,s.dailyDrawdownPct,s.totalDrawdownPct,s.maxRiskPerTradePct,s.maxPositions,s.maxSpreadAtrRatio,s.staleDataMs,s.maxConsecutiveLosses,s.autoPauseOnLossStreak,mode,Boolean(req.body?.killSwitch)]);
+      await pool.query("INSERT INTO kingbot_bot_risk_settings(user_id,bot_id,daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,lot_size,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(user_id,bot_id) DO UPDATE SET daily_drawdown_pct=EXCLUDED.daily_drawdown_pct,total_drawdown_pct=EXCLUDED.total_drawdown_pct,max_risk_per_trade_pct=EXCLUDED.max_risk_per_trade_pct,max_positions=EXCLUDED.max_positions,lot_size=EXCLUDED.lot_size,max_spread_atr_ratio=EXCLUDED.max_spread_atr_ratio,stale_data_ms=EXCLUDED.stale_data_ms,max_consecutive_losses=EXCLUDED.max_consecutive_losses,auto_pause_on_loss_streak=EXCLUDED.auto_pause_on_loss_streak,execution_mode=EXCLUDED.execution_mode,kill_switch=EXCLUDED.kill_switch,updated_at=NOW()",[user.id,bot.id,s.dailyDrawdownPct,s.totalDrawdownPct,s.maxRiskPerTradePct,s.maxPositions,s.lotSize,s.maxSpreadAtrRatio,s.staleDataMs,s.maxConsecutiveLosses,s.autoPauseOnLossStreak,mode,Boolean(req.body?.killSwitch)]);
       await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'BOT_RISK_SETTINGS_UPDATED',$2::jsonb)",[user.id,JSON.stringify({botId:bot.id,executionMode:mode,settings:s,killSwitch:Boolean(req.body?.killSwitch)})]);
       res.json({ok:true,botId:bot.id,settings:s,executionMode:mode,killSwitch:Boolean(req.body?.killSwitch),message:"Risk profile saved to the KINGBOT risk engine."});
     }catch(err){console.error("[KINGBOT RISK]",err?.message||err);res.status(500).json({ok:false,error:"Risk settings could not be saved."});}
@@ -343,11 +344,12 @@ export function createBotEngineRouter({ pool }) {
 
 export async function ensureBotEngineSchema(pool){
  if(!pool)return;
- await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_risk_settings (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, bot_id TEXT NOT NULL, daily_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 5, total_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 10, max_risk_per_trade_pct NUMERIC(6,2) NOT NULL DEFAULT 1, max_positions INTEGER NOT NULL DEFAULT 3, max_spread_atr_ratio NUMERIC(6,3) NOT NULL DEFAULT 0.25, stale_data_ms INTEGER NOT NULL DEFAULT 5000, max_consecutive_losses INTEGER NOT NULL DEFAULT 3, auto_pause_on_loss_streak BOOLEAN NOT NULL DEFAULT TRUE, execution_mode TEXT NOT NULL DEFAULT 'PAPER', kill_switch BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id,bot_id))");
+ await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_risk_settings (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, bot_id TEXT NOT NULL, daily_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 5, total_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 10, max_risk_per_trade_pct NUMERIC(6,2) NOT NULL DEFAULT 1, max_positions INTEGER NOT NULL DEFAULT 3, lot_size NUMERIC(12,4) NOT NULL DEFAULT 0.01, max_spread_atr_ratio NUMERIC(6,3) NOT NULL DEFAULT 0.25, stale_data_ms INTEGER NOT NULL DEFAULT 5000, max_consecutive_losses INTEGER NOT NULL DEFAULT 3, auto_pause_on_loss_streak BOOLEAN NOT NULL DEFAULT TRUE, execution_mode TEXT NOT NULL DEFAULT 'PAPER', kill_switch BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id,bot_id))");
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS daily_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 5");
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS total_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 10");
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS max_risk_per_trade_pct NUMERIC(6,2) NOT NULL DEFAULT 1");
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS max_positions INTEGER NOT NULL DEFAULT 3");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS lot_size NUMERIC(12,4) NOT NULL DEFAULT 0.01");
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS max_spread_atr_ratio NUMERIC(6,3) NOT NULL DEFAULT 0.25");
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS stale_data_ms INTEGER NOT NULL DEFAULT 5000");
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS max_consecutive_losses INTEGER NOT NULL DEFAULT 3");
