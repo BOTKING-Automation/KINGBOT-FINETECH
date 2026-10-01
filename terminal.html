@@ -2574,7 +2574,7 @@ async function checkBackend() {
     try{ await loadOrders(); }catch{}
   }
   try{await loadRisk();}catch{}
-  if(cycle===verificationCycle){
+  if(cycle===verificationCycle && accountLoaded){
     clearTimeout(brokerVerificationDelayTimer);
     brokerVerificationDelayTimer=null;
   }
