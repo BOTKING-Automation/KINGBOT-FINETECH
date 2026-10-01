@@ -114,8 +114,31 @@ async function entitled(userId,botId){
 }
 
 const ladderVelocityBuffers=new Map();
+const workerAccountCache=new Map();
+const workerCandleCache=new Map();
+const ACCOUNT_CACHE_MS=1500;
+const CANDLE_CACHE_MIN_MS=5000;
 
 function ladderKey(userId,botId){return String(userId)+":"+String(botId);}
+function accountCacheKey(userId){return String(userId);}
+function candleCacheKey(userId,symbol,timeframe){return String(userId)+":"+String(symbol).toUpperCase()+":"+String(timeframe);}
+async function getWorkerAccount(userId){
+  const key=accountCacheKey(userId);
+  const cached=workerAccountCache.get(key);
+  if(cached && Date.now()-cached.at<ACCOUNT_CACHE_MS)return cached.data;
+  const data=(await broker.getAccount(userId)).data||{};
+  workerAccountCache.set(key,{at:Date.now(),data});
+  return data;
+}
+async function getWorkerCandles(userId,symbol,timeframe,limit=100){
+  const key=candleCacheKey(userId,symbol,timeframe);
+  const ttl=Math.max(CANDLE_CACHE_MIN_MS,Math.min(60000,Math.max(5000,Number(timeframeMinutes[timeframe]||1)*2500)));
+  const cached=workerCandleCache.get(key);
+  if(cached && Date.now()-cached.at<ttl)return cached.data;
+  const data=(await broker.getHistoricalCandles(symbol,timeframe,userId,limit)).data||[];
+  workerCandleCache.set(key,{at:Date.now(),data});
+  return data;
+}
 function currentLadderState(row){
   if(!row)return null;
   return {
@@ -382,7 +405,7 @@ async function execute(row){
     const connected=await broker.connect(userId,s.executionMode);
     if(!connected.connected)throw new Error(connected.reason||"BROKER_CONNECTION_FAILED");
   }
-  const account=(await broker.getAccount(userId)).data||{};
+  const account=await getWorkerAccount(userId);
   const brokerName=String(status.broker||"").toLowerCase();
   if(brokerName==="exness"){
     if(s.executionMode==="PAPER")throw new Error("EXNESS_PAPER_MODE_REQUIRES_DEMO_API_ACCOUNT");
@@ -399,7 +422,7 @@ async function execute(row){
   if(!Number.isFinite(bid)||!Number.isFinite(ask)||ask<bid)throw new Error("INVALID_BROKER_QUOTE");
   if(!Number.isFinite(quoteTime)||Date.now()-quoteTime>s.staleDataMs)throw new Error("STALE_BROKER_QUOTE");
 
-  const candles=(await broker.getHistoricalCandles(config.symbol,config.timeframe,userId,100)).data||[];
+  const candles=await getWorkerCandles(userId,config.symbol,config.timeframe,100);
   const ind=indicators(candles);
   const spread=ask-bid;
   const velocityKey=ladderKey(userId,botId);
