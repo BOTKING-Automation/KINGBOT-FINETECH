@@ -198,7 +198,7 @@ export class DerivMarketFeed {
     this.desired.add(s);
     await this.connect();
     if (!this.ws || !this.connected) throw new Error("DERIV_MARKET_FEED_NOT_CONNECTED");
-    if (this.subscribed.has(s)) return;
+    if (this.subscribed.has(s)) return s;
     const message = {ticks:s,subscribe:1,req_id:++this.reqId};
     try {
       this.ws.send(JSON.stringify(message));
