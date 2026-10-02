@@ -2,6 +2,7 @@ import "dotenv/config";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getDerivMarketFeed } from "./deriv-market-feed.js";
 import { predictPendingOrderZones } from "./pending-order-model.js";
+import { technicalAnalysisBookContext } from "./technical-analysis-book.js";
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
@@ -317,7 +318,8 @@ async function askGrok({ technical, quotes, timeframe }) {
     "Do not promise profit or certainty. A score below 75 must not be described as an entry confirmation.",
     "TIMEFRAME: " + timeframe,
     "TECHNICAL ENGINE OUTPUT: " + JSON.stringify(technical),
-    "VERIFIED LIVE QUOTES: " + JSON.stringify(quotes)
+    "VERIFIED LIVE QUOTES: " + JSON.stringify(quotes),
+    "KINGBOT TECHNICAL ANALYSIS BOOK METHODOLOGY:\n" + technicalAnalysisBookContext(12)
   ].join("\n");
 
   const response = await fetch(baseUrl + "/responses", {

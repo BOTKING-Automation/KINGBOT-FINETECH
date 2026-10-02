@@ -14,6 +14,7 @@
     ["scanner.html","AI Scanner","◎","High-intelligence market scanner"],
     ["pattern.html","Patterns","◉","Pattern intelligence"],
     ["academy.html","Academy","◇","Education & research"],
+    ["technical-analysis-ai-book.html","TA AI Book","▤","Technical analysis intelligence book"],
     ["about.html","About","◎","KINGBOT FINTECH"],
     ["contact.html","Contact","✉","Support & contact"],
     ["settings.html","Settings","⚙","Account controls"],

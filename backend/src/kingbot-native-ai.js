@@ -3,6 +3,7 @@ import { runStandaloneMarketScan } from "./ai-market-scanner.js";
 import { evaluateKingbotBrain } from "./kingbot-brain.js";
 import { searchWeb, webSearchStatus } from "./kingbot-web-search.js";
 import { getPlans, BOT_NAMES } from "./subscriptions.js";
+import { searchTechnicalAnalysisBook, technicalAnalysisBookContext } from "./technical-analysis-book.js";
 
 const SYMBOLS = ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 
@@ -28,6 +29,7 @@ function intent(text){
   if(/\bbot status\b|\bis .*running\b|\bwhat is running\b|\bruntime\b|\bdiagnos(e|is)\b|\berror\b|\bwhy is .*bot\b|\bstopped\b|\bpaused\b/.test(t)) return "RUNTIME_INTELLIGENCE";
   if(/\b(what is happening|what happened|latest|today|this week|news|headline|headlines|breaking)\b/.test(t) && /\b(gold|xau|eurusd|gbpusd|usdjpy|btcusd|bitcoin|forex|market)\b/.test(t)) return "MARKET_RESEARCH";
   if(/google|search the web|search online|look up|find online|latest news|news about|research online|internet/.test(t)) return "WEB_RESEARCH";
+  if(/technical analysis book|ta book|analysis book|charting book|technical analysis chapter|learn technical analysis/.test(t)) return "TECHNICAL_ANALYSIS_BOOK";
   if(/risk|drawdown|exposure|stop loss|\bsl\b|take profit|\btp\b/.test(t)) return "RISK_REVIEW";
   if(/bot|strateg|flipper|breakout|smc|ladder|strategic/.test(t)) return "BOT_INTELLIGENCE";
   if(/store|shop|product|pricing|plan|subscription|purchase|checkout|payment|mpesa|license|upgrade|professional|institutional|basic/.test(t)) return "STORE_INTELLIGENCE";
@@ -43,6 +45,26 @@ function utilityReply(question){
     return {answer:"The current East Africa Time (EAT) is "+eat+".",facts:["EAT timezone: Africa/Nairobi (UTC+3).","Server UTC: "+utc],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No market analysis requested.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask KINGBOT your next question."};
   }
   return null;
+}
+
+function technicalAnalysisBookReply(question){
+  const chapters=searchTechnicalAnalysisBook(question);
+  const listed=chapters.map(ch=>`Chapter ${ch.id}: ${ch.title} — ${ch.principles.join(" ")}`);
+  return {
+    answer:"KINGBOT Technical Analysis AI Book is the methodology reference used to teach and explain the scanner's evidence-first analysis process.",
+    facts:listed,
+    technicalAnalysis:[
+      "Evidence before conclusion.",
+      "Structure before indicator.",
+      "Context before pattern.",
+      "Volatility before fixed distances.",
+      "Invalidation before execution.",
+      "Predicted pending-order zones are structural inference, not confirmed broker orders."
+    ],
+    setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Use the relevant chapter as a learning framework, then verify live market data before making a setup decision.",invalidation:"Education does not override live-data, risk or execution controls."},
+    riskFlags:["EDUCATIONAL_REFERENCE","NO_PROFIT_GUARANTEE"],
+    nextAction:"Open the KINGBOT Technical Analysis AI Book page or ask for a specific chapter such as RSI, market structure, liquidity, FVG or pending-order inference."
+  };
 }
 
 function kingbotKnowledgeReply(question){
@@ -303,6 +325,21 @@ export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker
   const requested=symbolFromText(question,symbol||"XAUUSD");
   const kind=intent(question);
   const utility=utilityReply(question);
+  if(kind==="TECHNICAL_ANALYSIS_BOOK"){
+    return {
+      provider:"KINGBOT_NATIVE",
+      model:"KINGBOT-CORE-1",
+      intent:kind,
+      symbol:requested,
+      reply:technicalAnalysisBookReply(question),
+      book:{
+        title:"KINGBOT Technical Analysis AI Book",
+        version:"1.0",
+        chapters:searchTechnicalAnalysisBook(question).map(x=>({id:x.id,title:x.title}))
+      },
+      verified:{technicalAnalysisBook:true}
+    };
+  }
   if(kind==="KINGBOT_KNOWLEDGE"){
     return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:kingbotKnowledgeReply(question),verified:{platformKnowledge:true,engineDefinitions:true}};
   }
