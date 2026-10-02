@@ -1058,6 +1058,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       return;
     }
     if(eventName==="snapshot"){
+      window.dispatchEvent(new CustomEvent("kingbot:terminal-snapshot", { detail: payload || {} }));
       const incoming=payload?.account||null;
       if(incoming){
         const merged=state.account?{...state.account,...incoming}:incoming;
@@ -1278,5 +1279,6 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 <script src="system/auth-gate.js"></script>
 <script src="system/access-control.js"></script>
 <script src="system/navigation.js"></script>
+<script src="system/voice-intelligence.js"></script>
 </body>
 </html>
