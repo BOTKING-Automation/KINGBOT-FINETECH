@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import { Mt5RuntimeAdapter } from "./mt5-runtime-adapter.mjs";
+import { createMt5HostSupervisor } from "./mt5-host-supervisor.mjs";
 
 const API_ORIGIN=String(process.env.KINGBOT_API_ORIGIN||"").replace(/\/$/,"");
 const BOOTSTRAP_TOKEN=String(process.env.KINGBOT_HOSTING_BOOTSTRAP_TOKEN||"").trim();
@@ -7,9 +9,10 @@ const NODE_NAME=String(process.env.KINGBOT_HOST_NODE_NAME||NODE_ID).trim();
 const NODE_REGION=String(process.env.KINGBOT_HOST_NODE_REGION||"unknown").trim();
 const NODE_ENDPOINT=String(process.env.KINGBOT_HOST_NODE_ENDPOINT||"").trim();
 const HEARTBEAT_MS=Math.max(5000,Number(process.env.KINGBOT_HOST_HEARTBEAT_MS||10000));
+const BRIDGE_WAIT_MS=Math.max(15000,Number(process.env.KINGBOT_HOST_BRIDGE_WAIT_MS||60000));
 
 if(!API_ORIGIN)throw new Error("KINGBOT_API_ORIGIN_REQUIRED");
-if(!BOOTSTRAP_TOKEN)throw new Error("KINGBOT_HOSTING_BOOTSTRAP_TOKEN_REQUIRED");
+if(!BOOTSTRAP_TOKEN&&!String(process.env.KINGBOT_HOST_NODE_TOKEN||"").trim())throw new Error("KINGBOT_HOST_AUTH_REQUIRED");
 
 let nodeToken=String(process.env.KINGBOT_HOST_NODE_TOKEN||"").trim();
 
@@ -28,9 +31,12 @@ async function api(path,options={}){
 }
 
 async function register(){
+  if(nodeToken){
+    console.log(JSON.stringify({event:"node_token_loaded",nodeId:NODE_ID}));
+    return;
+  }
   const result=await api("/api/mt5/hosting/node/register",{
     method:"POST",
-    headers:{},
     body:JSON.stringify({
       bootstrapToken:BOOTSTRAP_TOKEN,
       nodeId:NODE_ID,
@@ -54,38 +60,16 @@ async function heartbeat(){
   return result.deployments||[];
 }
 
-async function markDeployment(deploymentId,status,extra={}){
-  return api("/api/mt5/hosting/node/deployment-state",{
-    method:"POST",
-    body:JSON.stringify({deploymentId,status,...extra})
-  });
-}
-
 async function main(){
   await register();
-  while(true){
-    try{
-      const deployments=await heartbeat();
-      for(const deployment of deployments){
-        if(deployment.status==="PROVISIONING"){
-          // Deliberately do not claim RUNNING until an MT5 runtime adapter is installed
-          // and has verified broker connectivity and the KINGBOT EA heartbeat.
-          await markDeployment(deployment.id,"ERROR",{
-            brokerProvider:deployment.broker_provider||"",
-            accountId:deployment.account_id||""
-          });
-          console.error(JSON.stringify({
-            event:"deployment_blocked",
-            deploymentId:deployment.id,
-            reason:"MT5_RUNTIME_ADAPTER_NOT_INSTALLED"
-          }));
-        }
-      }
-    }catch(error){
-      console.error(JSON.stringify({event:"node_error",message:error?.message||String(error)}));
-    }
-    await new Promise(resolve=>setTimeout(resolve,HEARTBEAT_MS));
-  }
+  const adapter=new Mt5RuntimeAdapter();
+  const supervisor=createMt5HostSupervisor({
+    api,
+    adapter,
+    pollMs:HEARTBEAT_MS,
+    bridgeWaitMs:BRIDGE_WAIT_MS
+  });
+  await supervisor.loop(heartbeat);
 }
 
 main().catch(error=>{
