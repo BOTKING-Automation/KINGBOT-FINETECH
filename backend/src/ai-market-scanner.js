@@ -444,20 +444,7 @@ export async function runStandaloneMarketScan({ pool, twelveData, symbols, timef
   return standaloneMarketScan({ pool, twelveData, symbols, timeframe });
 }
 
-async function runMarketScan({ requireUser, pool, twelveData, req, res }) {
-  let user;
-  try {
-    user = await requireUser(pool, req, res);
-  } catch (error) {
-    console.error("[KINGBOT MARKET SCANNER AUTH]", error?.message || error);
-    return res.status(503).json({
-      ok:false,
-      error:"SCANNER_AUTH_SERVICE_UNAVAILABLE",
-      reason:"The scanner could not verify your KINGBOT session. Retry after the account service is available."
-    });
-  }
-  if (!user) return null;
-
+async function runMarketScan({ pool, twelveData, req, res }) {
   try {
     const result = await standaloneMarketScan({
       pool,
@@ -482,7 +469,7 @@ export async function ensureAiMarketScannerSchema(pool) {
   await ensureScannerSchema(pool);
 }
 
-export function registerAiMarketScanner(app, { requireUser, pool, rateLimit }) {
+export function registerAiMarketScanner(app, { pool, rateLimit }) {
   void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
 
   const limiter = rateLimit({
@@ -504,19 +491,7 @@ export function registerAiMarketScanner(app, { requireUser, pool, rateLimit }) {
     }
   });
 
-  app.get("/api/ai/market-scanner/status", async (req,res) => {
-    let user;
-    try {
-      user = await requireUser(pool, req, res);
-    } catch (error) {
-      console.error("[KINGBOT MARKET SCANNER STATUS AUTH]", error?.message || error);
-      return res.status(503).json({
-        ok:false,
-        error:"SCANNER_AUTH_SERVICE_UNAVAILABLE",
-        reason:"The scanner could not verify your KINGBOT session. Retry after the account service is available."
-      });
-    }
-    if (!user) return;
+  app.get("/api/ai/market-scanner/status", async (_req,res) => {
     const apiKey = String(process.env.XAI_API_KEY || "").trim();
     let tvCount=0;
     try { const q=await pool.query("SELECT COUNT(*)::int AS count FROM kingbot_tradingview_snapshots WHERE received_at > NOW() - INTERVAL '10 minutes'"); tvCount=q.rows[0]?.count || 0; } catch {}
@@ -538,7 +513,7 @@ export function registerAiMarketScanner(app, { requireUser, pool, rateLimit }) {
     });
   });
 
-  const scanHandler=async(req,res)=>{ await runMarketScan({requireUser,pool,twelveData,req,res}); };
+  const scanHandler=async(req,res)=>{ await runMarketScan({pool,twelveData,req,res}); };
   app.get("/api/ai/market-scanner",limiter,scanHandler);
   app.post("/api/ai/market-scanner",limiter,scanHandler);
   app.get("/api/market-scanner",limiter,scanHandler);
