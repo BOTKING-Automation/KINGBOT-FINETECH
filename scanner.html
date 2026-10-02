@@ -108,7 +108,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
     <div class="card-head"><div class="section-title">GROK ANALYSIS</div><div class="section-sub" id="analysisMeta">Awaiting scan</div></div>
     <div class="scan-body">
       <div class="scan-summary"><strong style="color:var(--cyan);font:900 9px JetBrains Mono">MARKET INTELLIGENCE</strong>
-        <div id="summaryText" class="summary-text">Sign in, connect a broker, then run the scanner.</div>
+        <div id="summaryText" class="summary-text">Standalone live market scanner ready. Broker connection is not required.</div>
       </div>
       <div id="signalPanel" class="signal-panel" style="display:none;margin-top:12px;padding:14px;border:1px solid rgba(25,230,255,.14);border-radius:13px;background:rgba(5,10,24,.72)">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
@@ -156,25 +156,11 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
     clearTimeout(toast.t); toast.t=setTimeout(()=>el.className="toast",3200);
   }
 
-  async function getToken(force){
-    const s=await window.KINGBOT_SESSION?.check?.({force:!!force});
-    if(!s?.authenticated)throw new Error("Please sign in to use the AI market scanner.");
-    if(!s?.user?.verified)throw new Error("Verify your email before using the AI market scanner.");
-    const u=window.KINGBOT_FIREBASE?.auth?.currentUser;
-    if(!u)throw new Error("Firebase session is not available.");
-    return u.getIdToken(!!force);
-  }
-
   async function request(path,options={}){
-    const send=async(force)=>{
-      const headers=new Headers(options.headers||{});
-      headers.set("Accept","application/json");
-      if(options.body)headers.set("Content-Type","application/json");
-      headers.set("Authorization","Bearer "+await getToken(force));
-      return fetch(API+path,{...options,headers,credentials:"omit",cache:"no-store"});
-    };
-    let r=await send(false);
-    if(r.status===401)r=await send(true);
+    const headers=new Headers(options.headers||{});
+    headers.set("Accept","application/json");
+    if(options.body)headers.set("Content-Type","application/json");
+    const r=await fetch(API+path,{...options,headers,credentials:"omit",cache:"no-store"});
     const data=await r.json().catch(()=>({}));
     if(!r.ok||data.ok===false)throw new Error(data.error||data.reason||data.message||("HTTP "+r.status));
     return data;
@@ -287,7 +273,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       qs("aiState").className=data.provider==="none"?"warn":"good";
       qs("coreSub").textContent=(data.source||"Live market feed")+" · "+(data.technicalCount||0)+" technical feeds · "+(data.quoteCount||0)+" live quotes";
       qs("scanState").textContent="QUOTES READY";
-      toast("Broker quotes synchronized.","good");
+      toast("Live market quotes synchronized.","good");
       return data;
     }catch(error){
       const msg=String(error?.message||"Scanner unavailable.");
@@ -327,7 +313,6 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
   qs("scanNow")?.addEventListener("click",runScan);
 
   (async()=>{
-    await window.KINGBOT_SESSION?.check?.().catch(()=>null);
     listFromInput(); renderQuotes();
     await checkStatus();
     syncQuotes().catch(()=>{});
