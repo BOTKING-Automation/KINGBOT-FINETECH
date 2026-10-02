@@ -386,7 +386,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
 
   let ai = null;
   try {
-    ai = await askGrok({ technical, quotes: directQuotes, timeframe: normalizedTimeframe });
+    ai = await askGrok({ technical, quotes, timeframe: normalizedTimeframe });
   } catch (error) {
     ai = {
       provider:"none",
@@ -397,11 +397,14 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
   }
 
   const fallbackAnalysis = {
-    market_regime: technical.some(x => x.bias === "BULLISH")
-      ? "BULLISH"
-      : technical.some(x => x.bias === "BEARISH")
-        ? "BEARISH"
-        : "MIXED",
+    market_regime: (() => {
+      const scored = technical.filter(x => x.source !== "none" && Number.isFinite(Number(x.score)));
+      if (!scored.length) return "MIXED";
+      const bull = scored.reduce((sum,x) => sum + (x.bias === "BULLISH" ? Number(x.score) : 0), 0);
+      const bear = scored.reduce((sum,x) => sum + (x.bias === "BEARISH" ? Number(x.score) : 0), 0);
+      if (Math.abs(bull - bear) < 10) return "MIXED";
+      return bull > bear ? "BULLISH" : "BEARISH";
+    })(),
     ranked_symbols: technical.map(x => ({symbol:x.symbol,...x})),
     risk_flags:[
       ...(ai?.aiError ? ["AI_EXPLANATION_UNAVAILABLE"] : []),
@@ -420,7 +423,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     marketData:twelveData?.status ? twelveData.status() : {configured:false},
     symbols:normalizedSymbols,
     timeframe:normalizedTimeframe,
-    quotes:directQuotes,
+    quotes,
     technical,
     tradingViewSnapshots:tvMap,
     analysis:ai.analysis || JSON.stringify(fallbackAnalysis),
