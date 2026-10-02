@@ -432,6 +432,27 @@
       }
     });
 
+      const state=root.querySelector(".kb-menu-state");
+      if(state){
+        state.innerHTML=authenticated
+          ? '<span class="kb-menu-dot"></span>AUTHENTICATED'
+          : '<span class="kb-menu-dot"></span>SYSTEM ONLINE';
+      }
+
+      document.querySelectorAll("[data-kb-auth-cta]").forEach(el=>{
+        if(authenticated){
+          el.textContent="DASHBOARD →";
+          el.setAttribute("href","index.html");
+          el.classList.remove("kb-guest-only");
+        }else{
+          el.textContent=el.dataset.guestText||"ENTER KINGBOT →";
+          el.setAttribute("href","access-stable.html#signin");
+        }
+      });
+
+      document.querySelectorAll("[data-kb-guest-only]").forEach(el=>{
+        el.hidden=authenticated;
+      });
     }
 
     function syncAuthUI(detail){
