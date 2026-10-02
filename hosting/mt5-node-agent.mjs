@@ -1,0 +1,94 @@
+import crypto from "node:crypto";
+
+const API_ORIGIN=String(process.env.KINGBOT_API_ORIGIN||"").replace(/\/$/,"");
+const BOOTSTRAP_TOKEN=String(process.env.KINGBOT_HOSTING_BOOTSTRAP_TOKEN||"").trim();
+const NODE_ID=String(process.env.KINGBOT_HOST_NODE_ID||crypto.randomUUID()).trim();
+const NODE_NAME=String(process.env.KINGBOT_HOST_NODE_NAME||NODE_ID).trim();
+const NODE_REGION=String(process.env.KINGBOT_HOST_NODE_REGION||"unknown").trim();
+const NODE_ENDPOINT=String(process.env.KINGBOT_HOST_NODE_ENDPOINT||"").trim();
+const HEARTBEAT_MS=Math.max(5000,Number(process.env.KINGBOT_HOST_HEARTBEAT_MS||10000));
+
+if(!API_ORIGIN)throw new Error("KINGBOT_API_ORIGIN_REQUIRED");
+if(!BOOTSTRAP_TOKEN)throw new Error("KINGBOT_HOSTING_BOOTSTRAP_TOKEN_REQUIRED");
+
+let nodeToken=String(process.env.KINGBOT_HOST_NODE_TOKEN||"").trim();
+
+async function api(path,options={}){
+  const response=await fetch(API_ORIGIN+path,{
+    ...options,
+    headers:{
+      "content-type":"application/json",
+      ...(nodeToken?{"x-kingbot-node-token":nodeToken}:{}),
+      ...(options.headers||{})
+    }
+  });
+  const body=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(String(body.error||response.statusText||"HOSTING_API_ERROR"));
+  return body;
+}
+
+async function register(){
+  const result=await api("/api/mt5/hosting/node/register",{
+    method:"POST",
+    headers:{},
+    body:JSON.stringify({
+      bootstrapToken:BOOTSTRAP_TOKEN,
+      nodeId:NODE_ID,
+      name:NODE_NAME,
+      region:NODE_REGION,
+      endpoint:NODE_ENDPOINT
+    })
+  });
+  nodeToken=result.nodeToken;
+  console.log(JSON.stringify({event:"node_registered",nodeId:NODE_ID,expiresInDays:result.expiresInDays}));
+}
+
+async function heartbeat(){
+  const result=await api("/api/mt5/hosting/node/heartbeat",{method:"POST",body:"{}"});
+  console.log(JSON.stringify({
+    event:"node_heartbeat",
+    nodeId:result.nodeId,
+    deployments:Array.isArray(result.deployments)?result.deployments.length:0,
+    serverTime:result.serverTime
+  }));
+  return result.deployments||[];
+}
+
+async function markDeployment(deploymentId,status,extra={}){
+  return api("/api/mt5/hosting/node/deployment-state",{
+    method:"POST",
+    body:JSON.stringify({deploymentId,status,...extra})
+  });
+}
+
+async function main(){
+  await register();
+  while(true){
+    try{
+      const deployments=await heartbeat();
+      for(const deployment of deployments){
+        if(deployment.status==="PROVISIONING"){
+          // Deliberately do not claim RUNNING until an MT5 runtime adapter is installed
+          // and has verified broker connectivity and the KINGBOT EA heartbeat.
+          await markDeployment(deployment.id,"ERROR",{
+            brokerProvider:deployment.broker_provider||"",
+            accountId:deployment.account_id||""
+          });
+          console.error(JSON.stringify({
+            event:"deployment_blocked",
+            deploymentId:deployment.id,
+            reason:"MT5_RUNTIME_ADAPTER_NOT_INSTALLED"
+          }));
+        }
+      }
+    }catch(error){
+      console.error(JSON.stringify({event:"node_error",message:error?.message||String(error)}));
+    }
+    await new Promise(resolve=>setTimeout(resolve,HEARTBEAT_MS));
+  }
+}
+
+main().catch(error=>{
+  console.error(JSON.stringify({event:"node_fatal",message:error?.message||String(error)}));
+  process.exit(1);
+});
