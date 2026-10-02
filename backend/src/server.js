@@ -61,6 +61,82 @@ app.use("/api/bots", createBotEngineRouter({ pool }));
 app.use("/api/runtime", createBotRuntimeRouter({ pool, broker }));
 app.use("/api/mt5/bridge", createMt5BridgeRouter({ pool, broker }));
 
+function base64Url(buffer){return Buffer.from(buffer).toString("base64url");}
+function derivOauthConfig(){
+  const clientId=String(process.env.DERIV_OAUTH_CLIENT_ID||"").trim();
+  const redirectUri=String(process.env.DERIV_OAUTH_REDIRECT_URI||"").trim();
+  const frontendReturn=String(process.env.DERIV_FRONTEND_RETURN_URL||"").trim();
+  if(!clientId||!redirectUri)throw new Error("DERIV_OAUTH_NOT_CONFIGURED");
+  return {clientId,redirectUri,frontendReturn};
+}
+async function derivOauthJson(path,options={}){
+  const response=await fetch("https://auth.deriv.com"+path,options);
+  const body=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(body?.error_description||body?.error||body?.message||("DERIV_OAUTH_REQUEST_FAILED_"+response.status));
+  return body;
+}
+app.get("/api/broker/deriv/oauth/start",async(req,res)=>{
+  try{
+    const user=await requireUser(pool,req,res);if(!user)return;
+    const {clientId,redirectUri,frontendReturn}=derivOauthConfig();
+    const mode=String(req.query?.executionMode||"DEMO").toUpperCase();
+    if(!["DEMO","LIVE"].includes(mode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+    const verifier=base64Url(crypto.randomBytes(64));
+    const challenge=base64Url(crypto.createHash("sha256").update(verifier).digest());
+    const saved=await broker.createDerivOAuthState({userId:user.id,codeVerifier:verifier,executionMode:mode});
+    const params=new URLSearchParams({response_type:"code",client_id:clientId,redirect_uri:redirectUri,scope:"trade",state:saved.state,code_challenge:challenge,code_challenge_method:"S256"});
+    res.json({ok:true,authorizationUrl:"https://auth.deriv.com/oauth2/auth?"+params.toString(),executionMode:mode,returnUrl:frontendReturn||null});
+  }catch(error){res.status(503).json({ok:false,error:String(error?.message||"DERIV_OAUTH_START_FAILED")});}
+});
+app.get("/api/broker/deriv/oauth/callback",async(req,res)=>{
+  const frontend=String(process.env.DERIV_FRONTEND_RETURN_URL||"").trim()||"https://botking-automation.github.io/KINGBOT-FINETECH/broker-connect.html";
+  const redirect=(params)=>{const url=new URL(frontend);for(const [k,v] of Object.entries(params))url.searchParams.set(k,v);res.redirect(302,url.toString());};
+  try{
+    const {clientId,redirectUri}=derivOauthConfig();
+    const code=String(req.query?.code||"").trim(),state=String(req.query?.state||"").trim();
+    const oauthError=String(req.query?.error_description||req.query?.error||"").trim();
+    if(oauthError)throw new Error("DERIV_AUTHORIZATION_DENIED: "+oauthError);
+    if(!code||!state)throw new Error("DERIV_OAUTH_CALLBACK_INVALID");
+    const pending=await broker.consumeDerivOAuthState(state);
+    if(!pending)throw new Error("DERIV_OAUTH_STATE_INVALID_OR_EXPIRED");
+    const form=new URLSearchParams({grant_type:"authorization_code",client_id:clientId,code,code_verifier:pending.code_verifier,redirect_uri:redirectUri});
+    const tokenPayload=await derivOauthJson("/oauth2/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:form.toString()});
+    const response=await fetch("https://api.derivws.com/trading/v1/options/accounts",{headers:{Authorization:"Bearer "+String(tokenPayload?.access_token||"")}});
+    const body=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(body?.errors?.[0]?.message||body?.message||("DERIV_ACCOUNT_LIST_FAILED_"+response.status));
+    const accounts=Array.isArray(body?.data)?body.data:(body?.data?[body.data]:[]);
+    const finalized=await broker.finalizeDerivOAuthState({state,tokenPayload,accounts});
+    redirect({deriv_pending:finalized.pending_id,executionMode:finalized.execution_mode});
+  }catch(error){redirect({deriv_error:String(error?.message||"DERIV_OAUTH_CALLBACK_FAILED")});}
+});
+app.get("/api/broker/deriv/oauth/pending",async(req,res)=>{
+  try{
+    const user=await requireUser(pool,req,res);if(!user)return;
+    const pending=await broker.getDerivOAuthPending({userId:user.id,pendingId:req.query?.pendingId});
+    if(!pending)return res.status(404).json({ok:false,error:"DERIV_OAUTH_PENDING_NOT_FOUND"});
+    res.json({ok:true,pendingId:pending.pending_id,executionMode:pending.execution_mode,accounts:pending.accounts});
+  }catch(error){res.status(503).json({ok:false,error:String(error?.message||"DERIV_OAUTH_PENDING_FAILED")});}
+});
+app.post("/api/broker/deriv/oauth/connect",async(req,res)=>{
+  try{
+    const user=await requireUser(pool,req,res);if(!user)return;
+    const accountId=String(req.body?.accountId||"").trim(),accountType=String(req.body?.accountType||"").toLowerCase(),pendingId=String(req.body?.pendingId||req.body?.connection?.pendingId||"").trim();
+    if(!accountId||!["demo","real"].includes(accountType)||!pendingId)return res.status(400).json({ok:false,error:"DERIV_ACCOUNT_SELECTION_REQUIRED"});
+    const pending=await broker.consumeDerivOAuthPending({userId:user.id,pendingId});
+    if(!pending)return res.status(409).json({ok:false,error:"DERIV_OAUTH_PENDING_NOT_FOUND"});
+    const account=pending.accounts.find(item=>String(item?.account_id||item?.id||"")===accountId);
+    if(!account)return res.status(403).json({ok:false,error:"DERIV_ACCOUNT_NOT_AUTHORIZED"});
+    const actualType=String(account?.account_type||account?.accountType||"").toLowerCase();
+    if(actualType&&actualType!==accountType)return res.status(409).json({ok:false,error:"DERIV_ACCOUNT_TYPE_MISMATCH"});
+    const mode=accountType==="real"?"LIVE":"DEMO";
+    if(pending.execution_mode!==mode)return res.status(409).json({ok:false,error:"DERIV_EXECUTION_MODE_ACCOUNT_MISMATCH"});
+    const saved=await broker.saveMapping({userId:user.id,provider:"deriv",accountId,accountToken:JSON.stringify({...pending.token,accountType}),executionMode:mode,derivAccountType:accountType});
+    if(!saved?.ok)return res.status(409).json(saved);
+    const connected=await broker.connect(user.id,mode);
+    if(!connected?.connected)return res.status(503).json({ok:false,error:"DERIV_CONNECTION_FAILED",reason:connected?.reason||"DERIV_CONNECTION_FAILED"});
+    res.json({ok:true,...connected});
+  }catch(error){res.status(503).json({ok:false,error:String(error?.message||"DERIV_OAUTH_CONNECT_FAILED")});}
+});
 app.get("/api/broker/live-authorization", async (req,res)=>{
   try{
     const user=await requireUser(pool,req,res); if(!user)return;
