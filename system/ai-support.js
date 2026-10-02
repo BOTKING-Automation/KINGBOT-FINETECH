@@ -16,7 +16,10 @@
     contextBusy: false,
     lastQueryAt: null,
     messages: [],
-    storageKey: "KINGBOT_AI_CHAT_V1"
+    storageKey: "KINGBOT_AI_CHAT_V2",
+    puterReady: false,
+    puterModel: "gpt-5.6-luna",
+    puterModels: []
   };
 
   function byId(id) {
@@ -223,7 +226,7 @@
   function renderHealth() {
     const h = state.health;
     if (!h) return;
-    const aiReady = Boolean(h.aiReady);
+    const aiReady = Boolean(state.puterReady || h.aiReady);
     const apiReady = Boolean(h.ok);
     const dbReady = Boolean(h.accountServiceReady);
     const provider = String(h.aiProvider || "").toLowerCase();
@@ -364,6 +367,112 @@
     }
   }
 
+  async function initPuter() {
+    if (window.puter?.ai?.chat) {
+      state.puterReady = true;
+    } else {
+      await new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-kingbot-puter]');
+        if (existing) {
+          existing.addEventListener("load", resolve, { once: true });
+          existing.addEventListener("error", () => reject(new Error("PUTER_SCRIPT_LOAD_FAILED")), { once: true });
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://js.puter.com/v2/";
+        script.async = true;
+        script.dataset.kingbotPuter = "true";
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("PUTER_SCRIPT_LOAD_FAILED"));
+        document.head.appendChild(script);
+      });
+      const deadline = Date.now() + 10000;
+      while (!window.puter?.ai?.chat && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      state.puterReady = Boolean(window.puter?.ai?.chat);
+    }
+
+    if (!state.puterReady) throw new Error("PUTER_AI_UNAVAILABLE");
+
+    try {
+      const models = await window.puter.ai.listModels();
+      state.puterModels = Array.isArray(models) ? models : [];
+      const ids = state.puterModels.map(item => String(item?.id || ""));
+      const preferred = ["gpt-5.6-luna", "gpt-5.5", "claude-sonnet-4-6", "gemini-3.1-flash-lite"];
+      state.puterModel = preferred.find(id => ids.includes(id)) || state.puterModel;
+    } catch {}
+    setTelemetry("aiCoreStatus", "PUTER ONLINE", "good");
+    setText("coreStateLabel", "PUTER AI CORE ONLINE");
+    setText("coreStateSub", "Puter.js is providing the conversational reasoning layer. Verified KINGBOT context remains server-sourced.");
+  }
+
+  function buildAiMessages(clean, conversation) {
+    const context = state.context ? JSON.parse(JSON.stringify(state.context)) : null;
+    if (context?.user) delete context.user;
+    const system = [
+      "You are KINGBOT Intelligence, the decision-support assistant inside KINGBOT FINTECH.",
+      "Use only the supplied verified KINGBOT context for account, broker, position, quote, runtime and risk facts.",
+      "Never invent balances, prices, positions, fills, performance, broker status or confidence scores.",
+      "Explain uncertainty when data is unavailable or stale.",
+      "You may analyze markets and trading systems, but do not present outcomes as guaranteed.",
+      "AI is not the execution authority. Never instruct the browser to bypass server-side broker validation, deterministic risk controls, or the KINGBOT worker.",
+      "If the user asks to execute a trade, explain that execution must pass the platform's server-side risk and broker controls.",
+      "VERIFIED KINGBOT CONTEXT:",
+      JSON.stringify(context || { available: false }, null, 2)
+    ].join("\n");
+    return [
+      { role: "system", content: system },
+      ...conversation.map(item => ({ role: item.role, content: item.content })),
+      { role: "user", content: clean }
+    ];
+  }
+
+  function createStreamingBubble() {
+    const container = byId("chatScroll");
+    if (!container) return null;
+    const row = document.createElement("div");
+    row.className = "chat-message assistant";
+    const bubble = document.createElement("div");
+    bubble.className = "chat-bubble";
+    const role = document.createElement("div");
+    role.className = "chat-role";
+    role.textContent = "KINGBOT INTELLIGENCE · PUTER AI";
+    const body = document.createElement("div");
+    body.className = "chat-body";
+    bubble.append(role, body);
+    row.appendChild(bubble);
+    container.appendChild(row);
+    container.scrollTop = container.scrollHeight;
+    return body;
+  }
+
+  async function streamPuterAnswer(clean, conversation) {
+    await initPuter();
+    const response = await window.puter.ai.chat(buildAiMessages(clean, conversation), {
+      model: state.puterModel,
+      stream: true,
+      temperature: 0.2,
+      max_tokens: 2400,
+      compaction: true
+    });
+    const body = createStreamingBubble();
+    if (!body) throw new Error("AI_CHAT_CONTAINER_UNAVAILABLE");
+
+    let answer = "";
+    for await (const part of response) {
+      if (part?.type === "error") throw new Error(String(part.message || "PUTER_STREAM_ERROR"));
+      if (typeof part?.text === "string" && part.text) {
+        answer += part.text;
+        body.textContent = answer;
+        const container = byId("chatScroll");
+        if (container) container.scrollTop = container.scrollHeight;
+      }
+    }
+    if (!answer.trim()) throw new Error("PUTER_RETURNED_EMPTY_RESPONSE");
+    return answer.trim();
+  }
+
   async function loadContext() {
     if (state.contextBusy) return;
     state.contextBusy = true;
@@ -425,18 +534,7 @@
           content: String(item.content || "").slice(0, 4000)
         }));
 
-      const response = await requestJson(API_BASE + "/ai/query", {
-        method: "POST",
-        body: JSON.stringify({
-          message: clean,
-          symbol: byId("symbolSelect")?.value || "",
-          timeframe: byId("timeframeSelect")?.value || "",
-          history: conversation
-        })
-      });
-
-      const answer = String(response.answer || "").trim();
-      if (!answer) throw new Error("KINGBOT Intelligence returned no analysis.");
+      const answer = await streamPuterAnswer(clean, conversation);
 
       hideTyping();
       addHistory("assistant", answer);
@@ -537,6 +635,11 @@
     setChatState("READY");
     setInterval(loadContext, 20000);
     loadHealth();
+    initPuter().catch(() => {
+      setTelemetry("aiCoreStatus", "OFFLINE", "bad");
+      setText("coreStateLabel", "PUTER AI UNAVAILABLE");
+      setText("coreStateSub", "The conversational AI service could not be initialized in this browser.");
+    });
     window.setTimeout(loadContext, 700);
     window.addEventListener("kingbot:session-change", () => loadContext());
     window.addEventListener("kingbot:access-ready", () => loadContext(), { once: true });
