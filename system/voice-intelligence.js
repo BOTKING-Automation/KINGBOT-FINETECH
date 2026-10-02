@@ -248,6 +248,8 @@
     });
 
     void getStatus();
+    window.addEventListener("kingbot:session-change",()=>void getStatus());
+    window.addEventListener("kingbot:access-ready",()=>void getStatus(),{once:false});
   }
 
   function init(){
