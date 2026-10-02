@@ -18,8 +18,9 @@
     messages: [],
     storageKey: "KINGBOT_AI_CHAT_V2",
     puterReady: false,
-    puterModel: "gpt-5.6-luna",
-    puterModels: []
+    puterModel: "gemini-3.1-flash-lite",
+    puterModels: [],
+    puterInitPromise: null
   };
 
   function byId(id) {
@@ -372,43 +373,62 @@
   }
 
   async function initPuter() {
-    if (window.puter?.ai?.chat) {
-      state.puterReady = true;
-    } else {
-      await new Promise((resolve, reject) => {
-        const existing = document.querySelector('script[data-kingbot-puter]');
-        if (existing) {
-          existing.addEventListener("load", resolve, { once: true });
-          existing.addEventListener("error", () => reject(new Error("PUTER_SCRIPT_LOAD_FAILED")), { once: true });
-          return;
-        }
-        const script = document.createElement("script");
-        script.src = "https://js.puter.com/v2/";
-        script.async = true;
-        script.dataset.kingbotPuter = "true";
-        script.onload = resolve;
-        script.onerror = () => reject(new Error("PUTER_SCRIPT_LOAD_FAILED"));
-        document.head.appendChild(script);
-      });
-      const deadline = Date.now() + 10000;
-      while (!window.puter?.ai?.chat && Date.now() < deadline) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      state.puterReady = Boolean(window.puter?.ai?.chat);
+    if (state.puterReady && window.puter?.ai?.chat) return;
+
+    if (state.puterInitPromise) {
+      await state.puterInitPromise;
+      return;
     }
 
-    if (!state.puterReady) throw new Error("PUTER_AI_UNAVAILABLE");
+    state.puterInitPromise = (async () => {
+      if (!window.puter?.ai?.chat) {
+        await new Promise((resolve, reject) => {
+          const existing = document.querySelector('script[data-kingbot-puter]');
+          if (existing) {
+            existing.addEventListener("load", resolve, { once: true });
+            existing.addEventListener("error", () => reject(new Error("PUTER_SCRIPT_LOAD_FAILED")), { once: true });
+            return;
+          }
+          const script = document.createElement("script");
+          script.src = "https://js.puter.com/v2/";
+          script.async = true;
+          script.dataset.kingbotPuter = "true";
+          script.onload = resolve;
+          script.onerror = () => reject(new Error("PUTER_SCRIPT_LOAD_FAILED"));
+          document.head.appendChild(script);
+        });
+      }
+
+      const deadline = Date.now() + 7000;
+      while (!window.puter?.ai?.chat && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 80));
+      }
+
+      state.puterReady = Boolean(window.puter?.ai?.chat);
+      if (!state.puterReady) throw new Error("PUTER_AI_UNAVAILABLE");
+
+      // Model discovery is optional and must never delay the first response.
+      // Keep a known fast default while checking available models in the background.
+      void (async () => {
+        try {
+          const models = await window.puter.ai.listModels();
+          state.puterModels = Array.isArray(models) ? models : [];
+          const ids = state.puterModels.map(item => String(item?.id || ""));
+          const preferred = ["gemini-3.1-flash-lite", "gpt-5.5", "claude-sonnet-4-6", "gpt-5.6-luna"];
+          state.puterModel = preferred.find(id => ids.includes(id)) || state.puterModel;
+        } catch {}
+      })();
+
+      setTelemetry("aiCoreStatus", "PUTER ONLINE", "good");
+      setText("coreStateLabel", "PUTER FAST AI CORE ONLINE");
+      setText("coreStateSub", "Fast conversational reasoning is ready. Verified KINGBOT context remains server-sourced.");
+    })();
 
     try {
-      const models = await window.puter.ai.listModels();
-      state.puterModels = Array.isArray(models) ? models : [];
-      const ids = state.puterModels.map(item => String(item?.id || ""));
-      const preferred = ["gemini-3.1-flash-lite", "gpt-5.5", "claude-sonnet-4-6", "gpt-5.6-luna"];
-      state.puterModel = preferred.find(id => ids.includes(id)) || state.puterModel;
-    } catch {}
-    setTelemetry("aiCoreStatus", "PUTER ONLINE", "good");
-    setText("coreStateLabel", "PUTER AI CORE ONLINE");
-    setText("coreStateSub", "Puter.js is providing the conversational reasoning layer. Verified KINGBOT context remains server-sourced.");
+      await state.puterInitPromise;
+    } finally {
+      state.puterInitPromise = null;
+    }
   }
 
   function buildAiMessages(clean, conversation) {
