@@ -40,7 +40,7 @@ export class UserBrokerManager {
 
   async ensureSchema(){
     if(!this.pool)return;
-    await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_broker_accounts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,credential_ciphertext TEXT NOT NULL,credential_iv TEXT NOT NULL,credential_tag TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'DEMO' CHECK(execution_mode IN ('DEMO','LIVE')),enabled BOOLEAN NOT NULL DEFAULT TRUE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,provider,account_id))");
+    await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_broker_accounts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,credential_ciphertext TEXT NOT NULL,credential_iv TEXT NOT NULL,credential_tag TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'DEMO' CHECK(execution_mode IN ('DEMO','LIVE')),live_execution_authorized BOOLEAN NOT NULL DEFAULT FALSE,live_authorized_at TIMESTAMPTZ,enabled BOOLEAN NOT NULL DEFAULT TRUE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,provider,account_id))");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts DROP CONSTRAINT IF EXISTS kingbot_broker_accounts_execution_mode_check");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD CONSTRAINT kingbot_broker_accounts_execution_mode_check CHECK(execution_mode IN ('DEMO','LIVE'))");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts DROP CONSTRAINT IF EXISTS kingbot_broker_accounts_execution_mode_check");
@@ -54,6 +54,9 @@ export class UserBrokerManager {
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT TRUE");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()");
     await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()");
+    await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS live_execution_authorized BOOLEAN NOT NULL DEFAULT FALSE");
+    await this.pool.query("ALTER TABLE kingbot_broker_accounts ADD COLUMN IF NOT EXISTS live_authorized_at TIMESTAMPTZ");
+    await this.pool.query("UPDATE kingbot_broker_accounts SET live_execution_authorized=FALSE,live_authorized_at=NULL WHERE live_execution_authorized IS NULL");
     await this.pool.query("CREATE TABLE IF NOT EXISTS kingbot_deriv_oauth_states (state TEXT PRIMARY KEY,user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,code_verifier TEXT NOT NULL,execution_mode TEXT NOT NULL DEFAULT 'DEMO',expires_at TIMESTAMPTZ NOT NULL,pending_id TEXT,token_ciphertext TEXT,token_iv TEXT,token_tag TEXT,accounts_json JSONB,status TEXT NOT NULL DEFAULT 'pending')");
     await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS pending_id TEXT");
     await this.pool.query("ALTER TABLE kingbot_deriv_oauth_states ADD COLUMN IF NOT EXISTS token_ciphertext TEXT");
@@ -208,7 +211,7 @@ export class UserBrokerManager {
 
   async getMapping(userId){
     if(!this.pool||!userId)return null;
-    const q=await this.pool.query("SELECT id,user_id,provider,account_id,execution_mode,enabled,credential_ciphertext,credential_iv,credential_tag FROM kingbot_broker_accounts WHERE user_id=$1 AND enabled=TRUE AND credential_ciphertext IS NOT NULL AND credential_iv IS NOT NULL AND credential_tag IS NOT NULL ORDER BY updated_at DESC LIMIT 1",[userId]);
+    const q=await this.pool.query("SELECT id,user_id,provider,account_id,execution_mode,enabled,live_execution_authorized,live_authorized_at,credential_ciphertext,credential_iv,credential_tag FROM kingbot_broker_accounts WHERE user_id=$1 AND enabled=TRUE AND credential_ciphertext IS NOT NULL AND credential_iv IS NOT NULL AND credential_tag IS NOT NULL ORDER BY updated_at DESC LIMIT 1",[userId]);
     return q.rowCount?q.rows[0]:null;
   }
 
@@ -264,13 +267,60 @@ export class UserBrokerManager {
     }
     const encrypted=encryptSecret(secretValue);
     try{
-      const q=await this.pool.query("INSERT INTO kingbot_broker_accounts(user_id,provider,account_id,credential_ciphertext,credential_iv,credential_tag,execution_mode,enabled,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,TRUE,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET credential_ciphertext=EXCLUDED.credential_ciphertext,credential_iv=EXCLUDED.credential_iv,credential_tag=EXCLUDED.credential_tag,execution_mode=EXCLUDED.execution_mode,enabled=TRUE,updated_at=NOW() RETURNING id,user_id,provider,account_id,execution_mode,enabled",[userId,providerName,id,encrypted.ciphertext,encrypted.iv,encrypted.tag,mode]);
+      const q=await this.pool.query("INSERT INTO kingbot_broker_accounts(user_id,provider,account_id,credential_ciphertext,credential_iv,credential_tag,execution_mode,enabled,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,TRUE,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET credential_ciphertext=EXCLUDED.credential_ciphertext,credential_iv=EXCLUDED.credential_iv,credential_tag=EXCLUDED.credential_tag,execution_mode=EXCLUDED.execution_mode,live_execution_authorized=FALSE,live_authorized_at=NULL,enabled=TRUE,updated_at=NOW() RETURNING id,user_id,provider,account_id,execution_mode,live_execution_authorized,live_authorized_at,enabled",[userId,providerName,id,encrypted.ciphertext,encrypted.iv,encrypted.tag,mode]);
       await this.disconnect(userId,{disableMapping:false});
       return {ok:true,account:q.rows[0]};
     }catch(error){
       if(error?.code==="23505")return {ok:false,error:"BROKER_ALREADY_CONNECTED",message:"A broker account is already connected. Disconnect it before connecting another broker or account."};
       throw error;
     }
+  }
+
+  async getLiveAuthorization(userId){
+    const mapping=await this.getMapping(userId);
+    if(!mapping)return {authorized:false,reason:"BROKER_ACCOUNT_NOT_CONFIGURED"};
+    return {
+      authorized:Boolean(mapping.live_execution_authorized),
+      executionMode:String(mapping.execution_mode||"DEMO").toUpperCase(),
+      accountId:mapping.account_id||null,
+      provider:mapping.provider||null,
+      authorizedAt:mapping.live_authorized_at||null
+    };
+  }
+
+  async setLiveAuthorization(userId,authorized){
+    if(!this.pool||!userId)throw new Error("USER_CONTEXT_REQUIRED");
+    const enable=Boolean(authorized);
+    const mapping=await this.getMapping(userId);
+    if(!mapping)throw new Error("BROKER_ACCOUNT_NOT_CONFIGURED");
+    if(enable){
+      if(String(mapping.execution_mode||"DEMO").toUpperCase()!=="LIVE")throw new Error("LIVE_EXECUTION_MODE_REQUIRED");
+      const status=await this.getStatus(userId);
+      const accountType=String(status?.accountSnapshot?.accountType||"").toUpperCase();
+      if(accountType!=="REAL")throw new Error("LIVE_REQUIRES_REAL_ACCOUNT");
+      if(status?.accountSnapshot?.tradingEnabled===false)throw new Error("BROKER_TRADING_DISABLED");
+    }
+    await this.pool.query(
+      "UPDATE kingbot_broker_accounts SET live_execution_authorized=$2,live_authorized_at=CASE WHEN $2 THEN NOW() ELSE NULL END,updated_at=NOW() WHERE id=$1",
+      [mapping.id,enable]
+    );
+    return this.getLiveAuthorization(userId);
+  }
+
+  async assertExecutionAuthorized(userId){
+    const mapping=await this.getMapping(userId);
+    if(!mapping)throw new Error("BROKER_ACCOUNT_NOT_CONFIGURED");
+    const mode=String(mapping.execution_mode||"DEMO").toUpperCase();
+    if(!["DEMO","LIVE"].includes(mode))throw new Error("INVALID_EXECUTION_MODE");
+    if(mode==="DEMO")return {authorized:true,mode,liveAuthorized:false,provider:mapping.provider,accountId:mapping.account_id};
+    if(String(process.env.KINGBOT_LIVE_AUTH_REQUIRED||"true").toLowerCase()!=="false"){
+      if(!Boolean(mapping.live_execution_authorized))throw new Error("LIVE_EXECUTION_NOT_AUTHORIZED");
+    }
+    const status=await this.getStatus(userId);
+    const accountType=String(status?.accountSnapshot?.accountType||"").toUpperCase();
+    if(accountType!=="REAL")throw new Error("LIVE_REQUIRES_REAL_ACCOUNT");
+    if(status?.accountSnapshot?.tradingEnabled===false)throw new Error("BROKER_TRADING_DISABLED");
+    return {authorized:true,mode,liveAuthorized:Boolean(mapping.live_execution_authorized),provider:mapping.provider,accountId:mapping.account_id};
   }
 
   async connect(userId,executionMode="DEMO"){
@@ -803,6 +853,7 @@ export class UserBrokerManager {
   }
 
   async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId,currency,multiplier,derivContractType}){
+    await this.assertExecutionAuthorized(userId);
     const entry=await this.connectionFor(userId);
     if(entry.provider==="deriv"){
       return await entry.api.placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId,currency,multiplier,derivContractType});
