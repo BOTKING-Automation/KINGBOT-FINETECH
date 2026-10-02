@@ -35,6 +35,7 @@ IMPORTANT:
         "terminal.html",
         "analytics.html",
         "ai.html",
+        "scanner.html",
         "bots.html",
         "settings.html",
         "subscription.html",
