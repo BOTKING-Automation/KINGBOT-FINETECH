@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getBotDefinitions } from "./bot-engines.js";
-import { runNativeKingbotAI } from "./kingbot-native-ai.js";
+import { runNativeKingbotAI, webSearchStatus } from "./kingbot-native-ai.js";
 
 const DEFAULT_SYMBOLS=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 const MODEL=String(process.env.GEMINI_AGENT_MODEL||process.env.GEMINI_MODEL||"gemini-2.5-flash-lite").trim();
@@ -45,7 +45,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     res.json({
       ok:true,agentReady:true,nativeReady:true,externalProvider:EXTERNAL_PROVIDER,model:EXTERNAL_PROVIDER==="gemini"&&ai?MODEL:"KINGBOT-CORE-1",mode:"KINGBOT_NATIVE_INTELLIGENCE_AGENT",
       authority:"ANALYSIS_ONLY",marketData:feed.status(),brokerConnected:Boolean(brokerStatus?.connected),
-      engines:Object.keys(getBotDefinitions())
+      engines:Object.keys(getBotDefinitions()),webResearch:webSearchStatus()
     });
   });
 
