@@ -45,6 +45,17 @@ export function createMt5HostingRouter({pool,requireUser}={}){
       "SELECT id FROM kingbot_mt5_host_deployments WHERE user_id=$1 AND status IN ('PROVISIONING','RUNNING','PAUSED') ORDER BY created_at DESC LIMIT 1",
       [user.id]
     );
+    const mapping=await pool.query(
+      "SELECT provider,account_id,execution_mode,live_execution_authorized FROM kingbot_broker_accounts WHERE user_id=$1 AND enabled=TRUE ORDER BY updated_at DESC LIMIT 1",
+      [user.id]
+    );
+    if(!mapping.rowCount)return res.status(409).json({ok:false,error:"BROKER_CONNECTION_REQUIRED",message:"Connect and verify a broker account before provisioning hosted MT5."});
+    const brokerProvider=String(mapping.rows[0].provider||"").toLowerCase();
+    const brokerAccountId=String(mapping.rows[0].account_id||"").trim();
+    const brokerMode=String(mapping.rows[0].execution_mode||"DEMO").toUpperCase();
+    if(brokerMode!==executionMode)return res.status(409).json({ok:false,error:"EXECUTION_MODE_BROKER_MISMATCH",brokerExecutionMode:brokerMode,requestedExecutionMode:executionMode});
+    if(executionMode==="LIVE"&&!mapping.rows[0].live_execution_authorized)
+      return res.status(409).json({ok:false,error:"LIVE_EXECUTION_NOT_AUTHORIZED",message:"Explicit live execution authorization is required before hosted LIVE provisioning."});
     if(q.rowCount)return res.status(409).json({ok:false,error:"MT5_HOST_ALREADY_PROVISIONING"});
     const nodeQ=await pool.query(`
       SELECT n.node_id
@@ -60,13 +71,13 @@ export function createMt5HostingRouter({pool,requireUser}={}){
     const nodeId=nodeQ.rows[0].node_id;
     const deploymentId=crypto.randomUUID();
     await pool.query(
-      "INSERT INTO kingbot_mt5_host_deployments(id,user_id,node_id,status,bot_id,execution_mode,created_at,updated_at) VALUES($1,$2,$3,'PROVISIONING',$4,$5,NOW(),NOW())",
-      [deploymentId,user.id,nodeId,botId,executionMode]
+      "INSERT INTO kingbot_mt5_host_deployments(id,user_id,node_id,status,bot_id,execution_mode,broker_provider,account_id,created_at,updated_at) VALUES($1,$2,$3,'PROVISIONING',$4,$5,$6,$7,NOW(),NOW())",
+      [deploymentId,user.id,nodeId,botId,executionMode,brokerProvider,brokerAccountId]
     );
     res.status(202).json({
       ok:true,deploymentId,status:"PROVISIONING",botId,executionMode,
       passwordRequiredByKingbot:false,
-      message:"KINGBOT queued the hosted MT5 deployment. Broker authentication is handled separately and is not stored by this control-plane request."
+      message:"KINGBOT queued the hosted MT5 deployment for the verified broker account. Broker credentials remain under the existing secure broker-connection layer."
     });
   });
 
