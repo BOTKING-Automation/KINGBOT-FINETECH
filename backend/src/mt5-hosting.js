@@ -158,6 +158,9 @@ export function createMt5HostingRouter({pool,requireUser}={}){
       if(executionMode==="LIVE"&&String(req.body?.liveConfirmation||"")!=="ENABLE_LIVE_TRADING")
         throw new Error("LIVE_CONFIRMATION_REQUIRED");
 
+      const current=await pool.query("SELECT id FROM kingbot_mt5_vps_profiles WHERE user_id=$1 LIMIT 1",[user.id]);
+      const currentProfileIdForUpdate=current.rowCount?current.rows[0].id:null;
+
       const active=await pool.query(
         "SELECT provider,account_id,execution_mode FROM kingbot_broker_accounts WHERE user_id=$1 AND enabled=TRUE ORDER BY updated_at DESC LIMIT 1"
       ,[user.id]);
@@ -187,9 +190,6 @@ export function createMt5HostingRouter({pool,requireUser}={}){
         ackUrl:apiOrigin(req)+"/api/mt5/bridge/ack"
       });
       const encrypted=encryptSecret(secretPayload);
-      const current=await pool.query("SELECT id FROM kingbot_mt5_vps_profiles WHERE user_id=$1 LIMIT 1",[user.id]);
-      const currentProfileIdForUpdate=current.rowCount?current.rows[0].id:null;
-
       let q;
       if(current.rowCount){
         q=await pool.query(
