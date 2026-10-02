@@ -69,6 +69,126 @@ app.use("/api/runtime", createBotRuntimeRouter({ pool, broker }));
 app.use("/api/mt5/bridge", createMt5BridgeRouter({ pool, broker }));
 app.use("/api/mt5/hosting", createMt5HostingRouter({ pool, requireUser }));
 
+// Generic broker connection API used by Broker Connect, Terminal and account-aware pages.
+app.post("/api/broker/account", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  const provider=String(req.body?.provider||"metaapi").trim().toLowerCase();
+  const accountId=String(req.body?.accountId||"").trim();
+  const executionMode=String(req.body?.executionMode||"DEMO").toUpperCase();
+  if(!accountId)return res.status(400).json({ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"});
+  if(!["DEMO","LIVE"].includes(executionMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+
+  try{
+    if(provider==="deriv"||provider==="derivmt5"||provider==="mt5-bridge"){
+      return res.status(400).json({ok:false,error:"USE_NATIVE_DERIV_OR_MT5_BRIDGE_FLOW"});
+    }
+
+    if(provider==="exness"){
+      if(!/^[0-9]{1,20}$/.test(accountId))return res.status(400).json({ok:false,error:"INVALID_EXNESS_ACCOUNT_ID"});
+      const apiKey=String(req.body?.apiKey||"").trim();
+      const secretKey=String(req.body?.secretKey||"").trim();
+      const baseUrl=String(req.body?.baseUrl||"").trim();
+      if(!apiKey)return res.status(400).json({ok:false,error:"EXNESS_API_KEY_REQUIRED"});
+      if(!secretKey)return res.status(400).json({ok:false,error:"EXNESS_SECRET_KEY_REQUIRED"});
+      if(baseUrl && !/^https:\/\//i.test(baseUrl))return res.status(400).json({ok:false,error:"EXNESS_BASE_URL_MUST_USE_HTTPS"});
+      const saved=await broker.saveMapping({userId:user.id,provider:"exness",accountId,executionMode,apiKey,secretKey,baseUrl});
+      if(saved?.ok===false)return res.status(saved.error==="BROKER_ALREADY_CONNECTED"?409:400).json(saved);
+      return res.status(201).json(saved);
+    }
+
+    if(provider==="oanda"){
+      const token=String(req.body?.accountToken||"").trim();
+      const baseUrl=String(req.body?.baseUrl||"").trim();
+      if(!token)return res.status(400).json({ok:false,error:"OANDA_API_TOKEN_REQUIRED"});
+      if(baseUrl && !/^https:\/\//i.test(baseUrl))return res.status(400).json({ok:false,error:"OANDA_BASE_URL_MUST_USE_HTTPS"});
+      const saved=await broker.saveMapping({userId:user.id,provider:"oanda",accountId,executionMode,accountToken:token,baseUrl});
+      if(saved?.ok===false)return res.status(saved.error==="BROKER_ALREADY_CONNECTED"?409:400).json(saved);
+      return res.status(201).json(saved);
+    }
+
+    const accountToken=String(req.body?.accountToken||"").trim();
+    if(!accountToken)return res.status(400).json({ok:false,error:"BROKER_ACCOUNT_TOKEN_REQUIRED"});
+    if(!/^[A-Za-z0-9._:-]{3,100}$/.test(accountId))return res.status(400).json({ok:false,error:"INVALID_BROKER_ACCOUNT_ID"});
+    const saved=await broker.saveMapping({
+      userId:user.id,
+      provider:provider||"metaapi",
+      accountId,
+      accountToken,
+      executionMode,
+      baseUrl:String(req.body?.baseUrl||"").trim()
+    });
+    if(saved?.ok===false)return res.status(saved.error==="BROKER_ALREADY_CONNECTED"?409:400).json(saved);
+    return res.status(201).json(saved);
+  }catch(error){
+    console.error("[KINGBOT BROKER] account mapping failed:",error?.message||error);
+    return res.status(500).json({
+      ok:false,
+      error:"BROKER_ACCOUNT_MAPPING_FAILED",
+      reason:String(error?.message||"BROKER_ACCOUNT_MAPPING_FAILED").slice(0,220)
+    });
+  }
+});
+
+app.get("/api/broker/identity", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  try{
+    const identity=await broker.getStoredIdentity(user.id);
+    res.json({ok:true,...identity});
+  }catch(error){
+    console.error("[KINGBOT BROKER] stored identity lookup failed:",error?.message||error);
+    res.status(503).json({ok:false,error:"BROKER_IDENTITY_UNAVAILABLE",reason:String(error?.message||"BROKER_IDENTITY_UNAVAILABLE").slice(0,220)});
+  }
+});
+
+app.get("/api/connection", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  try{
+    const status=await broker.getStatus(user.id);
+    res.json({ok:true,...status});
+  }catch(error){
+    console.error("[KINGBOT BROKER] connection status failed:",error?.message||error);
+    res.status(503).json({ok:false,error:"BROKER_CONNECTION_STATUS_UNAVAILABLE",reason:String(error?.message||"BROKER_CONNECTION_STATUS_UNAVAILABLE").slice(0,220)});
+  }
+});
+
+app.post("/api/broker/connect", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  const requestedMode=String(req.body?.executionMode||"DEMO").toUpperCase();
+  const mode=requestedMode==="PAPER"?"DEMO":requestedMode;
+  if(!["DEMO","LIVE"].includes(mode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+  try{
+    const result=await broker.connect(user.id,mode);
+    if(!result?.connected)return res.status(503).json({ok:false,...result});
+    const provider=String(result?.broker||"").toLowerCase();
+    const partnerSlug=provider==="mt5-bridge"?"deriv":provider;
+    if(partnerSlug)await partners.recordActiveConnection({
+      userId:user.id,
+      brokerSlug:partnerSlug,
+      metadata:{accountId:result?.accountId||null,executionMode:result?.mode||mode,bridge:provider==="mt5-bridge"}
+    }).catch(error=>console.warn("[KINGBOT PARTNER] active attribution failed:",error?.message||error));
+    res.json({ok:true,...result});
+  }catch(error){
+    console.error("[KINGBOT BROKER] connect failed:",error?.message||error);
+    res.status(502).json({ok:false,error:"BROKER_CONNECTION_FAILED",reason:String(error?.message||"BROKER_CONNECTION_FAILED").slice(0,220)});
+  }
+});
+
+app.post("/api/broker/disconnect", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  try{
+    const result=await broker.disconnect(user.id);
+    await mt5BridgeRegistry.revokeUserTokens(user.id).catch(()=>{});
+    if(pool){
+      await pool.query("UPDATE kingbot_bot_runtime SET state='STOPPED',last_error=$2,updated_at=NOW() WHERE user_id=$1 AND state='RUNNING'",[user.id,"BROKER_DISCONNECTED"]);
+      await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'BROKER_DISCONNECTED',$2::jsonb)",[user.id,JSON.stringify({stoppedRunningBots:true})]);
+    }
+    res.json({ok:true,...result,stoppedRunningBots:true});
+  }catch(error){
+    console.error("[KINGBOT BROKER] disconnect failed:",error?.message||error);
+    res.status(502).json({ok:false,error:"BROKER_DISCONNECT_FAILED",reason:String(error?.message||"BROKER_DISCONNECT_FAILED").slice(0,220)});
+  }
+});
+
 app.post("/api/ai/brain", async (req,res)=>{
   try{
     const user=await requireUser(pool,req,res); if(!user)return;
