@@ -279,6 +279,115 @@ async function collectQuotes(broker, userId, symbols) {
   }));
 }
 
+async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
+  const normalizedSymbols = cleanSymbols(symbols).length ? cleanSymbols(symbols) : DEFAULT_SYMBOLS;
+  const normalizedTimeframe = cleanTimeframe(timeframe);
+
+  if (!twelveData?.enabled && !pool) {
+    return {
+      ok:false,
+      error:"MARKET_DATA_ENGINE_NOT_CONFIGURED",
+      code:"MARKET_DATA_ENGINE_NOT_CONFIGURED",
+      message:"KINGBOT AI Scanner requires a configured live market-data engine."
+    };
+  }
+
+  const directQuotes = twelveData?.enabled
+    ? await twelveData.latestQuotes(normalizedSymbols)
+    : [];
+  const [tv, tdTechnical] = await Promise.all([
+    latestTradingView(pool, normalizedSymbols, normalizedTimeframe),
+    fetchTwelveDataTechnical(twelveData, normalizedSymbols, normalizedTimeframe)
+  ]);
+  const tdMap = Object.fromEntries(tdTechnical.map(x => [x.symbol, x]));
+  const technical = normalizedSymbols.map(symbol => {
+    const snapshot = tdMap[symbol] || tv.find(x => x.symbol === symbol);
+    return snapshot
+      ? {
+          symbol,
+          ...technicalEngine(snapshot),
+          timeframe: normalizedTimeframe,
+          source: tdMap[symbol] ? "Twelve Data live OHLC" : "TradingView",
+          barTime: snapshot.barTime,
+          dataFreshness: snapshot.receivedAt || snapshot.barTime
+        }
+      : {
+          symbol,
+          ...technicalEngine(null),
+          timeframe: normalizedTimeframe,
+          source:"none"
+        };
+  });
+
+  const tvMap = Object.fromEntries(tv.map(x => [x.symbol, x]));
+  const technicalSource = tdTechnical.length
+    ? "Twelve Data live OHLC + live quote feed"
+    : (tv.length ? "TradingView snapshots" : "live quotes only");
+
+  if (!technical.some(x => x.source !== "none") && !directQuotes.some(q => q.available)) {
+    return {
+      ok:false,
+      error:"LIVE_MARKET_DATA_UNAVAILABLE",
+      code:"LIVE_MARKET_DATA_UNAVAILABLE",
+      scanner:"KINGBOT AI MARKET SCANNER",
+      message:"The standalone scanner has no fresh verified market data. Check the live market-data feed configuration."
+    };
+  }
+
+  let ai = null;
+  try {
+    ai = await askGrok({ technical, quotes: directQuotes, timeframe: normalizedTimeframe });
+  } catch (error) {
+    ai = {
+      provider:"none",
+      model:null,
+      analysis:null,
+      aiError:String(error?.message || "AI_FAILED").slice(0,200)
+    };
+  }
+
+  const fallbackAnalysis = {
+    market_regime: technical.some(x => x.bias === "BULLISH")
+      ? "BULLISH"
+      : technical.some(x => x.bias === "BEARISH")
+        ? "BEARISH"
+        : "MIXED",
+    ranked_symbols: technical.map(x => ({symbol:x.symbol,...x})),
+    risk_flags:[
+      ...(ai?.aiError ? ["AI_EXPLANATION_UNAVAILABLE"] : []),
+      "BROKER_CONNECTION_NOT_REQUIRED_FOR_MARKET_SCAN"
+    ],
+    summary:"KINGBOT standalone market engine analyzed live verified market data. Broker connectivity is not part of market scanning."
+  };
+
+  return {
+    ok:true,
+    scanner:"KINGBOT AI MARKET SCANNER",
+    provider:ai.provider,
+    model:ai.model,
+    executionAuthority:"NONE",
+    source:technicalSource,
+    marketData:twelveData?.status ? twelveData.status() : {configured:false},
+    symbols:normalizedSymbols,
+    timeframe:normalizedTimeframe,
+    quotes:directQuotes,
+    technical,
+    tradingViewSnapshots:tvMap,
+    analysis:ai.analysis || JSON.stringify(fallbackAnalysis),
+    aiError:ai.aiError || null,
+    generatedAt:new Date().toISOString(),
+    quoteCount:directQuotes.filter(q=>q.available).length,
+    tradingViewCount:tv.length,
+    technicalCount:technical.filter(x=>x.source!=="none").length,
+    technicalSource,
+    brokerRequired:false
+  };
+}
+
+export async function runStandaloneMarketScan({ pool, twelveData, symbols, timeframe } = {}) {
+  return standaloneMarketScan({ pool, twelveData, symbols, timeframe });
+}
+
 async function runMarketScan({ requireUser, pool, broker, twelveData, req, res }) {
   let user;
   try {
@@ -292,58 +401,24 @@ async function runMarketScan({ requireUser, pool, broker, twelveData, req, res }
     });
   }
   if (!user) return null;
-  const symbols = cleanSymbols(req.query?.symbols || req.body?.symbols).length ? cleanSymbols(req.query?.symbols || req.body?.symbols) : DEFAULT_SYMBOLS;
-  const timeframe = cleanTimeframe(req.query?.timeframe || req.body?.timeframe);
 
   try {
-    let mapping = null;
-    try { mapping = await broker.getMapping(user.id); } catch {}
-    if (!mapping && !twelveData?.enabled) {
-      return res.status(503).json({
-        ok:false,
-        error:"MARKET_DATA_NOT_CONNECTED",
-        code:"MARKET_DATA_NOT_CONNECTED",
-        scanner:"KINGBOT AI MARKET SCANNER",
-        message:"Connect Twelve Data or a broker market-data source before running the market scanner."
-      });
-    }
-
-    const directQuotes = twelveData?.enabled ? twelveData.quotes(symbols) : [];
-    const brokerQuotes = mapping ? await collectQuotes(broker, user.id, symbols) : symbols.map(symbol => ({ symbol, available:false, error:"BROKER_NOT_CONNECTED" }));
-    const quotes = directQuotes.length && directQuotes.some(q => q.available)
-      ? directQuotes
-      : brokerQuotes;
-    const [tv, tdTechnical] = await Promise.all([latestTradingView(pool, symbols, timeframe), fetchTwelveDataTechnical(twelveData, symbols, timeframe)]);
-    const tdMap = Object.fromEntries(tdTechnical.map(x => [x.symbol, x]));
-    const technical = symbols.map(symbol => { const snapshot=tdMap[symbol] || tv.find(x=>x.symbol===symbol); return snapshot ? { symbol, ...technicalEngine(snapshot), timeframe, source:tdMap[symbol] ? "Twelve Data live OHLC" : "TradingView", barTime:snapshot.barTime, dataFreshness:snapshot.receivedAt||snapshot.barTime } : { symbol, ...technicalEngine(null), timeframe, source:"none" }; });
-    const tvMap = Object.fromEntries(tv.map(x => [x.symbol, x]));
-    const technicalSource = tdTechnical.length ? "Twelve Data live OHLC + live quote WebSocket" : (tv.length ? "TradingView webhook + live quote feed" : "live quotes only");
-    for (const q of quotes) {
-      if (!technical.some(x => x.symbol === q.symbol)) technical.push({ symbol:q.symbol, ...technicalEngine(null), timeframe, source:"TradingView", quote:q });
-    }
-
-    let ai = null;
-    try { ai = await askGrok({ technical, quotes, timeframe }); }
-    catch (error) { ai = { provider:"none", model:null, analysis:null, aiError:String(error?.message || "AI_FAILED").slice(0,200) }; }
-
-    return res.json({
-      ok:true, scanner:"KINGBOT AI MARKET SCANNER", provider:ai.provider, model:ai.model,
-      executionAuthority:"NONE",
-      source: technicalSource,
-      marketData: twelveData?.status ? twelveData.status() : { configured:false },
-      symbols, timeframe, quotes, technical, tradingViewSnapshots:tvMap,
-      analysis:ai.analysis || JSON.stringify({
-        market_regime: technical.some(x=>x.bias==="BULLISH") ? "BULLISH" : technical.some(x=>x.bias==="BEARISH") ? "BEARISH" : "MIXED",
-        ranked_symbols: technical.map(x=>({symbol:x.symbol,...x})),
-        risk_flags:["AI explanation unavailable; deterministic KINGBOT technical engine shown."],
-        summary:"KINGBOT technical engine analyzed the latest verified TradingView snapshots."
-      }),
-      aiError:ai.aiError || null, generatedAt:new Date().toISOString(), quoteCount:quotes.filter(q=>q.available).length,
-      tradingViewCount:tv.length, technicalCount:technical.filter(x=>x.source!=="none").length, technicalSource
+    const result = await standaloneMarketScan({
+      pool,
+      twelveData,
+      symbols:req.query?.symbols || req.body?.symbols,
+      timeframe:req.query?.timeframe || req.body?.timeframe
     });
+    if (!result.ok) return res.status(503).json(result);
+    return res.json(result);
   } catch (error) {
     console.error("[KINGBOT MARKET SCANNER]", error?.message || error);
-    return res.status(502).json({ ok:false, error:"AI_MARKET_SCANNER_UNAVAILABLE", code:"AI_MARKET_SCANNER_UNAVAILABLE", reason:String(error?.message || "AI_MARKET_SCANNER_UNAVAILABLE").slice(0,220) });
+    return res.status(502).json({
+      ok:false,
+      error:"AI_MARKET_SCANNER_UNAVAILABLE",
+      code:"AI_MARKET_SCANNER_UNAVAILABLE",
+      reason:String(error?.message || "AI_MARKET_SCANNER_UNAVAILABLE").slice(0,220)
+    });
   }
 }
 
@@ -394,6 +469,8 @@ export function registerAiMarketScanner(app, { requireUser, pool, broker, rateLi
     return res.json({
       ok:true, scanner:"KINGBOT AI MARKET SCANNER", aiReady:Boolean(apiKey), provider:apiKey?"xai":"none",
       marketData: twelveData.status(),
+      scannerStandalone:true,
+      brokerRequired:false,
       model:apiKey?String(process.env.XAI_MODEL || "grok-4.7"):null, brokerConnected, broker:brokerName,
       tradingViewConnected:tvCount>0, tradingViewSnapshotsLast10m:tvCount, webhookConfigured:Boolean(process.env.TRADINGVIEW_WEBHOOK_SECRET),
       defaultSymbols:DEFAULT_SYMBOLS
