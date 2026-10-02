@@ -10,6 +10,33 @@ const API_BASE="https://kingbot-fintech-api-etfv.onrender.com/api";
 const API_ORIGIN=API_BASE.replace(/\/api\/?$/i,"");
 const state={checked:false,checking:false,authenticated:false,user:null,error:null,checkedAt:0};
 let activeCheck=null;
+let firebaseAuthListenerBound=false;
+function applyFirebaseUser(user){
+ if(user){
+  state.authenticated=true;
+  state.user={
+   id:user.uid,
+   email:user.email||"",
+   name:user.displayName||user.email||"KINGBOT User",
+   verified:user.emailVerified===true,
+   emailVerified:user.emailVerified===true
+  };
+ }else{
+  state.authenticated=false;
+  state.user=null;
+ }
+ state.checked=true;
+ state.checkedAt=Date.now();
+}
+async function bindFirebaseAuthListener(){
+ if(firebaseAuthListenerBound||!window.KINGBOT_FIREBASE?.onChange)return;
+ firebaseAuthListenerBound=true;
+ window.KINGBOT_FIREBASE.onChange(user=>{
+  applyFirebaseUser(user||null);
+  session.updateUserElements();
+  session.emitChange();
+ });
+}
 async function firebaseClient(){
  if(window.KINGBOT_FIREBASE)return window.KINGBOT_FIREBASE;
  try{await import(new URL("system/firebase-auth.js",window.location.href).href);}catch{}
@@ -59,29 +86,21 @@ const session={
   if(!force&&state.checked&&Date.now()-state.checkedAt<this.config.cacheDuration)return this.getState();
     if(!window.KINGBOT_FIREBASE){try{await import(new URL("system/firebase-auth.js",window.location.href).href);}catch(error){state.error=error;} }
     if(!window.KINGBOT_FIREBASE){state.error=state.error||new Error("Firebase Authentication is not loaded.");state.checked=true;state.checkedAt=Date.now();state.authenticated=false;state.user=null;return this.getState();}
+    await bindFirebaseAuthListener();
   state.checking=true;state.error=null;
   activeCheck=(async()=>{
   try{
    const fb=await window.KINGBOT_FIREBASE.waitForAuthReady(10000).catch(()=>window.KINGBOT_FIREBASE?.auth?.currentUser||null);
    if(!fb){
-    state.authenticated=false;
-    state.user=null;
+    applyFirebaseUser(null);
    }else{
     const user=window.KINGBOT_FIREBASE.auth.currentUser||fb;
     if(!user){
-      state.authenticated=false;
-      state.user=null;
+      applyFirebaseUser(null);
     }else{
       // Firebase is the source of truth for browser authentication.
       // Do not block protected-page startup on Render/backend latency.
-      state.authenticated=true;
-      state.user={
-        id:user.uid,
-        email:user.email||"",
-        name:user.displayName||user.email||"KINGBOT User",
-        verified:user.emailVerified===true,
-        emailVerified:user.emailVerified===true
-      };
+      applyFirebaseUser(user);
 
       // Refresh backend account linkage opportunistically in the background.
       if(user.emailVerified){
