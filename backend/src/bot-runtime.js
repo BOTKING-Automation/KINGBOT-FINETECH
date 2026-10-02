@@ -254,6 +254,7 @@ export function createBotRuntimeRouter({pool,broker}){
         const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[user.id,b.id,clientId,s.executionMode,analysis.market.symbol,side,volume]);
         if(!journal.rowCount)return res.status(409).json({ok:false,error:"DUPLICATE_EXECUTION_REQUEST",message:"Duplicate execution request blocked. No order was submitted.",analysis,risk});
         try{
+          await broker.assertExecutionAuthorized(user.id);
           order=await broker.placeOrder({side,symbol:analysis.market.symbol,volume,stopLoss,takeProfit,comment:"KINGBOT",clientId,userId:user.id});
           await pool.query("UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,JSON.stringify(order)]);
           action="ORDER_SUBMITTED";
