@@ -56,7 +56,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
   <article class="glass hero-main">
     <div class="eyebrow">KINGBOT AI MARKET SCANNER · GROK</div>
     <h1>Scan the market with <span class="grad">machine intelligence.</span></h1>
-    <p class="hero-copy">Reads verified broker quotes, ranks symbols with Grok, and keeps execution outside the AI layer.</p>
+    <p class="hero-copy">Reads live market quotes and OHLC data, computes multi-factor technical structure, then uses Grok to synthesize the verified evidence. AI never invents missing market data.</p>
     <div class="hero-actions">
       <button id="scanNow" class="btn btn-primary" type="button">RUN FULL MARKET SCAN</button>
       <button id="refreshQuotes" class="btn" type="button">SYNC QUOTES</button>
@@ -204,7 +204,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
   function renderScan(data){
     qs("scannedCount").textContent=String((data.symbols||[]).length);
     qs("availableCount").textContent=String(data.quoteCount??(data.quotes||[]).filter(q=>q.available).length);
-    qs("analysisMeta").textContent=(data.provider||"KINGBOT ENGINE")+" · "+(data.model||"deterministic technical engine");
+    qs("analysisMeta").textContent=(data.provider||"KINGBOT ENGINE")+" · "+(data.model||"deterministic technical engine")+" · "+(data.technicalSource||"live data");
     qs("summaryText").textContent=data.analysis||"No analysis returned.";
     let regime="—", ranked=[];
     try{
@@ -278,7 +278,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       qs("brokerState").textContent="CONNECTED"; qs("brokerState").className="good";
       qs("aiState").textContent=data.provider==="xai"?"GROK ONLINE":(data.provider==="none"?"QUOTES ONLY":"AI ONLINE");
       qs("aiState").className=data.provider==="none"?"warn":"good";
-      qs("coreSub").textContent=(data.source||"TradingView linked")+" · "+(data.tradingViewCount||0)+" snapshots · quotes live";
+      qs("coreSub").textContent=(data.source||"Live market feed")+" · "+(data.technicalCount||0)+" technical feeds · "+(data.quoteCount||0)+" live quotes";
       qs("scanState").textContent="QUOTES READY";
       toast("Broker quotes synchronized.","good");
       return data;
