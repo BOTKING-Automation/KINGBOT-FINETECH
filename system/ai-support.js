@@ -232,11 +232,15 @@
     const provider = String(h.aiProvider || "").toLowerCase();
     const model = String(h.aiModel || "");
 
-    setTelemetry(
-      "aiCoreStatus",
-      aiReady ? (provider === "xai" ? "GROK ONLINE" : "AI ONLINE") : "OFFLINE",
-      aiReady ? "good" : "bad"
-    );
+    if (!state.puterReady) {
+      setTelemetry(
+        "aiCoreStatus",
+        aiReady ? (provider === "xai" ? "GROK ONLINE" : "AI ONLINE") : "OFFLINE",
+        aiReady ? "good" : "bad"
+      );
+    } else {
+      setTelemetry("aiCoreStatus", "PUTER ONLINE", "good");
+    }
     setTelemetry("apiStatus", apiReady ? "LIVE" : "OFFLINE", apiReady ? "good" : "bad");
     setTelemetry("dataServiceStatus", dbReady ? "READY" : "WAITING", dbReady ? "good" : "warn");
 
@@ -521,9 +525,7 @@
 
     try {
       if (!state.context) {
-        // Do not block the first AI reply on telemetry synchronization.
-        // The secured backend fetches fresh verified context during the AI request.
-        void loadContext();
+        try { await loadContext(); } catch {}
       }
 
       const conversation = state.messages
