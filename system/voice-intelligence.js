@@ -55,6 +55,7 @@
   }
 
   function stop(){
+    if(typeof stopElevenScribe==="function")stopElevenScribe();
     if(state.audio){
       try{state.audio.pause();state.audio.currentTime=0;}catch{}
     }
@@ -62,6 +63,8 @@
     state.speaking=false;
     const b=document.getElementById("kbVoiceSpeak");
     if(b)b.textContent="▶ SPEAK";
+    const mic=document.getElementById("kbVoiceMic");
+    if(mic)mic.textContent="⌕ VOICE INPUT";
   }
 
   async function speak(text){
