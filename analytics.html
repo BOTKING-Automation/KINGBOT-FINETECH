@@ -1078,7 +1078,7 @@ footer strong{
 
                 <div class="eyebrow">
                     <span class="dot"></span>
-                    KINGBOT INTELLIGENCE / ANALYTICS
+                    <span id="analyticsStatusText">KINGBOT INTELLIGENCE / ANALYTICS</span>
                 </div>
 
                 <h1>
@@ -1278,11 +1278,11 @@ footer strong{
                 </div>
 
                 <div class="panel-tools">
-                    <span class="tag live">
-                        ● VERIFIED DATA
+                    <span class="tag live" id="equityLiveTag">
+                        ● LIVE TERMINAL
                     </span>
 
-                    <span class="tag">90D</span>
+                    <span class="tag" id="equityRangeTag">LIVE STREAM</span>
                 </div>
 
             </div>
@@ -1934,10 +1934,10 @@ function formatMoney(value,currency="USD"){
 }
 
 function setGlobalStatus(status,detail=""){
-    const el=$("globalStatus");
+    const el=$("analyticsStatusText");
     if(!el)return;
-    const labels={live:"LIVE TERMINAL",syncing:"SYNCING",error:"DATA ERROR",standby:"DATA STANDBY"};
-    el.textContent=detail||labels[status]||"DATA STANDBY";
+    const labels={live:"LIVE TERMINAL",syncing:"SYNCING TERMINAL + ANALYTICS",error:"TERMINAL DATA ERROR",standby:"TERMINAL DATA STANDBY"};
+    el.textContent=detail||labels[status]||"TERMINAL DATA STANDBY";
 }
 
 function markAvailable(...ids){
@@ -2460,6 +2460,7 @@ async function refreshAll(){
 
 async function bootAnalytics(){
     if(state.booted)return;
+    window.refreshAnalytics=refreshAll;
     state.booted=true;
 
     clearAnalyticsState();
