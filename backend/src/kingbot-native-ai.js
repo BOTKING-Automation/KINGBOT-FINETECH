@@ -199,8 +199,7 @@ async function connectionSupport(broker,userId){
     const status=await broker.getStatus(userId);
     const connected=Boolean(status?.connected);
     const snap=status?.accountSnapshot||{};
-    const facts=["Broker connected: "+connected,"Broker: "+(status?.broker||status?.provider||"—"),"Execution mode: "+(status?.executionMode||"—"),"Account type: "+(status?.accountType||snap.accountType||"—")];
-    if(snap.accountId) facts.push("Account ID: "+String(snap.accountId));
+    const facts=["Broker configured: "+Boolean(status?.configured),"Broker connected: "+connected,"Broker: "+(status?.broker||status?.provider||"—"),"Execution mode: "+(status?.executionMode||"—"),"Account ID: "+(status?.accountId||"—"),"Account type: "+(status?.accountType||snap.accountType||"—")];
     if(snap.currency) facts.push("Currency: "+String(snap.currency));
     return {answer:connected?"KINGBOT verified that your broker connection is active.":"KINGBOT verified that no broker connection is currently active.",facts,technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:connected?"No connection action required.":"Connect a supported broker account.",invalidation:"Not applicable."},riskFlags:connected?[]:["BROKER_NOT_CONNECTED"],nextAction:connected?"Ask about your account, positions, balance, or runtime status.":"Open Broker Connect and complete authorization."};
   }catch(error){
