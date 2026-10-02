@@ -40,6 +40,8 @@ export class TwelveDataFeed {
     this.reconnectTimer = null;
     this.heartbeatTimer = null;
     this.started = false;
+    this.technicalCache = new Map();
+    this.technicalInflight = new Map();
   }
 
   get enabled() {
@@ -118,33 +120,51 @@ export class TwelveDataFeed {
     }, 5000);
   }
 
-  async technicalSnapshot(symbol, timeframe="5m") {
+  async technicalSnapshot(symbol, timeframe="5m", { maxAgeMs=15000, force=false } = {}) {
     if(!this.enabled) return null;
     const intervalMap={ "1m":"1min","3m":"3min","5m":"5min","15m":"15min","30m":"30min","1h":"1h","2h":"2h","4h":"4h","1d":"1day","1w":"1week" };
     const interval=intervalMap[String(timeframe).toLowerCase()]||"5min";
     const tdSymbol=normalizeSymbol(symbol);
-    const url="https://api.twelvedata.com/time_series?symbol="+encodeURIComponent(tdSymbol)+"&interval="+encodeURIComponent(interval)+"&outputsize=120&order=ASC&apikey="+encodeURIComponent(this.apiKey);
-    const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),9000);
-    try {
-      const res=await fetch(url,{signal:controller.signal,headers:{Accept:"application/json"}});
-      const data=await res.json().catch(()=>({}));
-      if(!res.ok || data?.status==="error" || !Array.isArray(data?.values)) throw new Error(data?.message||"TWELVE_DATA_TIME_SERIES_FAILED");
-      const bars=data.values.map(x=>({datetime:x.datetime,open:finite(x.open),high:finite(x.high),low:finite(x.low),close:finite(x.close),volume:finite(x.volume)})).filter(x=>[x.open,x.high,x.low,x.close].every(Number.isFinite));
-      if(bars.length<60) throw new Error("INSUFFICIENT_OHLC_DATA");
-      return { ...deriveTechnicalFromBars(bars), symbol:kingbotSymbol(tdSymbol), twelveDataSymbol:tdSymbol, timeframe, barsUsed:bars.length, source:"Twelve Data REST time_series" };
-    } finally { clearTimeout(timer); }
+    const key=kingbotSymbol(tdSymbol)+":"+String(timeframe).toLowerCase();
+    const cached=this.technicalCache.get(key);
+    const cacheAge=cached ? Date.now()-Number(cached.cachedAt||0) : Infinity;
+    if(!force && cached?.snapshot && cacheAge <= Math.max(1000,Number(maxAgeMs)||15000)) {
+      return { ...cached.snapshot, cacheAgeMs:Math.max(0,cacheAge), cached:true };
+    }
+    const pending=this.technicalInflight.get(key);
+    if(pending) return pending;
+
+    const load=(async()=>{
+      const url="https://api.twelvedata.com/time_series?symbol="+encodeURIComponent(tdSymbol)+"&interval="+encodeURIComponent(interval)+"&outputsize=120&order=ASC&apikey="+encodeURIComponent(this.apiKey);
+      const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),9000);
+      try {
+        const res=await fetch(url,{signal:controller.signal,headers:{Accept:"application/json"}});
+        const data=await res.json().catch(()=>({}));
+        if(!res.ok || data?.status==="error" || !Array.isArray(data?.values)) throw new Error(data?.message||"TWELVE_DATA_TIME_SERIES_FAILED");
+        const bars=data.values.map(x=>({datetime:x.datetime,open:finite(x.open),high:finite(x.high),low:finite(x.low),close:finite(x.close),volume:finite(x.volume)})).filter(x=>[x.open,x.high,x.low,x.close].every(Number.isFinite));
+        if(bars.length<60) throw new Error("INSUFFICIENT_OHLC_DATA");
+        const snapshot={ ...deriveTechnicalFromBars(bars), symbol:kingbotSymbol(tdSymbol), twelveDataSymbol:tdSymbol, timeframe, barsUsed:bars.length, source:"Twelve Data REST time_series" };
+        this.technicalCache.set(key,{snapshot,cachedAt:Date.now()});
+        return { ...snapshot, cacheAgeMs:0, cached:false };
+      } finally {
+        clearTimeout(timer);
+        this.technicalInflight.delete(key);
+      }
+    })();
+    this.technicalInflight.set(key,load);
+    return load;
   }
 
-  async latestQuotes(symbols) {
+  async latestQuotes(symbols, { allowRestFallback=true, restTimeoutMs=1500 } = {}) {
     if (!this.enabled) return [];
     const requested = [...new Set((Array.isArray(symbols) ? symbols : this.symbols).map(kingbotSymbol))].slice(0, 12);
     const websocketQuotes = this.quotes(requested);
     const missing = websocketQuotes.filter(q => !q.available);
-    if (!missing.length) return websocketQuotes;
+    if (!missing.length || !allowRestFallback) return websocketQuotes;
 
     const restQuotes = await Promise.all(missing.map(async item => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
+      const timer = setTimeout(() => controller.abort(), Math.max(250, Number(restTimeoutMs)||1500));
       try {
         const tdSymbol = normalizeSymbol(item.symbol);
         const url = "https://api.twelvedata.com/quote?symbol=" + encodeURIComponent(tdSymbol) + "&apikey=" + encodeURIComponent(this.apiKey);
