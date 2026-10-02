@@ -1,1 +1,467 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#030611">
+<meta name="description" content="KINGBOT AI Market Scanner — multi-market broker intelligence powered by Grok.">
+<title>KINGBOT — AI Market Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Orbitron:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="system/platform.css">
+<style>
+:root{
+  --bg:#030611;--bg2:#060b1d;--panel:rgba(7,13,29,.86);--panel2:rgba(10,18,39,.8);
+  --line:rgba(255,255,255,.085);--line2:rgba(255,255,255,.13);
+  --text:#f4f7ff;--muted:#7e8ba8;--muted2:#b5bfd4;
+  --cyan:#19e6ff;--blue:#4787ff;--violet:#9b5cff;--pink:#ff4fd8;--gold:#f6c34b;--green:#27e6a4;--red:#ff5578;
+  --shadow:0 22px 80px rgba(0,0,0,.42);--radius:20px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{
+  overflow-x:hidden;
+  background:
+    radial-gradient(circle at 12% 4%,rgba(25,230,255,.11),transparent 25%),
+    radial-gradient(circle at 88% 6%,rgba(155,92,255,.10),transparent 27%),
+    radial-gradient(circle at 55% 78%,rgba(246,195,75,.055),transparent 30%),
+    linear-gradient(145deg,#02040d 0%,#05091a 52%,#02040b 100%);
+}
+body:before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:-4;opacity:.30;
+  background-image:linear-gradient(rgba(255,255,255,.023) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.023) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:linear-gradient(to bottom,#000,transparent 92%);
+}
+a{color:inherit;text-decoration:none} button,input,select{font:inherit}
+.wrap{width:min(1500px,calc(100% - 30px));margin:0 auto;padding:28px 0 72px}
+.glass{
+  border:1px solid var(--line);background:linear-gradient(145deg,rgba(12,19,42,.9),rgba(3,7,17,.88));
+  border-radius:var(--radius);box-shadow:var(--shadow);position:relative;overflow:hidden;
+}
+.glass:before{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  padding:1px;background:linear-gradient(125deg,rgba(25,230,255,.22),rgba(155,92,255,.14),rgba(246,195,75,.12));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+}
+.hero{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(360px,.5fr);gap:15px}
+.hero-main{padding:32px 34px}
+.eyebrow{
+  display:inline-flex;gap:8px;align-items:center;padding:7px 10px;border:1px solid rgba(25,230,255,.18);
+  border-radius:999px;color:var(--cyan);background:rgba(25,230,255,.04);font:800 8px "JetBrains Mono";letter-spacing:.12em
+}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 11px currentColor;animation:pulse 1.7s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+h1{margin:18px 0 12px;font:900 clamp(30px,4.5vw,62px)/1.02 Orbitron;letter-spacing:-.05em;max-width:900px}
+.grad{
+  background:linear-gradient(90deg,var(--gold),var(--cyan),var(--violet),var(--pink));background-size:250% auto;
+  -webkit-background-clip:text;background-clip:text;color:transparent;animation:flow 8s linear infinite
+}
+@keyframes flow{to{background-position:250% center}}
+.hero-copy{max-width:850px;color:var(--muted2);font-size:13px;line-height:1.75}
+.hero-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
+.btn{
+  min-height:43px;padding:10px 14px;border:1px solid var(--line2);border-radius:11px;color:#fff;background:rgba(255,255,255,.035);
+  font:800 9px "JetBrains Mono";letter-spacing:.04em;transition:.18s ease
+}
+.btn:hover{transform:translateY(-1px);border-color:rgba(25,230,255,.22);background:rgba(255,255,255,.06)}
+.btn-primary{border-color:rgba(25,230,255,.26);background:linear-gradient(135deg,rgba(25,230,255,.10),rgba(71,135,255,.10))}
+.btn-gold{border-color:rgba(246,195,75,.24);background:rgba(246,195,75,.07);color:var(--gold)}
+.hero-side{padding:24px;display:flex;flex-direction:column;justify-content:space-between}
+.core{
+  min-height:210px;display:grid;place-items:center;position:relative;
+  background:radial-gradient(circle at 50% 50%,rgba(25,230,255,.06),transparent 60%)
+}
+.rings{position:absolute;width:175px;height:175px;border-radius:50%;border:1px solid rgba(25,230,255,.18);box-shadow:0 0 48px rgba(25,230,255,.08)}
+.rings:before,.rings:after{content:"";position:absolute;inset:-15px;border-radius:50%;border:1px solid rgba(155,92,255,.14);animation:spin 12s linear infinite}
+.rings:after{inset:-32px;border-color:rgba(246,195,75,.11);animation-direction:reverse;animation-duration:18s}
+@keyframes spin{to{transform:rotate(360deg)}}
+.core-mark{
+  position:relative;z-index:2;width:94px;height:94px;border-radius:26px;display:grid;place-items:center;
+  color:#07101a;background:linear-gradient(135deg,var(--gold),#ff8f2c);font:900 25px Orbitron;
+  box-shadow:0 0 45px rgba(246,195,75,.22)
+}
+.core-label{text-align:center;margin-top:4px;font:900 14px Orbitron;letter-spacing:.07em}
+.core-sub{text-align:center;margin-top:5px;color:var(--muted);font:700 8px "JetBrains Mono"}
+.core-status{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:15px}
+.metric{padding:11px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.022)}
+.metric span{display:block;color:var(--muted);font:800 7px "JetBrains Mono";letter-spacing:.06em}
+.metric strong{display:block;margin-top:6px;color:#fff;font:900 11px "JetBrains Mono";white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.good{color:var(--green)!important}.warn{color:var(--gold)!important}.bad{color:var(--red)!important}
+.section{margin-top:15px}
+.section-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:10px}
+.section-title{font:900 14px Orbitron;letter-spacing:.04em}
+.section-sub{margin-top:4px;color:var(--muted);font-size:10px}
+.scanner-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.select,.input{
+  min-height:40px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;outline:none;color:#fff;background:#091126;
+  font-size:10px
+}
+.symbol-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.symbol-card{
+  position:relative;min-height:108px;padding:14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.023);
+  transition:.18s ease;cursor:pointer
+}
+.symbol-card:hover{transform:translateY(-2px);border-color:rgba(25,230,255,.22);background:rgba(25,230,255,.028)}
+.symbol-card.selected{border-color:rgba(25,230,255,.38);box-shadow:0 0 26px rgba(25,230,255,.08),inset 0 0 30px rgba(25,230,255,.025)}
+.symbol-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.symbol-name{font:900 11px "JetBrains Mono";letter-spacing:.04em}
+.symbol-chip{padding:4px 6px;border-radius:7px;border:1px solid var(--line);color:var(--muted);font:800 7px "JetBrains Mono"}
+.symbol-price{margin-top:13px;font:900 16px "JetBrains Mono"}
+.symbol-change{margin-top:4px;color:var(--muted);font:700 8px "JetBrains Mono"}
+.symbol-glow{position:absolute;right:-25px;bottom:-35px;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,rgba(25,230,255,.10),transparent 68%)}
+.scan-layout{display:grid;grid-template-columns:minmax(0,1.22fr) minmax(360px,.78fr);gap:12px}
+.matrix{padding:0}.matrix-head,.card-head{min-height:52px;padding:13px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.mini-tag{padding:5px 7px;border:1px solid var(--line);border-radius:7px;color:var(--muted);font:800 7px "JetBrains Mono";white-space:nowrap}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:650px}
+th,td{padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.05);text-align:left}
+th{color:var(--muted);font:800 7px "JetBrains Mono";letter-spacing:.08em}
+td{color:#e7edf8;font-size:9px}
+td.mono{font-family:"JetBrains Mono"}
+.bias{display:inline-flex;padding:5px 7px;border-radius:7px;font:900 7px "JetBrains Mono";border:1px solid var(--line)}
+.bias.BULLISH{color:var(--green);border-color:rgba(39,230,164,.18);background:rgba(39,230,164,.045)}
+.bias.BEARISH{color:var(--red);border-color:rgba(255,85,120,.18);background:rgba(255,85,120,.045)}
+.bias.NEUTRAL{color:var(--gold);border-color:rgba(246,195,75,.18);background:rgba(246,195,75,.045)}
+.bias.DATA_INSUFFICIENT{color:var(--muted);background:rgba(255,255,255,.025)}
+.scan-card{padding:0}.scan-body{padding:15px}
+.scan-summary{
+  min-height:190px;padding:14px;border:1px solid rgba(25,230,255,.12);border-radius:13px;
+  background:linear-gradient(145deg,rgba(25,230,255,.045),rgba(155,92,255,.04))
+}
+.scan-summary strong{display:block;color:var(--cyan);font:900 9px "JetBrains Mono";letter-spacing:.08em}
+.summary-text{margin-top:9px;color:#dce6fa;font-size:11px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.flags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.flag{padding:5px 7px;border:1px solid rgba(246,195,75,.16);border-radius:7px;color:var(--gold);background:rgba(246,195,75,.035);font:800 7px "JetBrains Mono"}
+.empty{display:grid;place-items:center;min-height:220px;padding:25px;text-align:center;color:var(--muted);font:800 9px/1.7 "JetBrains Mono"}
+.detail-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.detail{padding:11px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.022)}
+.detail span{display:block;color:var(--muted);font:800 7px "JetBrains Mono"}
+.detail strong{display:block;margin-top:5px;color:#fff;font:900 10px "JetBrains Mono"}
+.timeline{padding:15px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.step{position:relative;padding:12px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.022)}
+.step:before{content:"";position:absolute;left:12px;right:12px;top:0;height:2px;background:linear-gradient(90deg,var(--cyan),var(--violet),transparent)}
+.step-index{color:var(--cyan);font:900 8px "JetBrains Mono"}
+.step h3{margin:8px 0 4px;font:800 10px Orbitron}
+.step p{margin:0;color:var(--muted);font-size:8px;line-height:1.5}
+.notice{margin-top:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.07);border-radius:12px;color:var(--muted);background:rgba(255,255,255,.018);font-size:9px;line-height:1.65}
+.footer{margin-top:18px;padding:20px 0;border-top:1px solid var(--line);text-align:center;color:#586680;font:800 7px "JetBrains Mono";letter-spacing:.08em}
+.toast{position:fixed;right:18px;bottom:18px;z-index:500;max-width:360px;padding:11px 13px;border:1px solid rgba(25,230,255,.22);border-radius:10px;background:rgba(4,8,18,.96);color:var(--muted2);font:800 8px "JetBrains Mono";opacity:0;transform:translateY(10px);pointer-events:none;transition:.22s}
+.toast.show{opacity:1;transform:none}.toast.good{color:var(--green);border-color:rgba(39,230,164,.22)}.toast.bad{color:var(--red);border-color:rgba(255,85,120,.22)}
+@media(max-width:1200px){.symbol-grid{grid-template-columns:repeat(3,1fr)}.scan-layout{grid-template-columns:1fr}.hero{grid-template-columns:1fr}.timeline{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:800px){.wrap{width:calc(100% - 20px);padding-top:20px}.hero-main{padding:24px 20px}.hero-side{padding:19px}.symbol-grid{grid-template-columns:repeat(2,1fr)}.detail-grid{grid-template-columns:repeat(2,1fr)}.scanner-bar>*{flex:1 1 150px}.timeline{grid-template-columns:1fr}}
+@media(max-width:520px){.symbol-grid{grid-template-columns:1fr 1fr}.core-status{grid-template-columns:1fr}.hero-actions .btn{width:100%}h1{font-size:32px}.scanner-bar{display:grid;grid-template-columns:1fr}.scanner-bar>*{width:100%}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div data-kingbot-navigation></div>
+
+<main class="wrap">
+<section class="hero">
+  <article class="glass hero-main">
+    <div class="eyebrow"><span class="dot"></span>KINGBOT AI MARKET SCANNER · GROK 4.7</div>
+    <h1>Scan the market with <span class="grad">machine intelligence.</span></h1>
+    <p class="hero-copy">A multi-market intelligence command center that reads verified broker quotes, sends the snapshot through Grok, ranks available symbols, surfaces risk flags, and keeps execution authority outside the AI layer.</p>
+    <div class="hero-actions">
+      <button id="scanNow" class="btn btn-primary" type="button">RUN FULL MARKET SCAN ↗</button>
+      <button id="refreshQuotes" class="btn" type="button">SYNC QUOTES</button>
+      <a class="btn btn-gold" href="terminal.html">OPEN TRADING TERMINAL</a>
+    </div>
+  </article>
+
+  <aside class="glass hero-side">
+    <div>
+      <div class="core">
+        <div class="rings"></div>
+        <div class="core-mark">AI</div>
+      </div>
+      <div class="core-label" id="coreLabel">SCANNER CORE</div>
+      <div class="core-sub" id="coreSub">Waiting for authenticated broker telemetry.</div>
+    </div>
+    <div class="core-status">
+      <div class="metric"><span>AI ENGINE</span><strong id="aiState">CHECKING</strong></div>
+      <div class="metric"><span>BROKER</span><strong id="brokerState">CHECKING</strong></div>
+      <div class="metric"><span>LAST SCAN</span><strong id="lastScan">—</strong></div>
+    </div>
+  </aside>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <div>
+      <div class="section-title">SCAN CONTROL</div>
+      <div class="section-sub">Select a scan horizon and symbols. Broker quotes are collected server-side.</div>
+    </div>
+    <span class="mini-tag" id="scanState">READY</span>
+  </div>
+  <div class="glass" style="padding:13px">
+    <div class="scanner-bar">
+      <select id="timeframe" class="select" aria-label="Timeframe">
+        <option value="1m">1M MICRO</option>
+        <option value="5m" selected>5M FAST</option>
+        <option value="15m">15M INTRADAY</option>
+        <option value="1h">1H STRUCTURE</option>
+        <option value="4h">4H SWING</option>
+        <option value="1d">1D MACRO</option>
+      </select>
+      <input id="symbols" class="input" value="XAUUSD,EURUSD,GBPUSD,USDJPY,BTCUSD" aria-label="Symbols" />
+      <button id="applySymbols" class="btn" type="button">APPLY UNIVERSE</button>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <div>
+      <div class="section-title">LIVE QUOTE UNIVERSE</div>
+      <div class="section-sub">Only values returned by the authenticated broker are displayed.</div>
+    </div>
+    <span class="mini-tag" id="quoteStamp">NOT SYNCED</span>
+  </div>
+  <div id="symbolGrid" class="symbol-grid"></div>
+</section>
+
+<section class="section">
+  <div class="scan-layout">
+    <article class="glass matrix">
+      <div class="matrix-head">
+        <div>
+          <div class="section-title">AI RANKING MATRIX</div>
+          <div class="section-sub">Grok reads the quote snapshot and returns a descriptive market ranking.</div>
+        </div>
+        <span class="mini-tag">NO EXECUTION AUTHORITY</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>SYMBOL</th><th>BIAS</th><th>PRICE</th><th>SPREAD</th><th>RATIONALE</th></tr></thead>
+          <tbody id="rankingBody"><tr><td colspan="5"><div class="empty">RUN A MARKET SCAN TO POPULATE THE INTELLIGENCE MATRIX.</div></td></tr></tbody>
+        </table>
+      </div>
+    </article>
+
+    <aside class="glass scan-card">
+      <div class="card-head">
+        <div>
+          <div class="section-title">GROK ANALYSIS CORE</div>
+          <div class="section-sub" id="analysisMeta">Awaiting scan output.</div>
+        </div>
+        <span class="mini-tag">GROK 4.7</span>
+      </div>
+      <div class="scan-body">
+        <div id="summaryBox" class="scan-summary">
+          <strong>MARKET INTELLIGENCE</strong>
+          <div id="summaryText" class="summary-text">Connect a verified broker and run the scanner. The AI layer will analyze only the broker snapshot supplied by KINGBOT.</div>
+          <div id="flags" class="flags"></div>
+        </div>
+        <div class="detail-grid">
+          <div class="detail"><span>SYMBOLS SCANNED</span><strong id="scannedCount">—</strong></div>
+          <div class="detail"><span>QUOTES AVAILABLE</span><strong id="availableCount">—</strong></div>
+          <div class="detail"><span>REGIME</span><strong id="regime">—</strong></div>
+          <div class="detail"><span>EXECUTION</span><strong>BLOCKED</strong></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <div>
+      <div class="section-title">HOW THE SCANNER WORKS</div>
+      <div class="section-sub">AI provides intelligence; deterministic platform controls remain authoritative.</div>
+    </div>
+  </div>
+  <div class="glass timeline">
+    <div class="step"><span class="step-index">01 · DATA</span><h3>Broker Snapshot</h3><p>Authenticated KINGBOT backend requests current quotes from the connected broker.</p></div>
+    <div class="step"><span class="step-index">02 · REASON</span><h3>Grok Analysis</h3><p>The verified snapshot is passed to Grok 4.7 with strict no-invention instructions.</p></div>
+    <div class="step"><span class="step-index">03 · RANK</span><h3>Market Matrix</h3><p>Bias, rationale, regime and risk flags are rendered into a decision-support view.</p></div>
+    <div class="step"><span class="step-index">04 · CONTROL</span><h3>Risk Boundary</h3><p>The scanner cannot place trades or bypass KINGBOT's validation and risk engine.</p></div>
+  </div>
+  <div class="notice">This scanner is decision support, not a guaranteed forecasting system. Quote availability, spread and broker conditions can change between scan time and execution.</div>
+</section>
+
+<footer class="footer">KINGBOT FINTECH · AI MARKET SCANNER · GROK INTELLIGENCE · GIBSONFX TECH</footer>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script src="system/session.js"></script>
+<script src="system/auth-gate.js"></script>
+<script src="system/access-control.js"></script>
+<script src="system/navigation.js"></script>
+<script>
+(function(){
+  "use strict";
+  const API=window.KINGBOT_API?.baseUrl||"https://kingbot-fintech-api-etfv.onrender.com/api";
+  const qs=id=>document.getElementById(id);
+  const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false};
+
+  function toast(text,tone){
+    const el=qs("toast"); if(!el)return;
+    el.textContent=text; el.className="toast show"+(tone?" "+tone:"");
+    clearTimeout(toast.t); toast.t=setTimeout(()=>el.className="toast",3200);
+  }
+
+  async function getToken(force){
+    const s=await window.KINGBOT_SESSION?.check?.({force:!!force});
+    if(!s?.authenticated)throw new Error("Please sign in to use the AI market scanner.");
+    if(!s?.user?.verified)throw new Error("Verify your email before using the AI market scanner.");
+    const u=window.KINGBOT_FIREBASE?.auth?.currentUser;
+    if(!u)throw new Error("Firebase session is not available.");
+    return u.getIdToken(!!force);
+  }
+
+  async function request(path,options={}){
+    const send=async(force)=>{
+      const headers=new Headers(options.headers||{});
+      headers.set("Accept","application/json");
+      if(options.body)headers.set("Content-Type","application/json");
+      headers.set("Authorization","Bearer "+await getToken(force));
+      return fetch(API+path,{...options,headers,credentials:"omit",cache:"no-store"});
+    };
+    let r=await send(false);
+    if(r.status===401)r=await send(true);
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok||data.ok===false)throw new Error(data.error||data.reason||data.message||("HTTP "+r.status));
+    return data;
+  }
+
+  function listFromInput(){
+    const raw=String(qs("symbols")?.value||"").split(",");
+    state.symbols=[...new Set(raw.map(x=>x.trim().toUpperCase()).filter(x=>/^[A-Z0-9._-]{3,30}$/.test(x)))].slice(0,12);
+    if(!state.symbols.length)state.symbols=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
+  }
+
+  function fmt(v){
+    const n=Number(v); return Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:5}):"—";
+  }
+  function fmtSpread(v){
+    const n=Number(v); return Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:5}):"—";
+  }
+  function renderQuotes(){
+    const grid=qs("symbolGrid"); if(!grid)return;
+    grid.innerHTML="";
+    state.quotes.forEach(q=>{
+      const card=document.createElement("button"); card.type="button"; card.className="symbol-card"+(q.available?"":" selected");
+      card.innerHTML='<div class="symbol-top"><span class="symbol-name"></span><span class="symbol-chip"></span></div>'+
+        '<div class="symbol-price"></div><div class="symbol-change"></div><span class="symbol-glow"></span>';
+      card.querySelector(".symbol-name").textContent=q.symbol;
+      card.querySelector(".symbol-chip").textContent=q.available?"LIVE":"NO DATA";
+      card.querySelector(".symbol-price").textContent=q.available?fmt(q.price):"—";
+      card.querySelector(".symbol-change").textContent=q.available?"Spread "+fmtSpread(q.spread):String(q.error||"QUOTE UNAVAILABLE").slice(0,28);
+      grid.appendChild(card);
+    });
+    qs("quoteStamp").textContent="SYNC "+new Date().toLocaleTimeString();
+  }
+
+  function parseAnalysis(raw){
+    try{
+      const clean=String(raw||"").replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+      return JSON.parse(clean);
+    }catch{return {summary:String(raw||"").trim(),ranked_symbols:[],risk_flags:[],market_regime:"—"};}
+  }
+
+  function renderScan(data){
+    const parsed=parseAnalysis(data.analysis);
+    const ranked=Array.isArray(parsed.ranked_symbols)?parsed.ranked_symbols:[];
+    const tbody=qs("rankingBody"); tbody.innerHTML="";
+    if(!ranked.length){
+      const row=document.createElement("tr"); const cell=document.createElement("td"); cell.colSpan=5; cell.innerHTML='<div class="empty">GROK DID NOT RETURN A PARSED RANKING. OPEN THE RAW ANALYSIS BELOW.</div>'; tbody.appendChild(row);
+    }else{
+      ranked.forEach(item=>{
+        const symbol=String(item.symbol||"—").toUpperCase();
+        const quote=data.quotes?.find(q=>q.symbol===symbol);
+        const row=document.createElement("tr");
+        const cells=[
+          {text:symbol,cls:"mono"},
+          {html:'<span class="bias '+String(item.bias||"DATA_INSUFFICIENT").toUpperCase().replace(/[^A-Z_]/g,"")+'"></span>'},
+          {text:quote?.price!==undefined?fmt(quote.price):"—",cls:"mono"},
+          {text:quote?.spread!==undefined?fmtSpread(quote.spread):"—",cls:"mono"},
+          {text:String(item.rationale||"No rationale returned.")}
+        ];
+        cells.forEach((c,i)=>{
+          const td=document.createElement("td"); if(c.cls)td.className=c.cls;
+          if(c.html){td.innerHTML=c.html;td.querySelector(".bias").textContent=String(item.bias||"DATA_INSUFFICIENT").toUpperCase();}
+          else td.textContent=c.text; row.appendChild(td);
+        });
+        tbody.appendChild(row);
+      });
+    }
+    const summary=parsed.summary||"Grok returned structured ranking data without a summary.";
+    qs("summaryText").textContent=summary;
+    qs("analysisMeta").textContent=(data.provider||"AI").toUpperCase()+" · "+(data.model||"MODEL")+" · "+new Date(data.generatedAt||Date.now()).toLocaleTimeString();
+    qs("scannedCount").textContent=String(Array.isArray(data.symbols)?data.symbols.length:0);
+    qs("availableCount").textContent=String((data.quotes||[]).filter(q=>q.available).length);
+    qs("regime").textContent=String(parsed.market_regime||"—").toUpperCase().slice(0,24);
+
+    const flags=qs("flags"); flags.innerHTML="";
+    const rf=Array.isArray(parsed.risk_flags)?parsed.risk_flags:[];
+    if(!rf.length){const x=document.createElement("span");x.className="flag";x.textContent="NO EXPLICIT FLAGS RETURNED";flags.appendChild(x);}
+    else rf.slice(0,8).forEach(flag=>{const x=document.createElement("span");x.className="flag";x.textContent=String(flag).slice(0,100);flags.appendChild(x);});
+  }
+
+  async function syncQuotes(){
+    if(state.busy)return;
+    try{
+      state.busy=true; qs("scanState").textContent="SYNCING";
+      listFromInput();
+      const path="/market-scanner?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value);
+      const data=await request(path,{method:"GET"});
+      state.quotes=data.quotes||[];
+      renderQuotes();
+      qs("brokerState").textContent="CONNECTED"; qs("brokerState").className="good";
+      qs("aiState").textContent=data.provider==="xai"?"GROK ONLINE":"AI ONLINE"; qs("aiState").className="good";
+      qs("coreLabel").textContent="SCANNER CORE ONLINE";
+      qs("coreSub").textContent=(data.model||"AI")+" connected through KINGBOT backend.";
+      qs("scanState").textContent="QUOTES READY";
+      toast("Verified broker quotes synchronized.","good");
+      return data;
+    }catch(error){
+      qs("brokerState").textContent="UNAVAILABLE"; qs("brokerState").className="warn";
+      qs("aiState").textContent="CHECK FAILED"; qs("aiState").className="bad";
+      qs("coreSub").textContent=error?.message||"Unable to synchronize broker telemetry.";
+      qs("scanState").textContent="ERROR";
+      toast(error?.message||"Scanner unavailable.","bad");
+      throw error;
+    }finally{state.busy=false;}
+  }
+
+  async function runScan(){
+    if(state.busy)return;
+    try{
+      state.busy=true;qs("scanState").textContent="SCANNING";qs("scanNow").disabled=true;
+      listFromInput();
+      const path="/market-scanner?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value);
+      const data=await request(path,{method:"GET"});
+      state.quotes=data.quotes||[];
+      renderQuotes();renderScan(data);
+      qs("lastScan").textContent=new Date(data.generatedAt||Date.now()).toLocaleTimeString();
+      qs("quoteStamp").textContent="SCAN "+new Date(data.generatedAt||Date.now()).toLocaleTimeString();
+      qs("scanState").textContent="SCAN COMPLETE";
+      toast("Grok market scan completed.","good");
+    }catch(error){
+      qs("scanState").textContent="ERROR";
+      toast(error?.message||"Market scan failed.","bad");
+    }finally{state.busy=false;qs("scanNow").disabled=false;}
+  }
+
+  qs("applySymbols")?.addEventListener("click",()=>{listFromInput();syncQuotes().catch(()=>{});});
+  qs("refreshQuotes")?.addEventListener("click",()=>syncQuotes().catch(()=>{}));
+  qs("scanNow")?.addEventListener("click",runScan);
+  qs("symbols")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();syncQuotes().catch(()=>{});}});
+
+  window.addEventListener("kingbot:session-change",()=>syncQuotes().catch(()=>{}));
+  setInterval(()=>{if(!document.hidden)syncQuotes().catch(()=>{});},20000);
+
+  (async()=>{
+    await window.KINGBOT_SESSION?.check?.().catch(()=>null);
+    listFromInput();
+    syncQuotes().catch(()=>{});
+  })();
+})();
+</script>
+</body>
+</html>
