@@ -46,12 +46,16 @@ export function createMt5HostingRouter({pool,requireUser}={}){
       [user.id]
     );
     if(q.rowCount)return res.status(409).json({ok:false,error:"MT5_HOST_ALREADY_PROVISIONING"});
-    const nodeQ=await pool.query(
-      "SELECT n.node_id FROM kingbot_mt5_host_nodes n
-       LEFT JOIN kingbot_mt5_host_deployments d ON d.node_id=n.node_id AND d.status IN ('PROVISIONING','RUNNING','PAUSED')
-       WHERE n.revoked=FALSE AND n.status='ONLINE' AND n.expires_at>NOW()
-       GROUP BY n.node_id ORDER BY COUNT(d.id) ASC, MIN(n.updated_at) ASC LIMIT 1"
-    );
+    const nodeQ=await pool.query(`
+      SELECT n.node_id
+      FROM kingbot_mt5_host_nodes n
+      LEFT JOIN kingbot_mt5_host_deployments d
+        ON d.node_id=n.node_id AND d.status IN ('PROVISIONING','RUNNING','PAUSED')
+      WHERE n.revoked=FALSE AND n.status='ONLINE' AND n.expires_at>NOW()
+      GROUP BY n.node_id
+      ORDER BY COUNT(d.id) ASC, MIN(n.updated_at) ASC
+      LIMIT 1
+    `);
     if(!nodeQ.rowCount)return res.status(503).json({ok:false,error:"NO_MT5_HOST_NODE_AVAILABLE"});
     const nodeId=nodeQ.rows[0].node_id;
     const deploymentId=crypto.randomUUID();
