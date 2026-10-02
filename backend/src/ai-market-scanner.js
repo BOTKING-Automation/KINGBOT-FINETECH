@@ -469,7 +469,7 @@ export async function ensureAiMarketScannerSchema(pool) {
   await ensureScannerSchema(pool);
 }
 
-export function registerAiMarketScanner(app, { pool, rateLimit }) {
+export function registerAiMarketScanner(app, { pool, rateLimit, twelveData }) {
   void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
 
   const limiter = rateLimit({
