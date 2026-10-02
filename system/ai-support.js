@@ -372,129 +372,15 @@
     }
   }
 
-  async function initPuter() {
-    if (state.puterReady && window.puter?.ai?.chat) return;
-
-    if (state.puterInitPromise) {
-      await state.puterInitPromise;
-      return;
-    }
-
-    state.puterInitPromise = (async () => {
-      if (!window.puter?.ai?.chat) {
-        await new Promise((resolve, reject) => {
-          const existing = document.querySelector('script[data-kingbot-puter]');
-          if (existing) {
-            existing.addEventListener("load", resolve, { once: true });
-            existing.addEventListener("error", () => reject(new Error("PUTER_SCRIPT_LOAD_FAILED")), { once: true });
-            return;
-          }
-          const script = document.createElement("script");
-          script.src = "https://js.puter.com/v2/";
-          script.async = true;
-          script.dataset.kingbotPuter = "true";
-          script.onload = resolve;
-          script.onerror = () => reject(new Error("PUTER_SCRIPT_LOAD_FAILED"));
-          document.head.appendChild(script);
-        });
-      }
-
-      const deadline = Date.now() + 7000;
-      while (!window.puter?.ai?.chat && Date.now() < deadline) {
-        await new Promise(resolve => setTimeout(resolve, 80));
-      }
-
-      state.puterReady = Boolean(window.puter?.ai?.chat);
-      if (!state.puterReady) throw new Error("PUTER_AI_UNAVAILABLE");
-
-      // Model discovery is optional and must never delay the first response.
-      // Keep a known fast default while checking available models in the background.
-      void (async () => {
-        try {
-          const models = await window.puter.ai.listModels();
-          state.puterModels = Array.isArray(models) ? models : [];
-          const ids = state.puterModels.map(item => String(item?.id || ""));
-          const preferred = ["gemini-3.1-flash-lite", "gpt-5.5", "claude-sonnet-4-6", "gpt-5.6-luna"];
-          state.puterModel = preferred.find(id => ids.includes(id)) || state.puterModel;
-        } catch {}
-      })();
-
-      setTelemetry("aiCoreStatus", "PUTER ONLINE", "good");
-      setText("coreStateLabel", "PUTER FAST AI CORE ONLINE");
-      setText("coreStateSub", "Fast conversational reasoning is ready. Verified KINGBOT context remains server-sourced.");
-    })();
-
-    try {
-      await state.puterInitPromise;
-    } finally {
-      state.puterInitPromise = null;
-    }
-  }
-
-  function buildAiMessages(clean, conversation) {
-    const context = state.context ? JSON.parse(JSON.stringify(state.context)) : null;
-    if (context?.user) delete context.user;
-    const system = [
-      "You are KINGBOT Intelligence, the decision-support assistant inside KINGBOT FINTECH.",
-      "Use only the supplied verified KINGBOT context for account, broker, position, quote, runtime and risk facts.",
-      "Never invent balances, prices, positions, fills, performance, broker status or confidence scores.",
-      "Explain uncertainty when data is unavailable or stale.",
-      "You may analyze markets and trading systems, but do not present outcomes as guaranteed.",
-      "AI is not the execution authority. Never instruct the browser to bypass server-side broker validation, deterministic risk controls, or the KINGBOT worker.",
-      "If the user asks to execute a trade, explain that execution must pass the platform's server-side risk and broker controls.",
-      "VERIFIED KINGBOT CONTEXT:",
-      JSON.stringify(context || { available: false })
-    ].join("\n");
-    return [
-      { role: "system", content: system },
-      ...conversation.slice(-4).map(item => ({ role: item.role, content: String(item.content || "").slice(0, 1800) })),
-      { role: "user", content: clean }
-    ];
-  }
-
-  function createStreamingBubble() {
-    const container = byId("chatScroll");
-    if (!container) return null;
-    const row = document.createElement("div");
-    row.className = "chat-message assistant";
-    const bubble = document.createElement("div");
-    bubble.className = "chat-bubble";
-    const role = document.createElement("div");
-    role.className = "chat-role";
-    role.textContent = "KINGBOT INTELLIGENCE · PUTER AI";
-    const body = document.createElement("div");
-    body.className = "chat-body";
-    bubble.append(role, body);
-    row.appendChild(bubble);
-    container.appendChild(row);
-    container.scrollTop = container.scrollHeight;
-    return body;
-  }
-
-  async function streamPuterAnswer(clean, conversation) {
-    await initPuter();
-    const response = await window.puter.ai.chat(buildAiMessages(clean, conversation), {
-      model: state.puterModel,
-      stream: true,
-      temperature: 0.2,
-      max_tokens: 900,
-      compaction: false
+  async function runBackendAgent(clean, conversation) {
+    const symbol = byId("symbolSelect")?.value || "XAUUSD";
+    const data = await requestJson(API_BASE + "/ai/agent", {
+      method: "POST",
+      body: JSON.stringify({ message: clean, symbol, conversation: conversation.slice(-4) })
     });
-    const body = createStreamingBubble();
-    if (!body) throw new Error("AI_CHAT_CONTAINER_UNAVAILABLE");
-
-    let answer = "";
-    for await (const part of response) {
-      if (part?.type === "error") throw new Error(String(part.message || "PUTER_STREAM_ERROR"));
-      if (typeof part?.text === "string" && part.text) {
-        answer += part.text;
-        body.textContent = answer;
-        const container = byId("chatScroll");
-        if (container) container.scrollTop = container.scrollHeight;
-      }
-    }
-    if (!answer.trim()) throw new Error("PUTER_RETURNED_EMPTY_RESPONSE");
-    return answer.trim();
+    const reply = data?.reply || {};
+    const answer = String(reply.answer || data?.message || "KINGBOT AI returned no answer.");
+    return { answer, data };
   }
 
   async function loadContext() {
@@ -539,13 +425,11 @@
 
     if (input) input.disabled = true;
     if (button) button.disabled = true;
-    setChatState("THINKING");
+    setChatState("KINGBOT AI · THINKING");
     addHistory("user", clean);
     showTyping();
 
     try {
-      // Do not block the AI response on broker telemetry.
-      // The context panel refreshes independently; the AI can answer immediately.
       if (!state.context) void loadContext();
 
       const conversation = state.messages
@@ -556,19 +440,19 @@
           content: String(item.content || "").slice(0, 1800)
         }));
 
-      const answer = await streamPuterAnswer(clean, conversation);
+      const result = await runBackendAgent(clean, conversation);
 
       hideTyping();
-      addHistory("assistant", answer);
-      window.dispatchEvent(new CustomEvent("kingbot:ai-response", { detail: { text: answer } }));
+      addHistory("assistant", result.answer);
+      window.dispatchEvent(new CustomEvent("kingbot:ai-response", { detail: result }));
 
       state.lastQueryAt = new Date();
       setText("lastQuery", state.lastQueryAt.toLocaleTimeString());
-      setChatState("ONLINE");
-      showToast("KINGBOT Intelligence responded.", "good");
+      setChatState("NATIVE AI ONLINE");
+      showToast("KINGBOT Native AI responded.", "good");
     } catch (error) {
       hideTyping();
-      const messageText = error?.message || "KINGBOT Intelligence is temporarily unavailable.";
+      const messageText = error?.message || "KINGBOT AI is temporarily unavailable.";
       addHistory("assistant", messageText);
       setChatState("ERROR");
       showToast(messageText, "bad");
@@ -657,6 +541,7 @@
     setChatState("READY");
     setInterval(loadContext, 20000);
     loadHealth();
+    /* Native KINGBOT AI is the production chat path. No browser AI provider is required. */
     initPuter().catch(() => {
       setTelemetry("aiCoreStatus", "OFFLINE", "bad");
       setText("coreStateLabel", "PUTER AI UNAVAILABLE");
