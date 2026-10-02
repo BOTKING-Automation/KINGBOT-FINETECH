@@ -217,11 +217,20 @@ async function runMarketScan({ requireUser, pool, broker, twelveData, req, res }
   const timeframe = cleanTimeframe(req.query?.timeframe || req.body?.timeframe);
 
   try {
-    const mapping = await broker.getMapping(user.id);
-    if (!mapping) return res.status(503).json({ ok:false, error:"BROKER_NOT_CONNECTED", code:"BROKER_NOT_CONNECTED", scanner:"KINGBOT AI MARKET SCANNER", message:"Connect a broker account before running the market scanner." });
+    let mapping = null;
+    try { mapping = await broker.getMapping(user.id); } catch {}
+    if (!mapping && !twelveData?.enabled) {
+      return res.status(503).json({
+        ok:false,
+        error:"MARKET_DATA_NOT_CONNECTED",
+        code:"MARKET_DATA_NOT_CONNECTED",
+        scanner:"KINGBOT AI MARKET SCANNER",
+        message:"Connect Twelve Data or a broker market-data source before running the market scanner."
+      });
+    }
 
     const directQuotes = twelveData?.enabled ? twelveData.quotes(symbols) : [];
-    const brokerQuotes = await collectQuotes(broker, user.id, symbols);
+    const brokerQuotes = mapping ? await collectQuotes(broker, user.id, symbols) : symbols.map(symbol => ({ symbol, available:false, error:"BROKER_NOT_CONNECTED" }));
     const quotes = directQuotes.length && directQuotes.some(q => q.available)
       ? directQuotes
       : brokerQuotes;
