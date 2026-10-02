@@ -176,7 +176,7 @@ export function createMt5HostingRouter({pool,requireUser}={}){
         "SELECT id,status FROM kingbot_mt5_host_deployments WHERE user_id=$1 AND status IN ('PROVISIONING','RUNNING','PAUSED') ORDER BY created_at DESC LIMIT 1",
         [user.id]
       );
-      if(activeDeployment.rowCount&&currentProfileIdForUpdate){
+      if(activeDeployment.rowCount){
         return res.status(409).json({ok:false,error:"VPS_DEPLOYMENT_ACTIVE",deploymentId:activeDeployment.rows[0].id,message:"Stop the current VPS deployment before replacing its VPS or MT5 credentials."});
       }
 
