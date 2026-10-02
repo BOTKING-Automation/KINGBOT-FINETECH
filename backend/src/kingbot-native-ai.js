@@ -1,4 +1,5 @@
 import { getBotDefinitions } from "./bot-engines.js";
+import { runStandaloneMarketScan } from "./ai-market-scanner.js";
 import { evaluateKingbotBrain } from "./kingbot-brain.js";
 import { searchWeb, webSearchStatus } from "./kingbot-web-search.js";
 import { getPlans, BOT_NAMES } from "./subscriptions.js";
@@ -369,6 +370,85 @@ export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker
       verified:{google:true,freshnessDays:fresh,marketContext:Boolean(marketContext)}
     };
   }
+  if(kind==="MARKET_INTELLIGENCE"){
+    try{
+      const scan=await runStandaloneMarketScan({
+        pool,
+        twelveData,
+        symbols:[requested],
+        timeframe:"5m"
+      });
+      if(scan.ok){
+        const item=(scan.technical||[]).find(x=>x.symbol===requested)||{};
+        const parsed=safeJson(scan.analysis);
+        const ranked=Array.isArray(parsed?.ranked_symbols)?parsed.ranked_symbols:[];
+        const rankedItem=ranked.find(x=>x.symbol===requested)||item;
+        const quote=(scan.quotes||[]).find(x=>x.symbol===requested)||null;
+        const signal=rankedItem?.signal||item?.signal||"DATA_INSUFFICIENT";
+        return {
+          provider:"KINGBOT_NATIVE",
+          model:"KINGBOT-CORE-1",
+          intent:kind,
+          symbol:requested,
+          scanner:scan,
+          reply:{
+            answer:"KINGBOT AI analyzed live "+requested+" data through the standalone market scanner. Current engine state: "+String(signal).replaceAll("_"," ")+" with "+String(rankedItem?.score??item?.score??0)+"% technical confluence.",
+            facts:[
+              "Market source: "+String(scan.source||"live market-data engine"),
+              "Broker connection required for scan: false",
+              "Timeframe: "+String(scan.timeframe||"5m"),
+              ...(quote?.available?["Live quote: "+quote.price]:[])
+            ],
+            technicalAnalysis:Array.isArray(rankedItem?.technicalAnalysis)?rankedItem.technicalAnalysis:[],
+            setup:{
+              signal,
+              entry:rankedItem?.entry??item?.entry??null,
+              waitFor:rankedItem?.waitFor||item?.waitFor||"Fresh confirmation is required.",
+              invalidation:rankedItem?.invalidation||item?.invalidation||"Technical structure invalidation."
+            },
+            riskFlags:["SCANNER_INDEPENDENT_OF_BROKER","EXECUTION_AUTHORIZATION_NOT_GRANTED"],
+            nextAction:signal==="ENTRY_CONFIRMING"
+              ?"Pass the setup through the deterministic risk gate before any execution."
+              :"Wait for stronger verified confluence."
+          },
+          sources:[],
+          verified:{standaloneScanner:true,liveQuote:Boolean(quote?.available),technicalData:Boolean(scan.technicalCount)}
+        };
+      }
+      return {
+        provider:"KINGBOT_NATIVE",
+        model:"KINGBOT-CORE-1",
+        intent:kind,
+        symbol:requested,
+        reply:{
+          answer:"KINGBOT AI could not obtain fresh verified market data for "+requested+".",
+          facts:[String(scan.message||scan.reason||scan.error||"LIVE_MARKET_DATA_UNAVAILABLE").slice(0,220)],
+          technicalAnalysis:[],
+          setup:{signal:"DATA_INSUFFICIENT",entry:null,waitFor:"Fresh verified market data.",invalidation:"No valid market data."},
+          riskFlags:["LIVE_MARKET_DATA_UNAVAILABLE"],
+          nextAction:"Check the standalone market-data feed configuration."
+        },
+        verified:{standaloneScanner:false}
+      };
+    }catch(error){
+      return {
+        provider:"KINGBOT_NATIVE",
+        model:"KINGBOT-CORE-1",
+        intent:kind,
+        symbol:requested,
+        reply:{
+          answer:"KINGBOT AI market scanner is temporarily unavailable.",
+          facts:[String(error?.message||"LIVE_MARKET_DATA_UNAVAILABLE").slice(0,220)],
+          technicalAnalysis:[],
+          setup:{signal:"DATA_INSUFFICIENT",entry:null,waitFor:"Fresh verified market data.",invalidation:"No valid market data."},
+          riskFlags:["SCANNER_UNAVAILABLE"],
+          nextAction:"Retry the standalone scanner."
+        },
+        verified:{standaloneScanner:false}
+      };
+    }
+  }
+
   const quotes=twelveData?.enabled?twelveData.quotes([requested]):[];
   const quote=quotes[0]||null;
 
