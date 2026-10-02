@@ -24,6 +24,7 @@ import { registerTerminalSnapshot } from "./terminal-snapshot.js";
 import { registerAiMarketScanner } from "./ai-market-scanner.js";
 import { registerTerminalLive } from "./terminal-live.js";
 import { registerElevenLabsVoice } from "./elevenlabs-voice.js";
+import { registerAiIntelligence } from "./ai-intelligence.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -72,6 +73,7 @@ registerTerminalSnapshot(app, { requireUser, pool, broker, firstFinite });
 registerAiMarketScanner(app, { requireUser, pool, broker, rateLimit });
 registerTerminalLive(app, { requireUser, pool, broker, firstFinite });
 registerElevenLabsVoice(app, { requireUser, pool, rateLimit });
+registerAiIntelligence(app, { requireUser, pool, broker });
 
 app.get("/api/health", (_req, res) => {
   res.json({
