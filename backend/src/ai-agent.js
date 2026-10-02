@@ -1,11 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getBotDefinitions } from "./bot-engines.js";
+import { runNativeKingbotAI } from "./kingbot-native-ai.js";
 
 const DEFAULT_SYMBOLS=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 const MODEL=String(process.env.GEMINI_AGENT_MODEL||process.env.GEMINI_MODEL||"gemini-2.5-flash-lite").trim();
 const API_KEY=String(process.env.GEMINI_API_KEY||"").trim();
 const ai=API_KEY?new GoogleGenAI({apiKey:API_KEY}):null;
+const EXTERNAL_PROVIDER=String(process.env.KINGBOT_AI_EXTERNAL_PROVIDER||"none").trim().toLowerCase();
 
 const SYSTEM=`You are KINGBOT AI, the proprietary intelligence agent for KINGBOT FINTECH.
 You are a market-intelligence and platform-operations agent, not a profit predictor.
@@ -41,7 +43,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     let brokerStatus={connected:false};
     try{brokerStatus=await broker.getStatus(user.id)}catch{}
     res.json({
-      ok:true,agentReady:Boolean(ai),model:ai?MODEL:null,mode:"KINGBOT_INTELLIGENCE_AGENT",
+      ok:true,agentReady:true,nativeReady:true,externalProvider:EXTERNAL_PROVIDER,model:EXTERNAL_PROVIDER==="gemini"&&ai?MODEL:"KINGBOT-CORE-1",mode:"KINGBOT_NATIVE_INTELLIGENCE_AGENT",
       authority:"ANALYSIS_ONLY",marketData:feed.status(),brokerConnected:Boolean(brokerStatus?.connected),
       engines:Object.keys(getBotDefinitions())
     });
@@ -52,9 +54,14 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     const question=String(req.body?.message||"").trim().slice(0,3000);
     const symbol=cleanSymbol(req.body?.symbol);
     if(!question)return res.status(400).json({ok:false,error:"AI_AGENT_MESSAGE_REQUIRED"});
-    if(!ai)return res.status(503).json({ok:false,error:"KINGBOT_AI_NOT_CONFIGURED",message:"Configure GEMINI_API_KEY on the backend."});
+    const native=await runNativeKingbotAI({question,symbol,twelveData:feed,pool,broker,userId:user.id});
+    if(EXTERNAL_PROVIDER!=="gemini" || !ai){
+      return res.json({ok:true,agent:"KINGBOT",...native,generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
+    }
 
     const context=buildContext({symbol,twelveData:feed,broker,botDefinitions:getBotDefinitions()});
+    context.nativeKingbotAI=native.reply;
+    context.nativeProvider=native.provider;
     let account=null,positions=[];
     try{
       const status=await broker.getStatus(user.id);
