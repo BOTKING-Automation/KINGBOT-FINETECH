@@ -107,14 +107,38 @@ export function createMt5HostingRouter({pool,requireUser}={}){
       "SELECT id,user_id,status,bot_id,execution_mode,broker_provider,account_id,last_heartbeat_at FROM kingbot_mt5_host_deployments WHERE node_id=$1 AND status IN ('PROVISIONING','RUNNING','PAUSED') ORDER BY created_at",
       [node.node_id]
     );
-    const enriched=deployments.rows.map(deployment=>{
-      let bridgeConnected=false;
-      if(String(deployment.broker_provider||"").toLowerCase()==="mt5-bridge"){
-        const bridge=mt5BridgeRegistry.getState(deployment.user_id);
-        bridgeConnected=Boolean(bridge&&String(bridge.login||"")===String(deployment.account_id||""));
+    const userIds=[...new Set(deployments.rows.map(d=>String(d.user_id||"")).filter(Boolean))];
+    let bridgeRows=[];
+    if(userIds.length){
+      const bridgeQ=await pool.query(
+        "SELECT user_id,mt5_login,last_seen_at,account_type FROM kingbot_mt5_bridge_tokens WHERE user_id = ANY($1::uuid[]) AND revoked=FALSE AND expires_at>NOW() AND mt5_login IS NOT NULL",
+        [userIds]
+      );
+      bridgeRows=bridgeQ.rows;
+    }
+    const bridgeByUser=new Map();
+    for(const row of bridgeRows){
+      const current=bridgeByUser.get(String(row.user_id));
+      if(!current||new Date(row.last_seen_at||0).getTime()>new Date(current.last_seen_at||0).getTime())bridgeByUser.set(String(row.user_id),row);
+    }
+    const enriched=[];
+    for(const deployment of deployments.rows){
+      const bridge=bridgeByUser.get(String(deployment.user_id));
+      const bridgeConnected=Boolean(
+        String(deployment.broker_provider||"").toLowerCase()==="mt5-bridge" &&
+        bridge &&
+        String(bridge.mt5_login||"")===String(deployment.account_id||"") &&
+        bridge.last_seen_at &&
+        Date.now()-new Date(bridge.last_seen_at).getTime()<20_000
+      );
+      if(bridgeConnected){
+        await pool.query(
+          "UPDATE kingbot_mt5_host_deployments SET last_heartbeat_at=NOW(),updated_at=NOW() WHERE id=$1 AND status IN ('RUNNING','PAUSED','PROVISIONING')",
+          [deployment.id]
+        );
       }
-      return {...deployment,bridgeConnected};
-    });
+      enriched.push({...deployment,bridgeConnected,bridgeLastSeenAt:bridge?.last_seen_at||null});
+    }
     res.json({ok:true,nodeId:node.node_id,serverTime:new Date().toISOString(),deployments:enriched});
   });
 
