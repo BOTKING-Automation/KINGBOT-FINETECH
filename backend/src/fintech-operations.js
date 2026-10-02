@@ -201,6 +201,48 @@ export function createFintechOpsRouter({pool}){
     if(!["open","investigating","resolved","dismissed"].includes(status))return res.status(400).json({ok:false,error:"Invalid compliance status."});
     try{const q=await pool.query("UPDATE kingbot_compliance_alerts SET status=$2,assigned_to=COALESCE($3,assigned_to),resolved_at=CASE WHEN $2 IN ('resolved','dismissed') THEN NOW() ELSE NULL END WHERE id=$1 RETURNING *",[req.params.id,status,a.id]);if(!q.rowCount)return res.status(404).json({ok:false,error:"Compliance alert not found."});if(q.rows[0].user_id)await notify(pool,q.rows[0].user_id,"compliance","Compliance case "+status,"Your KINGBOT compliance case is now "+status+".",{alertId:req.params.id,status});res.json({ok:true,alert:q.rows[0]});}catch(error){res.status(500).json({ok:false,error:"Compliance alert update failed."});}
   });
+  router.get("/risk/overview",adminLimit,async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    try{
+      const [risk,losses,failed,disabled]=await Promise.all([
+        pool.query("SELECT COUNT(*)::int AS n FROM kingbot_bot_risk_settings WHERE kill_switch=TRUE"),
+        pool.query("SELECT COUNT(*)::int AS n FROM kingbot_execution_journal WHERE status='REJECTED' AND created_at>NOW()-INTERVAL '24 hours'"),
+        pool.query("SELECT COUNT(*)::int AS n FROM kingbot_payment_intents WHERE status IN ('failed','rejected') AND created_at>NOW()-INTERVAL '24 hours'"),
+        pool.query("SELECT COUNT(*)::int AS n FROM kingbot_users WHERE admin_blocked=TRUE")
+      ]);
+      res.json({ok:true,overview:{
+        accountsWithKillSwitch:Number(risk.rows[0]?.n||0),
+        rejectedExecutions24h:Number(losses.rows[0]?.n||0),
+        failedPayments24h:Number(failed.rows[0]?.n||0),
+        disabledAccounts:Number(disabled.rows[0]?.n||0)
+      },generatedAt:now()});
+    }catch(error){res.status(500).json({ok:false,error:"Risk overview unavailable."});}
+  });
+
+  router.post("/risk/sweep",adminLimit,async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);
+    if(!a)return;
+    try{
+      let created=0;
+      const checks=[
+        ["EXECUTION_REJECTION_SPIKE","high","SELECT COUNT(*)::int AS n FROM kingbot_execution_journal WHERE status='REJECTED' AND created_at>NOW()-INTERVAL '1 hour'","rejected executions in the last hour"],
+        ["PAYMENT_FAILURE_SPIKE","medium","SELECT COUNT(*)::int AS n FROM kingbot_payment_intents WHERE status='failed' AND created_at>NOW()-INTERVAL '1 hour'","failed payment intents in the last hour"]
+      ];
+      for(const [type,severity,sql,label] of checks){
+        const q=await pool.query(sql);
+        if(Number(q.rows[0]?.n||0)>=5){
+          const exists=await pool.query("SELECT 1 FROM kingbot_compliance_alerts WHERE alert_type=$1 AND status IN ('open','investigating') AND created_at>NOW()-INTERVAL '6 hours' LIMIT 1",[type]);
+          if(!exists.rowCount){
+            await pool.query("INSERT INTO kingbot_compliance_alerts(alert_type,severity,status,source,details,assigned_to) VALUES($1,$2,'open','risk_sweep',$3::jsonb,$4)",[type,severity,JSON.stringify({count:Number(q.rows[0].n),label,window:"1 hour"}),a.id]);
+            created++;
+          }
+        }
+      }
+      await audit(pool,a.id,"RISK_SWEEP",{created});
+      res.json({ok:true,created});
+    }catch(error){res.status(500).json({ok:false,error:"Risk sweep failed."});}
+  });
+
   router.post("/compliance/sweep",adminLimit,async(req,res)=>{
     const a=await requireAdmin(pool,req,res);if(!a)return;
     try{
