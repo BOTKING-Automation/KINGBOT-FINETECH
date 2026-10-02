@@ -34,7 +34,14 @@ export function createMt5HostSupervisor({api,adapter,pollMs=DEFAULT_POLL_MS,brid
       if(!preflight.ok)throw new Error(preflight.error);
 
       active.get(id).stage="prepare";
-      await adapter.prepareDeployment(deployment);
+      let runtimeConfig=null;
+      if(deployment.vps_profile_id){
+        const encoded=encodeURIComponent(String(id));
+        const result=await api("/api/mt5/hosting/node/deployment-config?deploymentId="+encoded,{method:"GET"});
+        runtimeConfig=result.config||null;
+        if(!runtimeConfig)throw new Error("VPS_RUNTIME_CONFIG_UNAVAILABLE");
+      }
+      await adapter.prepareDeployment(deployment,runtimeConfig);
 
       active.get(id).stage="launch";
       const launched=await adapter.launchDeployment(deployment);
