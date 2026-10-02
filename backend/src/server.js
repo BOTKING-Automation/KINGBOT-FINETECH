@@ -61,6 +61,36 @@ app.use("/api/bots", createBotEngineRouter({ pool }));
 app.use("/api/runtime", createBotRuntimeRouter({ pool, broker }));
 app.use("/api/mt5/bridge", createMt5BridgeRouter({ pool, broker }));
 
+app.get("/api/broker/live-authorization", async (req,res)=>{
+  try{
+    const user=await requireUser(pool,req,res); if(!user)return;
+    const authorization=await broker.getLiveAuthorization(user.id);
+    res.json({ok:true,...authorization});
+  }catch(error){
+    res.status(503).json({ok:false,error:String(error?.message||"LIVE_AUTHORIZATION_STATUS_UNAVAILABLE")});
+  }
+});
+
+app.post("/api/broker/live-authorization", async (req,res)=>{
+  try{
+    const user=await requireUser(pool,req,res); if(!user)return;
+    const requested=Boolean(req.body?.authorized);
+    if(requested && String(req.body?.confirmation||"")!=="ENABLE_LIVE_TRADING"){
+      return res.status(400).json({ok:false,error:"LIVE_CONFIRMATION_REQUIRED",message:"Explicit confirmation ENABLE_LIVE_TRADING is required to authorize live execution."});
+    }
+    const authorization=await broker.setLiveAuthorization(user.id,requested);
+    await pool.query(
+      "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,$2,$3::jsonb)",
+      [user.id,requested?"LIVE_EXECUTION_AUTHORIZED":"LIVE_EXECUTION_REVOKED",JSON.stringify({provider:authorization.provider,accountId:authorization.accountId,authorizedAt:authorization.authorizedAt})]
+    );
+    res.json({ok:true,...authorization});
+  }catch(error){
+    const message=String(error?.message||"LIVE_AUTHORIZATION_UPDATE_FAILED");
+    const status=/REQUIRES_REAL|EXECUTION_MODE_REQUIRED|TRADING_DISABLED|NOT_CONFIGURED/.test(message)?409:400;
+    res.status(status).json({ok:false,error:message});
+  }
+});
+
 function firstFinite(...values){
   for(const value of values){
     const n=Number(value);
