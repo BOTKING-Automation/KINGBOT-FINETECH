@@ -135,6 +135,55 @@ export class TwelveDataFeed {
     } finally { clearTimeout(timer); }
   }
 
+  async latestQuotes(symbols) {
+    if (!this.enabled) return [];
+    const requested = [...new Set((Array.isArray(symbols) ? symbols : this.symbols).map(kingbotSymbol))].slice(0, 12);
+    const websocketQuotes = this.quotes(requested);
+    const missing = websocketQuotes.filter(q => !q.available);
+    if (!missing.length) return websocketQuotes;
+
+    const restQuotes = await Promise.all(missing.map(async item => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      try {
+        const tdSymbol = normalizeSymbol(item.symbol);
+        const url = "https://api.twelvedata.com/quote?symbol=" + encodeURIComponent(tdSymbol) + "&apikey=" + encodeURIComponent(this.apiKey);
+        const res = await fetch(url, { signal: controller.signal, headers: { Accept: "application/json" } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data?.status === "error") throw new Error(data?.message || "TWELVE_DATA_QUOTE_FAILED");
+        const bid = finite(data?.bid);
+        const ask = finite(data?.ask);
+        const price = finite(data?.close ?? data?.price ?? (bid !== null && ask !== null ? (bid + ask) / 2 : null));
+        if (price === null) throw new Error("TWELVE_DATA_QUOTE_EMPTY");
+        return {
+          symbol: kingbotSymbol(tdSymbol),
+          twelveDataSymbol: tdSymbol,
+          price,
+          bid,
+          ask,
+          spread: bid !== null && ask !== null ? ask - bid : null,
+          timestamp: finite(data?.timestamp) ? Number(data.timestamp) * 1000 : Date.now(),
+          time: data?.datetime || null,
+          source: "Twelve Data REST quote",
+          available: true
+        };
+      } catch (error) {
+        return {
+          symbol: item.symbol,
+          twelveDataSymbol: item.twelveDataSymbol || normalizeSymbol(item.symbol),
+          available: false,
+          source: "Twelve Data REST quote",
+          error: String(error?.message || "TWELVE_DATA_QUOTE_UNAVAILABLE").slice(0, 120)
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }));
+
+    const restMap = Object.fromEntries(restQuotes.map(q => [q.symbol, q]));
+    return websocketQuotes.map(q => q.available ? q : (restMap[q.symbol] || q));
+  }
+
   quotes(symbols) {
     return symbols.map(symbol => {
       const tdSymbol = normalizeSymbol(symbol);
