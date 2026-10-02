@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>KINGBOT — Pattern Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Orbitron:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="system/platform.css">
+<style>
+:root{--bg:#030611;--panel:rgba(8,15,34,.9);--line:rgba(255,255,255,.08);--text:#f4f7ff;--muted:#7e8ba8;--cyan:#19e6ff;--gold:#f6c34b;--green:#27e6a4;--red:#ff5578;--violet:#9b5cff}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{background:radial-gradient(circle at 12% 4%,rgba(25,230,255,.1),transparent 26%),radial-gradient(circle at 88% 7%,rgba(155,92,255,.1),transparent 28%),linear-gradient(145deg,#02040d,#05091a 55%,#02040b)}
+.wrap{width:min(1500px,calc(100% - 30px));margin:0 auto;padding:28px 0 70px}
+.glass{border:1px solid var(--line);background:linear-gradient(145deg,rgba(12,19,42,.92),rgba(3,7,17,.9));border-radius:20px;box-shadow:0 22px 80px rgba(0,0,0,.42);overflow:hidden}
+.hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(320px,.7fr);gap:15px}
+.hero-main{padding:30px}.eyebrow{display:inline-flex;gap:8px;align-items:center;padding:7px 10px;border:1px solid rgba(25,230,255,.18);border-radius:999px;color:var(--cyan);font:800 8px "JetBrains Mono";letter-spacing:.12em}
+h1{margin:18px 0 12px;font:900 clamp(28px,4vw,52px)/1.05 Orbitron;letter-spacing:-.04em}.grad{background:linear-gradient(90deg,var(--gold),var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+.copy{color:#b5bfd4;font-size:13px;line-height:1.7;max-width:850px}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
+.btn,.select,.input{min-height:42px;padding:10px 13px;border:1px solid rgba(255,255,255,.12);border-radius:11px;color:#fff;background:rgba(255,255,255,.035);font:800 9px "JetBrains Mono";cursor:pointer;text-decoration:none}
+.btn-primary{border-color:rgba(25,230,255,.26);background:linear-gradient(135deg,rgba(25,230,255,.11),rgba(71,135,255,.1))}
+.hero-side{padding:20px}.core{display:grid;grid-template-columns:92px 1fr;gap:14px;align-items:center}.core-mark{width:88px;height:88px;border-radius:24px;display:grid;place-items:center;background:linear-gradient(135deg,var(--gold),#ff8f2c);color:#07101a;font:900 21px Orbitron;box-shadow:0 0 35px rgba(246,195,75,.18)}
+.core-title{font:900 17px Orbitron}.core-sub{margin-top:6px;color:var(--muted);font:700 8px "JetBrains Mono";line-height:1.7}.status{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:15px}.metric{padding:11px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.022)}.metric span,.label{display:block;color:var(--muted);font:800 7px "JetBrains Mono";letter-spacing:.04em}.metric strong{display:block;margin-top:6px;font:900 11px "JetBrains Mono"}.good{color:var(--green)}.warn{color:var(--gold)}.bad{color:var(--red)}
+.section{margin-top:15px}.section-head{display:flex;justify-content:space-between;gap:12px;align-items:end;margin-bottom:9px}.section-title{font:900 14px Orbitron}.section-sub{margin-top:4px;color:var(--muted);font-size:10px}
+.control{display:flex;gap:8px;flex-wrap:wrap;padding:12px}.select{background:#091126}.input{flex:1;min-width:230px}
+.summary-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:12px}.summary{padding:18px}.big-bias{font:900 30px Orbitron;margin-top:8px}.summary-text{margin-top:10px;color:#cbd5e7;font-size:11px;line-height:1.75}.meter{margin-top:14px;height:9px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}.meter i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--violet),var(--cyan),var(--gold));width:0;transition:.35s}
+.pattern-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.pattern-card{padding:15px;min-height:145px}.pattern-card .name{font:900 10px Orbitron;letter-spacing:.02em}.pattern-card .state{margin-top:12px;font:900 16px "JetBrains Mono"}.pattern-card .why{margin-top:7px;color:var(--muted);font-size:9px;line-height:1.6}.tag{display:inline-flex;padding:4px 7px;border:1px solid var(--line);border-radius:7px;font:900 7px "JetBrains Mono";margin-top:10px}.tag.detected{color:var(--green);border-color:rgba(39,230,164,.18)}.tag.watch{color:var(--gold);border-color:rgba(246,195,75,.18)}.tag.none{color:var(--muted)}
+.structure-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.structure{padding:14px}.structure strong{display:block;margin-top:7px;font:900 15px "JetBrains Mono"}.structure small{display:block;margin-top:6px;color:var(--muted);font-size:9px;line-height:1.5}
+.table-wrap{overflow:auto}.matrix{width:100%;border-collapse:collapse;min-width:760px}.matrix th,.matrix td{padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.05);text-align:left;font-size:9px}.matrix th{color:var(--muted);font:800 7px "JetBrains Mono"}.pill{display:inline-flex;padding:5px 7px;border-radius:7px;border:1px solid var(--line);font:900 7px "JetBrains Mono"}.pill.bull{color:var(--green)}.pill.bear{color:var(--red)}.pill.neutral{color:var(--gold)}
+.empty{padding:40px;text-align:center;color:var(--muted);font:800 9px "JetBrains Mono"}.footnote{margin-top:12px;color:#64708a;font:700 8px/1.7 "JetBrains Mono"}
+.toast{position:fixed;right:18px;bottom:18px;z-index:500;max-width:370px;padding:11px 13px;border-radius:10px;background:rgba(4,8,18,.97);font:800 8px "JetBrains Mono";opacity:0;transition:.22s}.toast.show{opacity:1}
+@media(max-width:1050px){.hero,.summary-grid{grid-template-columns:1fr}.pattern-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.pattern-grid,.structure-grid,.status{grid-template-columns:1fr 1fr}.core{grid-template-columns:1fr}.core-mark{margin:auto}.input{min-width:100%}}
+</style>
+</head>
+<body>
+<div data-kingbot-navigation></div>
+<main class="wrap">
+<section class="hero">
+  <article class="glass hero-main">
+    <div class="eyebrow">KINGBOT PATTERN INTELLIGENCE · LIVE</div>
+    <h1>Detect market <span class="grad">patterns before execution.</span></h1>
+    <p class="copy">The Pattern page converts verified scanner and TradingView evidence into a structured pattern map: market structure, liquidity, momentum, imbalance, trend alignment and confirmation states.</p>
+    <div class="actions">
+      <button id="analyze" class="btn btn-primary">ANALYZE PATTERNS</button>
+      <button id="sync" class="btn">SYNC LIVE DATA</button>
+      <a class="btn" href="scanner.html">OPEN AI SCANNER</a>
+      <a class="btn" href="terminal.html">OPEN TERMINAL</a>
+    </div>
+  </article>
+  <aside class="glass hero-side">
+    <div class="core">
+      <div class="core-mark">PAT</div>
+      <div>
+        <div class="core-title">PATTERN CORE</div>
+        <div class="core-sub" id="coreSub">Waiting for verified market data.</div>
+      </div>
+    </div>
+    <div class="status">
+      <div class="metric"><span>ENGINE</span><strong id="engine">READY</strong></div>
+      <div class="metric"><span>SYMBOL</span><strong id="activeSymbol">XAUUSD</strong></div>
+      <div class="metric"><span>TIMEFRAME</span><strong id="activeTf">5M</strong></div>
+    </div>
+  </aside>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <div><div class="section-title">PATTERN CONTROL</div><div class="section-sub">Use the same live scanner API as the AI Scanner.</div></div>
+  </div>
+  <div class="glass control">
+    <select id="timeframe" class="select">
+      <option value="1m">1M</option><option value="5m" selected>5M</option><option value="15m">15M</option>
+      <option value="1h">1H</option><option value="4h">4H</option><option value="1d">1D</option>
+    </select>
+    <select id="symbol" class="select">
+      <option>XAUUSD</option><option>EURUSD</option><option>GBPUSD</option><option>USDJPY</option><option>BTCUSD</option>
+    </select>
+    <button id="runOne" class="btn btn-primary">SCAN SELECTED</button>
+    <span id="state" class="btn" style="pointer-events:none">READY</span>
+  </div>
+</section>
+
+<section class="section summary-grid">
+  <article class="glass summary">
+    <div class="label">CURRENT PATTERN BIAS</div>
+    <div id="bias" class="big-bias">WAITING</div>
+    <div id="summary" class="summary-text">Run a pattern scan to load the latest verified TradingView and quote context.</div>
+    <div class="meter"><i id="meter"></i></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px">
+      <div class="metric"><span>SCORE</span><strong id="score">—</strong></div>
+      <div class="metric"><span>PRICE</span><strong id="price">—</strong></div>
+      <div class="metric"><span>SIGNAL</span><strong id="signal">—</strong></div>
+    </div>
+  </article>
+  <article class="glass summary">
+    <div class="label">MARKET STRUCTURE</div>
+    <div class="structure-grid" style="margin-top:12px">
+      <div class="structure"><span class="label">TREND</span><strong id="trend">—</strong><small>Directional state from the verified snapshot.</small></div>
+      <div class="structure"><span class="label">BOS</span><strong id="bos">—</strong><small>Break of structure state.</small></div>
+      <div class="structure"><span class="label">CHOCH</span><strong id="choch">—</strong><small>Change-of-character state.</small></div>
+    </div>
+  </article>
+</section>
+
+<section class="section">
+  <div class="section-head"><div><div class="section-title">DETECTED PATTERNS</div><div class="section-sub">Pattern states are evidence-driven; missing fields remain unconfirmed.</div></div></div>
+  <div id="patternGrid" class="pattern-grid">
+    <div class="glass empty" style="grid-column:1/-1">RUN SCAN TO DETECT PATTERNS</div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><div><div class="section-title">PATTERN MATRIX</div><div class="section-sub">Compare the configured universe using the same deterministic technical engine.</div></div></div>
+  <article class="glass">
+    <div class="table-wrap">
+      <table class="matrix">
+        <thead><tr><th>SYMBOL</th><th>BIAS</th><th>SCORE</th><th>STRUCTURE</th><th>LIQUIDITY</th><th>IMBALANCE</th><th>MOMENTUM</th><th>SIGNAL</th></tr></thead>
+        <tbody id="matrixBody"><tr><td colspan="8"><div class="empty">NO DATA</div></td></tr></tbody>
+      </table>
+    </div>
+  </article>
+  <div class="footnote">Pattern intelligence does not grant execution authority. Trade execution remains outside the chat/pattern UI and behind the platform's deterministic broker, strategy and risk controls.</div>
+</section>
+</main>
+<div id="toast" class="toast"></div>
+<script src="system/session.js"></script>
+<script src="system/auth-gate.js"></script>
+<script src="system/access-control.js"></script>
+<script src="system/navigation.js"></script>
+<script>
+(function(){
+  "use strict";
+  const API=window.KINGBOT_API?.baseUrl||"https://kingbot-fintech-api-etfv.onrender.com/api";
+  const q=id=>document.getElementById(id);
+  const fmt=v=>{const n=Number(v);return Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:5}):"—";};
+  function toast(msg){const el=q("toast");el.textContent=msg;el.className="toast show";clearTimeout(toast.t);toast.t=setTimeout(()=>el.className="toast",3000);}
+  async function token(force){
+    const s=await window.KINGBOT_SESSION?.check?.({force:!!force});
+    if(!s?.authenticated)throw new Error("Please sign in to use Pattern Intelligence.");
+    if(!s?.user?.verified)throw new Error("Verify your email before using Pattern Intelligence.");
+    const u=window.KINGBOT_FIREBASE?.auth?.currentUser;
+    if(!u)throw new Error("Firebase session is unavailable.");
+    return u.getIdToken(!!force);
+  }
+  async function api(path,opts={}){
+    const send=async(force)=>{
+      const headers=new Headers(opts.headers||{});
+      headers.set("Accept","application/json");
+      if(opts.body)headers.set("Content-Type","application/json");
+      headers.set("Authorization","Bearer "+await token(force));
+      return fetch(API+path,{...opts,headers,credentials:"omit",cache:"no-store"});
+    };
+    let r=await send(false); if(r.status===401)r=await send(true);
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok||data.ok===false)throw new Error(data.error||data.reason||data.message||("HTTP "+r.status));
+    return data;
+  }
+  function esc(v){return String(v??"—").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+  function detect(snapshot, technical){
+    const t=String(snapshot?.trend||"").toUpperCase();
+    const bos=String(snapshot?.bos||"").toUpperCase();
+    const choch=String(snapshot?.choch||"").toUpperCase();
+    const liq=String(snapshot?.liquiditySweep||snapshot?.liquidity_sweep||"").toUpperCase();
+    const fvg=!!snapshot?.fvg;
+    const ema20=Number(snapshot?.ema20), ema50=Number(snapshot?.ema50), rsi=Number(snapshot?.rsi14??snapshot?.rsi);
+    const macd=Number(snapshot?.macd), macdSignal=Number(snapshot?.macdSignal??snapshot?.macd_signal);
+    const ema=Number.isFinite(ema20)&&Number.isFinite(ema50)?(ema20>ema50?"BULLISH":ema20<ema50?"BEARISH":"NEUTRAL"):"UNCONFIRMED";
+    const momentum=Number.isFinite(rsi)&&(Number.isFinite(macd)&&Number.isFinite(macdSignal))
+      ? (rsi>=50&&macd>macdSignal?"BULLISH":rsi<50&&macd<macdSignal?"BEARISH":"MIXED")
+      : "UNCONFIRMED";
+    const items=[
+      ["Trend Continuation",t?("BULLISH"===t||"BEARISH"===t?t:"NEUTRAL"):"UNCONFIRMED",t?"Trend field confirmed.":"Waiting for trend field."],
+      ["Break of Structure",bos||"UNCONFIRMED",bos?"BOS field confirmed.":"No BOS confirmation supplied."],
+      ["Change of Character",choch||"UNCONFIRMED",choch?"CHOCH field confirmed.":"No CHOCH confirmation supplied."],
+      ["Liquidity Sweep",liq||"UNCONFIRMED",liq?"Liquidity event supplied by snapshot.":"No liquidity sweep supplied."],
+      ["Fair Value Gap",fvg?"DETECTED":"UNCONFIRMED",fvg?"FVG field detected.":"No FVG confirmation supplied."],
+      ["EMA Alignment",ema,ema!=="UNCONFIRMED"?"EMA20/EMA50 alignment available.":"EMA inputs unavailable."],
+      ["Momentum",momentum,momentum!=="UNCONFIRMED"?"RSI + MACD context available.":"Momentum inputs unavailable."],
+      ["Engine Signal",technical?.signal||"UNCONFIRMED",technical?.reason||"No deterministic pattern output."]
+    ];
+    return items;
+  }
+  function renderCard(name,state,why){
+    const cls=state==="UNCONFIRMED"?"none":state==="MIXED"||state==="NEUTRAL"||state==="WAIT"?"watch":"detected";
+    const card=document.createElement("article");card.className="glass pattern-card";
+    card.innerHTML='<div class="name"></div><div class="state"></div><div class="why"></div><span class="tag"></span>';
+    card.querySelector(".name").textContent=name;card.querySelector(".state").textContent=state;card.querySelector(".why").textContent=why;
+    const tag=card.querySelector(".tag");tag.textContent=cls==="detected"?"CONFIRMED":cls==="watch"?"WATCH":"UNCONFIRMED";tag.className="tag "+cls;
+    return card;
+  }
+  function renderSelected(row,snapshot){
+    const bias=String(row?.bias||"NEUTRAL").toUpperCase();
+    q("bias").textContent=bias;
+    q("bias").className="big-bias "+(bias==="BULLISH"?"good":bias==="BEARISH"?"bad":"warn");
+    q("summary").textContent=row?.reason||"Pattern engine returned no explanatory context.";
+    q("score").textContent=row?.score!=null?row.score+"%":"—";
+    q("price").textContent=fmt(row?.entry??row?.quote?.price);
+    q("signal").textContent=row?.signal||"—";
+    q("trend").textContent=String(snapshot?.trend||"UNCONFIRMED").toUpperCase();
+    q("bos").textContent=String(snapshot?.bos||"UNCONFIRMED").toUpperCase();
+    q("choch").textContent=String(snapshot?.choch||"UNCONFIRMED").toUpperCase();
+    q("meter").style.width=Math.max(0,Math.min(100,Number(row?.score)||0))+"%";
+    const grid=q("patternGrid");grid.innerHTML="";
+    detect(snapshot||{},row||{}).forEach(x=>grid.appendChild(renderCard(x[0],x[1],x[2])));
+  }
+  function renderMatrix(rows,snapshots){
+    const body=q("matrixBody");body.innerHTML="";
+    if(!rows?.length){body.innerHTML='<tr><td colspan="8"><div class="empty">NO VERIFIED DATA</div></td></tr>';return;}
+    rows.forEach(row=>{
+      const snap=snapshots?.[row.symbol]||{};
+      const liq=String(snap.liquiditySweep||snap.liquidity_sweep||"").toUpperCase()||"—";
+      const fvg=snap.fvg?"DETECTED":"—";
+      const rsi=Number(snap.rsi14??snap.rsi), macd=Number(snap.macd), ms=Number(snap.macdSignal??snap.macd_signal);
+      const mom=Number.isFinite(rsi)&&Number.isFinite(macd)&&Number.isFinite(ms)?(rsi>=50&&macd>ms?"BULLISH":rsi<50&&macd<ms?"BEARISH":"MIXED"):"—";
+      const bias=String(row.bias||"NEUTRAL").toUpperCase();
+      const cls=bias==="BULLISH"?"bull":bias==="BEARISH"?"bear":"neutral";
+      const tr=String(snap.trend||"—").toUpperCase(),bos=String(snap.bos||"—").toUpperCase();
+      const structure=tr+(bos!=="—"?" / "+bos:"");
+      const el=document.createElement("tr");
+      el.innerHTML='<td>'+esc(row.symbol)+'</td><td><span class="pill '+cls+'">'+esc(bias)+'</span></td><td>'+esc(row.score??"—")+'%</td><td>'+esc(structure)+'</td><td>'+esc(liq)+'</td><td>'+esc(fvg)+'</td><td>'+esc(mom)+'</td><td>'+esc(row.signal||"—")+'</td>';
+      body.appendChild(el);
+    });
+  }
+  async function run(){
+    const tf=q("timeframe").value, sym=q("symbol").value.toUpperCase();
+    q("engine").textContent="SCANNING";q("state").textContent="SYNCING";q("activeSymbol").textContent=sym;q("activeTf").textContent=tf.toUpperCase();
+    try{
+      const data=await api("/ai/market-scanner?symbols="+encodeURIComponent(["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"].join(","))+"&timeframe="+encodeURIComponent(tf));
+      const rows=Array.isArray(data.technical)?data.technical:[];
+      const selected=rows.find(x=>String(x.symbol).toUpperCase()===sym)||rows[0]||null;
+      const snapshots=data.tradingViewSnapshots||{};
+      if(selected)renderSelected(selected,snapshots[selected.symbol]||{});
+      renderMatrix(rows,snapshots);
+      q("engine").textContent=data.provider&&data.provider!=="none"?"AI+RULES":"RULES";
+      q("state").textContent="LIVE";
+      q("coreSub").textContent=(data.quoteCount||0)+" verified quote(s) · "+(data.tradingViewCount||0)+" TradingView snapshot(s)";
+    }catch(e){
+      q("engine").textContent="OFFLINE";q("state").textContent="ERROR";toast(e.message||"Pattern scan failed");
+      q("coreSub").textContent="Market data is unavailable. Connect a supported source.";
+    }
+  }
+  q("analyze").addEventListener("click",run);q("sync").addEventListener("click",run);q("runOne").addEventListener("click",run);
+})();
+</script>
+</body>
+</html>
