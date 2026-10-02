@@ -91,7 +91,7 @@ export function createMt5HostingRouter({pool,requireUser}={}){
       enrollmentExpiresAt:profile.enrollment_expires_at,
       updatedAt:profile.updated_at
     }:null
-  )});
+  });
   });
 
   router.get("/vps-profile",async(req,res)=>{
