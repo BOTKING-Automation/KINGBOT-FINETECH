@@ -2012,3 +2012,565 @@ a {
   }
 
 }
+
+
+/* =========================================================
+   KINGBOT FINTECH — UI/UX SKILL UPGRADE
+   Evidence-first trading interface primitives
+========================================================= */
+
+:root{
+  --kb-accent:var(--kb-cyan);
+  --kb-accent-2:var(--kb-violet);
+  --kb-accent-soft:rgba(25,230,255,.12);
+  --kb-accent-border:rgba(25,230,255,.24);
+  --kb-action-gradient:linear-gradient(110deg,var(--kb-cyan),var(--kb-blue),var(--kb-violet));
+  --kb-topbar-height:74px;
+  --kb-touch:46px;
+}
+
+html[data-kb-theme="violet"]{
+  --kb-accent:var(--kb-violet);
+  --kb-accent-2:var(--kb-pink);
+  --kb-accent-soft:rgba(155,92,255,.12);
+  --kb-accent-border:rgba(155,92,255,.28);
+  --kb-action-gradient:linear-gradient(110deg,var(--kb-violet),var(--kb-pink),var(--kb-cyan));
+}
+
+html[data-kb-theme="gold"]{
+  --kb-accent:var(--kb-gold);
+  --kb-accent-2:var(--kb-cyan);
+  --kb-accent-soft:rgba(246,185,59,.12);
+  --kb-accent-border:rgba(246,185,59,.28);
+  --kb-action-gradient:linear-gradient(110deg,var(--kb-gold),var(--kb-cyan),var(--kb-violet));
+}
+
+/* Prevent the first paint from ever becoming a light flash. */
+html,body{
+  background-color:var(--kb-bg-0);
+}
+body{
+  min-width:320px;
+}
+
+/* Shared system chrome. */
+.kb-system-bar{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  z-index:2147482000;
+  min-height:32px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:7px 14px;
+  background:linear-gradient(180deg,rgba(2,4,10,.96),rgba(2,4,10,.72));
+  border-bottom:1px solid rgba(255,255,255,.055);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+  pointer-events:none;
+}
+.kb-system-bar__inner{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:8px 14px;
+  width:min(1480px,100%);
+}
+.kb-system-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:24px;
+  padding:3px 8px;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:999px;
+  background:rgba(7,12,26,.62);
+  color:var(--kb-text-dim);
+  font:800 8px/1 "JetBrains Mono",monospace;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+}
+.kb-system-pill i{
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:var(--kb-text-dim);
+}
+.kb-system-pill.is-live{color:var(--kb-green);border-color:rgba(35,247,163,.16)}
+.kb-system-pill.is-live i{background:var(--kb-green);box-shadow:0 0 10px rgba(35,247,163,.75)}
+.kb-system-pill.is-warn{color:var(--kb-gold);border-color:rgba(246,185,59,.18)}
+.kb-system-pill.is-warn i{background:var(--kb-gold);box-shadow:0 0 10px rgba(246,185,59,.72)}
+.kb-system-pill.is-offline{color:var(--kb-red);border-color:rgba(255,77,109,.18)}
+.kb-system-pill.is-offline i{background:var(--kb-red);box-shadow:0 0 10px rgba(255,77,109,.72)}
+
+/* Keep content below the system HUD. Pages may override when they already have fixed app bars. */
+body.kb-ui-runtime-ready main,
+body.kb-ui-runtime-ready .page-shell,
+body.kb-ui-runtime-ready .app-shell{
+  scroll-margin-top:calc(var(--kb-topbar-height) + 18px);
+}
+
+/* Navigation upgrade. */
+#kb-compact-nav{
+  top:42px !important;
+}
+#kb-compact-nav .kb-fintech-logo{
+  top:12px !important;
+  left:14px !important;
+  width:64px !important;
+  height:64px !important;
+  padding:6px !important;
+  border-radius:18px !important;
+  border-color:rgba(25,230,255,.16) !important;
+  box-shadow:0 0 0 1px rgba(155,92,255,.07),0 16px 45px rgba(0,0,0,.4),0 0 28px rgba(25,230,255,.08);
+  transition:transform .24s cubic-bezier(.2,.8,.2,1),box-shadow .24s ease,border-color .24s ease;
+}
+#kb-compact-nav .kb-fintech-logo:hover{
+  transform:translateY(-2px) scale(1.02);
+  border-color:var(--kb-accent-border) !important;
+  box-shadow:0 0 0 1px rgba(155,92,255,.12),0 18px 55px rgba(0,0,0,.44),0 0 42px var(--kb-accent-soft);
+}
+#kb-compact-nav .kb-nav-trigger{
+  width:52px !important;
+  height:52px !important;
+  border-radius:17px !important;
+  border-color:rgba(25,230,255,.14) !important;
+  box-shadow:0 14px 35px rgba(0,0,0,.32),0 0 22px rgba(25,230,255,.06);
+  transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease,background .22s ease;
+}
+#kb-compact-nav .kb-nav-trigger:hover{
+  transform:translateY(-2px);
+  border-color:var(--kb-accent-border) !important;
+  box-shadow:0 18px 45px rgba(0,0,0,.36),0 0 28px var(--kb-accent-soft);
+}
+#kb-compact-nav .kb-menu{
+  top:64px !important;
+  width:min(380px,calc(100vw - 20px)) !important;
+  padding:12px !important;
+  border-radius:20px !important;
+  border-color:rgba(25,230,255,.11) !important;
+  box-shadow:0 28px 90px rgba(0,0,0,.58),0 0 50px rgba(25,230,255,.06),inset 0 1px rgba(255,255,255,.035);
+}
+#kb-compact-nav .kb-menu::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 100% 0%,rgba(155,92,255,.12),transparent 42%),
+    radial-gradient(circle at 0% 100%,rgba(25,230,255,.08),transparent 40%);
+}
+#kb-compact-nav .kb-menu-grid{
+  position:relative;
+  grid-template-columns:1fr 1fr !important;
+  gap:7px !important;
+}
+#kb-compact-nav .kb-menu-grid a{
+  min-height:50px !important;
+  padding:9px 10px !important;
+  border-radius:13px !important;
+  border-color:rgba(255,255,255,.055) !important;
+  background:rgba(255,255,255,.018);
+  transition:transform .2s ease,border-color .2s ease,background .2s ease,box-shadow .2s ease,color .2s ease;
+}
+#kb-compact-nav .kb-menu-grid a:hover{
+  transform:translateY(-1px);
+  background:var(--kb-accent-soft);
+  border-color:var(--kb-accent-border) !important;
+  box-shadow:0 0 22px var(--kb-accent-soft);
+}
+#kb-compact-nav .kb-menu-grid a.kb-active{
+  background:linear-gradient(135deg,var(--kb-accent-soft),rgba(255,255,255,.028));
+  border-color:var(--kb-accent-border) !important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.018),0 0 20px var(--kb-accent-soft);
+}
+#kb-compact-nav .kb-menu-icon{
+  flex:0 0 25px;
+  width:25px;
+  height:25px;
+  display:grid;
+  place-items:center;
+  border-radius:8px;
+  color:var(--kb-accent);
+  background:rgba(255,255,255,.025);
+  font-size:13px;
+  box-shadow:inset 0 0 12px rgba(255,255,255,.025);
+}
+#kb-compact-nav .kb-menu-name{
+  font-size:8.5px !important;
+  letter-spacing:.075em !important;
+}
+#kb-compact-nav .kb-menu-sub{
+  font-size:6.2px !important;
+  line-height:1.25;
+}
+#kb-compact-nav .kb-menu-account{
+  position:relative;
+  grid-template-columns:repeat(4,1fr) !important;
+  gap:7px !important;
+  margin-top:11px !important;
+  padding-top:11px !important;
+}
+#kb-compact-nav .kb-menu-account a{
+  min-height:38px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  border-radius:10px !important;
+  font:800 7.5px "JetBrains Mono",monospace !important;
+  color:var(--kb-text-soft) !important;
+  background:rgba(255,255,255,.018);
+}
+#kb-compact-nav .kb-menu-account a:hover{
+  color:#fff !important;
+  border-color:var(--kb-accent-border) !important;
+  box-shadow:0 0 18px var(--kb-accent-soft);
+}
+
+/* Theme control and system status inside the navigation menu. */
+.kb-menu-control-row{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin:0 0 10px;
+  padding:7px 8px;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:11px;
+  background:rgba(255,255,255,.018);
+}
+.kb-menu-control-title{
+  color:var(--kb-text-dim);
+  font:800 6.5px "JetBrains Mono",monospace;
+  letter-spacing:.12em;
+}
+.kb-menu-control-actions{
+  display:flex;
+  gap:6px;
+}
+.kb-menu-control-btn{
+  min-height:30px;
+  padding:0 9px;
+  border:1px solid rgba(255,255,255,.065);
+  border-radius:9px;
+  color:var(--kb-text-soft);
+  background:rgba(255,255,255,.022);
+  font:800 7px "JetBrains Mono",monospace;
+  letter-spacing:.06em;
+}
+.kb-menu-control-btn:hover,
+.kb-menu-control-btn:focus-visible{
+  color:#fff;
+  border-color:var(--kb-accent-border);
+  box-shadow:0 0 18px var(--kb-accent-soft);
+}
+.kb-menu-control-btn[data-kb-theme="cyan"]::before{background:var(--kb-cyan)}
+.kb-menu-control-btn[data-kb-theme="violet"]::before{background:var(--kb-violet)}
+.kb-menu-control-btn[data-kb-theme="gold"]::before{background:var(--kb-gold)}
+.kb-menu-control-btn::before{
+  content:"";
+  width:7px;
+  height:7px;
+  display:inline-block;
+  margin-right:5px;
+  vertical-align:-1px;
+  border-radius:50%;
+  box-shadow:0 0 9px currentColor;
+}
+
+/* Evidence / freshness primitives. */
+.kb-data-meta{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+  font:700 9px "JetBrains Mono",monospace;
+  color:var(--kb-text-dim);
+}
+.kb-data-meta__source{color:var(--kb-text-soft)}
+.kb-data-meta__fresh{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  padding:4px 7px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.065);
+  background:rgba(255,255,255,.018);
+}
+.kb-data-meta__fresh i{
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:var(--kb-text-dim);
+}
+.kb-data-meta.is-live{color:var(--kb-green)}
+.kb-data-meta.is-live .kb-data-meta__fresh{border-color:rgba(35,247,163,.16);background:rgba(35,247,163,.035)}
+.kb-data-meta.is-live .kb-data-meta__fresh i{background:var(--kb-green);box-shadow:0 0 9px rgba(35,247,163,.72)}
+.kb-data-meta.is-warning{color:var(--kb-gold)}
+.kb-data-meta.is-warning .kb-data-meta__fresh{border-color:rgba(246,185,59,.16);background:rgba(246,185,59,.035)}
+.kb-data-meta.is-warning .kb-data-meta__fresh i{background:var(--kb-gold);box-shadow:0 0 9px rgba(246,185,59,.72)}
+.kb-data-meta.is-stale{color:var(--kb-red)}
+.kb-data-meta.is-stale .kb-data-meta__fresh{border-color:rgba(255,77,109,.18);background:rgba(255,77,109,.04)}
+.kb-data-meta.is-stale .kb-data-meta__fresh i{background:var(--kb-red);box-shadow:0 0 9px rgba(255,77,109,.72)}
+
+/* Compact risk cockpit. */
+.kb-risk-cockpit{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+}
+.kb-risk-card{
+  position:relative;
+  padding:14px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:14px;
+  background:linear-gradient(150deg,rgba(10,18,40,.74),rgba(3,7,18,.87));
+}
+.kb-risk-card::after{
+  content:"";
+  position:absolute;
+  left:14px;
+  right:14px;
+  bottom:10px;
+  height:2px;
+  border-radius:999px;
+  background:linear-gradient(90deg,var(--kb-accent),transparent);
+  opacity:.6;
+}
+.kb-risk-label{
+  color:var(--kb-text-dim);
+  font:800 8px "JetBrains Mono",monospace;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+}
+.kb-risk-value{
+  margin-top:7px;
+  font:800 22px "JetBrains Mono",monospace;
+  color:var(--kb-text);
+}
+.kb-risk-value[data-state="profit"]{color:var(--kb-green)}
+.kb-risk-value[data-state="loss"]{color:var(--kb-red)}
+.kb-risk-meter{
+  margin-top:9px;
+  height:5px;
+  overflow:hidden;
+  border-radius:999px;
+  background:rgba(255,255,255,.055);
+}
+.kb-risk-meter > span{
+  display:block;
+  height:100%;
+  width:var(--kb-risk-pct,0%);
+  max-width:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,var(--kb-accent),var(--kb-accent-2));
+  box-shadow:0 0 14px var(--kb-accent-soft);
+  transition:width .35s ease;
+}
+.kb-risk-caption{
+  margin-top:8px;
+  color:var(--kb-text-dim);
+  font-size:9px;
+  line-height:1.45;
+}
+
+/* AI evidence hierarchy. */
+.kb-ai-evidence{
+  display:grid;
+  gap:9px;
+}
+.kb-ai-evidence__row{
+  display:grid;
+  grid-template-columns:92px minmax(0,1fr);
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:12px;
+  background:rgba(255,255,255,.018);
+}
+.kb-ai-evidence__label{
+  color:var(--kb-accent);
+  font:800 7px "JetBrains Mono",monospace;
+  letter-spacing:.11em;
+}
+.kb-ai-evidence__value{
+  color:var(--kb-text-soft);
+  font-size:11px;
+  line-height:1.6;
+}
+
+/* Confirmation cards for any risky UI action. */
+.kb-action-card{
+  display:grid;
+  gap:10px;
+  padding:14px;
+  border:1px solid rgba(246,185,59,.16);
+  border-radius:14px;
+  background:linear-gradient(145deg,rgba(246,185,59,.045),rgba(255,255,255,.018));
+}
+.kb-action-card[data-tone="danger"]{
+  border-color:rgba(255,77,109,.18);
+  background:linear-gradient(145deg,rgba(255,77,109,.05),rgba(255,255,255,.018));
+}
+.kb-action-card__title{
+  font:800 10px "Orbitron",sans-serif;
+  color:var(--kb-text);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+.kb-action-card__consequence{
+  color:var(--kb-text-dim);
+  font-size:10px;
+  line-height:1.55;
+}
+
+/* App-level status overlay and error boundary styling. */
+.kb-ui-status{
+  position:fixed;
+  right:16px;
+  bottom:16px;
+  z-index:2147482500;
+  max-width:min(360px,calc(100vw - 32px));
+  padding:11px 13px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:12px;
+  background:rgba(4,9,22,.94);
+  box-shadow:0 18px 55px rgba(0,0,0,.42);
+  color:var(--kb-text-soft);
+  font:800 9px/1.45 "JetBrains Mono",monospace;
+  opacity:0;
+  transform:translateY(10px);
+  pointer-events:none;
+  transition:opacity .2s ease,transform .2s ease;
+}
+.kb-ui-status.is-visible{opacity:1;transform:translateY(0)}
+.kb-ui-status[data-tone="success"]{border-color:rgba(35,247,163,.16)}
+.kb-ui-status[data-tone="warning"]{border-color:rgba(246,185,59,.18)}
+.kb-ui-status[data-tone="danger"]{border-color:rgba(255,77,109,.18)}
+
+/* Accessibility. */
+#kb-compact-nav button:focus-visible,
+#kb-compact-nav a:focus-visible,
+.kb-menu-control-btn:focus-visible{
+  outline:2px solid var(--kb-accent);
+  outline-offset:2px;
+}
+
+/* Phone-first trading surfaces. */
+@media (max-width:760px){
+  :root{--kb-topbar-height:64px}
+  .kb-system-bar{justify-content:flex-start;padding-inline:9px;overflow-x:auto;scrollbar-width:none}
+  .kb-system-bar::-webkit-scrollbar{display:none}
+  .kb-system-bar__inner{width:max-content;justify-content:flex-start;flex-wrap:nowrap}
+  .kb-system-pill{white-space:nowrap}
+  #kb-compact-nav .kb-fintech-logo{
+    width:56px !important;
+    height:56px !important;
+    top:10px !important;
+    left:10px !important;
+  }
+  #kb-compact-nav .kb-menu{
+    width:min(420px,calc(100vw - 20px)) !important;
+    max-height:calc(100vh - 86px);
+    overflow:auto;
+  }
+  #kb-compact-nav .kb-menu-grid{
+    grid-template-columns:1fr !important;
+  }
+  #kb-compact-nav .kb-menu-grid a{
+    min-height:48px !important;
+  }
+  #kb-compact-nav .kb-menu-account{
+    grid-template-columns:repeat(2,1fr) !important;
+  }
+  .kb-risk-cockpit{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media (max-width:500px){
+  .kb-risk-cockpit{grid-template-columns:1fr}
+  .kb-ai-evidence__row{grid-template-columns:1fr}
+  .kb-ui-status{right:10px;bottom:10px;max-width:calc(100vw - 20px)}
+}
+
+/* Reduced motion remains an explicit accessibility contract. */
+@media (prefers-reduced-motion:reduce){
+  #kb-compact-nav .kb-fintech-logo,
+  #kb-compact-nav .kb-nav-trigger,
+  #kb-compact-nav .kb-menu-grid a,
+  #kb-compact-nav .kb-menu-account a,
+  .kb-risk-meter > span,
+  .kb-ui-status{
+    transition:none !important;
+  }
+}
+
+
+/* Confirmation modal used for risky/destructive actions. */
+.kb-modal-overlay{
+  position:fixed;
+  inset:0;
+  z-index:2147483600;
+  display:grid;
+  place-items:center;
+  padding:20px;
+  background:rgba(0,0,0,.68);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+.kb-modal{
+  width:min(480px,100%);
+  padding:20px;
+  border:1px solid rgba(25,230,255,.17);
+  border-radius:18px;
+  background:linear-gradient(145deg,rgba(8,15,34,.98),rgba(2,6,16,.99));
+  box-shadow:0 30px 100px rgba(0,0,0,.6),0 0 45px rgba(25,230,255,.07);
+}
+.kb-modal-kicker{
+  color:var(--kb-accent);
+  font:800 8px "JetBrains Mono",monospace;
+  letter-spacing:.15em;
+}
+.kb-modal h2{
+  margin:10px 0 8px;
+  color:var(--kb-text);
+  font:800 18px Orbitron,sans-serif;
+}
+.kb-modal p{
+  margin:0;
+  color:var(--kb-text-soft);
+  font-size:12px;
+  line-height:1.7;
+}
+.kb-modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:18px;
+}
+.kb-modal-actions button{
+  min-height:var(--kb-touch);
+  padding:0 14px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.03);
+  color:var(--kb-text-soft);
+  font:800 9px "JetBrains Mono",monospace;
+}
+.kb-modal-actions button[data-confirm]{
+  border-color:var(--kb-accent-border);
+  background:var(--kb-action-gradient);
+  color:#040712;
+}
+@media(max-width:500px){
+  .kb-modal-actions{display:grid;grid-template-columns:1fr}
+  .kb-modal-actions button{width:100%}
+}
