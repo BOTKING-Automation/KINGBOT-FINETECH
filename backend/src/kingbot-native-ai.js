@@ -325,6 +325,21 @@ export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker
   const requested=symbolFromText(question,symbol||"XAUUSD");
   const kind=intent(question);
   const utility=utilityReply(question);
+  if(kind==="TECHNICAL_ANALYSIS_BOOK"){
+    return {
+      provider:"KINGBOT_NATIVE",
+      model:"KINGBOT-CORE-1",
+      intent:kind,
+      symbol:requested,
+      reply:technicalAnalysisBookReply(question),
+      book:{
+        title:"KINGBOT Technical Analysis AI Book",
+        version:"1.0",
+        chapters:searchTechnicalAnalysisBook(question).map(x=>({id:x.id,title:x.title}))
+      },
+      verified:{technicalAnalysisBook:true}
+    };
+  }
   if(kind==="KINGBOT_KNOWLEDGE"){
     return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:kingbotKnowledgeReply(question),verified:{platformKnowledge:true,engineDefinitions:true}};
   }
