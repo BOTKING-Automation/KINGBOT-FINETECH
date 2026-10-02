@@ -7,6 +7,7 @@
     ["terminal.html","Terminal","⌁","Trading terminal"],
     ["bots.html","Bots","◉","Automated trading systems"],
     ["broker-connect.html","Broker Connect","⚡","Secure broker execution"],
+    ["vps-dashboard.html","VPS Dashboard","▣","User-owned VPS & MT5 hosting"],
     ["partner-revenue.html","Partner Revenue","◌","Broker referral intelligence"],
     ["analytics.html","Analytics","▦","Performance intelligence"],
     ["ai.html","AI Intelligence","✦","AI intelligence layer"],
@@ -42,7 +43,7 @@
   const protectedPages=new Set([
     "index.html","terminal.html","analytics.html","ai.html","scanner.html",
     "bots.html","settings.html","subscription.html","broker-connect.html",
-    "partner-revenue.html","pattern.html"
+    "partner-revenue.html","pattern.html","vps-dashboard.html"
   ]);
 
   function accountMarkup(authState){
