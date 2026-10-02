@@ -4146,9 +4146,49 @@ loadPreview();
         robotWave * .44
       );
 
+    /* LEFT-SIDE EARTH / GLOBAL NETWORK ZONE */
+    const earthDx =
+      (nx - 0.115) / 0.145;
+
+    const earthDy =
+      (ny - 0.565) / 0.205;
+
+    const earthDistance =
+      earthDx*earthDx +
+      earthDy*earthDy;
+
+    const earthWave =
+      .5 +
+      .5 *
+      Math.sin(
+        t * 2.65 +
+        nx * 18 -
+        ny * 8
+      );
+
+    const earthPulse =
+      .5 +
+      .5 *
+      Math.sin(
+        t * 3.8 +
+        nx * 7 +
+        ny * 11
+      );
+
+    const earth =
+      Math.exp(
+        -earthDistance * 2.45
+      ) *
+      (
+        .42 +
+        earthWave * .32 +
+        earthPulse * .20
+      );
+
     return {
       brain:Math.min(1,brain),
-      robot:Math.min(1,robot)
+      robot:Math.min(1,robot),
+      earth:Math.min(1,earth)
     };
 
   }
@@ -4357,6 +4397,13 @@ loadPreview();
           slowCycle * .9
         );
 
+      const earthColor =
+        colorAt(
+          fastCycle * 1.42 +
+          .73 +
+          slowCycle * 1.15
+        );
+
       let lightColor =
         groupColor;
 
@@ -4410,6 +4457,25 @@ loadPreview();
       }
 
       /*
+        Earth/global network gets its own independent spectrum so
+        the globe changes colour separately from the brain and robot.
+      */
+      if(
+        zones.earth >
+        strength * .78
+      ){
+        lightColor =
+          earthColor;
+
+        strength =
+          Math.min(
+            .84,
+            strength +
+            zones.earth * .56
+          );
+      }
+
+      /*
         Preserve the source luminance/details while shifting the
         actual bright pixels toward each group's animated colour.
       */
@@ -4451,7 +4517,8 @@ loadPreview();
       const flare =
         moving * .13 +
         brainStrength * .16 +
-        robotStrength * .12;
+        robotStrength * .12 +
+        zones.earth * .14;
 
       data[i] =
         Math.min(
