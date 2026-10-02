@@ -295,17 +295,59 @@ export function createFintechOpsRouter({pool}){
   });
   router.post("/api-keys/:id/revoke",userLimit,async(req,res)=>{const u=await requireUser(pool,req,res);if(!u)return;const q=await pool.query("UPDATE kingbot_api_keys SET revoked_at=COALESCE(revoked_at,NOW()) WHERE id=$1 AND user_id=$2 RETURNING id,revoked_at",[req.params.id,u.id]);if(!q.rowCount)return res.status(404).json({ok:false,error:"API key not found."});await audit(pool,u.id,"API_KEY_REVOKED",{keyId:req.params.id});res.json({ok:true,key:q.rows[0]});});
 
+  router.get("/invoices/me",userLimit,async(req,res)=>{
+    const u=await requireUser(pool,req,res);if(!u)return;
+    try{
+      const q=await pool.query("SELECT number,status,amount,currency,line_items,issued_at,due_at,paid_at FROM kingbot_invoices WHERE user_id=$1 ORDER BY issued_at DESC LIMIT 100",[u.id]);
+      res.json({ok:true,invoices:q.rows});
+    }catch(error){res.status(500).json({ok:false,error:"Invoice history unavailable."});}
+  });
+
+  router.get("/invoices",adminLimit,async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    try{
+      const q=await pool.query("SELECT i.*,u.email FROM kingbot_invoices i JOIN kingbot_users u ON u.id=i.user_id ORDER BY i.issued_at DESC LIMIT 500");
+      res.json({ok:true,invoices:q.rows});
+    }catch(error){res.status(500).json({ok:false,error:"Invoice registry unavailable."});}
+  });
+
+  router.post("/invoices",adminLimit,async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    const userId=clean(req.body?.userId,80),amount=Number(req.body?.amount),currency=clean(req.body?.currency,8).toUpperCase()||"KES";
+    const lineItems=Array.isArray(req.body?.lineItems)?req.body.lineItems.slice(0,30):[];
+    if(!userId||!Number.isFinite(amount)||amount<=0)return res.status(400).json({ok:false,error:"Invoice user and positive amount are required."});
+    const number="KB-"+Date.now().toString(36).toUpperCase()+"-"+crypto.randomBytes(3).toString("hex").toUpperCase();
+    try{
+      const q=await pool.query("INSERT INTO kingbot_invoices(user_id,number,status,amount,currency,line_items) VALUES($1,$2,'issued',$3,$4,$5::jsonb) RETURNING *",[userId,number,amount,currency,JSON.stringify(lineItems)]);
+      await audit(pool,a.id,"INVOICE_CREATED",{invoiceId:q.rows[0].id,number,userId,amount,currency});
+      await notify(pool,userId,"invoice","KINGBOT invoice issued","A new KINGBOT invoice has been issued to your account.",{invoiceId:q.rows[0].id,number});
+      res.status(201).json({ok:true,invoice:q.rows[0]});
+    }catch(error){res.status(500).json({ok:false,error:"Invoice creation failed."});}
+  });
+
+  router.post("/invoices/:id/mark-paid",adminLimit,async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    try{
+      const q=await pool.query("UPDATE kingbot_invoices SET status='paid',paid_at=COALESCE(paid_at,NOW()) WHERE id=$1 RETURNING *",[req.params.id]);
+      if(!q.rowCount)return res.status(404).json({ok:false,error:"Invoice not found."});
+      await audit(pool,a.id,"INVOICE_MARKED_PAID",{invoiceId:req.params.id,number:q.rows[0].number});
+      await notify(pool,q.rows[0].user_id,"invoice","KINGBOT invoice paid","Your KINGBOT invoice has been marked paid.",{invoiceId:req.params.id,number:q.rows[0].number});
+      res.json({ok:true,invoice:q.rows[0]});
+    }catch(error){res.status(500).json({ok:false,error:"Invoice payment update failed."});}
+  });
+
   router.get("/reports/me",userLimit,async(req,res)=>{
     const u=await requireUser(pool,req,res);if(!u)return;
     try{
-      const [sub,bots,trades,tickets,kyc]=await Promise.all([
+      const [sub,bots,trades,tickets,kyc,invoices]=await Promise.all([
         pool.query("SELECT plan_id,status,started_at,expires_at,approved_at FROM kingbot_subscriptions WHERE user_id=$1 ORDER BY started_at DESC LIMIT 20",[u.id]),
         pool.query("SELECT bot_id,state,symbol,timeframe,last_signal,last_run_at,last_error,updated_at FROM kingbot_bot_runtime WHERE user_id=$1 ORDER BY updated_at DESC",[u.id]),
         pool.query("SELECT client_id,bot_id,execution_mode,symbol,side,volume,status,error_message,created_at,updated_at FROM kingbot_execution_journal WHERE user_id=$1 ORDER BY created_at DESC LIMIT 200",[u.id]),
         pool.query("SELECT id,subject,category,priority,status,created_at,updated_at FROM kingbot_support_tickets WHERE user_id=$1 ORDER BY updated_at DESC LIMIT 50",[u.id]),
-        pool.query("SELECT status,country_code,risk_level,submitted_at,reviewed_at,reviewer_note FROM kingbot_kyc_profiles WHERE user_id=$1 LIMIT 1",[u.id])
+        pool.query("SELECT status,country_code,risk_level,submitted_at,reviewed_at,reviewer_note FROM kingbot_kyc_profiles WHERE user_id=$1 LIMIT 1",[u.id]),
+        pool.query("SELECT number,status,amount,currency,issued_at,due_at,paid_at,line_items FROM kingbot_invoices WHERE user_id=$1 ORDER BY issued_at DESC LIMIT 100",[u.id])
       ]);
-      res.json({ok:true,generatedAt:now(),subscriptionHistory:sub.rows,bots:bots.rows,tradeExecutions:trades.rows,support:tickets.rows,kyc:kyc.rows[0]||null});
+      res.json({ok:true,generatedAt:now(),subscriptionHistory:sub.rows,bots:bots.rows,tradeExecutions:trades.rows,support:tickets.rows,kyc:kyc.rows[0]||null,invoices:invoices.rows});
     }catch(error){console.error("[KINGBOT REPORT]",error?.message||error);res.status(500).json({ok:false,error:"Report generation failed."});}
   });
 
