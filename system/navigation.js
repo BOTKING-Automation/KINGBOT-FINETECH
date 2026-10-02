@@ -1,325 +1,233 @@
-/* KINGBOT FINTECH — Global Command Navigator v2 */
+/* KINGBOT FINTECH — Advanced unified navigation
+   High-performance command menu: compact top-left trigger + right-side nav dashboard.
+   No framework, no canvas, no polling. CSS animations are GPU-friendly and DOM is created once. */
 (function(window, document){
   "use strict";
 
-  const GROUPS = [
-    {
-      id:"trade",
-      label:"TRADE & EXECUTION",
-      icon:"◈",
-      items:[
-        ["index.html","Overview","⌂","Core platform command view"],
-        ["markets.html","Markets","◈","Live market intelligence"],
-        ["terminal.html","Terminal","⌁","Execution terminal & telemetry"],
-        ["bots.html","Bots","◉","Five automated trading engines"],
-        ["broker-connect.html","Broker Connect","⚡","Broker authorization & account binding"],
-        ["vps-dashboard.html","VPS Dashboard","▣","MT5 / VPS runtime hosting"]
-      ]
-    },
-    {
-      id:"intelligence",
-      label:"INTELLIGENCE",
-      icon:"✦",
-      items:[
-        ["analytics.html","Analytics","▦","Performance & risk intelligence"],
-        ["reports.html","Reports","▤","Trading and account reports"],
-        ["ai.html","AI Intelligence","✦","KINGBOT intelligence console"],
-        ["scanner.html","AI Scanner","◎","Live market scanning"],
-        ["pattern.html","Patterns","◉","Pattern intelligence"],
-        ["technical-analysis-ai-book.html","TA AI Book","▤","Technical analysis research"],
-        ["academy.html","Academy","◇","Education & research"]
-      ]
-    },
-    {
-      id:"account",
-      label:"ACCOUNT & OPERATIONS",
-      icon:"◇",
-      items:[
-        ["profile.html","Profile","◎","Identity & account profile"],
-        ["subscription.html","Subscription","◆","Plan & access management"],
-        ["partner-revenue.html","Partner Revenue","◌","Broker referral intelligence"],
-        ["security-center.html","Security Center","⌾","Security & credentials"],
-        ["compliance.html","Compliance","◇","KYC & compliance center"],
-        ["support-center.html","Support","✉","Customer support operations"],
-        ["settings.html","Settings","⚙","Account controls"]
-      ]
-    },
-    {
-      id:"company",
-      label:"COMPANY",
-      icon:"◎",
-      items:[
-        ["about.html","About","◎","KINGBOT FINTECH"],
-        ["contact.html","Contact","✉","Client services & partnerships"],
-        ["legal.html","Legal Center","▤","Terms, privacy & risk disclosure"],
-        ["admin-entry.html","Admin OS","▣","Restricted administrator command center","admin"]
-      ]
-    }
+  const links = [
+    ["index.html","Overview","⌂","Core platform"],
+    ["markets.html","Markets","◈","Live market intelligence"],
+    ["terminal.html","Terminal","⌁","Trading terminal"],
+    ["bots.html","Bot Ecosystem","◉","Automated trading systems"],
+    ["analytics.html","Analytics","▦","Performance intelligence"],
+    ["ai.html","AI Intelligence","✦","AI trading layer"],
+    ["academy.html","Academy","◇","Education & research"],
+    ["pricing.html","Plans","◫","Platform access"],
+    ["about.html","About","◎","KINGBOT FINTECH"],
+    ["contact.html","Contact","✉","Support & contact"],
+    ["settings.html","Settings","⚙","Account controls"],
+    ["legal.html","Legal Center","▤","Terms & risk disclosure"]
   ];
 
-  const GUEST_ACCOUNT = [
+  const accountLinks = [
     ["subscription.html","Subscription"],
     ["access-stable.html#signin","Sign in"],
     ["access-stable.html#signup","Create account"]
   ];
 
-  const PROTECTED = new Set([
-    "index.html","markets.html","terminal.html","analytics.html","ai.html","scanner.html",
-    "bots.html","settings.html","subscription.html","broker-connect.html",
-    "partner-revenue.html","pattern.html","vps-dashboard.html","reports.html",
-    "security-center.html","support-center.html","compliance.html","profile.html"
-  ]);
-
-  const API_BASE="https://kingbot-fintech-api-etfv.onrender.com/api";
-
   function currentPage(){
-    return (window.location.pathname.split("/").filter(Boolean).pop()||"index.html").toLowerCase();
+    const file=(window.location.pathname.split("/").filter(Boolean).pop()||"index.html").toLowerCase();
+    return file === "" ? "index.html" : file;
   }
 
-  function escapeHtml(value){
-    return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+  function style(){
+    if(document.getElementById("kb-advanced-nav-style")) return;
+    const s=document.createElement("style");
+    s.id="kb-advanced-nav-style";
+    s.textContent=`
+      #kb-nav-trigger{
+        position:fixed;top:18px;left:18px;z-index:2147483000;
+        width:48px;height:48px;border-radius:15px;border:1px solid rgba(255,255,255,.12);
+        background:rgba(5,10,24,.78);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+        color:#eef2ff;cursor:pointer;display:grid;place-items:center;
+        box-shadow:0 12px 35px rgba(0,0,0,.35),0 0 28px rgba(25,230,255,.08);
+        transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease;
+        isolation:isolate;
+      }
+      #kb-nav-trigger:before{
+        content:"";position:absolute;inset:-2px;border-radius:17px;padding:1px;
+        background:conic-gradient(from 0deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#2ee6a8,#19e6ff);
+        -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+        -webkit-mask-composite:xor;mask-composite:exclude;opacity:.9;
+        animation:kbSpin 4.5s linear infinite;z-index:-1;
+      }
+      #kb-nav-trigger:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 15px 42px rgba(0,0,0,.42),0 0 35px rgba(25,230,255,.2)}
+      #kb-nav-trigger .kb-bars{width:20px;height:16px;position:relative}
+      #kb-nav-trigger .kb-bars i{position:absolute;left:0;width:100%;height:2px;border-radius:2px;background:linear-gradient(90deg,#19e6ff,#9b5cff,#f6b93b);transition:.22s}
+      #kb-nav-trigger .kb-bars i:nth-child(1){top:0}.kb-bars i:nth-child(2){top:7px}.kb-bars i:nth-child(3){top:14px}
+      #kb-nav-trigger[aria-expanded="true"] .kb-bars i:nth-child(1){top:7px;transform:rotate(45deg)}
+      #kb-nav-trigger[aria-expanded="true"] .kb-bars i:nth-child(2){opacity:0;transform:scaleX(.2)}
+      #kb-nav-trigger[aria-expanded="true"] .kb-bars i:nth-child(3){top:7px;transform:rotate(-45deg)}
+
+      #kb-nav-overlay{
+        position:fixed;inset:0;z-index:2147482990;display:none;
+        background:rgba(1,4,12,.72);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+        opacity:0;transition:opacity .22s ease;
+      }
+      #kb-nav-overlay.kb-open{display:block;opacity:1}
+
+      #kb-nav-panel{
+        position:absolute;top:12px;right:12px;bottom:12px;width:min(900px,calc(100vw - 24px));
+        overflow:hidden;border-radius:28px;
+        background:linear-gradient(145deg,rgba(10,18,40,.97),rgba(3,7,17,.985));
+        border:1px solid rgba(255,255,255,.09);
+        box-shadow:0 35px 120px rgba(0,0,0,.72),0 0 90px rgba(77,141,255,.09);
+        transform:translateX(30px) scale(.985);transition:transform .28s cubic-bezier(.2,.8,.2,1);
+        isolation:isolate;
+      }
+      #kb-nav-overlay.kb-open #kb-nav-panel{transform:none}
+      #kb-nav-panel:before{
+        content:"";position:absolute;inset:0;padding:1px;border-radius:28px;pointer-events:none;
+        background:conic-gradient(from 35deg,#19e6ff,#4d8dff,#9b5cff,#ff4fd8,#f6b93b,#2ee6a8,#19e6ff);
+        -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+        -webkit-mask-composite:xor;mask-composite:exclude;opacity:.9;
+        animation:kbSpin 9s linear infinite;
+      }
+      #kb-nav-panel:after{
+        content:"";position:absolute;inset:0;pointer-events:none;
+        background:radial-gradient(circle at 20% 15%,rgba(25,230,255,.1),transparent 28%),
+                   radial-gradient(circle at 80% 85%,rgba(255,79,216,.08),transparent 30%);
+        z-index:-1;
+      }
+      .kb-nv-shell{height:100%;display:grid;grid-template-columns:1fr 280px;position:relative}
+      .kb-nv-main{min-width:0;padding:30px 30px 28px;overflow:auto}
+      .kb-nv-right{position:relative;padding:30px 20px 24px;border-left:1px solid rgba(255,255,255,.07);background:rgba(2,7,18,.42);overflow:auto}
+      .kb-nv-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+      .kb-nv-kicker{font:700 9px/1 JetBrains Mono,monospace;letter-spacing:.28em;color:#19e6ff;text-transform:uppercase}
+      .kb-nv-title{margin-top:9px;font:800 clamp(22px,3vw,34px)/1.05 Orbitron,sans-serif;letter-spacing:-.03em;color:#eef2ff}
+      .kb-nv-title span{background:linear-gradient(90deg,#f6b93b,#19e6ff,#9b5cff);-webkit-background-clip:text;background-clip:text;color:transparent}
+      .kb-nv-close{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#93a0c9;cursor:pointer;font-size:20px}
+      .kb-nv-close:hover{color:#fff;border-color:rgba(25,230,255,.35)}
+      .kb-nv-status{margin-top:25px;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:13px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);font:600 9px JetBrains Mono,monospace;color:#93a0c9}
+      .kb-nv-live{width:7px;height:7px;border-radius:50%;background:#2ee6a8;box-shadow:0 0 12px #2ee6a8;animation:kbPulse 1.5s ease-in-out infinite}
+      .kb-nv-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin-top:16px}
+      .kb-nv-card{position:relative;min-height:105px;padding:16px;border-radius:16px;background:linear-gradient(145deg,rgba(16,26,58,.75),rgba(5,10,24,.82));border:1px solid rgba(255,255,255,.07);transition:.2s;overflow:hidden}
+      .kb-nv-card:before{content:"";position:absolute;inset:-50%;background:conic-gradient(from 90deg,transparent,#19e6ff22,transparent,#ff4fd822,transparent);animation:kbSpin 7s linear infinite;opacity:0;transition:.2s}
+      .kb-nv-card:hover{transform:translateY(-3px);border-color:rgba(25,230,255,.32);box-shadow:0 15px 35px rgba(0,0,0,.25)}
+      .kb-nv-card:hover:before{opacity:1}
+      .kb-nv-card>*{position:relative}
+      .kb-nv-icon{font-size:19px;margin-bottom:11px;color:#f6b93b}
+      .kb-nv-name{font:800 10px Orbitron,sans-serif;color:#eef2ff;letter-spacing:.03em}
+      .kb-nv-desc{margin-top:5px;font:500 8px/1.45 Space Grotesk,sans-serif;color:#7180a9}
+      .kb-nv-right-title{font:800 10px Orbitron,sans-serif;letter-spacing:.14em;color:#eef2ff}
+      .kb-nv-rail{margin-top:14px;display:grid;gap:6px}
+      .kb-nv-link{display:grid;grid-template-columns:31px 1fr;gap:9px;align-items:center;padding:10px;border-radius:12px;color:#8f9bc0;border:1px solid transparent;transition:.18s}
+      .kb-nv-link:hover,.kb-nv-link.kb-active{color:#fff;background:linear-gradient(90deg,rgba(25,230,255,.09),rgba(155,92,255,.07));border-color:rgba(25,230,255,.16)}
+      .kb-nv-link.kb-active{box-shadow:inset 2px 0 0 #19e6ff,0 0 22px rgba(25,230,255,.05)}
+      .kb-nv-link-icon{width:31px;height:31px;display:grid;place-items:center;border-radius:9px;background:rgba(255,255,255,.035);font-size:14px;color:#19e6ff}
+      .kb-nv-link-text{font:700 9px Space Grotesk,sans-serif}.kb-nv-link-sub{display:block;margin-top:2px;font:500 7px JetBrains Mono,monospace;color:#5f6b8e}
+      .kb-nv-section{margin-top:24px;padding-top:18px;border-top:1px solid rgba(255,255,255,.06)}
+      .kb-nv-section-label{font:700 8px JetBrains Mono,monospace;letter-spacing:.2em;color:#596684;margin-bottom:9px}
+      .kb-nv-mini{display:flex;gap:7px;flex-wrap:wrap}
+      .kb-nv-chip{font:700 7px JetBrains Mono,monospace;color:#93a0c9;padding:7px 9px;border-radius:8px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06)}
+      .kb-nv-footer{position:absolute;bottom:18px;left:20px;right:20px;font:500 7px/1.5 JetBrains Mono,monospace;color:#4f5b7c}
+      @keyframes kbSpin{to{transform:rotate(360deg)}}@keyframes kbPulse{50%{opacity:.35;transform:scale(.75)}}
+      @media(max-width:760px){
+        #kb-nav-trigger{top:12px;left:12px;width:44px;height:44px}
+        #kb-nav-panel{top:7px;right:7px;bottom:7px;width:calc(100vw - 14px);border-radius:22px}
+        .kb-nv-shell{grid-template-columns:1fr}
+        .kb-nv-main{padding:23px 18px 100px}
+        .kb-nv-right{border-left:0;border-top:1px solid rgba(255,255,255,.07);padding:20px 18px 85px}
+        .kb-nv-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+        .kb-nv-footer{position:static;margin-top:18px}
+      }
+      @media(prefers-reduced-motion:reduce){
+        #kb-nav-trigger:before,#kb-nav-panel:before,.kb-nv-card:before,.kb-nv-live{animation:none}
+        #kb-nav-overlay,#kb-nav-panel{transition:none}
+      }
+    `;
+    document.head.appendChild(s);
   }
 
-  function ensureRuntime(){
-    if(window.KINGBOT_UI)return Promise.resolve(window.KINGBOT_UI);
-    return new Promise(resolve=>{
-      const script=document.querySelector('script[data-kb-ui-runtime="true"]')||document.querySelector('script[src*="ui-runtime.js"]');
-      if(script){script.addEventListener("load",()=>resolve(window.KINGBOT_UI||null),{once:true});setTimeout(()=>resolve(window.KINGBOT_UI||null),700);return;}
-      const s=document.createElement("script");
-      s.src=new URL("system/ui-runtime.js",window.location.href).href;
-      s.dataset.kbUiRuntime="true";
-      s.onload=()=>resolve(window.KINGBOT_UI||null);
-      s.onerror=()=>resolve(null);
-      document.head.appendChild(s);
-    });
-  }
+  function build(){
+    if(document.getElementById("kb-nav-trigger")) return;
 
-  async function resolveAuthState(){
-    if(!window.KINGBOT_SESSION){
-      try{await import(new URL("system/session.js",window.location.href).href);}catch{}
-    }
-    if(!window.KINGBOT_SESSION)return {authenticated:false,verified:false,user:null};
-    try{return await window.KINGBOT_SESSION.check();}catch{return {authenticated:false,verified:false,user:null};}
-  }
-
-  async function resolveAccessState(){
-    if(!window.KINGBOT_ACCESS)return null;
-    try{
-      if(!window.KINGBOT_ACCESS.state.loaded)await window.KINGBOT_ACCESS.initialize();
-      return window.KINGBOT_ACCESS.getState();
-    }catch{return null;}
-  }
-
-  function accountMarkup(authState){
-    const authenticated=Boolean(authState?.authenticated);
-    const verified=Boolean(authState?.user?.verified);
-    if(authenticated&&verified){
-      const name=escapeHtml(String(authState.user?.name||authState.user?.email||"ACCOUNT").trim());
-      return '<a href="profile.html" class="kb-nav-account-link" data-kb-account>Profile</a>'+
-        '<a href="subscription.html" class="kb-nav-account-link" data-kb-account>Subscription</a>'+
-        '<a href="admin-entry.html" class="kb-nav-account-link" data-kb-account data-kb-admin-entry>Admin</a>'+
-        '<a href="#" class="kb-nav-account-link" data-kb-logout>Logout · '+name+'</a>';
-    }
-    if(authenticated&&!verified){
-      return '<a href="verify.html" class="kb-nav-account-link" data-kb-account>Verify</a>'+
-        '<a href="#" class="kb-nav-account-link" data-kb-signin>Continue</a>'+
-        '<a href="access-stable.html#signin" class="kb-nav-account-link" data-kb-account>Sign in</a>';
-    }
-    return GUEST_ACCOUNT.map(([href,name])=>'<a href="'+href+'" class="kb-nav-account-link" data-kb-account>'+name+'</a>').join("");
-  }
-
-  function iconDot(group){
-    return '<span class="kb-nav-group-icon">'+group.icon+'</span>';
-  }
-
-  function groupMarkup(group,page){
-    const itemMarkup=group.items.map(([href,name,icon,desc,role])=>{
-      const active=href.toLowerCase()===page;
-      const protectedAttr=PROTECTED.has(href.toLowerCase())?' data-kb-protected="true"':'';
-      const adminAttr=role==="admin"?' data-kb-admin-link="true"':'';
-      return '<a href="'+href+'" class="kb-nav-item'+(active?' is-active':'')+'"'+protectedAttr+adminAttr+'>'+
-        '<span class="kb-nav-item-icon">'+icon+'</span>'+
-        '<span class="kb-nav-item-copy"><strong>'+name+'</strong><small>'+desc+'</small></span>'+
-        (active?'<span class="kb-nav-active-dot" aria-hidden="true"></span>':'')+
-      '</a>';
-    }).join("");
-    return '<section class="kb-nav-group" data-group="'+group.id+'">'+
-      '<div class="kb-nav-group-head">'+iconDot(group)+'<span>'+group.label+'</span><b>'+String(group.items.length).padStart(2,"0")+'</b></div>'+
-      '<div class="kb-nav-group-items">'+itemMarkup+'</div>'+
-    '</section>';
-  }
-
-  function filterItems(root,query){
-    const q=String(query||"").trim().toLowerCase();
-    let visible=0;
-    root.querySelectorAll(".kb-nav-item").forEach(item=>{
-      const text=item.textContent.toLowerCase();
-      const show=!q||text.includes(q);
-      item.hidden=!show;
-      if(show)visible++;
-    });
-    root.querySelectorAll(".kb-nav-group").forEach(group=>{
-      const count=[...group.querySelectorAll(".kb-nav-item")].filter(x=>!x.hidden).length;
-      group.hidden=count===0;
-    });
-    const result=root.querySelector("[data-kb-search-count]");
-    if(result)result.textContent=q?(visible+" MODULE"+(visible===1?"":"S")+" MATCHED"):"23 MODULES";
-  }
-
-  async function refreshApi(root){
-    const pill=root.querySelector("[data-kb-api]");
-    if(!pill)return;
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),2500);
-    try{
-      const r=await fetch(API_BASE+"/health",{headers:{Accept:"application/json"},cache:"no-store",credentials:"omit",signal:controller.signal});
-      const d=await r.json().catch(()=>({}));
-      const live=r.ok&&d?.ok!==false;
-      pill.classList.toggle("is-live",live);
-      pill.classList.toggle("is-offline",!live);
-      pill.querySelector("span").textContent=live?"API LIVE":"API OFFLINE";
-    }catch{
-      pill.classList.remove("is-live");
-      pill.classList.add("is-offline");
-      pill.querySelector("span").textContent="API OFFLINE";
-    }finally{clearTimeout(timer);}
-  }
-
-  async function updateAdminVisibility(root){
-    const access=await resolveAccessState();
-    const admin=access?.isAdmin===true;
-    root.querySelectorAll("[data-kb-admin-link]").forEach(link=>{
-      link.classList.toggle("is-admin-available",admin);
-      const note=link.querySelector("small");
-      if(note&&!admin)note.textContent="Restricted administrator access";
-    });
-    const badge=root.querySelector("[data-kb-admin-badge]");
-    if(badge)badge.textContent=admin?"ADMIN VERIFIED":"ADMIN RESTRICTED";
-  }
-
-  async function build(){
-    if(document.getElementById("kb-command-nav"))return;
-    if(document.querySelector(".verify-shell,.auth-shell,.auth-card"))return;
-
-    await ensureRuntime();
-
-    const page=currentPage();
-    const authState=await resolveAuthState();
-
-    const root=document.createElement("aside");
-    root.id="kb-command-nav";
-    root.innerHTML=
-      '<a class="kb-command-brand" href="index.html" aria-label="KINGBOT Overview">'+
-        '<img src="assets/images/kingbot-fintech-logo.png" alt="KINGBOT">'+
-        '<span><strong>KINGBOT</strong><small>FINTECH COMMAND</small></span>'+
-      '</a>'+
-      '<div class="kb-command-head">'+
-        '<div><span class="kb-command-kicker">NAVIGATION / SYSTEM CORE</span><h2>Command Center</h2><small>All customer platform modules in one control surface.</small></div>'+
-        '<button type="button" class="kb-nav-close" aria-label="Close navigation">×</button>'+
-      '</div>'+
-      '<div class="kb-command-status">'+
-        '<span class="kb-command-status-pill is-live" data-kb-api><i></i><span>API CHECKING</span></span>'+
-        '<span class="kb-command-status-pill is-live"><i></i><span>RISK GATED</span></span>'+
-        '<span class="kb-command-status-pill"><i></i><span>NON-CUSTODIAL</span></span>'+
-      '</div>'+
-      '<label class="kb-nav-search"><span>⌕</span><input type="search" aria-label="Search platform modules" placeholder="Search modules…" autocomplete="off"><kbd>⌘K</kbd></label>'+
-      '<div class="kb-nav-result"><span data-kb-search-count>23 MODULES</span><span>ESC TO CLOSE</span></div>'+
-      '<div class="kb-nav-scroll">'+GROUPS.map(g=>groupMarkup(g,page)).join("")+'</div>'+
-      '<div class="kb-nav-account"><div class="kb-nav-account-title"><span>ACCOUNT CHANNEL</span><b data-kb-admin-badge>ADMIN STATUS</b></div>'+accountMarkup(authState)+'</div>'+
-      '<div class="kb-nav-footer"><span>CONSISTENCY · RESILIENCE · INNOVATION</span><button type="button" class="kb-nav-theme" data-kb-theme="cyan" aria-label="Cyan theme">CYAN</button></div>';
-
-    document.body.appendChild(root);
+    style();
 
     const trigger=document.createElement("button");
-    trigger.id="kb-command-trigger";
+    trigger.id="kb-nav-trigger";
     trigger.type="button";
-    trigger.className="kb-command-trigger";
-    trigger.setAttribute("aria-label","Open KINGBOT Command Center");
+    trigger.setAttribute("aria-label","Open KINGBOT navigation");
     trigger.setAttribute("aria-expanded","false");
-    trigger.innerHTML='<span></span><span></span><span></span><b>MENU</b>';
+    trigger.innerHTML='<span class="kb-bars" aria-hidden="true"><i></i><i></i><i></i></span>';
+
+    const overlay=document.createElement("div");
+    overlay.id="kb-nav-overlay";
+    overlay.setAttribute("aria-hidden","true");
+
+    const panel=document.createElement("aside");
+    panel.id="kb-nav-panel";
+    panel.setAttribute("aria-label","KINGBOT FINTECH navigation dashboard");
+
+    const page=currentPage();
+    const pageLinks=links.map(([href,name,icon,desc])=>{
+      const active=href.toLowerCase()===page;
+      return '<a class="kb-nv-card" href="'+href+'"'+(active?' aria-current="page"':'')+'>'+
+        '<div class="kb-nv-icon">'+icon+'</div><div class="kb-nv-name">'+name+'</div><div class="kb-nv-desc">'+desc+'</div></a>';
+    }).join("");
+
+    const rail=links.map(([href,name,icon,desc])=>{
+      const active=href.toLowerCase()===page;
+      return '<a class="kb-nv-link'+(active?' kb-active':'')+'" href="'+href+'"'+(active?' aria-current="page"':'')+'>'+
+        '<span class="kb-nv-link-icon">'+icon+'</span><span class="kb-nv-link-text">'+name+'<span class="kb-nv-link-sub">'+desc+'</span></span></a>';
+    }).join("");
+
+    const account=accountLinks.map(([href,name])=>'<a class="kb-nv-link" href="'+href+'"><span class="kb-nv-link-icon">↗</span><span class="kb-nv-link-text">'+name+'</span></a>').join("");
+
+    panel.innerHTML=
+      '<div class="kb-nv-shell">'+
+        '<section class="kb-nv-main">'+
+          '<div class="kb-nv-head"><div><div class="kb-nv-kicker">KINGBOT // CONTROL SYSTEM</div><div class="kb-nv-title">FINTECH <span>COMMAND</span></div></div><button class="kb-nv-close" type="button" aria-label="Close navigation">×</button></div>'+
+          '<div class="kb-nv-status"><span class="kb-nv-live"></span><span>SYSTEM ONLINE</span><span style="margin-left:auto">UNIFIED OS</span></div>'+
+          '<div class="kb-nv-grid">'+pageLinks+'</div>'+
+        '</section>'+
+        '<nav class="kb-nv-right">'+
+          '<div class="kb-nv-right-title">NAVIGATION</div>'+
+          '<div class="kb-nv-rail">'+rail+'</div>'+
+          '<div class="kb-nv-section"><div class="kb-nv-section-label">ACCOUNT</div><div class="kb-nv-rail">'+account+'</div></div>'+
+          '<div class="kb-nv-section"><div class="kb-nv-section-label">AUTOMATION</div><div class="kb-nv-mini"><span class="kb-nv-chip">AUTO-TRADING</span><span class="kb-nv-chip">AI LAYER</span><span class="kb-nv-chip">RISK ENGINE</span><span class="kb-nv-chip">LIVE DATA</span></div></div>'+
+          '<div class="kb-nv-footer">ONE PLATFORM · ONE CONTROL SURFACE<br>CONSISTENCY · RESILIENCE · INNOVATION</div>'+
+        '</nav>'+
+      '</div>';
+
+    overlay.appendChild(panel);
     document.body.appendChild(trigger);
+    document.body.appendChild(overlay);
 
-    const backdrop=document.createElement("button");
-    backdrop.id="kb-command-backdrop";
-    backdrop.type="button";
-    backdrop.setAttribute("aria-label","Close navigation");
-    document.body.appendChild(backdrop);
-
-    const open=()=>{
-      root.classList.add("is-open");
-      backdrop.classList.add("is-open");
-      trigger.classList.add("is-open");
+    function open(){
+      overlay.classList.add("kb-open");
+      overlay.setAttribute("aria-hidden","false");
       trigger.setAttribute("aria-expanded","true");
-      root.querySelector(".kb-nav-search input")?.focus({preventScroll:true});
-      document.documentElement.classList.add("kb-nav-lock");
-    };
-    const close=()=>{
-      root.classList.remove("is-open");
-      backdrop.classList.remove("is-open");
-      trigger.classList.remove("is-open");
+      document.body.style.overflow="hidden";
+      const close=panel.querySelector(".kb-nv-close");
+      if(close) close.focus();
+    }
+    function close(){
+      overlay.classList.remove("kb-open");
+      overlay.setAttribute("aria-hidden","true");
       trigger.setAttribute("aria-expanded","false");
-      document.documentElement.classList.remove("kb-nav-lock");
-    };
+      document.body.style.overflow="";
+      trigger.focus();
+    }
 
-    trigger.addEventListener("click",()=>root.classList.contains("is-open")?close():open());
-    root.querySelector(".kb-nav-close").addEventListener("click",close);
-    backdrop.addEventListener("click",close);
-    document.addEventListener("keydown",e=>{
-      if(e.key==="Escape")close();
-      if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();open();}
-    });
-
-    const input=root.querySelector(".kb-nav-search input");
-    input.addEventListener("input",()=>filterItems(root,input.value));
-
-    root.querySelectorAll("[data-kb-theme]").forEach(btn=>{
-      btn.addEventListener("click",()=>{
-        window.KINGBOT_UI?.applyTheme(btn.dataset.kbTheme);
-        btn.textContent=(window.KINGBOT_UI?.getTheme?.()||"cyan").toUpperCase();
-      });
-    });
-
-    root.querySelectorAll("[data-kb-logout]").forEach(a=>a.addEventListener("click",async e=>{
-      e.preventDefault();
-      const logout=window.KINGBOT_SESSION?.logout;
-      if(logout)await logout({redirect:true});else location.replace("access-stable.html#signin");
-    }));
-
-    root.querySelector("[data-kb-signin]")?.addEventListener("click",e=>{
-      e.preventDefault();
-      location.replace("verify.html?return="+encodeURIComponent(window.location.pathname+window.location.search+window.location.hash));
-    });
-
-    root.querySelectorAll("[data-kb-protected]").forEach(a=>a.addEventListener("click",async e=>{
-      const state=window.KINGBOT_SESSION?.getState?.()||await resolveAuthState();
-      if(!state.authenticated){e.preventDefault();location.replace("access-stable.html?return="+encodeURIComponent(a.getAttribute("href")||"")+"#signin");return;}
-      if(!state.user?.verified){e.preventDefault();location.replace("verify.html?return="+encodeURIComponent(a.getAttribute("href")||""));}
-    }));
-
-    root.querySelectorAll(".kb-nav-item").forEach(a=>a.addEventListener("click",close));
-    window.addEventListener("kingbot:session-change",async e=>{
-      const next=e.detail||await resolveAuthState();
-      const box=root.querySelector(".kb-nav-account");
-      box.querySelectorAll(".kb-nav-account-link,[data-kb-admin-entry]").forEach(x=>x.remove());
-      box.insertAdjacentHTML("beforeend",accountMarkup(next));
-      box.querySelectorAll("[data-kb-logout]").forEach(x=>x.addEventListener("click",async ev=>{
-        ev.preventDefault();const logout=window.KINGBOT_SESSION?.logout;if(logout)await logout({redirect:true});
-      }));
-      await updateAdminVisibility(root);
-    });
-
-    await updateAdminVisibility(root);
-    await refreshApi(root);
-    const timer=setInterval(()=>refreshApi(root),30000);
-    window.addEventListener("pagehide",()=>clearInterval(timer),{once:true});
+    trigger.addEventListener("click",()=>overlay.classList.contains("kb-open")?close():open());
+    panel.querySelector(".kb-nv-close").addEventListener("click",close);
+    overlay.addEventListener("click",e=>{if(e.target===overlay) close()});
+    document.addEventListener("keydown",e=>{if(e.key==="Escape"&&overlay.classList.contains("kb-open")) close()},{passive:true});
+    panel.querySelectorAll("a").forEach(a=>a.addEventListener("click",()=>close()));
 
     window.KINGBOT_NAV={
-      open,close,current:currentPage,
-      refresh:async()=>{await updateAdminVisibility(root);await refreshApi(root);},
-      search:(q)=>{input.value=q;filterItems(root,q);open();}
+      config:{links,account:accountLinks},
+      state:{initialized:true,user:null,open:false},
+      initialize:()=>Promise.resolve(),
+      current:currentPage,
+      active:href=>String(href).toLowerCase()===currentPage(),
+      refreshUser:()=>Promise.resolve(),
+      open,close
     };
   }
 
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",build,{once:true});
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",build,{once:true});
   else build();
+
 })(window,document);
