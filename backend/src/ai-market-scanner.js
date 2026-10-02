@@ -539,7 +539,14 @@ export function registerAiMarketScanner(app, { requireUser, pool, broker, rateLi
     try { const q=await pool.query("SELECT COUNT(*)::int AS count FROM kingbot_tradingview_snapshots WHERE received_at > NOW() - INTERVAL '10 minutes'"); tvCount=q.rows[0]?.count || 0; } catch {}
     return res.json({
       ok:true, scanner:"KINGBOT AI MARKET SCANNER", aiReady:Boolean(apiKey), provider:apiKey?"xai":"none",
-      marketData: twelveData.status(),
+      marketData:{
+        twelveData:twelveData.status(),
+        derivPublic:{
+          ...publicDerivFeed.status(),
+          standalone:true,
+          source:"Deriv public live market feed"
+        }
+      },
       scannerStandalone:true,
       brokerRequired:false,
       model:apiKey?String(process.env.XAI_MODEL || "grok-4.7"):null, brokerConnected, broker:brokerName,
