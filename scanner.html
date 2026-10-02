@@ -69,7 +69,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
     <div class="core-sub" id="coreSub">Checking services…</div>
     <div class="core-status">
       <div class="metric"><span>AI ENGINE</span><strong id="aiState">CHECKING</strong></div>
-      <div class="metric"><span>BROKER</span><strong id="brokerState">CHECKING</strong></div>
+      <div class="metric"><span>MARKET FEED</span><strong id="marketState">CHECKING</strong></div>
       <div class="metric"><span>LAST SCAN</span><strong id="lastScan">—</strong></div>
     </div>
   </aside>
@@ -246,14 +246,18 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       const data=await request("/ai/market-scanner/status");
       qs("aiState").textContent=data.aiReady?(data.provider==="xai"?"GROK ONLINE":"AI ONLINE"):"NO AI KEY";
       qs("aiState").className=data.aiReady?"good":"warn";
-      if(data.brokerConnected){
-        qs("brokerState").textContent=String(data.broker||"CONNECTED").toUpperCase();
-        qs("brokerState").className="good";
-        qs("coreSub").textContent="Broker linked · ready to scan.";
+      const feed=data.marketData||{};
+      const live=Boolean(feed.connected||data.tradingViewConnected);
+      if(feed.configured||data.tradingViewConnected){
+        qs("marketState").textContent=feed.connected?"LIVE FEED":(data.tradingViewConnected?"TRADINGVIEW":"MARKET DATA");
+        qs("marketState").className=live?"good":"warn";
+        qs("coreSub").textContent=data.brokerRequired===false
+          ?"Standalone market scanner ready · broker connection is not required."
+          :"Standalone market-data engine ready.";
       }else{
-        qs("brokerState").textContent="NOT CONNECTED";
-        qs("brokerState").className="warn";
-        qs("coreSub").textContent="Connect a broker account to load live quotes.";
+        qs("marketState").textContent="DATA SETUP";
+        qs("marketState").className="warn";
+        qs("coreSub").textContent="Configure the KINGBOT live market-data engine.";
       }
     }catch(error){
       const msg=String(error?.message||"");
@@ -261,7 +265,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
         qs("aiState").textContent="DEPLOY PENDING"; qs("aiState").className="warn";
         qs("coreSub").textContent="Scanner API not on this deploy yet — redeploy backend.";
       }else if(/sign in|Authentication|Firebase|Verify/i.test(msg)){
-        qs("aiState").textContent="SIGN IN"; qs("brokerState").textContent="AUTH";
+        qs("aiState").textContent="SIGN IN"; qs("marketState").textContent="AUTH";
         qs("coreSub").textContent=msg;
       }
     }
@@ -275,8 +279,9 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       const data=await request(path,{method:"GET"});
       state.quotes=data.quotes||[];
       renderQuotes();
-      qs("brokerState").textContent="CONNECTED"; qs("brokerState").className="good";
-      qs("aiState").textContent=data.provider==="xai"?"GROK ONLINE":(data.provider==="none"?"QUOTES ONLY":"AI ONLINE");
+      qs("marketState").textContent=(data.quoteCount||0)>0?"LIVE FEED":"TECHNICAL FEED";
+      qs("marketState").className="good";
+      qs("aiState").textContent=data.provider==="xai"?"GROK ONLINE":(data.provider==="none"?"ENGINE ONLINE":"AI ONLINE");
       qs("aiState").className=data.provider==="none"?"warn":"good";
       qs("coreSub").textContent=(data.source||"Live market feed")+" · "+(data.technicalCount||0)+" technical feeds · "+(data.quoteCount||0)+" live quotes";
       qs("scanState").textContent="QUOTES READY";
@@ -286,8 +291,8 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       const msg=String(error?.message||"Scanner unavailable.");
       const brokerIssue=/BROKER_NOT_CONNECTED|broker/i.test(msg);
       const authIssue=/sign in|Firebase|Verify|Authentication|401/i.test(msg);
-      qs("brokerState").textContent=brokerIssue?"NOT CONNECTED":authIssue?"AUTH":"UNAVAILABLE";
-      qs("brokerState").className="warn";
+      qs("marketState").textContent=brokerIssue?"NOT CONNECTED":authIssue?"AUTH":"UNAVAILABLE";
+      qs("marketState").className="warn";
       qs("aiState").textContent=authIssue?"AUTH":"STANDBY";
       qs("aiState").className="warn";
       qs("coreSub").textContent=msg;
