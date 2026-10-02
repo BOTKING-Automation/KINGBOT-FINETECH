@@ -158,6 +158,70 @@ async function latestTradingView(pool, symbols, timeframe) {
   return q.rows.map(r => ({ ...r.payload, symbol: r.symbol, timeframe: r.timeframe, barTime: r.bar_time, receivedAt: r.received_at }));
 }
 
+
+function sma(values, period) {
+  if (!Array.isArray(values) || values.length < period) return null;
+  const slice = values.slice(-period);
+  return slice.reduce((a,b)=>a+b,0) / period;
+}
+function emaSeries(values, period) {
+  if (!Array.isArray(values) || values.length < period) return [];
+  const k=2/(period+1);
+  let prev=sma(values.slice(0,period),period);
+  const out=Array(period-1).fill(null);
+  out.push(prev);
+  for(let i=period;i<values.length;i++){ prev=values[i]*k+prev*(1-k); out.push(prev); }
+  return out;
+}
+function rsiValue(values, period=14) {
+  if(values.length<=period)return null;
+  let gain=0,loss=0;
+  for(let i=1;i<=period;i++){const d=values[i]-values[i-1];gain+=Math.max(d,0);loss+=Math.max(-d,0);}
+  let avgGain=gain/period, avgLoss=loss/period;
+  for(let i=period+1;i<values.length;i++){const d=values[i]-values[i-1];avgGain=(avgGain*(period-1)+Math.max(d,0))/period;avgLoss=(avgLoss*(period-1)+Math.max(-d,0))/period;}
+  if(avgLoss===0)return 100;
+  return 100-(100/(1+avgGain/avgLoss));
+}
+function atrValue(bars, period=14) {
+  if(bars.length<=period)return null;
+  const trs=[];
+  for(let i=1;i<bars.length;i++){const h=bars[i].high,l=bars[i].low,pc=bars[i-1].close;trs.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));}
+  return sma(trs,period);
+}
+function deriveTechnicalFromBars(bars) {
+  if(!Array.isArray(bars)||bars.length<60)return null;
+  const closes=bars.map(b=>b.close), highs=bars.map(b=>b.high), lows=bars.map(b=>b.low);
+  const e20=emaSeries(closes,20), e50=emaSeries(closes,50);
+  const ema20=e20.at(-1), ema50=e50.at(-1), rsi=rsiValue(closes,14), atr=atrValue(bars,14);
+  const fast=emaSeries(closes,12), slow=emaSeries(closes,26);
+  const macdSeries=closes.map((_,i)=>fast[i]!=null&&slow[i]!=null?fast[i]-slow[i]:null).filter(v=>v!=null);
+  const macd=sma(macdSeries.slice(-9),9), macdLine=macdSeries.at(-1);
+  const last=bars.at(-1), prev=bars.at(-2), recentHigh=Math.max(...highs.slice(-20,-1)), recentLow=Math.min(...lows.slice(-20,-1));
+  const priorHigh=Math.max(...highs.slice(-40,-20)), priorLow=Math.min(...lows.slice(-40,-20));
+  const trend=ema20>ema50&&last.close>ema20?"BULLISH":ema20<ema50&&last.close<ema20?"BEARISH":"NEUTRAL";
+  const bos=last.close>recentHigh?"BULLISH":last.close<recentLow?"BEARISH":"NONE";
+  const choch=(prev.close<=priorHigh&&last.close>priorHigh)?"BULLISH":(prev.close>=priorLow&&last.close<priorLow)?"BEARISH":"NONE";
+  const liquiditySweep=(last.low<recentLow&&last.close>recentLow)?"BULLISH":(last.high>recentHigh&&last.close<recentHigh)?"BEARISH":"NONE";
+  const fvg=bars.length>=4 && (bars.at(-1).low>bars.at(-3).high || bars.at(-1).high<bars.at(-3).low);
+  return {
+    close:last.close, price:last.close, ema20, ema50, rsi14:rsi, macd:macdLine, macdSignal:macd,
+    atr14:atr, support:recentLow, resistance:recentHigh, trend, bos, choch,
+    liquiditySweep, fvg, source:"Twelve Data OHLC + KINGBOT technical engine",
+    barTime:last.datetime||last.timestamp||null, receivedAt:new Date().toISOString()
+  };
+}
+async function fetchTwelveDataTechnical(twelveData, symbols, timeframe) {
+  if(!twelveData?.enabled)return [];
+  return Promise.all(symbols.map(async symbol=>{
+    try {
+      const snapshot=await twelveData.technicalSnapshot(symbol,timeframe);
+      return snapshot?{symbol,...snapshot}:null;
+    } catch(error) {
+      return {symbol,technicalError:String(error?.message||"TECHNICAL_DATA_UNAVAILABLE").slice(0,120)};
+    }
+  })).then(rows=>rows.filter(Boolean));
+}
+
 async function askGrok({ technical, quotes, timeframe }) {
   const apiKey = String(process.env.XAI_API_KEY || "").trim();
   if (!apiKey) return { provider: "none", model: null, analysis: null };
@@ -234,9 +298,9 @@ async function runMarketScan({ requireUser, pool, broker, twelveData, req, res }
     const quotes = directQuotes.length && directQuotes.some(q => q.available)
       ? directQuotes
       : brokerQuotes;
-    const [tv] = await Promise.all([latestTradingView(pool, symbols, timeframe)]);
-    const technical = tv.map(snapshot => ({ symbol:snapshot.symbol, ...technicalEngine(snapshot), timeframe, source:"TradingView", barTime:snapshot.barTime }));
-    const tvMap = Object.fromEntries(tv.map(x => [x.symbol, x]));
+    const [tv, tdTechnical] = await Promise.all([latestTradingView(pool, symbols, timeframe), fetchTwelveDataTechnical(twelveData, symbols, timeframe)]);
+    const tdMap=Object.fromEntries(tdTechnical.map(x=>[x.symbol,x]));\n    const technical = symbols.map(symbol => { const snapshot=tdMap[symbol] || tv.find(x=>x.symbol===symbol); return snapshot ? { symbol, ...technicalEngine(snapshot), timeframe, source:tdMap[symbol] ? "Twelve Data live OHLC" : "TradingView", barTime:snapshot.barTime, dataFreshness:snapshot.receivedAt||snapshot.barTime } : { symbol, ...technicalEngine(null), timeframe, source:"none" }; });
+    const tvMap = Object.fromEntries(tv.map(x => [x.symbol, x]));\n    const technicalSource = tdTechnical.length ? "Twelve Data live OHLC + live quote WebSocket" : (tv.length ? "TradingView webhook + live quote feed" : "live quotes only");
     for (const q of quotes) {
       if (!technical.some(x => x.symbol === q.symbol)) technical.push({ symbol:q.symbol, ...technicalEngine(null), timeframe, source:"TradingView", quote:q });
     }
@@ -248,7 +312,7 @@ async function runMarketScan({ requireUser, pool, broker, twelveData, req, res }
     return res.json({
       ok:true, scanner:"KINGBOT AI MARKET SCANNER", provider:ai.provider, model:ai.model,
       executionAuthority:"NONE",
-      source: twelveData?.enabled ? "Twelve Data WebSocket + TradingView webhook" : "TradingView webhook + broker quote",
+      source: technicalSource,
       marketData: twelveData?.status ? twelveData.status() : { configured:false },
       symbols, timeframe, quotes, technical, tradingViewSnapshots:tvMap,
       analysis:ai.analysis || JSON.stringify({
@@ -258,7 +322,7 @@ async function runMarketScan({ requireUser, pool, broker, twelveData, req, res }
         summary:"KINGBOT technical engine analyzed the latest verified TradingView snapshots."
       }),
       aiError:ai.aiError || null, generatedAt:new Date().toISOString(), quoteCount:quotes.filter(q=>q.available).length,
-      tradingViewCount:tv.length
+      tradingViewCount:tv.length, technicalCount:technical.filter(x=>x.source!=="none").length, technicalSource
     });
   } catch (error) {
     console.error("[KINGBOT MARKET SCANNER]", error?.message || error);
