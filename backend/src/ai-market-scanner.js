@@ -238,33 +238,89 @@ async function askGrok({ technical, quotes, timeframe }) {
   const model = String(process.env.XAI_MODEL || "grok-4.7").trim();
   const baseUrl = String(process.env.XAI_API_BASE_URL || "https://api.x.ai/v1").trim().replace(/\/$/, "");
   const prompt = [
-    "You are KINGBOT AI, a trading-intelligence explanation layer.",
-    "The deterministic KINGBOT technical engine calculated the supplied fields from a verified TradingView snapshot.",
-    "Do not invent market data. Do not override the deterministic signal. Explain what is present, what is missing, the entry condition, what to wait for, and invalidation.",
-    "Return VALID JSON only with keys: market_regime, ranked_symbols, risk_flags, summary.",
-    "Each ranked_symbols item must contain: symbol,bias,signal,score,entry,sl,tp1,tp2,waitFor,reason,technicalAnalysis,invalidation.",
-    "Never promise profit or certainty.",
+    "You are KINGBOT AI, a market-intelligence reasoning layer.",
+    "Use ONLY the supplied verified market data. Do not invent prices, candles, levels, news, or signals.",
+    "The deterministic KINGBOT engine is authoritative for the calculated technical fields.",
+    "Synthesize the evidence into a disciplined market-intelligence report.",
+    "For each symbol, explain trend, momentum, structure, liquidity/FVG evidence, setup state, entry condition, invalidation and risk flags.",
+    "Do not promise profit or certainty. A score below 75 must not be described as an entry confirmation.",
     "TIMEFRAME: " + timeframe,
     "TECHNICAL ENGINE OUTPUT: " + JSON.stringify(technical),
-    "VERIFIED QUOTES: " + JSON.stringify(quotes)
+    "VERIFIED LIVE QUOTES: " + JSON.stringify(quotes)
   ].join("\n");
 
   const response = await fetch(baseUrl + "/responses", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + apiKey
+    },
     body: JSON.stringify({
       model,
       input: [
-        { role: "system", content: "KINGBOT AI market intelligence. Output JSON only." },
+        { role: "system", content: "KINGBOT AI market intelligence. Return structured JSON only." },
         { role: "user", content: prompt }
       ],
-      max_output_tokens: 1600
+      text: {
+        format: {
+          type: "json_schema",
+          name: "kingbot_market_scan",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              market_regime: { type: "string" },
+              ranked_symbols: {
+                type: "array",
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    symbol: { type: "string" },
+                    bias: { type: "string" },
+                    signal: { type: "string" },
+                    score: { type: "number" },
+                    entry: { type: ["number", "null"] },
+                    sl: { type: ["number", "null"] },
+                    tp1: { type: ["number", "null"] },
+                    tp2: { type: ["number", "null"] },
+                    waitFor: { type: "string" },
+                    reason: { type: "string" },
+                    technicalAnalysis: { type: "array", items: { type: "string" } },
+                    invalidation: { type: "string" },
+                    riskFlags: { type: "array", items: { type: "string" } }
+                  },
+                  required: ["symbol","bias","signal","score","entry","sl","tp1","tp2","waitFor","reason","technicalAnalysis","invalidation","riskFlags"]
+                }
+              },
+              risk_flags: { type: "array", items: { type: "string" } },
+              summary: { type: "string" }
+            },
+            required: ["market_regime","ranked_symbols","risk_flags","summary"]
+          }
+        }
+      },
+      max_output_tokens: 2200,
+      store: false
     })
   });
+
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data?.error?.message || data?.message || "XAI_MARKET_SCAN_FAILED");
-  const analysis = String(data?.output_text || "").trim();
+  if (!response.ok) {
+    throw new Error(data?.error?.message || data?.message || "XAI_MARKET_SCAN_FAILED");
+  }
+
+  let analysis = String(data?.output_text || "").trim();
+  if (!analysis && Array.isArray(data?.output)) {
+    for (const item of data.output) {
+      if (item?.type !== "message" || !Array.isArray(item.content)) continue;
+      const part = item.content.find(x => x?.type === "output_text" && typeof x.text === "string");
+      if (part?.text) { analysis = part.text.trim(); break; }
+    }
+  }
   if (!analysis) throw new Error("XAI_MARKET_SCAN_EMPTY");
+  JSON.parse(analysis);
   return { provider: "xai", model, analysis };
 }
 
