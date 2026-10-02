@@ -55,7 +55,8 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     const question=String(req.body?.message||"").trim().slice(0,3000);
     const symbol=cleanSymbol(req.body?.symbol);
     if(!question)return res.status(400).json({ok:false,error:"AI_AGENT_MESSAGE_REQUIRED"});
-    const native=await runNativeKingbotAI({question,symbol,twelveData:feed,pool,broker,userId:user.id});
+    const conversation=Array.isArray(req.body?.conversation)?req.body.conversation.slice(-6).map(item=>({role:item?.role==="assistant"?"assistant":"user",content:String(item?.content||"").slice(0,1800)})):[];
+    const native=await runNativeKingbotAI({question,symbol,twelveData:feed,pool,broker,userId:user.id,conversation});
     if(EXTERNAL_PROVIDER!=="gemini" || !ai){
       return res.json({ok:true,agent:"KINGBOT",...native,generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
     }
