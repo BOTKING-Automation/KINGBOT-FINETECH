@@ -666,45 +666,79 @@ h1{
 }
 
 @keyframes heroBotColorCycle{
-  0%,100%{
+  /* Rapid RGB transition at startup */
+  0%{
     filter:
       hue-rotate(0deg)
-      saturate(1.35)
+      saturate(1.45)
       brightness(1.08)
-      drop-shadow(0 0 18px rgba(246,185,59,.70))
+      drop-shadow(0 0 18px rgba(246,185,59,.78))
       drop-shadow(0 0 52px rgba(246,185,59,.38));
+  }
+  5%{
+    filter:
+      hue-rotate(228deg)
+      saturate(1.65)
+      brightness(1.10)
+      drop-shadow(0 0 21px rgba(155,92,255,.86))
+      drop-shadow(0 0 60px rgba(155,92,255,.46));
+  }
+  10%{
+    filter:
+      hue-rotate(178deg)
+      saturate(1.65)
+      brightness(1.10)
+      drop-shadow(0 0 21px rgba(71,135,255,.86))
+      drop-shadow(0 0 62px rgba(71,135,255,.48));
+  }
+  15%{
+    filter:
+      hue-rotate(108deg)
+      saturate(1.65)
+      brightness(1.12)
+      drop-shadow(0 0 21px rgba(35,247,163,.86))
+      drop-shadow(0 0 62px rgba(35,247,163,.46));
   }
   20%{
     filter:
-      hue-rotate(228deg)
-      saturate(1.55)
-      brightness(1.10)
-      drop-shadow(0 0 20px rgba(155,92,255,.78))
-      drop-shadow(0 0 58px rgba(155,92,255,.44));
-  }
-  40%{
-    filter:
-      hue-rotate(178deg)
-      saturate(1.55)
-      brightness(1.10)
-      drop-shadow(0 0 20px rgba(71,135,255,.80))
-      drop-shadow(0 0 60px rgba(71,135,255,.45));
-  }
-  60%{
-    filter:
-      hue-rotate(108deg)
-      saturate(1.55)
-      brightness(1.12)
-      drop-shadow(0 0 20px rgba(35,247,163,.80))
-      drop-shadow(0 0 60px rgba(35,247,163,.44));
-  }
-  80%{
-    filter:
       hue-rotate(318deg)
-      saturate(1.65)
+      saturate(1.70)
       brightness(1.12)
-      drop-shadow(0 0 21px rgba(255,77,109,.82))
-      drop-shadow(0 0 62px rgba(255,77,109,.46));
+      drop-shadow(0 0 22px rgba(255,77,109,.88))
+      drop-shadow(0 0 65px rgba(255,77,109,.48));
+  }
+  /* Slow continuous color drift after the fast phase */
+  35%{
+    filter:
+      hue-rotate(270deg)
+      saturate(1.55)
+      brightness(1.09)
+      drop-shadow(0 0 20px rgba(155,92,255,.78))
+      drop-shadow(0 0 58px rgba(155,92,255,.40));
+  }
+  55%{
+    filter:
+      hue-rotate(170deg)
+      saturate(1.48)
+      brightness(1.08)
+      drop-shadow(0 0 19px rgba(25,230,255,.76))
+      drop-shadow(0 0 56px rgba(25,230,255,.38));
+  }
+  75%{
+    filter:
+      hue-rotate(105deg)
+      saturate(1.48)
+      brightness(1.08)
+      drop-shadow(0 0 19px rgba(35,247,163,.74))
+      drop-shadow(0 0 55px rgba(35,247,163,.36));
+  }
+  100%{
+    filter:
+      hue-rotate(0deg)
+      saturate(1.45)
+      brightness(1.08)
+      drop-shadow(0 0 18px rgba(246,185,59,.78))
+      drop-shadow(0 0 52px rgba(246,185,59,.38));
   }
 }
 
@@ -718,7 +752,7 @@ h1{
 
   border-radius:23px;
 
-  animation:heroBotColorCycle 10s ease-in-out infinite;
+  animation:heroBotColorCycle 18s linear infinite;
   will-change:filter,transform;
 
   background:
