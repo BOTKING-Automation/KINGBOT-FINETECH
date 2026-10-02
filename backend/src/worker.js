@@ -399,6 +399,7 @@ async function executeLadderV8DerivStart({userId,botId,config,s,account,quote,in
     const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,s.executionMode,config.symbol,sideName,stake]);
     if(!journal.rowCount)continue;
     try{
+      await broker.assertExecutionAuthorized(userId);
       const order=await broker.placeOrder({side:sideName,symbol:config.symbol,volume:stake,stopLoss,takeProfit,comment:"KINGBOT V8 DERIV R"+i,clientId,userId,currency:accountCurrency,multiplier,derivContractType:contractType});
       await pool.query("UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,JSON.stringify(order)]);
       if(order?.contractId)contractIds.push(String(order.contractId));
@@ -495,7 +496,8 @@ async function executeLadderV8DerivManage({userId,botId,config,s,account,quote,p
         const clientId="kbv8d_"+crypto.randomUUID();
         const pyramidStopLoss=Number(Math.max(0.01,Math.min(nextStake*0.9,Number(ind.v8Atr||ind.atr)*cfg.atrSLMult*Number(state.deriv_multiplier||100))).toFixed(2));
         const pyramidTakeProfit=Number(Math.max(nextStake*1.05,nextStake+pyramidStopLoss*Number(cfg.takeProfitRR||2.0)).toFixed(2));
-        const order=await broker.placeOrder({side,symbol:config.symbol,volume:nextStake,stopLoss:pyramidStopLoss,takeProfit:pyramidTakeProfit,comment:"KINGBOT V8 DERIV PYRAMID R"+state.rungsOpened,clientId,userId,currency:String(account.currency||"USD"),multiplier:Number(state.deriv_multiplier||100),derivContractType:state.deriv_contract_type});
+        await broker.assertExecutionAuthorized(userId);
+      const order=await broker.placeOrder({side,symbol:config.symbol,volume:nextStake,stopLoss:pyramidStopLoss,takeProfit:pyramidTakeProfit,comment:"KINGBOT V8 DERIV PYRAMID R"+state.rungsOpened,clientId,userId,currency:String(account.currency||"USD"),multiplier:Number(state.deriv_multiplier||100),derivContractType:state.deriv_contract_type});
         if(order?.contractId){
           state.positionIds=[...state.positionIds.map(String),String(order.contractId)];
           stakes.push(nextStake);
@@ -568,6 +570,7 @@ async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,pos
     const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,s.executionMode,config.symbol,side,volume]);
     if(!journal.rowCount)continue;
     try{
+      await broker.assertExecutionAuthorized(userId);
       const order=await broker.placeOrder({side,symbol:config.symbol,volume,stopLoss:sl,takeProfit:null,comment:"KINGBOT V8 LADDER R"+i,clientId,userId});
       await pool.query("UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,JSON.stringify(order)]);
       const id=order?.contractId!=null?String(order.contractId):"";
@@ -681,7 +684,8 @@ async function executeLadderV8Manage({userId,botId,config,s,account,quote,positi
       const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,s.executionMode,config.symbol,Number(state.direction)>0?"BUY":"SELL",nextLot]);
       if(journal.rowCount){
         try{
-          const order=await broker.placeOrder({side:Number(state.direction)>0?"BUY":"SELL",symbol:config.symbol,volume:nextLot,stopLoss:sl,takeProfit:null,comment:"KINGBOT V8 PYRAMID R"+rungsOpened,clientId,userId});
+          await broker.assertExecutionAuthorized(userId);
+      const order=await broker.placeOrder({side:Number(state.direction)>0?"BUY":"SELL",symbol:config.symbol,volume:nextLot,stopLoss:sl,takeProfit:null,comment:"KINGBOT V8 PYRAMID R"+rungsOpened,clientId,userId});
           await pool.query("UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,JSON.stringify(order)]);
           const ids=await discoverNewLadderPositionIds(userId,config.symbol,Number(state.direction)>0?"BUY":"SELL",beforeIds,order);
           positionIds.push(...ids);
