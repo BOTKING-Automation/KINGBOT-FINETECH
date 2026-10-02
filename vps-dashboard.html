@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#02060d">
+<meta name="description" content="KINGBOT user-owned Windows VPS and MT5 deployment dashboard.">
+<title>KINGBOT FINTECH — VPS Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700;800&family=Orbitron:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="system/platform.css">
+<style>
+:root{--bg:#02060d;--panel:#07101d;--line:rgba(255,255,255,.075);--text:#eef5ff;--muted:#7d8ba4;--cyan:#19e6ff;--violet:#9b5cff;--gold:#f6b93b;--green:#23f7a3;--red:#ff5574}
+*{box-sizing:border-box}html{background:var(--bg)}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at 8% 0%,rgba(25,230,255,.075),transparent 30%),radial-gradient(circle at 92% 0%,rgba(155,92,255,.085),transparent 28%),linear-gradient(180deg,#02060d,#040a13)}
+main{width:min(1320px,calc(100% - 28px));margin:auto;padding:78px 0 60px}
+.hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:14px;margin-bottom:14px}
+.card{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,rgba(7,15,28,.96),rgba(3,8,16,.985));box-shadow:0 24px 80px rgba(0,0,0,.34)}
+.hero-copy{padding:24px}.eyebrow{color:var(--cyan);font:900 8px "JetBrains Mono";letter-spacing:.16em}.hero h1{margin:11px 0 7px;font:900 clamp(28px,4vw,48px) Orbitron;letter-spacing:-.035em;line-height:1}.hero h1 span{color:var(--cyan)}.hero p{max-width:760px;color:#7b8aa3;font-size:10px;line-height:1.72;margin:0}.pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:15px}.pill{padding:6px 8px;border:1px solid rgba(255,255,255,.06);border-radius:7px;color:#6e7c96;background:rgba(255,255,255,.016);font:800 6px "JetBrains Mono"}.side{padding:18px}.side-title{color:#586780;font:800 7px "JetBrains Mono";letter-spacing:.11em}.state{margin-top:13px;padding:13px;border-radius:12px;border:1px solid rgba(35,247,163,.14);background:rgba(35,247,163,.025)}.state strong{font:900 12px Orbitron;color:var(--green)}.state span{display:block;margin-top:6px;color:#75849d;font:600 7px "JetBrains Mono";line-height:1.55}.section{margin-top:13px}.section-head{display:flex;align-items:end;justify-content:space-between;gap:10px;margin:0 2px 8px}.section-title{font:900 12px Orbitron;letter-spacing:.08em}.section-sub{margin-top:4px;color:#62718a;font-size:8px}.section-code{color:#4e5d73;font:800 6px "JetBrains Mono";letter-spacing:.12em}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.panel{padding:16px}.panel h2{margin:0;font:900 10px Orbitron;letter-spacing:.08em}.panel-copy{margin-top:5px;color:#65748c;font:600 7px "JetBrains Mono";line-height:1.5}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:13px}.field.full{grid-column:1/-1}.field label{display:block;margin-bottom:5px;color:#77869f;font:800 6px "JetBrains Mono";letter-spacing:.06em}.field input,.field select{width:100%;height:39px;border:1px solid rgba(255,255,255,.08);border-radius:9px;background:#030811;color:#edf4ff;padding:0 10px;outline:none;font:700 7.5px "JetBrains Mono"}.field input:focus,.field select:focus{border-color:rgba(25,230,255,.34);box-shadow:0 0 0 2px rgba(25,230,255,.05)}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.btn{border:0;border-radius:8px;padding:10px 12px;background:linear-gradient(90deg,var(--gold),#ffe39a,var(--cyan));color:#03070d;font:900 7px "JetBrains Mono";cursor:pointer}.btn.alt{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);color:#8d9ab0}.btn:disabled{opacity:.45;cursor:not-allowed}.status{margin-top:9px;min-height:19px;color:#70809a;font:700 6.5px "JetBrains Mono";line-height:1.55}.security{margin-top:12px;padding:10px;border:1px solid rgba(35,247,163,.1);border-radius:9px;background:rgba(35,247,163,.018);color:#73839b;font:600 6px "JetBrains Mono";line-height:1.6}.security strong{color:#9ce7c4}.deployment-list{display:grid;gap:8px;margin-top:13px}.deploy{padding:11px;border:1px solid rgba(255,255,255,.06);border-radius:10px;background:rgba(255,255,255,.018)}.deploy-top{display:flex;justify-content:space-between;gap:8px}.deploy-id{color:#b7c5d9;font:800 7px "JetBrains Mono";overflow:hidden;text-overflow:ellipsis}.deploy-state{font:900 6px "JetBrains Mono";color:var(--green)}.deploy-state.wait{color:var(--gold)}.deploy-state.err{color:var(--red)}.deploy-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:9px}.mini span{display:block;color:#536179;font:700 5.5px "JetBrains Mono"}.mini strong{display:block;margin-top:4px;color:#c8d4e6;font:800 6.5px "JetBrains Mono";overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.command{display:none;margin-top:12px}.command.show{display:block}.command textarea{width:100%;min-height:92px;resize:vertical;border:1px solid rgba(25,230,255,.11);border-radius:9px;background:#02070d;color:#a9eddb;padding:10px;font:700 6.5px "JetBrains Mono";outline:none}@media(max-width:900px){.hero{grid-template-columns:1fr}.grid{grid-template-columns:1fr}}@media(max-width:650px){main{width:calc(100% - 14px);padding-top:68px}.fields{grid-template-columns:1fr}.field.full{grid-column:auto}.deploy-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div data-kingbot-navigation></div>
+<main>
+  <section class="hero">
+    <div class="card hero-copy">
+      <div class="eyebrow">KINGBOT FINTECH · USER VPS CONTROL CENTER</div>
+      <h1>Your <span>VPS.</span> Your MT5.</h1>
+      <p>Configure the exact Windows VPS and MetaTrader 5 account that KINGBOT should operate. Save the configuration, enroll the KINGBOT VPS agent, then deploy a selected strategy to the enrolled server.</p>
+      <div class="pills"><span class="pill">WINDOWS VPS</span><span class="pill">MT5 LOGIN</span><span class="pill">ACCOUNT-BOUND</span><span class="pill">TLS</span><span class="pill">24/7 AGENT</span></div>
+    </div>
+    <aside class="card side">
+      <div class="side-title">HOSTING STATUS</div>
+      <div class="state"><strong id="overallState">CHECKING…</strong><span id="overallCopy">Reading your VPS profile and deployment state from the KINGBOT backend.</span></div>
+      <div class="security"><strong>NOTE:</strong> The VPS agent runs inside your Windows VPS. KINGBOT does not need ongoing RDP/SSH access after the agent is enrolled.</div>
+    </aside>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div><div class="section-title">VPS CONFIGURATION</div><div class="section-sub">Enter the server and exact MT5 account details.</div></div><div class="section-code">PROFILE / SECURE STORAGE</div></div>
+    <div class="card panel">
+      <div class="fields">
+        <div class="field"><label>VPS HOST / IP</label><input id="vpsHost" autocomplete="off" placeholder="203.0.113.10"></div>
+        <div class="field"><label>VPS PROTOCOL</label><select id="vpsProtocol"><option value="RDP">RDP</option><option value="SSH">SSH</option></select></div>
+        <div class="field"><label>VPS PORT</label><input id="vpsPort" type="number" min="1" max="65535" value="3389"></div>
+        <div class="field"><label>OPERATING SYSTEM</label><select id="vpsOs"><option value="WINDOWS">WINDOWS</option></select></div>
+        <div class="field"><label>VPS USERNAME</label><input id="vpsUsername" autocomplete="username" placeholder="Windows user / administrator"></div>
+        <div class="field"><label>VPS PASSWORD</label><input id="vpsPassword" type="password" autocomplete="new-password" placeholder="Stored encrypted"></div>
+        <div class="field"><label>MT5 BROKER SERVER</label><input id="mt5Server" autocomplete="off" placeholder="Exact broker trade server"></div>
+        <div class="field"><label>MT5 LOGIN / ACCOUNT</label><input id="mt5Login" inputmode="numeric" autocomplete="off" placeholder="Numeric login"></div>
+        <div class="field"><label>MT5 TRADING PASSWORD</label><input id="mt5Password" type="password" autocomplete="new-password" placeholder="Stored encrypted"></div>
+        <div class="field"><label>MT5 TERMINAL PATH</label><input id="terminalPath" autocomplete="off" value="C:\Program Files\MetaTrader 5\terminal64.exe"></div>
+      </div>
+      <div class="security"><strong>SECURITY:</strong> Sensitive VPS and MT5 credentials are encrypted by the KINGBOT backend. Password fields are cleared from the page after a successful save and are never stored in browser localStorage.</div>
+      <div class="actions"><button class="btn" id="saveProfile">SAVE VPS + MT5 CONFIG</button><button class="btn alt" id="reloadProfile">RELOAD SAVED PROFILE</button></div>
+      <div class="status" id="profileStatus">No VPS profile loaded.</div>
+    </div>
+  </section>
+
+  <section class="section grid">
+    <div class="card panel">
+      <h2>KINGBOT DEPLOYMENT</h2>
+      <div class="panel-copy">Choose the trading strategy, chart context, and execution mode for the enrolled VPS.</div>
+      <div class="fields">
+        <div class="field"><label>STRATEGY</label><select id="botId"><option value="strategic">KINGBOT STRATEGIC</option><option value="flipper">FLIPPER</option><option value="breakout">BREAKOUT</option><option value="smc-pro">SMC PRO</option><option value="ladder-flip">LADDER FLIP V8</option></select></div>
+        <div class="field"><label>EXECUTION MODE</label><select id="executionMode"><option value="DEMO">DEMO</option><option value="LIVE">LIVE</option></select></div>
+        <div class="field"><label>SYMBOL</label><select id="symbol"><option>XAUUSD</option><option>EURUSD</option><option>GBPUSD</option><option>USDJPY</option><option>BTCUSD</option></select></div>
+        <div class="field"><label>TIMEFRAME</label><select id="timeframe"><option>M1</option><option>M5</option><option>M15</option><option>H1</option><option>H4</option></select></div>
+        <div class="field full" id="liveConfirmWrap" style="display:none"><label>LIVE AUTHORIZATION</label><input id="liveConfirm" autocomplete="off" placeholder="Type ENABLE_LIVE_TRADING"></div>
+      </div>
+      <div class="actions"><button class="btn" id="enroll">GENERATE AGENT TOKEN</button><button class="btn" id="deploy">DEPLOY TO MY VPS</button><button class="btn alt" id="refresh">REFRESH STATUS</button></div>
+      <div class="status" id="deployStatus">Save your VPS profile before enrollment or deployment.</div>
+      <div class="command" id="commandBox"><textarea id="agentCommand" readonly></textarea><div class="actions"><button class="btn alt" id="copyCommand">COPY POWERSELL COMMAND</button></div></div>
+    </div>
+
+    <div class="card panel">
+      <h2>SAVED PROFILE</h2>
+      <div class="panel-copy">Non-secret connection details currently bound to your KINGBOT account.</div>
+      <div class="deployment-list" id="profileSummary"><div class="deploy"><div class="deploy-top"><div class="deploy-id">PROFILE</div><div class="deploy-state wait">NOT LOADED</div></div></div></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div><div class="section-title">DEPLOYMENT MONITOR</div><div class="section-sub">KINGBOT marks a deployment RUNNING only after the enrolled MT5 bridge reports its heartbeat.</div></div><div class="section-code">LIVE BACKEND STATE</div></div>
+    <div class="card panel"><div class="deployment-list" id="deploymentList"><div class="deploy"><div class="deploy-top"><div class="deploy-id">No deployments loaded</div><div class="deploy-state wait">WAITING</div></div></div></div></div>
+  </section>
+</main>
+
+<script src="system/session.js"></script>
+<script src="system/auth-gate.js"></script>
+<script src="system/access-control.js"></script>
+<script src="system/navigation.js"></script>
+<script>
+(function(){
+"use strict";
+const API=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbot-fintech-api-etfv.onrender.com/api";
+const $=id=>document.getElementById(id);
+let profile=null;
+async function token(){
+  if(!window.KINGBOT_FIREBASE)await import("./system/firebase-auth.js");
+  const fb=window.KINGBOT_FIREBASE;
+  if(!fb)throw new Error("Firebase Authentication is unavailable. Sign in again.");
+  let u=fb.auth?.currentUser||null;
+  if(!u)u=await fb.waitForAuthReady(12000).catch(()=>fb.auth?.currentUser||null);
+  if(!u)throw new Error("KINGBOT session is not available. Sign in again.");
+  try{await u.reload?.()}catch{}
+  if(!u.emailVerified)throw new Error("Verify your email before using VPS Dashboard.");
+  return u.getIdToken(true);
+}
+function headers(t){return {"Content-Type":"application/json","Authorization":"Bearer "+t};}
+function setStatus(id,msg){$(id).textContent=msg;}
+function applyMode(){
+  const live=$("executionMode").value==="LIVE";
+  $("liveConfirmWrap").style.display=live?"block":"none";
+}
+$("executionMode").addEventListener("change",applyMode);
+function renderProfile(p){
+  profile=p||null;
+  if(!p){
+    $("profileSummary").innerHTML='<div class="deploy"><div class="deploy-top"><div class="deploy-id">PROFILE</div><div class="deploy-state wait">NOT CONFIGURED</div></div><div class="status">Fill the configuration above and click SAVE VPS + MT5 CONFIG.</div></div>';
+    $("overallState").textContent="NOT CONFIGURED";
+    $("overallCopy").textContent="No user-owned VPS profile is currently saved.";
+    return;
+  }
+  $("profileSummary").innerHTML='<div class="deploy"><div class="deploy-top"><div class="deploy-id">'+String(p.vpsHost||"VPS")+'</div><div class="deploy-state">'+(p.enrollmentReady?"ENROLLMENT READY":"PROFILE SAVED")+'</div></div><div class="deploy-grid">'+
+    '<div class="mini"><span>PORT</span><strong>'+String(p.vpsPort||"")+'</strong></div>'+
+    '<div class="mini"><span>USER</span><strong>'+String(p.username||"")+'</strong></div>'+
+    '<div class="mini"><span>MT5 LOGIN</span><strong>'+String(p.mt5Login||"")+'</strong></div>'+
+    '<div class="mini"><span>SERVER</span><strong>'+String(p.mt5Server||"")+'</strong></div>'+
+    '</div><div class="status">Strategy '+String(p.botId||"strategic").toUpperCase()+' · '+String(p.symbol||"XAUUSD")+' · '+String(p.timeframe||"M1")+' · '+String(p.executionMode||"DEMO")+'</div></div>';
+  $("botId").value=p.botId||"strategic";$("symbol").value=p.symbol||"XAUUSD";$("timeframe").value=p.timeframe||"M1";$("executionMode").value=p.executionMode||"DEMO";applyMode();
+}
+function renderDeployments(list){
+  const items=Array.isArray(list)?list:[];
+  if(!items.length){$("deploymentList").innerHTML='<div class="deploy"><div class="deploy-top"><div class="deploy-id">No VPS deployments</div><div class="deploy-state wait">READY</div></div><div class="status">Save your profile, enroll the VPS agent, then deploy a strategy.</div></div>';return;}
+  $("deploymentList").innerHTML=items.map(d=>{
+    const st=String(d.status||"UNKNOWN").toUpperCase(), cls=st==="ERROR"?"err":st==="PROVISIONING"?"wait":"";
+    return '<div class="deploy"><div class="deploy-top"><div class="deploy-id">'+String(d.id||"DEPLOYMENT")+'</div><div class="deploy-state '+cls+'">'+st+(d.online?" · ONLINE":"")+'</div></div><div class="deploy-grid">'+
+      '<div class="mini"><span>MODE</span><strong>'+String(d.execution_mode||"")+'</strong></div>'+
+      '<div class="mini"><span>BOT</span><strong>'+String(d.bot_id||"").toUpperCase()+'</strong></div>'+
+      '<div class="mini"><span>ACCOUNT</span><strong>'+String(d.account_id||"")+'</strong></div>'+
+      '<div class="mini"><span>HOST</span><strong>'+String(d.hostingMode||"USER_VPS")+'</strong></div>'+
+      '</div></div>';
+  }).join("");
+  const active=items.find(x=>["PROVISIONING","RUNNING","PAUSED"].includes(String(x.status||"").toUpperCase()));
+  if(active){$("overallState").textContent=String(active.status||"UNKNOWN").toUpperCase();$("overallCopy").textContent=active.online?"Your enrolled VPS is reporting heartbeat.":"Deployment exists; waiting for the VPS agent / MT5 bridge.";}
+  else {$("overallState").textContent=profile?"READY":"NOT CONFIGURED";$("overallCopy").textContent=profile?"VPS profile is saved and available for a new deployment.":"No profile is configured.";}
+}
+async function load(){
+  try{
+    const t=await token();
+    const r=await fetch(API+"/mt5/hosting/status",{headers:{"Authorization":"Bearer "+t},cache:"no-store"});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||"VPS STATUS UNAVAILABLE");
+    renderProfile(d.vpsProfile);
+    renderDeployments(d.deployments);
+    if(d.vpsProfile&&d.vpsProfile.mt5Server){$("profileStatus").textContent="Saved profile loaded. Sensitive passwords are intentionally not returned to the browser."; }
+    else $("profileStatus").textContent="No VPS profile configured.";
+  }catch(e){$("overallState").textContent="AUTH / API ERROR";$("overallCopy").textContent=String(e.message||"Unable to load VPS state.");setStatus("profileStatus",String(e.message||"VPS status unavailable."));}
+}
+$("saveProfile").addEventListener("click",async()=>{
+  const payload={
+    vpsHost:$("vpsHost").value.trim(),vpsPort:Number($("vpsPort").value||3389),vpsProtocol:$("vpsProtocol").value,vpsOs:$("vpsOs").value,
+    vpsUsername:$("vpsUsername").value.trim(),vpsPassword:$("vpsPassword").value,
+    mt5Server:$("mt5Server").value.trim(),mt5Login:$("mt5Login").value.trim(),mt5Password:$("mt5Password").value,
+    terminalPath:$("terminalPath").value.trim(),symbol:$("symbol").value,timeframe:$("timeframe").value,
+    botId:$("botId").value,executionMode:$("executionMode").value,
+    liveConfirmation:$("executionMode").value==="LIVE"?$("liveConfirm").value.trim():""
+  };
+  if(!payload.vpsHost||!payload.vpsUsername||!payload.vpsPassword||!payload.mt5Server||!/^\d+$/.test(payload.mt5Login)||!payload.mt5Password){setStatus("profileStatus","Complete VPS host/user/password and MT5 server/login/password.");return;}
+  if(payload.executionMode==="LIVE"&&payload.liveConfirmation!=="ENABLE_LIVE_TRADING"){setStatus("profileStatus","LIVE mode requires ENABLE_LIVE_TRADING.");return;}
+  const btn=$("saveProfile");btn.disabled=true;btn.textContent="SAVING…";
+  try{
+    const t=await token();
+    const r=await fetch(API+"/mt5/hosting/vps-profile",{method:"POST",headers:headers(t),body:JSON.stringify(payload),credentials:"omit"});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.message||d.error||"VPS PROFILE SAVE FAILED");
+    profile=d.profile||null;
+    $("vpsPassword").value="";$("mt5Password").value="";
+    renderProfile(profile);
+    setStatus("profileStatus","VPS + MT5 configuration saved ✓. Generate the agent token next.");
+  }catch(e){setStatus("profileStatus",String(e.message||"VPS PROFILE SAVE FAILED"))}
+  finally{btn.disabled=false;btn.textContent="SAVE VPS + MT5 CONFIG";}
+});
+$("reloadProfile").addEventListener("click",load);
+$("enroll").addEventListener("click",async()=>{
+  try{
+    const t=await token();
+    const r=await fetch(API+"/mt5/hosting/vps-profile/enrollment",{method:"POST",headers:{"Authorization":"Bearer "+t}});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.command)throw new Error(d.error||"AGENT ENROLLMENT FAILED");
+    $("agentCommand").value=d.command;$("commandBox").classList.add("show");
+    setStatus("deployStatus","AGENT TOKEN READY ✓ · Expires in "+String(d.expiresInHours||24)+" hours. Run the command on your Windows VPS.");
+  }catch(e){setStatus("deployStatus",String(e.message||"AGENT ENROLLMENT FAILED"))}
+});
+$("copyCommand").addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText($("agentCommand").value);setStatus("deployStatus","PowerShell command copied.");}catch{setStatus("deployStatus","Copy blocked. Select the command manually.");}
+});
+$("deploy").addEventListener("click",async()=>{
+  if(!profile){setStatus("deployStatus","Save VPS + MT5 configuration first.");return;}
+  if($("executionMode").value==="LIVE"&&$("liveConfirm").value.trim()!=="ENABLE_LIVE_TRADING"){setStatus("deployStatus","LIVE mode requires ENABLE_LIVE_TRADING.");return;}
+  const btn=$("deploy");btn.disabled=true;btn.textContent="QUEUEING…";
+  try{
+    const t=await token();
+    const r=await fetch(API+"/mt5/hosting/provision-vps",{method:"POST",headers:headers(t),body:JSON.stringify({botId:$("botId").value,executionMode:$("executionMode").value}),credentials:"omit"});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.message||d.error||d.reason||"VPS DEPLOYMENT FAILED");
+    setStatus("deployStatus","DEPLOYMENT QUEUED ✓ · "+String(d.deploymentId||"PENDING")+" · Start the enrolled VPS agent if it is not already running.");
+    await load();
+  }catch(e){setStatus("deployStatus",String(e.message||"VPS DEPLOYMENT FAILED"))}
+  finally{btn.disabled=false;btn.textContent="DEPLOY TO MY VPS";}
+});
+$("refresh").addEventListener("click",load);
+applyMode();
+load();
+setInterval(load,15000);
+})();
+</script>
+</body>
+</html>
