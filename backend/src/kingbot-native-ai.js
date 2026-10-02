@@ -369,11 +369,6 @@ export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker
       verified:{google:true,freshnessDays:fresh,marketContext:Boolean(marketContext)}
     };
   }
-    const search=await searchWeb(String(question||"").replace(/\b(google|search the web|search online|look up|find online|research online|on the internet)\b/gi,"").trim()||question,{limit:6});
-    if(!search.ok) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:{answer:"I can perform Google-backed research, but Google Search is not configured on the backend yet.",facts:[search.error||"GOOGLE_SEARCH_NOT_CONFIGURED",...(search.setup?[search.setup]:[])],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Google Search credentials.",invalidation:"No web search available."},riskFlags:["WEB_SEARCH_UNAVAILABLE"],nextAction:"Configure GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX on the backend."},verified:{google:false}};
-    const facts=search.results.map((r,i)=>(i+1)+". "+r.title+" — "+r.snippet+" — "+r.url);
-    return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:{answer:"I searched Google for “"+search.query+"” and found "+search.results.length+" result(s).",facts,technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No trading setup requested.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask me to summarize, compare, or investigate the sources."},sources:search.results,verified:{google:true}};
-  }
   const quotes=twelveData?.enabled?twelveData.quotes([requested]):[];
   const quote=quotes[0]||null;
 
