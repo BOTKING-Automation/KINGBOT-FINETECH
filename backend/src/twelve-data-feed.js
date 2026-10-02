@@ -23,6 +23,12 @@ function kingbotSymbol(symbol) {
   return normalizeSymbol(symbol).replace("/", "");
 }
 
+function sma(values, period){ if(!Array.isArray(values)||values.length<period)return null; const s=values.slice(-period); return s.reduce((a,b)=>a+b,0)/period; }
+function emaSeries(values,period){ if(values.length<period)return []; const k=2/(period+1); let prev=sma(values.slice(0,period),period); const out=Array(period-1).fill(null); out.push(prev); for(let i=period;i<values.length;i++){prev=values[i]*k+prev*(1-k);out.push(prev);} return out; }
+function rsiValue(values,period=14){if(values.length<=period)return null;let g=0,l=0;for(let i=1;i<=period;i++){const d=values[i]-values[i-1];g+=Math.max(d,0);l+=Math.max(-d,0);}let ag=g/period,al=l/period;for(let i=period+1;i<values.length;i++){const d=values[i]-values[i-1];ag=(ag*(period-1)+Math.max(d,0))/period;al=(al*(period-1)+Math.max(-d,0))/period;}return al===0?100:100-100/(1+ag/al);}
+function atrValue(bars,period=14){if(bars.length<=period)return null;const t=[];for(let i=1;i<bars.length;i++){const h=bars[i].high,l=bars[i].low,p=bars[i-1].close;t.push(Math.max(h-l,Math.abs(h-p),Math.abs(l-p)));}return sma(t,period);}
+function deriveTechnicalFromBars(bars){if(bars.length<60)return null;const c=bars.map(x=>x.close),h=bars.map(x=>x.high),l=bars.map(x=>x.low),e20=emaSeries(c,20),e50=emaSeries(c,50),f=emaSeries(c,12),s=emaSeries(c,26),macdSeries=c.map((_,i)=>f[i]!=null&&s[i]!=null?f[i]-s[i]:null).filter(v=>v!=null),macd=macdSeries.at(-1),macdSignal=sma(macdSeries,9),rsi=rsiValue(c),atr=atrValue(bars),last=bars.at(-1),prev=bars.at(-2),rh=Math.max(...h.slice(-20,-1)),rl=Math.min(...l.slice(-20,-1)),ph=Math.max(...h.slice(-40,-20)),pl=Math.min(...l.slice(-40,-20)),ema20=e20.at(-1),ema50=e50.at(-1);const trend=ema20>ema50&&last.close>ema20?"BULLISH":ema20<ema50&&last.close<ema20?"BEARISH":"NEUTRAL";const bos=last.close>rh?"BULLISH":last.close<rl?"BEARISH":"NONE";const choch=prev.close<=ph&&last.close>ph?"BULLISH":prev.close>=pl&&last.close<pl?"BEARISH":"NONE";const liquiditySweep=last.low<rl&&last.close>rl?"BULLISH":last.high>rh&&last.close<rh?"BEARISH":"NONE";const fvg=bars.at(-1).low>bars.at(-3).high||bars.at(-1).high<bars.at(-3).low;return {close:last.close,price:last.close,ema20,ema50,rsi14:rsi,macd,macdSignal,atr14:atr,support:rl,resistance:rh,trend,bos,choch,liquiditySweep,fvg,barTime:last.datetime,receivedAt:new Date().toISOString()};}
+
 export class TwelveDataFeed {
   constructor({ symbols = DEFAULT_SYMBOLS } = {}) {
     this.apiKey = String(process.env.TWELVE_DATA_API_KEY || "").trim();
