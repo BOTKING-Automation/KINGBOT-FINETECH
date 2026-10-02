@@ -2512,3 +2512,65 @@ body.kb-ui-runtime-ready .app-shell{
     transition:none !important;
   }
 }
+
+
+/* Confirmation modal used for risky/destructive actions. */
+.kb-modal-overlay{
+  position:fixed;
+  inset:0;
+  z-index:2147483600;
+  display:grid;
+  place-items:center;
+  padding:20px;
+  background:rgba(0,0,0,.68);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+.kb-modal{
+  width:min(480px,100%);
+  padding:20px;
+  border:1px solid rgba(25,230,255,.17);
+  border-radius:18px;
+  background:linear-gradient(145deg,rgba(8,15,34,.98),rgba(2,6,16,.99));
+  box-shadow:0 30px 100px rgba(0,0,0,.6),0 0 45px rgba(25,230,255,.07);
+}
+.kb-modal-kicker{
+  color:var(--kb-accent);
+  font:800 8px "JetBrains Mono",monospace;
+  letter-spacing:.15em;
+}
+.kb-modal h2{
+  margin:10px 0 8px;
+  color:var(--kb-text);
+  font:800 18px Orbitron,sans-serif;
+}
+.kb-modal p{
+  margin:0;
+  color:var(--kb-text-soft);
+  font-size:12px;
+  line-height:1.7;
+}
+.kb-modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:18px;
+}
+.kb-modal-actions button{
+  min-height:var(--kb-touch);
+  padding:0 14px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.03);
+  color:var(--kb-text-soft);
+  font:800 9px "JetBrains Mono",monospace;
+}
+.kb-modal-actions button[data-confirm]{
+  border-color:var(--kb-accent-border);
+  background:var(--kb-action-gradient);
+  color:#040712;
+}
+@media(max-width:500px){
+  .kb-modal-actions{display:grid;grid-template-columns:1fr}
+  .kb-modal-actions button{width:100%}
+}
