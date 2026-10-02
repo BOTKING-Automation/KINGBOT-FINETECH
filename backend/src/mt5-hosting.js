@@ -6,16 +6,19 @@ const HEARTBEAT_TIMEOUT_MS = 20_000;
 
 function clean(value,max=200){return String(value??"").trim().slice(0,max);}
 function hashToken(token){return crypto.createHash("sha256").update(String(token||""),"utf8").digest("hex");}
+function encryptionKey(){
+  const raw=String(process.env.BROKER_CREDENTIALS_KEY||"").trim();
+  if(!raw||raw.length<32)throw new Error("BROKER_CREDENTIALS_KEY_NOT_CONFIGURED");
+  return crypto.createHash("sha256").update(raw,"utf8").digest();
+}
 function encryptSecret(value){
   const iv=crypto.randomBytes(12);
-  const cipher=crypto.createCipheriv("aes-256-gcm",crypto.createHash("sha256").update(String(process.env.BROKER_CREDENTIALS_KEY||"").trim(),"utf8").digest(),iv);
+  const cipher=crypto.createCipheriv("aes-256-gcm",encryptionKey(),iv);
   const ciphertext=Buffer.concat([cipher.update(String(value),"utf8"),cipher.final()]);
   return {ciphertext:ciphertext.toString("base64"),iv:iv.toString("base64"),tag:cipher.getAuthTag().toString("base64")};
 }
 function decryptSecret(row){
-  const raw=String(process.env.BROKER_CREDENTIALS_KEY||"").trim();
-  if(!raw||raw.length<32)throw new Error("BROKER_CREDENTIALS_KEY_NOT_CONFIGURED");
-  const decipher=crypto.createDecipheriv("aes-256-gcm",crypto.createHash("sha256").update(raw,"utf8").digest(),Buffer.from(row.credential_iv,"base64"));
+  const decipher=crypto.createDecipheriv("aes-256-gcm",encryptionKey(),Buffer.from(row.credential_iv,"base64"));
   decipher.setAuthTag(Buffer.from(row.credential_tag,"base64"));
   return Buffer.concat([decipher.update(Buffer.from(row.credential_ciphertext,"base64")),decipher.final()]).toString("utf8");
 }
@@ -166,6 +169,14 @@ export function createMt5HostingRouter({pool,requireUser}={}){
           return res.status(409).json({ok:false,error:"MT5_ACCOUNT_MISMATCH",message:"The VPS MT5 login must match the current KINGBOT MT5 account or the old broker mapping must be disconnected."});
       }
 
+      const activeDeployment=await pool.query(
+        "SELECT id,status FROM kingbot_mt5_host_deployments WHERE user_id=$1 AND status IN ('PROVISIONING','RUNNING','PAUSED') ORDER BY created_at DESC LIMIT 1",
+        [user.id]
+      );
+      if(activeDeployment.rowCount&&currentProfileIdForUpdate){
+        return res.status(409).json({ok:false,error:"VPS_DEPLOYMENT_ACTIVE",deploymentId:activeDeployment.rows[0].id,message:"Stop the current VPS deployment before replacing its VPS or MT5 credentials."});
+      }
+
       const bridge=await import("./mt5-bridge.js");
       const tokenResult=await bridge.mt5BridgeRegistry.issueToken({userId:user.id,mode:executionMode,label:"KINGBOT User VPS · "+mt5Login});
       const secretPayload=JSON.stringify({
@@ -177,6 +188,8 @@ export function createMt5HostingRouter({pool,requireUser}={}){
       });
       const encrypted=encryptSecret(secretPayload);
       const current=await pool.query("SELECT id FROM kingbot_mt5_vps_profiles WHERE user_id=$1 LIMIT 1",[user.id]);
+      const currentProfileIdForUpdate=current.rowCount?current.rows[0].id:null;
+
       let q;
       if(current.rowCount){
         q=await pool.query(
@@ -443,8 +456,8 @@ export function createMt5HostingRouter({pool,requireUser}={}){
     if(!deploymentId||!["PROVISIONING","RUNNING","PAUSED","STOPPED","ERROR"].includes(status))
       return res.status(400).json({ok:false,error:"INVALID_DEPLOYMENT_STATE"});
     const q=await pool.query(
-      "UPDATE kingbot_mt5_host_deployments SET status=$1,node_id=$2,account_id=COALESCE(NULLIF($3,''),account_id),broker_provider=COALESCE(NULLIF($4,''),broker_provider),last_heartbeat_at=NOW(),updated_at=NOW() WHERE id=$5 RETURNING id,status,node_id",
-      [status,node.node_id,clean(req.body?.accountId,100),clean(req.body?.brokerProvider,80),deploymentId]
+      "UPDATE kingbot_mt5_host_deployments SET status=$1,node_id=$2,account_id=COALESCE(NULLIF($3,''),account_id),broker_provider=COALESCE(NULLIF($4,''),broker_provider),last_heartbeat_at=NOW(),updated_at=NOW() WHERE id=$5 AND (node_id=$2 OR (node_id IS NULL AND vps_profile_id=$6)) RETURNING id,status,node_id",
+      [status,node.node_id,clean(req.body?.accountId,100),clean(req.body?.brokerProvider,80),deploymentId,node.vps_profile_id]
     );
     if(!q.rowCount)return res.status(404).json({ok:false,error:"DEPLOYMENT_NOT_FOUND"});
     res.json({ok:true,deployment:q.rows[0]});
