@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getDerivMarketFeed } from "./deriv-market-feed.js";
+import { predictPendingOrderZones } from "./pending-order-model.js";
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
@@ -107,6 +108,14 @@ function technicalEngine(snapshot) {
 
   return {
     signal, bias, score, entry, sl, tp1, tp2, waitFor,
+    atr14: atr,
+    support,
+    resistance,
+    trend,
+    bos,
+    choch,
+    liquiditySweep: liquidity,
+    fvg,
     reason: analysis.length ? analysis.join(" · ") : "Insufficient technical fields.",
     technicalAnalysis: analysis,
     invalidation: bias === "BULLISH"
@@ -490,6 +499,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
         };
   });
   technical = overlayLiveQuotes(technical, directQuotes);
+  technical = technical.map(item => ({ ...item, pendingOrderZones: predictPendingOrderZones(item) }));
 
   const tvMap = Object.fromEntries(tv.map(x => [x.symbol, x]));
   const technicalSource = tdTechnical.length
