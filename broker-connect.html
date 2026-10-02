@@ -44,6 +44,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
 .mode-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.mode-label,.intel-label{color:#586780;font:800 7px "JetBrains Mono";letter-spacing:.11em}.mode-state{color:var(--cyan);font:900 7px "JetBrains Mono"}.mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:9px;max-width:330px}.mode-btn{height:34px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.018);color:#697890;font:900 7px "JetBrains Mono";cursor:pointer}.mode-btn.active{color:#031017;border-color:transparent;background:linear-gradient(90deg,#19e6ff,#a9f7ff)}.mode-copy{margin-top:8px;color:#617089;font:600 6.5px "JetBrains Mono";line-height:1.5}.intel-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px}.intel-chip{padding:8px;border:1px solid rgba(255,255,255,.055);border-radius:8px;background:rgba(255,255,255,.016)}.intel-chip b{display:block;color:#d9e5f6;font:900 9px Orbitron}.intel-chip span{display:block;margin-top:3px;color:#5e6d85;font:700 5.8px "JetBrains Mono"}.smart-route{margin-top:8px;color:#7e8ca3;font:600 6.5px "JetBrains Mono";line-height:1.5}.smart-route strong{color:var(--green)}
 .broker .environment{display:flex;align-items:center;gap:5px;margin-top:10px}.environment span{padding:4px 6px;border-radius:6px;border:1px solid rgba(35,247,163,.12);background:rgba(35,247,163,.018);color:#7edfb8;font:800 5.7px "JetBrains Mono"}.environment span.live{border-color:rgba(246,185,59,.14);background:rgba(246,185,59,.018);color:#e3bb68}.broker[data-cap-demo="no"] .environment span.demo{opacity:.38;text-decoration:line-through}
 .connection-diagnostics{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:10px}.diag{padding:7px 8px;border:1px solid rgba(255,255,255,.05);border-radius:7px;background:rgba(255,255,255,.012)}.diag b{display:block;color:#64738a;font:800 5.5px "JetBrains Mono"}.diag span{display:block;margin-top:3px;color:#a0adbf;font:800 6px "JetBrains Mono"}.diag.ok span{color:var(--green)}.diag.build span{color:var(--gold)}
+.mt5-cloud-banner{position:relative;display:grid;grid-template-columns:1.4fr .8fr;gap:12px;align-items:center;margin:0 0 14px;padding:15px 16px;border:1px solid rgba(25,230,255,.18);border-radius:16px;background:linear-gradient(135deg,rgba(8,19,35,.98),rgba(7,10,24,.98));box-shadow:0 14px 38px rgba(0,0,0,.24),inset 0 0 32px rgba(25,230,255,.025);overflow:hidden}.mt5-cloud-banner:before{content:"";position:absolute;right:-50px;top:-75px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(25,230,255,.14),transparent 68%);pointer-events:none}.mt5-cloud-kicker{color:#19e6ff;font:900 7px "JetBrains Mono";letter-spacing:.14em}.mt5-cloud-title{margin-top:5px;font:900 14px Orbitron}.mt5-cloud-title span{color:#19e6ff}.mt5-cloud-copy{margin-top:5px;color:#728199;font:600 7px "JetBrains Mono";line-height:1.55;max-width:760px}.mt5-cloud-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.mt5-cloud-pills span{padding:5px 7px;border:1px solid rgba(255,255,255,.06);border-radius:7px;background:rgba(255,255,255,.018);color:#718099;font:800 5.8px "JetBrains Mono"}.mt5-cloud-state{position:relative;z-index:1;justify-self:end;width:min(240px,100%);padding:12px;border:1px solid rgba(35,247,163,.13);border-radius:12px;background:rgba(35,247,163,.022)}.mt5-cloud-state b{display:block;color:#23f7a3;font:900 7px "JetBrains Mono";letter-spacing:.1em}.mt5-cloud-state span{display:block;margin-top:5px;color:#8090a8;font:600 6.5px "JetBrains Mono";line-height:1.5}@media(max-width:1000px){.mt5-cloud-banner{grid-template-columns:1fr}.mt5-cloud-state{justify-self:stretch;width:auto}}
 @media(max-width:1000px){.control-strip{grid-template-columns:1fr}.connection-diagnostics{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){.intel-grid{grid-template-columns:1fr 1fr 1fr}.connection-diagnostics{grid-template-columns:1fr 1fr}}
 
@@ -80,6 +81,19 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
     </aside>
   </section>
 
+
+  <section class="mt5-cloud-banner" aria-label="KINGBOT MT5 cloud hosting">
+    <div>
+      <div class="mt5-cloud-kicker">NEW · PHONE-FIRST MT5 HOSTING</div>
+      <div class="mt5-cloud-title">Run <span>KINGBOT MT5</span> in the cloud.</div>
+      <div class="mt5-cloud-copy">Connect the exact broker MT5 account, verify the KINGBOT EA bridge, then hand the execution environment to a hosted MT5 node. Your phone does not need to stay online.</div>
+      <div class="mt5-cloud-pills"><span>24/7 MT5</span><span>EA HEARTBEAT</span><span>ACCOUNT-BOUND</span><span>NO BROKER PASSWORD IN UI</span></div>
+    </div>
+    <div class="mt5-cloud-state">
+      <b>MT5 CLOUD ROUTE</b>
+      <span>Select DERIV MT5 below to open the native bridge and cloud-hosting controls.</span>
+    </div>
+  </section>
 
   <section class="control-strip">
     <div class="mode-panel">
@@ -134,8 +148,8 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
 
       <article class="broker deriv" data-broker="derivmt5" data-mode="bridge" data-cap-demo="yes" data-cap-live="yes" data-native="yes" data-search="deriv mt5 cfd forex gold xauusd native bridge demo real">
         <div class="broker-inner">
-          <div class="broker-top"><div class="brand"><div class="logo"><img src="https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg" alt="Deriv MT5"></div><div><div class="broker-name">DERIV MT5</div><div class="broker-code">CFD · MT5 · NATIVE EA BRIDGE</div></div></div><span class="availability live">MT5</span></div>
-          <div class="broker-copy">Connect the dedicated Deriv MT5 account through the KINGBOT MT5 EA Bridge. Execution remains inside MT5 and KINGBOT receives broker-native lots, prices, floating P/L, S/L, T/P and account telemetry.</div>
+          <div class="broker-top"><div class="brand"><div class="logo"><img src="https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg" alt="Deriv MT5"></div><div><div class="broker-name">DERIV MT5</div><div class="broker-code">CFD · MT5 · NATIVE EA BRIDGE</div></div></div><span class="availability live">MT5 + CLOUD</span></div>
+          <div class="broker-copy">Connect the dedicated Deriv MT5 account through the KINGBOT MT5 EA Bridge, then hand the verified terminal to KINGBOT Cloud for phone-first 24/7 hosting. Execution remains inside MT5 and KINGBOT receives broker-native lots, prices, floating P/L, S/L, T/P and account telemetry.</div>
           <div class="broker-specs"><div class="spec"><b>CONNECTION</b><span>KINGBOT EA BRIDGE</span></div><div class="spec"><b>EXECUTION</b><span>NATIVE CFD · LOTS</span></div></div>
           <div class="meta"><span>XAUUSD</span><span>CFDs</span><span>LOTS</span><span>MT5</span></div><div class="environment"><span class="demo">● DEMO</span><span class="live">● LIVE / REAL</span></div><div class="connection-diagnostics"><div class="diag ok"><b>AUTH</b><span>BRIDGE</span></div><div class="diag ok"><b>POSITIONS</b><span>MT5</span></div><div class="diag ok"><b>MARKET DATA</b><span>STREAM</span></div><div class="diag ok"><b>EXECUTION</b><span>NATIVE LOTS</span></div></div>
           <div class="broker-action"><button class="connect" data-open="derivmt5">CONNECT DERIV MT5</button><a class="docs" href="https://deriv.com/trading-platforms/mt5/web-terminal" target="_blank" rel="noopener">OPEN DERIV MT5 ↗</a></div><div class="status-line">Setup: sign into Deriv MT5, install the KINGBOT EA Bridge, generate a KINGBOT token, then paste it into the EA.</div>
