@@ -573,7 +573,7 @@ function renderAccounts(list){
     const label=type==="real"?"DERIV REAL ACCOUNT":"DERIV DEMO ACCOUNT";
     return '<div class="account-item'+(i===0?" active":"")+'" data-account="'+id.replace(/"/g,"&quot;")+'" data-account-type="'+type.replace(/"/g,"&quot;")+'"><div><b>'+label+'</b><span>'+id+' · '+mode+' · '+String(a.currency||"USD")+' · Balance '+balance+'</span></div><span>SELECT</span></div>';
   }).join("");
-  selectedAccount=items[0]?.id||null;
+  selectedAccount=items[0]?.account_id||items[0]?.id||items[0]?.accountId||null;
   $("authorizeBtn").disabled=!selectedAccount;
   $("authorizeBtn").textContent=selectedAccount?"CONNECT SELECTED ACCOUNT":"SELECT AN ACCOUNT";
   document.querySelectorAll(".account-item").forEach(el=>el.addEventListener("click",()=>{
