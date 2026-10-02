@@ -4204,6 +4204,38 @@ function showToast(message){
 <script src="system/auth-gate.js"></script>
 <script src="system/access-control.js"></script>
 <script src="system/navigation.js"></script>
+<script>
+(function(){
+  "use strict";
+  function syncAuthUi(state){
+    const authenticated=Boolean(state?.authenticated&&state?.user?.verified);
+    document.querySelectorAll("[data-kb-auth-cta]").forEach(el=>{
+      if(authenticated){
+        el.textContent="OPEN DASHBOARD →";
+        el.setAttribute("href","index.html");
+      }else{
+        el.textContent=el.getAttribute("data-guest-text")||"ENTER KINGBOT →";
+        el.setAttribute("href","access-stable.html#signin");
+      }
+    });
+    document.querySelectorAll("[data-kb-guest-only]").forEach(el=>{
+      el.hidden=authenticated;
+      if(!authenticated)el.style.removeProperty("display");
+    });
+  }
+  async function init(){
+    try{
+      const session=window.KINGBOT_SESSION;
+      if(!session){syncAuthUi({authenticated:false});return;}
+      syncAuthUi(session.getState());
+      const state=await session.check();
+      syncAuthUi(state);
+    }catch{syncAuthUi({authenticated:false});}
+  }
+  window.addEventListener("kingbot:session-change",e=>syncAuthUi(e.detail||window.KINGBOT_SESSION?.getState?.()||{authenticated:false}));
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else void init();
+})();
+</script>
   
 </body>
 </html>
