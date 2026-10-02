@@ -14,6 +14,11 @@
     speaking:false,
     recording:false,
     audio:null,
+    scribeWs:null,
+    scribeStream:null,
+    scribeContext:null,
+    scribeSource:null,
+    scribeProcessor:null,
     latestText:"",
     latestTerminal:null,
     lastStatus:null
@@ -149,13 +154,175 @@
     state.latestTerminal=event?.detail||null;
   }
 
-  function startSpeechInput(){
+  function floatTo16BitBase64(float32){
+    const bytes=new Uint8Array(float32.length*2);
+    const view=new DataView(bytes.buffer);
+    for(let i=0;i<float32.length;i++){
+      const sample=Math.max(-1,Math.min(1,float32[i]));
+      view.setInt16(i*2,sample<0?sample*0x8000:sample*0x7fff,true);
+    }
+    let binary="";
+    const step=0x8000;
+    for(let i=0;i<bytes.length;i+=step){
+      binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+step,bytes.length)));
+    }
+    return btoa(binary);
+  }
+
+  function downsampleTo16k(buffer,inputRate){
+    const target=16000;
+    if(inputRate===target)return buffer;
+    const ratio=inputRate/target;
+    const newLength=Math.max(1,Math.round(buffer.length/ratio));
+    const result=new Float32Array(newLength);
+    let offset=0;
+    for(let i=0;i<newLength;i++){
+      const start=Math.floor(i*ratio);
+      const end=Math.min(buffer.length,Math.floor((i+1)*ratio));
+      let total=0,count=0;
+      for(let j=start;j<end;j++){total+=buffer[j];count++;}
+      result[i]=count?total/count:buffer[Math.min(start,buffer.length-1)]||0;
+      offset++;
+    }
+    return result;
+  }
+
+  function stopElevenScribe(){
+    if(state.scribeWs){
+      try{state.scribeWs.close();}catch{}
+      state.scribeWs=null;
+    }
+    if(state.scribeProcessor){
+      try{state.scribeProcessor.disconnect();}catch{}
+      state.scribeProcessor=null;
+    }
+    if(state.scribeSource){
+      try{state.scribeSource.disconnect();}catch{}
+      state.scribeSource=null;
+    }
+    if(state.scribeStream){
+      try{state.scribeStream.getTracks().forEach(track=>track.stop());}catch{}
+      state.scribeStream=null;
+    }
+    if(state.scribeContext){
+      try{void state.scribeContext.close();}catch{}
+      state.scribeContext=null;
+    }
+    state.recording=false;
+  }
+
+  async function startElevenScribe(){
+    if(!window.KINGBOT_API?.json)throw new Error("API_NOT_READY");
+    const input=document.getElementById("commandInput");
+    if(!input)throw new Error("Open the AI Command Console to use voice input.");
+
+    const tokenResponse=await window.KINGBOT_API.json("/voice/scribe-token",{
+      method:"POST",
+      body:JSON.stringify({})
+    });
+    if(!tokenResponse?.token)throw new Error("ELEVENLABS_SCRIBE_TOKEN_UNAVAILABLE");
+
+    if(!navigator.mediaDevices?.getUserMedia)throw new Error("MICROPHONE_API_UNAVAILABLE");
+
+    const stream=await navigator.mediaDevices.getUserMedia({
+      audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}
+    });
+
+    const wsUrl=
+      "wss://api.elevenlabs.io/v1/speech-to-text/realtime"+
+      "?model_id="+encodeURIComponent(tokenResponse.model||"scribe_v2_realtime")+
+      "&token="+encodeURIComponent(tokenResponse.token)+
+      "&audio_format=pcm_16000"+
+      "&sample_rate=16000"+
+      "&commit_strategy=vad"+
+      "&language_code=en";
+
+    const ws=new WebSocket(wsUrl);
+    state.scribeWs=ws;
+    state.scribeStream=stream;
+    state.recording=true;
+
+    const mic=document.getElementById("kbVoiceMic");
+    if(mic)mic.textContent="● ELEVEN STT";
+
+    await new Promise((resolve,reject)=>{
+      let opened=false;
+
+      ws.onopen=()=>{
+        opened=true;
+        try{
+          const AudioContext=window.AudioContext||window.webkitAudioContext;
+          if(!AudioContext)throw new Error("AUDIO_CONTEXT_UNAVAILABLE");
+
+          const ctx=new AudioContext();
+          state.scribeContext=ctx;
+          const source=ctx.createMediaStreamSource(stream);
+          const processor=ctx.createScriptProcessor(4096,1,1);
+          state.scribeSource=source;
+          state.scribeProcessor=processor;
+
+          processor.onaudioprocess=event=>{
+            if(ws.readyState!==WebSocket.OPEN||!state.recording)return;
+            const mono=event.inputBuffer.getChannelData(0);
+            const pcm=downsampleTo16k(mono,ctx.sampleRate);
+            try{
+              ws.send(JSON.stringify({
+                message_type:"input_audio_chunk",
+                audio_base_64:floatTo16BitBase64(pcm)
+              }));
+            }catch{}
+          };
+
+          source.connect(processor);
+          processor.connect(ctx.destination);
+          void ctx.resume();
+
+          resolve();
+        }catch(error){
+          try{ws.close();}catch{}
+          reject(error);
+        }
+      };
+
+      ws.onerror=()=>{
+        if(!opened)reject(new Error("ELEVENLABS_SCRIBE_CONNECTION_FAILED"));
+      };
+
+      ws.onclose=event=>{
+        if(!opened)reject(new Error("ELEVENLABS_SCRIBE_CONNECTION_FAILED"));
+        else if(state.recording && event.code!==1000)notify("ElevenLabs voice session closed.","warn");
+        state.recording=false;
+        if(mic)mic.textContent="⌕ VOICE INPUT";
+        if(state.scribeWs===ws)stopElevenScribe();
+      };
+
+      ws.onmessage=event=>{
+        try{
+          const data=JSON.parse(event.data);
+          if(data.message_type==="partial_transcript"){
+            input.value=String(data.text||"");
+          }else if(data.message_type==="committed_transcript"){
+            const finalText=String(data.text||"").trim();
+            if(finalText){
+              input.value=(input.value?input.value+" ":"")+finalText;
+              input.dispatchEvent(new Event("input",{bubbles:true}));
+            }
+          }else if(data.message_type==="error"||data.message_type==="rate_limited"){
+            notify("ElevenLabs voice input is unavailable right now.","warn");
+          }
+        }catch{}
+      };
+    });
+
+    notify("ElevenLabs Scribe is listening.","good");
+  }
+
+  function startBrowserSpeechInput(){
     const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SpeechRecognition){
       notify("Live voice input is not supported by this browser.","warn");
       return;
     }
-    if(state.recording)return;
 
     const input=document.getElementById("commandInput");
     if(!input){
@@ -190,6 +357,20 @@
     };
 
     recognition.start();
+  }
+
+  async function startSpeechInput(){
+    if(state.recording){
+      stopElevenScribe();
+      return;
+    }
+    try{
+      await startElevenScribe();
+    }catch(error){
+      stopElevenScribe();
+      notify("ElevenLabs STT unavailable; using browser voice input.","warn");
+      startBrowserSpeechInput();
+    }
   }
 
   function inject(){
