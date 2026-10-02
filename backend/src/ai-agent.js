@@ -58,7 +58,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     const conversation=Array.isArray(req.body?.conversation)?req.body.conversation.slice(-6).map(item=>({role:item?.role==="assistant"?"assistant":"user",content:String(item?.content||"").slice(0,1800)})):[];
     const native=await runNativeKingbotAI({question,symbol,twelveData:feed,pool,broker,userId:user.id,conversation});
     if(EXTERNAL_PROVIDER!=="gemini" || !ai){
-      return res.json({ok:true,agent:"KINGBOT",...native,generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
+      return res.json({ok:true,agent:"KINGBOT",...native,sources:native.sources||[],generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
     }
 
     const context=buildContext({symbol,twelveData:feed,broker,botDefinitions:getBotDefinitions()});
@@ -109,7 +109,7 @@ Respond with JSON:
         config:{systemInstruction:SYSTEM,responseMimeType:"application/json",maxOutputTokens:900,temperature:0.15}
       });
       const parsed=safeJson(response.text)||{answer:String(response.text||"KINGBOT AI returned no structured answer.")};
-      return res.json({ok:true,agent:"KINGBOT",model:MODEL,symbol,context,reply:parsed,generatedAt:new Date().toISOString()});
+      return res.json({ok:true,agent:"KINGBOT",model:MODEL,symbol,context,reply:parsed,sources:native.sources||[],generatedAt:new Date().toISOString()});
     }catch(error){
       console.error("[KINGBOT AI AGENT]",error?.message||error);
       return res.status(502).json({ok:false,error:"KINGBOT_AI_AGENT_FAILED",message:String(error?.message||"AI agent failed").slice(0,220)});
