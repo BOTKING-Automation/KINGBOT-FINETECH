@@ -11,7 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700;800&family=Orbitron:wght@700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="system/platform.css">
 <style>
-:root{--bg:#02060d;--panel:#07101d;--line:rgba(255,255,255,.075);--text:#eef5ff;--muted:#7d8ba4;--cyan:#19e6ff;--violet:#9b5cff;--gold:#f6b93b;--green:#23f7a3;--red:#ff5574}
+:root{--bg:#02060d;--panel:#07101d;--line:rgba(255,255,255,.075);--text:#eef5ff;--muted:#7d8ba4;--cyan:#19e6ff;--violet:#9b5cff;--gold:#f6b93b;--green:#23f7a3;--red:#ff5574;--pink:#ff4fd8}
 *{box-sizing:border-box}html{background:var(--bg)}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at 8% 0%,rgba(25,230,255,.075),transparent 30%),radial-gradient(circle at 92% 0%,rgba(155,92,255,.085),transparent 28%),linear-gradient(180deg,#02060d,#040a13)}
 main{width:min(1320px,calc(100% - 28px));margin:auto;padding:78px 0 60px}
 .hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:14px;margin-bottom:14px}
@@ -31,9 +31,9 @@ main{width:min(1320px,calc(100% - 28px));margin:auto;padding:78px 0 60px}
 .center-tech .core .glyph{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) translateZ(18px);color:#eaffff;font:900 29px Orbitron;letter-spacing:-.08em;text-shadow:0 0 8px rgba(25,230,255,.9),0 0 28px rgba(25,230,255,.65),0 0 48px rgba(155,92,255,.45);animation:glyphPulse 2.6s ease-in-out infinite;}
 
 .center-tech .ring{position:absolute;inset:8%;border:1px solid rgba(25,230,255,.18);border-radius:50%;box-shadow:inset 0 0 45px rgba(25,230,255,.045),0 0 34px rgba(25,230,255,.035);animation:ringSpin 16s linear infinite;transform-style:preserve-3d;}
-.center-tech .ring.r2{inset:17%;transform:rotateX(62deg) rotateY(14deg);border-style:dashed;border-color:rgba(155,92,255,.18);animation-duration:11s;animation-direction:reverse;}
-.center-tech .ring.r3{inset:28%;transform:rotateX(70deg) rotateY(-12deg);border-color:rgba(255,79,216,.16);animation-duration:8s;}
-.center-tech .ring.r4{inset:38%;transform:rotateX(58deg) rotateZ(18deg);border-style:dotted;border-color:rgba(246,185,59,.18);animation-duration:6s;animation-direction:reverse;}
+.center-tech .ring.r2{inset:17%;transform:rotateX(62deg) rotateY(14deg);border-style:dashed;border-color:rgba(155,92,255,.18);animation:tiltedRing2 11s linear infinite reverse;}
+.center-tech .ring.r3{inset:28%;transform:rotateX(70deg) rotateY(-12deg);border-color:rgba(255,79,216,.16);animation:tiltedRing3 8s linear infinite;}
+.center-tech .ring.r4{inset:38%;transform:rotateX(58deg) rotateZ(18deg);border-style:dotted;border-color:rgba(246,185,59,.18);animation:tiltedRing4 6s linear infinite reverse;}
 .center-tech .ring:before{content:"";position:absolute;left:50%;top:-4px;width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 14px var(--cyan),0 0 34px rgba(25,230,255,.45);}
 .center-tech .ring.r2:before{background:var(--violet);box-shadow:0 0 14px var(--violet),0 0 30px rgba(155,92,255,.42);}
 .center-tech .ring.r3:before{background:var(--pink);box-shadow:0 0 14px var(--pink),0 0 30px rgba(255,79,216,.4);}
@@ -64,7 +64,10 @@ main{width:min(1320px,calc(100% - 28px));margin:auto;padding:78px 0 60px}
 
 .center-tech .trace{position:absolute;height:1px;width:15%;background:linear-gradient(90deg,transparent,rgba(25,230,255,.42));transform-origin:left center;animation:tracePulse 2.8s ease-in-out infinite;}
 .center-tech .t1{left:18%;top:38%;transform:rotate(9deg)}.center-tech .t2{right:19%;top:31%;transform:rotate(171deg);background:linear-gradient(90deg,transparent,rgba(155,92,255,.4));animation-delay:-.7s}.center-tech .t3{right:20%;bottom:28%;transform:rotate(203deg);background:linear-gradient(90deg,transparent,rgba(255,79,216,.36));animation-delay:-1.5s}.center-tech .t4{left:21%;bottom:24%;transform:rotate(-18deg);background:linear-gradient(90deg,transparent,rgba(246,185,59,.36));animation-delay:-2.1s}
-@keyframes corePulse{0%,100%{transform:translate(-50%,-50%) scale(.92);opacity:.72}50%{transform:translate(-50%,-50%) scale(1.08);opacity:1}}
+@keyframes corePulse{0%,100%{transform:translate(-50%,-50%) translateZ(0) scale(.92);opacity:.72}50%{transform:translate(-50%,-50%) translateZ(18px) scale(1.08);opacity:1}}
+@keyframes tiltedRing2{0%{transform:rotateX(62deg) rotateY(14deg) rotateZ(0deg)}100%{transform:rotateX(62deg) rotateY(14deg) rotateZ(360deg)}}
+@keyframes tiltedRing3{0%{transform:rotateX(70deg) rotateY(-12deg) rotateZ(0deg)}100%{transform:rotateX(70deg) rotateY(-12deg) rotateZ(360deg)}}
+@keyframes tiltedRing4{0%{transform:rotateX(58deg) rotateZ(18deg) rotateY(0deg)}100%{transform:rotateX(58deg) rotateZ(18deg) rotateY(360deg)}}
 @keyframes coreSpin{to{transform:rotate(360deg)}}@keyframes ringSpin{to{transform:rotate(360deg)}}@keyframes beamSpin{to{transform:translate(-50%,-2%) rotate(360deg)}}
 @keyframes axisFlow{50%{opacity:.25;transform:scaleX(.72)}}@keyframes dataFloat{50%{transform:translateY(-5px);opacity:.72}}@keyframes tracePulse{50%{width:21%;opacity:.3}}
 .hero,.section,.control-rail{position:relative;z-index:2}
