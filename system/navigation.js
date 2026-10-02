@@ -10,6 +10,11 @@
     ["vps-dashboard.html","VPS Dashboard","▣","User-owned VPS & MT5 hosting"],
     ["partner-revenue.html","Partner Revenue","◌","Broker referral intelligence"],
     ["analytics.html","Analytics","▦","Performance intelligence"],
+    ["reports.html","Reports","▤","Trading and account reports"],
+    ["security-center.html","Security Center","⌾","Security and API credentials"],
+    ["support-center.html","Support","✉","Customer support operations"],
+    ["developer.html","Developer API","⌘","Read-only integration API"],
+    ["fintech-ops.html","Fintech Ops","▣","Internal fintech control plane"],
     ["ai.html","AI Intelligence","✦","AI intelligence layer"],
     ["scanner.html","AI Scanner","◎","High-intelligence market scanner"],
     ["pattern.html","Patterns","◉","Pattern intelligence"],
@@ -44,7 +49,7 @@
   const protectedPages=new Set([
     "index.html","terminal.html","analytics.html","ai.html","scanner.html",
     "bots.html","settings.html","subscription.html","broker-connect.html",
-    "partner-revenue.html","pattern.html","vps-dashboard.html"
+    "partner-revenue.html","pattern.html","vps-dashboard.html","reports.html","security-center.html","support-center.html","developer.html","fintech-ops.html"
   ]);
 
   function accountMarkup(authState){
