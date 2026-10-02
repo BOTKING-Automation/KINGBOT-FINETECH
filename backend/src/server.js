@@ -21,6 +21,7 @@ import { startWorker } from "./worker.js";
 import { createMt5BridgeRouter, ensureMt5BridgeSchema } from "./mt5-bridge-router.js";
 import { mt5BridgeRegistry } from "./mt5-bridge.js";
 import { registerTerminalSnapshot } from "./terminal-snapshot.js";
+import { registerAiMarketScanner } from "./ai-market-scanner.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -49,6 +50,7 @@ app.use("/api/bots", createBotEngineRouter({ pool }));
 app.use("/api/runtime", createBotRuntimeRouter({ pool, broker }));
 app.use("/api/mt5/bridge", createMt5BridgeRouter({ pool, broker }));
 registerTerminalSnapshot(app, { requireUser, pool, broker, firstFinite });
+registerAiMarketScanner(app, { requireUser, pool, broker, rateLimit });
 
 app.get("/api/risk", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
