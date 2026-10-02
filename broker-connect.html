@@ -694,51 +694,37 @@ applyExecutionMode();
 
 (async function handleDerivReturn(){
   const params=new URLSearchParams(window.location.search);
-  const status=params.get("deriv");
-  if(!status)return;
+  const pendingId=params.get("deriv_pending")||"";
+  const error=params.get("deriv_error")||"";
+  if(!pendingId&&!error)return;
   selectBroker("deriv");
-  if(status==="authorized"){
-    const connection=params.get("connection")||"";
-    if(!connection){
-      setStatus("Deriv authorization returned without a connection reference. Please try again.");
-      return;
-    }
-    window.__KINGBOT_DERIV_PENDING=connection;
-    verified=false;
-    setStep(3);
-    $("brokerLogin").style.display="none";
-    $("nextStep").style.display="none";
-    $("credentials").classList.remove("show");
-    $("accountSelect").classList.add("show");
-    $("flowCopy").innerHTML="<strong>STEP 3 · AUTHORIZATION VERIFIED</strong><br>Deriv approved KINGBOT. Choose the exact Demo or Real trading account you want KINGBOT to manage.";
-    setStatus("Loading your authorized Deriv accounts…");
-    try{
-      const t=await firebaseToken();
-      const r=await fetch(API_BASE+"/broker/deriv/oauth/accounts?connection="+encodeURIComponent(connection),{headers:{Authorization:"Bearer "+t}});
-      const d=await r.json().catch(()=>({}));
-      if(!r.ok||!Array.isArray(d.accounts))throw new Error(d.reason||d.error||"Unable to load authorized Deriv accounts.");
-      if(!d.accounts.length)throw new Error("No active Deriv Options trading accounts were returned.");
-      renderAccounts(d.accounts);
-      setStatus("Authorization verified. Select one authorized Deriv account.");
-    }catch(e){
-      window.__KINGBOT_DERIV_PENDING=null;
-      setStatus(e.message||"Unable to load Deriv accounts.");
-      $("accountList").innerHTML='<div class="flow-copy"><strong>ACCOUNT DISCOVERY FAILED</strong><br>'+String(e.message||"Try the Deriv OAuth flow again.").replace(/[<>&"]/g,m=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[m]))+'</div>';
-      $("authorizeBtn").disabled=true;
-    }
-  }else if(status==="connected"){
-    verified=true;
-    setStep(4);
-    $("flowCopy").innerHTML="<strong>STEP 4 · DERIV CONNECTION COMPLETE</strong><br>Deriv is already connected to the authorized KINGBOT account.";
-    setStatus("Deriv connection is active.");
-    $("brokerLogin").style.display="none";
-    $("nextStep").style.display="none";
-    $("credentials").classList.remove("show");
-  }else{
-    setStatus(params.get("message")||"Deriv authorization was not completed.");
+  if(error){setStatus(error);window.history.replaceState({},document.title,window.location.pathname);return;}
+  selectedExecution=(params.get("executionMode")||"DEMO").toUpperCase()==="LIVE"?"LIVE":"DEMO";
+  applyExecutionMode();
+  window.__KINGBOT_DERIV_PENDING={pendingId};
+  verified=false;
+  setStep(3);
+  $("brokerLogin").style.display="none";
+  $("nextStep").style.display="none";
+  $("credentials").classList.remove("show");
+  $("accountSelect").classList.add("show");
+  $("flowCopy").innerHTML="<strong>STEP 3 · AUTHORIZATION VERIFIED</strong><br>Deriv approved KINGBOT. Choose the exact Demo or Real trading account you want KINGBOT to manage.";
+  setStatus("Loading your authorized Deriv accounts…");
+  try{
+    const t=await firebaseToken();
+    const r=await fetch(API_BASE+"/broker/deriv/oauth/pending?pendingId="+encodeURIComponent(pendingId),{headers:{Authorization:"Bearer "+t},cache:"no-store"});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!Array.isArray(d.accounts))throw new Error(d.error||"Unable to load authorized Deriv accounts.");
+    if(!d.accounts.length)throw new Error("No active Deriv Options trading accounts were returned.");
+    renderAccounts(d.accounts);
+    setStatus("Authorization verified. Select one authorized Deriv account.");
+  }catch(e){
+    window.__KINGBOT_DERIV_PENDING=null;
+    setStatus(e.message||"Unable to load Deriv accounts.");
+    $("authorizeBtn").disabled=true;
   }
   window.history.replaceState({},document.title,window.location.pathname);
-})(); 
+})();; 
 
 (function(){
   const cards=[...document.querySelectorAll(".broker")];
