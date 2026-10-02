@@ -15,6 +15,7 @@
     ["analytics.html","Analytics","▦","Performance intelligence"],
     ["ai.html","AI Intelligence","✦","AI intelligence layer"],
     ["scanner.html","AI Scanner","◫","Live AI market scanner"],
+    ["gold-signals.html","Gold Signals","◆","Live XAUUSD signal desk"],
     ["academy.html","Academy","◇","Education & research"],
     ["about.html","About","◎","KINGBOT FINTECH"],
     ["contact.html","Contact","✉","Support & contact"],
