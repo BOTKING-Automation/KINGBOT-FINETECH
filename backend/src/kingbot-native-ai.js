@@ -25,6 +25,7 @@ function intent(text){
   if(/\b(my )?(broker )?(connection|connected|connect|disconnect|connection status)\b|\bwhich broker\b|\bbroker status\b|\bderiv connection\b|\bmt5 connection\b/.test(t)) return "CONNECTION_INTELLIGENCE";
   if(/\b(account|balance|equity|margin|free margin|position|positions|portfolio|account status)\b/.test(t)) return "ACCOUNT_INTELLIGENCE";
   if(/\bbot status\b|\bis .*running\b|\bwhat is running\b|\bruntime\b|\bdiagnos(e|is)\b|\berror\b|\bwhy is .*bot\b|\bstopped\b|\bpaused\b/.test(t)) return "RUNTIME_INTELLIGENCE";
+  if(/\b(what is happening|what happened|latest|today|this week|news|headline|headlines|breaking)\b/.test(t) && /\b(gold|xau|eurusd|gbpusd|usdjpy|btcusd|bitcoin|forex|market)\b/.test(t)) return "MARKET_RESEARCH";
   if(/google|search the web|search online|look up|find online|latest news|news about|research online|internet/.test(t)) return "WEB_RESEARCH";
   if(/risk|drawdown|exposure|stop loss|\bsl\b|take profit|\btp\b/.test(t)) return "RISK_REVIEW";
   if(/bot|strateg|flipper|breakout|smc|ladder|strategic/.test(t)) return "BOT_INTELLIGENCE";
@@ -322,7 +323,37 @@ export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker
     },verified:{store:true,userSpecific:Boolean(userId)}};
   }
 
-  if(kind==="WEB_RESEARCH"){
+  if(kind==="WEB_RESEARCH" || kind==="MARKET_RESEARCH"){
+    const rawQuery=String(question||"").replace(/\b(google|search the web|search online|look up|find online|research online|on the internet)\b/gi,"").trim()||question;
+    const fresh=/\b(today|latest|current|now|breaking|headline|headlines|this week)\b/i.test(rawQuery)
+      ? (/\b(today|now)\b/i.test(rawQuery)?1:7)
+      : 0;
+    const search=await searchWeb(rawQuery,{limit:8,freshnessDays:fresh});
+    if(!search.ok){
+      return {
+        provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,
+        reply:{
+          answer:"Google research is available to the KINGBOT brain, but the Google connector is not configured on the backend yet.",
+          facts:[search.error||"GOOGLE_SEARCH_NOT_CONFIGURED",...(search.setup?[search.setup]:[])],
+          technicalAnalysis:[],
+          setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Google Search credentials.",invalidation:"No verified web sources available."},
+          riskFlags:["WEB_SEARCH_UNAVAILABLE"],
+          nextAction:"Configure GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX on the backend."
+        },
+        verified:{google:false}
+      };
+    }
+    const facts=search.results.map(r=>String(r.rank)+". "+r.title+(r.publishedAt?" · "+r.publishedAt:"")+" — "+r.snippet+" — "+r.url);
+    const answer=kind==="MARKET_RESEARCH"
+      ? "KINGBOT searched Google for current external information relevant to "+requested+" and returned "+search.results.length+" result(s). Market interpretation still requires live market data."
+      : "KINGBOT searched Google for “"+search.query+"” and returned "+search.results.length+" result(s). The source metadata is preserved for the reasoning layer.";
+    return {
+      provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,
+      reply:{answer,facts,technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No direct execution request.",invalidation:"Research is informational and is not execution authorization."},riskFlags:[],nextAction:kind==="MARKET_RESEARCH"?"Ask for a combined market and news analysis.":"Ask me to summarize, compare, or investigate the sources."},
+      sources:search.results,
+      verified:{google:true,freshnessDays:fresh}
+    };
+  }
     const search=await searchWeb(String(question||"").replace(/\b(google|search the web|search online|look up|find online|research online|on the internet)\b/gi,"").trim()||question,{limit:6});
     if(!search.ok) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:{answer:"I can perform Google-backed research, but Google Search is not configured on the backend yet.",facts:[search.error||"GOOGLE_SEARCH_NOT_CONFIGURED",...(search.setup?[search.setup]:[])],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Google Search credentials.",invalidation:"No web search available."},riskFlags:["WEB_SEARCH_UNAVAILABLE"],nextAction:"Configure GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX on the backend."},verified:{google:false}};
     const facts=search.results.map((r,i)=>(i+1)+". "+r.title+" — "+r.snippet+" — "+r.url);
