@@ -1177,115 +1177,206 @@ h2{
 }
 
 /* =========================================
-   FEATURES
+   KINGBOT INFRASTRUCTURE — ANIMATED SYSTEM FLOW
 ========================================= */
 
-.feats{
-  display:grid;
+.infra-section{
+  position:relative;
+  overflow:hidden;
+  isolation:isolate;
+  min-height:720px;
+  background:
+    radial-gradient(circle at 50% 48%,rgba(25,230,255,.08),transparent 28%),
+    radial-gradient(circle at 18% 65%,rgba(155,92,255,.06),transparent 25%),
+    radial-gradient(circle at 82% 65%,rgba(35,247,163,.06),transparent 25%),
+    #050a18;
+}
 
-  grid-template-columns:
-    repeat(3,1fr);
+.infra-bg{
+  position:absolute;
+  inset:0;
+  z-index:-3;
+  background:
+    linear-gradient(180deg,rgba(5,10,24,.78),rgba(5,10,24,.48) 45%,rgba(5,10,24,.88)),
+    url("assets/images/Kingbot Fintech AI Trading Hub.png") center/cover no-repeat;
+  opacity:.34;
+  transform:scale(1.04);
+  filter:saturate(1.18) contrast(1.06);
+  animation:infraImageFlow 18s ease-in-out infinite alternate;
+}
 
-  gap:16px;
+.infra-section::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-2;
+  background:
+    linear-gradient(90deg,rgba(246,185,59,.05),transparent 22%,transparent 78%,rgba(25,230,255,.05)),
+    radial-gradient(circle at 50% 55%,transparent 0 25%,rgba(5,10,24,.42) 65%,rgba(5,10,24,.9) 100%);
+  pointer-events:none;
+}
 
+.infra-scan{
+  position:absolute;
+  z-index:-1;
+  left:-20%;
+  top:0;
+  width:18%;
+  height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.13),rgba(25,230,255,.12),transparent);
+  filter:blur(10px);
+  transform:skewX(-14deg);
+  animation:infraScan 7s linear infinite;
+  pointer-events:none;
+}
+
+.infra-content{
+  position:relative;
+  z-index:2;
+}
+
+.infra-section .sec-tag,
+.infra-section h2,
+.infra-section .sec-sub{
+  position:relative;
+  z-index:3;
+}
+
+.infra-section h2{
+  text-shadow:
+    0 0 12px rgba(25,230,255,.14),
+    0 0 28px rgba(155,92,255,.08);
+}
+
+.infra-section .sec-sub{
+  max-width:720px;
+}
+
+.infra-section .feats{
+  position:relative;
+  z-index:4;
+  grid-template-columns:repeat(4,1fr);
+  gap:14px;
   margin-top:42px;
 }
 
-.card{
-  position:relative;
-
-  overflow:hidden;
-
+.infra-card{
+  min-height:245px;
   background:
-    linear-gradient(
-      145deg,
-      rgba(16,26,58,.82),
-      rgba(5,11,27,.94)
-    );
-
-  border:1px solid rgba(255,255,255,.07);
-
-  border-radius:17px;
-
-  padding:25px;
-
-  transition:
-    transform .3s,
-    border-color .3s,
-    box-shadow .3s;
-}
-
-.card::before{
-  content:"";
-
-  position:absolute;
-
-  width:130px;
-  height:130px;
-
-  right:-70px;
-  top:-70px;
-
-  border-radius:50%;
-
-  background:
-    radial-gradient(
-      circle,
-      rgba(246,185,59,.12),
-      transparent 70%
-    );
-}
-
-.card:hover{
-  transform:translateY(-6px);
-
-  border-color:
-    rgba(246,185,59,.34);
-
+    linear-gradient(145deg,rgba(5,11,27,.80),rgba(5,11,27,.92));
+  backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.10);
   box-shadow:
-    0 18px 50px rgba(0,0,0,.42),
-    0 0 30px rgba(246,185,59,.05);
+    0 18px 55px rgba(0,0,0,.36),
+    inset 0 0 30px rgba(255,255,255,.015);
+  animation:infraCardFloat 5s ease-in-out infinite;
 }
 
-.card .ic{
-  width:46px;
-  height:46px;
+.infra-card:nth-child(2){animation-delay:-1.2s}
+.infra-card:nth-child(3){animation-delay:-2.4s}
+.infra-card:nth-child(4){animation-delay:-3.6s}
 
-  display:grid;
-  place-items:center;
+.infra-card::after{
+  content:"";
+  position:absolute;
+  left:8%;
+  right:8%;
+  bottom:-1px;
+  height:2px;
+  background:linear-gradient(90deg,transparent,var(--infra-color),transparent);
+  box-shadow:0 0 18px var(--infra-color);
+  opacity:.75;
+  animation:infraEdge 2.8s ease-in-out infinite;
+}
 
-  margin-bottom:15px;
-
-  border-radius:13px;
-
+.infra-card .ic{
+  border-color:color-mix(in srgb,var(--infra-color) 42%,transparent);
   background:
-    linear-gradient(
-      135deg,
-      rgba(246,185,59,.14),
-      rgba(25,230,255,.06)
-    );
-
-  border:1px solid rgba(246,185,59,.22);
-
-  font-size:20px;
+    radial-gradient(circle,var(--infra-soft),transparent 70%);
+  box-shadow:
+    0 0 20px var(--infra-soft);
+  animation:infraIcon 3s ease-in-out infinite;
 }
 
-.card h3{
-  font-family:var(--disp);
-
-  font-size:12px;
-
-  margin-bottom:9px;
-
-  letter-spacing:.04em;
+.infra-card h3{
+  color:var(--infra-color);
+  text-shadow:0 0 12px var(--infra-soft);
 }
 
-.card p{
-  color:var(--dim);
+.infra-gold{
+  --infra-color:#f6b93b;
+  --infra-soft:rgba(246,185,59,.28);
+}
+.infra-purple{
+  --infra-color:#b36cff;
+  --infra-soft:rgba(179,108,255,.28);
+}
+.infra-blue{
+  --infra-color:#35a7ff;
+  --infra-soft:rgba(53,167,255,.28);
+}
+.infra-green{
+  --infra-color:#35e6a8;
+  --infra-soft:rgba(53,230,168,.28);
+}
 
-  font-size:12px;
+@keyframes infraImageFlow{
+  0%{transform:scale(1.04) translate3d(0,0,0);filter:saturate(1.05) contrast(1.02)}
+  50%{transform:scale(1.07) translate3d(-.6%,.3%,0);filter:saturate(1.30) contrast(1.08)}
+  100%{transform:scale(1.10) translate3d(.7%,-.4%,0);filter:saturate(1.18) contrast(1.06)}
+}
 
-  line-height:1.7;
+@keyframes infraScan{
+  0%{left:-20%;opacity:0}
+  10%{opacity:.9}
+  55%{opacity:.65}
+  100%{left:110%;opacity:0}
+}
+
+@keyframes infraCardFloat{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-4px)}
+}
+
+@keyframes infraEdge{
+  0%,100%{opacity:.30;transform:scaleX(.72)}
+  50%{opacity:1;transform:scaleX(1)}
+}
+
+@keyframes infraIcon{
+  0%,100%{transform:scale(1);filter:brightness(1)}
+  50%{transform:scale(1.035);filter:brightness(1.18)}
+}
+
+@media(max-width:980px){
+  .infra-section .feats{
+    grid-template-columns:repeat(2,1fr);
+  }
+}
+
+@media(max-width:600px){
+  .infra-section{
+    min-height:auto;
+  }
+  .infra-bg{
+    opacity:.22;
+  }
+  .infra-section .feats{
+    grid-template-columns:1fr;
+  }
+  .infra-card{
+    min-height:auto;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .infra-bg,
+  .infra-scan,
+  .infra-card,
+  .infra-card::after,
+  .infra-card .ic{
+    animation:none;
+  }
 }
 
 /* =========================================
@@ -2437,25 +2528,25 @@ footer{
 
 
 <!-- =========================================================
-     FEATURES
+     KINGBOT INFRASTRUCTURE
 ========================================================= -->
 
-<section id="features">
+<section id="features" class="infra-section">
 
-  <div class="wrap">
+  <div class="infra-bg" aria-hidden="true"></div>
+  <div class="infra-scan" aria-hidden="true"></div>
+
+  <div class="wrap infra-content">
 
     <div class="sec-tag">
       KINGBOT INFRASTRUCTURE
     </div>
 
     <h2>
-
       Built for
-
       <span class="gold">
         Modern Trading.
       </span>
-
     </h2>
 
     <p class="sec-sub">
@@ -2464,119 +2555,45 @@ footer{
       analytics and professional risk monitoring.
     </p>
 
-
     <div class="feats">
 
-      <div class="card">
-
-        <div class="ic">
-          🤖
-        </div>
-
-        <h3>
-          AI TRADING SYSTEMS
-        </h3>
-
+      <div class="card infra-card infra-gold">
+        <div class="ic">🤖</div>
+        <h3>AI TRADING SYSTEMS</h3>
         <p>
           Intelligent analysis and automated strategy
           infrastructure designed around defined trading logic
           and configurable risk controls.
         </p>
-
       </div>
 
-
-      <div class="card">
-
-        <div class="ic">
-          📊
-        </div>
-
-        <h3>
-          LIVE MARKET INTELLIGENCE
-        </h3>
-
+      <div class="card infra-card infra-purple">
+        <div class="ic">📊</div>
+        <h3>LIVE MARKET INTELLIGENCE</h3>
         <p>
           Monitor market prices, technical information,
           momentum, volatility and market structure through
           live market feeds.
         </p>
-
       </div>
 
-
-      <div class="card">
-
-        <div class="ic">
-          🌐
-        </div>
-
-        <h3>
-          MULTI-MARKET
-        </h3>
-
+      <div class="card infra-card infra-blue">
+        <div class="ic">🌐</div>
+        <h3>MULTI-MARKET</h3>
         <p>
           A unified interface for monitoring multiple asset
           classes across forex, metals, crypto and indices.
         </p>
-
       </div>
 
-
-      <div class="card">
-
-        <div class="ic">
-          ⚙️
-        </div>
-
-        <h3>
-          ADVANCED ANALYTICS
-        </h3>
-
+      <div class="card infra-card infra-green">
+        <div class="ic">⚙️</div>
+        <h3>ADVANCED ANALYTICS</h3>
         <p>
           Institutional-style performance, exposure,
           drawdown, execution and portfolio intelligence
           designed for verified account data.
         </p>
-
-      </div>
-
-
-      <div class="card">
-
-        <div class="ic">
-          🛡️
-        </div>
-
-        <h3>
-          RISK CONTROL
-        </h3>
-
-        <p>
-          Configurable drawdown policies, risk monitoring,
-          account protection and emergency control
-          infrastructure.
-        </p>
-
-      </div>
-
-
-      <div class="card">
-
-        <div class="ic">
-          🧠
-        </div>
-
-        <h3>
-          AI INTELLIGENCE
-        </h3>
-
-        <p>
-          AI-assisted market explanations, trading-system
-          diagnostics and portfolio intelligence based on
-          available verified information.
-        </p>
-
       </div>
 
     </div>
