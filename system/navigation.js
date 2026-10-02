@@ -118,6 +118,40 @@
         pointer-events:none;
       }
 
+      /* Animated KINGBOT + crown logo: smooth gold → purple → blue → green → red */
+      #kb-compact-nav .kb-fintech-logo{
+        animation:kbLogoColorCycle 10s ease-in-out infinite, kbLogoFloat 3.8s ease-in-out infinite;
+        will-change:filter,transform;
+      }
+
+      @keyframes kbLogoColorCycle{
+        0%,100%{
+          filter:saturate(1.15) brightness(1.06) hue-rotate(0deg) drop-shadow(0 0 10px rgba(246,185,59,.48)) drop-shadow(0 0 28px rgba(246,185,59,.20));
+        }
+        20%{
+          filter:saturate(1.35) brightness(1.08) hue-rotate(228deg) drop-shadow(0 0 12px rgba(155,92,255,.62)) drop-shadow(0 0 32px rgba(155,92,255,.25));
+        }
+        40%{
+          filter:saturate(1.35) brightness(1.08) hue-rotate(178deg) drop-shadow(0 0 12px rgba(71,135,255,.64)) drop-shadow(0 0 34px rgba(71,135,255,.25));
+        }
+        60%{
+          filter:saturate(1.38) brightness(1.10) hue-rotate(108deg) drop-shadow(0 0 12px rgba(35,247,163,.64)) drop-shadow(0 0 34px rgba(35,247,163,.25));
+        }
+        80%{
+          filter:saturate(1.42) brightness(1.10) hue-rotate(318deg) drop-shadow(0 0 13px rgba(255,77,109,.66)) drop-shadow(0 0 36px rgba(255,77,109,.27));
+        }
+      }
+
+      @keyframes kbLogoFloat{
+        0%,100%{transform:translateY(0) scale(1)}
+        50%{transform:translateY(-2px) scale(1.025)}
+      }
+
+      #kb-compact-nav .kb-fintech-logo:hover{
+        animation-play-state:paused;
+        transform:translateY(-2px) scale(1.045);
+      }
+
       #kb-compact-nav .kb-nav-trigger:hover{
         transform:translateY(-2px);
         box-shadow:0 16px 44px rgba(0,0,0,.5),0 0 32px rgba(25,230,255,.16);
