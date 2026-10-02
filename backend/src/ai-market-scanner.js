@@ -268,21 +268,6 @@ async function askGrok({ technical, quotes, timeframe }) {
   return { provider: "xai", model, analysis };
 }
 
-async function collectQuotes(broker, userId, symbols) {
-  return Promise.all(symbols.map(async symbol => {
-    try {
-      const result = await broker.getQuote(symbol, userId);
-      const raw = result?.data || result || {};
-      const bid = finite(raw.bid ?? raw.buy ?? raw.bidPrice);
-      const ask = finite(raw.ask ?? raw.sell ?? raw.askPrice);
-      const price = finite(raw.price ?? (bid !== null && ask !== null ? (bid + ask) / 2 : null));
-      return { symbol, bid, ask, price, spread: bid !== null && ask !== null ? ask - bid : null, time: raw.time || raw.timestamp || null, available: price !== null || (bid !== null && ask !== null) };
-    } catch (error) {
-      return { symbol, available: false, error: String(error?.message || "QUOTE_UNAVAILABLE").slice(0, 120) };
-    }
-  }));
-}
-
 async function fetchPublicDerivData(symbols, timeframe) {
   const rows = await Promise.all(symbols.map(async symbol => {
     let quote = null;
@@ -459,7 +444,7 @@ export async function runStandaloneMarketScan({ pool, twelveData, symbols, timef
   return standaloneMarketScan({ pool, twelveData, symbols, timeframe });
 }
 
-async function runMarketScan({ requireUser, pool, broker, twelveData, req, res }) {
+async function runMarketScan({ requireUser, pool, twelveData, req, res }) {
   let user;
   try {
     user = await requireUser(pool, req, res);
@@ -497,7 +482,7 @@ export async function ensureAiMarketScannerSchema(pool) {
   await ensureScannerSchema(pool);
 }
 
-export function registerAiMarketScanner(app, { requireUser, pool, broker, rateLimit }) {
+export function registerAiMarketScanner(app, { requireUser, pool, rateLimit }) {
   void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
 
   const limiter = rateLimit({
@@ -533,8 +518,6 @@ export function registerAiMarketScanner(app, { requireUser, pool, broker, rateLi
     }
     if (!user) return;
     const apiKey = String(process.env.XAI_API_KEY || "").trim();
-    let brokerConnected=false, brokerName=null;
-    try { const mapping=await broker.getMapping(user.id); brokerConnected=Boolean(mapping); brokerName=mapping?.provider || null; } catch {}
     let tvCount=0;
     try { const q=await pool.query("SELECT COUNT(*)::int AS count FROM kingbot_tradingview_snapshots WHERE received_at > NOW() - INTERVAL '10 minutes'"); tvCount=q.rows[0]?.count || 0; } catch {}
     return res.json({
@@ -549,13 +532,13 @@ export function registerAiMarketScanner(app, { requireUser, pool, broker, rateLi
       },
       scannerStandalone:true,
       brokerRequired:false,
-      model:apiKey?String(process.env.XAI_MODEL || "grok-4.7"):null, brokerConnected, broker:brokerName,
+      model:apiKey?String(process.env.XAI_MODEL || "grok-4.7"):null,
       tradingViewConnected:tvCount>0, tradingViewSnapshotsLast10m:tvCount, webhookConfigured:Boolean(process.env.TRADINGVIEW_WEBHOOK_SECRET),
       defaultSymbols:DEFAULT_SYMBOLS
     });
   });
 
-  const scanHandler=async(req,res)=>{ await runMarketScan({requireUser,pool,broker,twelveData,req,res}); };
+  const scanHandler=async(req,res)=>{ await runMarketScan({requireUser,pool,twelveData,req,res}); };
   app.get("/api/ai/market-scanner",limiter,scanHandler);
   app.post("/api/ai/market-scanner",limiter,scanHandler);
   app.get("/api/market-scanner",limiter,scanHandler);
