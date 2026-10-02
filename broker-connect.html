@@ -242,7 +242,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
 <div style="margin-top:14px;font-size:12px;line-height:1.65;color:#aeb9ca">1. Sign into the exact Deriv MT5 account. 2. Install and compile <b>KINGBOT_MT5_BRIDGE.mq5</b>. 3. Add the KINGBOT API host to MT5 WebRequest allowed URLs. 4. Generate a token below and paste it into the EA.</div>
 <div style="margin-top:14px;display:grid;grid-template-columns:1fr auto;gap:8px"><input id="mt5BridgeToken" readonly type="text" autocomplete="off" placeholder="Generate a secure bridge token" style="width:100%;box-sizing:border-box;font-family:monospace;letter-spacing:.04em"><button class="modal-btn alt" id="copyMt5Token" type="button">COPY</button></div>
 <div class="modal-actions" style="margin-top:10px"><button class="modal-btn" id="generateMt5Token" type="button">GENERATE BRIDGE TOKEN</button></div>
-<div id="mt5BridgeStatus" class="status-line">TOKEN NOT GENERATED</div>
+<div id="mt5BridgeStatus" class="status-line">TOKEN NOT GENERATED</div><div id="mt5CloudPanel" style="display:none;margin-top:12px;padding:14px;border:1px solid rgba(35,247,163,.16);border-radius:12px;background:rgba(35,247,163,.025)"><div style="font:900 8px &quot;JetBrains Mono&quot;;letter-spacing:.08em;color:#23f7a3">KINGBOT CLOUD MT5</div><div id="mt5CloudStatus" class="status-line" style="margin-top:6px">MT5 bridge must be online before cloud hosting can start.</div><div class="modal-actions"><button class="modal-btn" id="deployMt5Cloud" type="button">DEPLOY TO KINGBOT CLOUD</button></div></div>
 </div>
         <div class="modal-actions"><button class="modal-btn" id="verifyBtn" type="button">VERIFY EXNESS CONNECTION</button></div>
       </div>
@@ -447,6 +447,7 @@ async function checkMt5Bridge(){
       $("mt5BridgeStatus").textContent="MT5 ONLINE ✓ · "+String(d.login||d.accountId||"ACCOUNT")+" · "+String(d.server||"MT5");
       setStep(4);textFor();setStatus("KINGBOT MT5 BRIDGE CONNECTED ✓ · Native MT5 execution is online.");
       if(mt5BridgePollTimer){clearInterval(mt5BridgePollTimer);mt5BridgePollTimer=null;}
+      void refreshMt5CloudStatus();
       return true;
     }
     $("mt5BridgeStatus").textContent="WAITING FOR MT5 EA HEARTBEAT…";
@@ -457,6 +458,55 @@ function startMt5BridgeWatch(){
   if(mt5BridgePollTimer)clearInterval(mt5BridgePollTimer);
   void checkMt5Bridge();
   mt5BridgePollTimer=setInterval(checkMt5Bridge,1500);
+}
+async function refreshMt5CloudStatus(){
+  const panel=$("mt5CloudPanel"),status=$("mt5CloudStatus"),btn=$("deployMt5Cloud");
+  if(!panel||!status||!btn)return;
+  panel.style.display=verified?"block":"none";
+  if(!verified)return;
+  try{
+    const t=await firebaseToken();
+    const r=await fetch(API_BASE+"/mt5/hosting/status",{headers:{Authorization:"Bearer "+t},cache:"no-store"});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||"CLOUD_STATUS_UNAVAILABLE");
+    const latest=Array.isArray(d.deployments)?d.deployments.find(x=>String(x.broker_provider||"").toLowerCase()==="mt5-bridge"):null;
+    if(latest){
+      status.textContent="DEPLOYMENT · "+String(latest.status||"UNKNOWN")+" · "+(latest.online?"HOST ONLINE":"HOST WAITING");
+      btn.disabled=String(latest.status||"").toUpperCase()==="PROVISIONING";
+      btn.textContent=btn.disabled?"CLOUD DEPLOYMENT IN PROGRESS":"REDEPLOY MT5 TO KINGBOT CLOUD";
+    }else{
+      status.textContent="MT5 bridge online. A Windows MT5 host node can now accept this account for cloud deployment.";
+      btn.disabled=false;
+      btn.textContent="DEPLOY TO KINGBOT CLOUD";
+    }
+  }catch(e){
+    status.textContent="Cloud hosting status unavailable. The broker connection remains active.";
+    btn.disabled=false;
+    btn.textContent="DEPLOY TO KINGBOT CLOUD";
+  }
+}
+async function deployMt5ToCloud(){
+  const btn=$("deployMt5Cloud"),status=$("mt5CloudStatus");
+  if(!btn||!status)return;
+  btn.disabled=true;btn.textContent="QUEUEING…";
+  try{
+    const t=await firebaseToken();
+    const r=await fetch(API_BASE+"/mt5/hosting/provision",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},
+      body:JSON.stringify({botId:"strategic",executionMode:selectedExecution}),
+      credentials:"omit"
+    });
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.message||d.error||d.reason||("Cloud provisioning failed (HTTP "+r.status+")."));
+    status.textContent="CLOUD DEPLOYMENT QUEUED · "+String(d.deploymentId||"PENDING");
+    setStatus("KINGBOT queued the verified MT5 account for cloud hosting. The host must reach EA heartbeat before the deployment is marked RUNNING.");
+    btn.textContent="CLOUD DEPLOYMENT QUEUED";
+    await refreshMt5CloudStatus();
+  }catch(e){
+    status.textContent=String(e.message||"Cloud deployment failed.");
+    btn.disabled=false;btn.textContent="DEPLOY TO KINGBOT CLOUD";
+  }
 }
 async function copyMt5Token(){
   const value=$("mt5BridgeToken").value.trim();
@@ -748,6 +798,7 @@ applyExecutionMode();
   search.addEventListener("input",applyFilters);
 })();
 
+$("deployMt5Cloud")?.addEventListener("click",deployMt5ToCloud);
 void refreshConnectionLock();
 })();
 </script>
