@@ -263,7 +263,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
     if(state.busy)return;
     try{
       state.busy=true; listFromInput();
-      const path="/ai/market-scanner?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value);
+      const path="/ai/market-scanner/quotes?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value);
       const data=await request(path,{method:"GET"});
       state.quotes=data.quotes||[];
       renderQuotes();
@@ -271,8 +271,9 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       qs("marketState").className="good";
       qs("aiState").textContent=data.provider==="xai"?"GROK ONLINE":(data.provider==="none"?"ENGINE ONLINE":"AI ONLINE");
       qs("aiState").className=data.provider==="none"?"warn":"good";
-      qs("coreSub").textContent=(data.source||"Live market feed")+" · "+(data.technicalCount||0)+" technical feeds · "+(data.quoteCount||0)+" live quotes";
-      qs("scanState").textContent="QUOTES READY";
+      qs("coreSub").textContent=(data.source||"Live market feed")+" · "+(data.quoteCount||0)+" live quotes · "+(data.latencyMs||0)+"ms";
+      qs("lastScan").textContent="LIVE";
+      qs("scanState").textContent="LIVE QUOTES";
       toast("Live market quotes synchronized.","good");
       return data;
     }catch(error){
@@ -296,8 +297,22 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       state.busy=true; qs("scanState").textContent="SCANNING"; qs("scanNow").disabled=true;
       listFromInput();
       const path="/ai/market-scanner?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value);
-      const data=await request(path,{method:"GET"});
-      state.quotes=data.quotes||[];
+      const quotePath="/ai/market-scanner/quotes?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value);
+
+      const scanPromise=request(path,{method:"GET"});
+      try{
+        const quoteData=await request(quotePath,{method:"GET"});
+        state.quotes=quoteData.quotes||[];
+        renderQuotes();
+        qs("marketState").textContent=(quoteData.quoteCount||0)>0?"LIVE FEED":"TECHNICAL FEED";
+        qs("marketState").className="good";
+        qs("coreSub").textContent=(quoteData.source||"Live market feed")+" · "+(quoteData.quoteCount||0)+" live quotes · "+(quoteData.latencyMs||0)+"ms";
+      }catch(error){
+        console.warn("Fast quote sync failed:",error);
+      }
+
+      const data=await scanPromise;
+      state.quotes=data.quotes||state.quotes;
       renderQuotes(); renderScan(data);
       qs("lastScan").textContent=new Date(data.generatedAt||Date.now()).toLocaleTimeString();
       qs("scanState").textContent="SCAN COMPLETE";
