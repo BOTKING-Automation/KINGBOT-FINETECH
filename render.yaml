@@ -18,6 +18,8 @@ services:
         sync: false
       - key: BROKER_CREDENTIALS_KEY
         sync: false
+      - key: WORKER_STANDBY
+        value: "1"
 
   - type: worker
     name: kingbot-fintech-worker
@@ -35,3 +37,5 @@ services:
           property: connectionString
       - key: BROKER_CREDENTIALS_KEY
         sync: false
+      - key: WORKER_STANDBY
+        value: "0"
