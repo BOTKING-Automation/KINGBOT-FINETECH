@@ -23,6 +23,7 @@ import { mt5BridgeRegistry } from "./mt5-bridge.js";
 import { registerTerminalSnapshot } from "./terminal-snapshot.js";
 import { registerAiMarketScanner } from "./ai-market-scanner.js";
 import { registerTerminalLive } from "./terminal-live.js";
+import { registerElevenLabsVoice } from "./elevenlabs-voice.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -70,6 +71,7 @@ function firstFinite(...values){
 registerTerminalSnapshot(app, { requireUser, pool, broker, firstFinite });
 registerAiMarketScanner(app, { requireUser, pool, broker, rateLimit });
 registerTerminalLive(app, { requireUser, pool, broker, firstFinite });
+registerElevenLabsVoice(app, { requireUser, pool, rateLimit });
 
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -79,7 +81,10 @@ app.get("/api/health", (_req, res) => {
     aiProvider: AI_PROVIDER,
     aiModel: AI_PROVIDER === "xai" ? XAI_MODEL : (AI_PROVIDER === "gemini" ? GEMINI_MODEL : null),
     accountServiceReady: true,
-    passwordRecoveryEmailReady: true
+    passwordRecoveryEmailReady: true,
+    voiceReady: Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID),
+    voiceProvider: "elevenlabs",
+    voiceModel: process.env.ELEVENLABS_MODEL || "eleven_flash_v2_5"
   });
 });
 
