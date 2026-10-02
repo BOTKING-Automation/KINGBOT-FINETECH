@@ -227,6 +227,7 @@
     const apiReady = Boolean(h.ok);
     const dbReady = Boolean(h.accountServiceReady);
     const provider = String(h.externalProvider || h.aiProvider || "native").toLowerCase();
+    const googleReady = Boolean(h.webResearch?.configured);
     const model = String(h.aiModel || h.model || "KINGBOT-CORE-1");
 
     setTelemetry(
@@ -244,7 +245,7 @@
     setText(
       "coreStateSub",
       aiReady
-        ? "Native KINGBOT intelligence is active through the secured backend" + (model ? " · " + model : "") + "."
+        ? "Native KINGBOT intelligence is active through the secured backend" + (model ? " · " + model : "") + (googleReady ? " · GOOGLE RESEARCH READY" : "") + "."
         : "Server AI is not configured or is unavailable."
     );
   }
@@ -369,7 +370,11 @@
       body: JSON.stringify({ message: clean, symbol, conversation: conversation.slice(-4) })
     });
     const reply = data?.reply || {};
-    const answer = String(reply.answer || data?.message || "KINGBOT AI returned no answer.");
+    let answer = String(reply.answer || data?.message || "KINGBOT AI returned no answer.");
+    const sources = Array.isArray(data?.sources) ? data.sources.slice(0,6) : [];
+    if(sources.length){
+      answer += "\n\nSOURCES\n" + sources.map((s,i) => (i+1)+". "+String(s.title||"Source")+" — "+String(s.url||"")).join("\n");
+    }
     return { answer, data };
   }
 
