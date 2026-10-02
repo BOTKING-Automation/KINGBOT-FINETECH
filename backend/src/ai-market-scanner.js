@@ -1,8 +1,12 @@
 import "dotenv/config";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
+import { getDerivMarketFeed } from "./deriv-market-feed.js";
+import { DerivTraderClient } from "./deriv-trader-client.js";
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
+const publicDerivFeed = getDerivMarketFeed();
+const publicDerivClient = new DerivTraderClient({ executionMode:"DEMO" });
 
 function cleanSymbols(value) {
   const input = Array.isArray(value) ? value : String(value || "").split(",");
@@ -279,6 +283,41 @@ async function collectQuotes(broker, userId, symbols) {
   }));
 }
 
+async function fetchPublicDerivData(symbols, timeframe) {
+  const rows = await Promise.all(symbols.map(async symbol => {
+    let quote = null;
+    let technical = null;
+    let quoteError = null;
+    let technicalError = null;
+    try {
+      quote = await publicDerivFeed.getQuote(symbol,{maxAgeMs:3000,timeoutMs:7000});
+    } catch(error) {
+      quoteError = String(error?.message||"DERIV_PUBLIC_QUOTE_UNAVAILABLE").slice(0,140);
+    }
+    try {
+      const bars = await publicDerivClient.getHistoricalCandles(symbol,timeframe,120);
+      technical = deriveTechnicalFromBars((Array.isArray(bars)?bars:[]).map(b => ({
+        ...b,
+        datetime:b.time
+      })));
+      if(technical) {
+        technical = {
+          ...technical,
+          symbol,
+          timeframe,
+          source:"Deriv public live OHLC",
+          barTime:technical.barTime || bars.at(-1)?.time || null,
+          receivedAt:new Date().toISOString()
+        };
+      }
+    } catch(error) {
+      technicalError = String(error?.message||"DERIV_PUBLIC_OHLC_UNAVAILABLE").slice(0,140);
+    }
+    return {symbol,quote,technical,quoteError,technicalError};
+  }));
+  return rows;
+}
+
 async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
   const normalizedSymbols = cleanSymbols(symbols).length ? cleanSymbols(symbols) : DEFAULT_SYMBOLS;
   const normalizedTimeframe = cleanTimeframe(timeframe);
@@ -295,11 +334,35 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
   const directQuotes = twelveData?.enabled
     ? await twelveData.latestQuotes(normalizedSymbols)
     : [];
+  const derivData = directQuotes.some(q => q.available)
+    ? []
+    : await fetchPublicDerivData(normalizedSymbols,normalizedTimeframe);
+  const derivQuotes = derivData.map(x => {
+    if(!x.quote) return {symbol:x.symbol,available:false,source:"Deriv public live feed",error:x.quoteError||"DERIV_PUBLIC_QUOTE_UNAVAILABLE"};
+    return {
+      symbol:x.symbol,
+      brokerSymbol:x.quote.brokerSymbol||null,
+      price:x.quote.price,
+      bid:x.quote.bid,
+      ask:x.quote.ask,
+      spread:x.quote.bid!=null&&x.quote.ask!=null?x.quote.ask-x.quote.bid:null,
+      time:x.quote.time||null,
+      timestamp:x.quote.epoch!=null?Number(x.quote.epoch)*1000:Date.now(),
+      available:true,
+      source:"Deriv public live feed"
+    };
+  });
+  const quotes=directQuotes.some(q=>q.available)
+    ? directQuotes
+    : derivQuotes;
   const [tv, tdTechnical] = await Promise.all([
     latestTradingView(pool, normalizedSymbols, normalizedTimeframe),
     fetchTwelveDataTechnical(twelveData, normalizedSymbols, normalizedTimeframe)
   ]);
-  const tdMap = Object.fromEntries(tdTechnical.map(x => [x.symbol, x]));
+  const combinedTechnical=[...tdTechnical,...derivData.map(x=>x.technical).filter(Boolean)];
+  const technicalBySymbol=new Map();
+  for(const item of combinedTechnical) if(!technicalBySymbol.has(item.symbol)) technicalBySymbol.set(item.symbol,item);
+  const tdMap = Object.fromEntries([...technicalBySymbol.entries()].map(([k,v]) => [k,v]));
   const technical = normalizedSymbols.map(symbol => {
     const snapshot = tdMap[symbol] || tv.find(x => x.symbol === symbol);
     return snapshot
@@ -322,7 +385,9 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
   const tvMap = Object.fromEntries(tv.map(x => [x.symbol, x]));
   const technicalSource = tdTechnical.length
     ? "Twelve Data live OHLC + live quote feed"
-    : (tv.length ? "TradingView snapshots" : "live quotes only");
+    : (derivData.some(x=>x.technical)
+      ? "Deriv public live OHLC + live quote feed"
+      : (tv.length ? "TradingView snapshots" : "live quotes only"));
 
   if (!technical.some(x => x.source !== "none") && !directQuotes.some(q => q.available)) {
     return {
@@ -376,7 +441,13 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     analysis:ai.analysis || JSON.stringify(fallbackAnalysis),
     aiError:ai.aiError || null,
     generatedAt:new Date().toISOString(),
-    quoteCount:directQuotes.filter(q=>q.available).length,
+    quoteCount:quotes.filter(q=>q.available).length,
+    marketDataSources:{
+      brokerIndependent:true,
+      derivPublic:true,
+      twelveData:Boolean(twelveData?.enabled),
+      tradingView:Boolean(tv.length)
+    },
     tradingViewCount:tv.length,
     technicalCount:technical.filter(x=>x.source!=="none").length,
     technicalSource,
