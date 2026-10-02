@@ -19,15 +19,28 @@ function symbolFromText(text, fallback="XAUUSD"){
 function intent(text){
   const t=String(text||"").toLowerCase().trim();
   if(/^(hi|hello|hey|yo|good morning|good afternoon|good evening|howdy|greetings)\b/.test(t)||/\bhow are you\b|\bwho are you\b|\bwhat are you\b|\bthank you\b|\bthanks\b|\bbye\b|\bgood night\b/.test(t)) return "CONVERSATION";
+  if(/\bwhat time is it\b|\bcurrent time\b|\bwhat is the time\b|\bwhat's the time\b|\btime now\b|\bwhat day is it\b|\bwhat date is it\b|\btoday'?s date\b|\bcurrent date\b/.test(t)) return "TIME";
+  if(/\b(my )?(broker )?(connection|connected|connect|disconnect|connection status)\b|\bwhich broker\b|\bbroker status\b|\bderiv connection\b|\bmt5 connection\b/.test(t)) return "CONNECTION_INTELLIGENCE";
+  if(/\b(account|balance|equity|margin|free margin|position|positions|portfolio|account status)\b/.test(t)) return "ACCOUNT_INTELLIGENCE";
+  if(/\bbot status\b|\bis .*running\b|\bwhat is running\b|\bruntime\b|\bdiagnos(e|is)\b|\berror\b|\bwhy is .*bot\b|\bstopped\b|\bpaused\b/.test(t)) return "RUNTIME_INTELLIGENCE";
   if(/google|search the web|search online|look up|find online|latest news|news about|research online|internet/.test(t)) return "WEB_RESEARCH";
-  if(/store|shop|product|pricing|plan|subscription|buy|purchase|checkout|payment|mpesa|license|upgrade|professional|institutional|basic/.test(t)) return "STORE_INTELLIGENCE";
-  if(/trade|entry|signal|setup|buy|sell|long|short|gold|xau|eurusd|gbpusd|usdjpy|btcusd|market|analysis|forex/.test(t)) return "MARKET_INTELLIGENCE";
   if(/risk|drawdown|exposure|stop loss|\bsl\b|take profit|\btp\b/.test(t)) return "RISK_REVIEW";
   if(/bot|strateg|flipper|breakout|smc|ladder|strategic/.test(t)) return "BOT_INTELLIGENCE";
-  if(/account|balance|equity|position|portfolio|broker|mt5|deriv/.test(t)) return "ACCOUNT_INTELLIGENCE";
-  if(/price|quote|how much|current/.test(t)) return "LIVE_MARKET";
+  if(/store|shop|product|pricing|plan|subscription|purchase|checkout|payment|mpesa|license|upgrade|professional|institutional|basic/.test(t)) return "STORE_INTELLIGENCE";
+  if(/trade|entry|signal|setup|sell|long|short|gold|xau|eurusd|gbpusd|usdjpy|btcusd|market|analysis|forex|quote|price|candles|trend/.test(t)) return "MARKET_INTELLIGENCE";
   return "PLATFORM_SUPPORT";
 }
+function utilityReply(question){
+  const t=String(question||"").toLowerCase().trim();
+  if(/\bwhat time is it\b|\bcurrent time\b|\bwhat is the time\b|\bwhat's the time\b|\btime now\b|\bwhat day is it\b|\bwhat date is it\b|\btoday'?s date\b|\bcurrent date\b/.test(t)){
+    const now=new Date();
+    const eat=new Intl.DateTimeFormat("en-KE",{timeZone:"Africa/Nairobi",dateStyle:"full",timeStyle:"medium"}).format(now);
+    const utc=new Intl.DateTimeFormat("en-GB",{timeZone:"UTC",dateStyle:"full",timeStyle:"medium"}).format(now);
+    return {answer:"The current East Africa Time (EAT) is "+eat+".",facts:["EAT timezone: Africa/Nairobi (UTC+3).","Server UTC: "+utc],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No market analysis requested.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask KINGBOT your next question."};
+  }
+  return null;
+}
+
 function conversationalReply(question){
   const t=String(question||"").toLowerCase().trim();
   if(/^(hi|hello|hey|yo|good morning|good afternoon|good evening|howdy|greetings)\b/.test(t)) return {answer:"Hey! 👋 KINGBOT AI is online. I can chat with you, explain the platform, research information online, or use verified live market intelligence. What would you like to do?",facts:["Native KINGBOT conversational layer is active."],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Ask a question or choose an intelligence function.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask KINGBOT anything about the platform, bots, markets, risk, or online research."};
@@ -180,10 +193,50 @@ async function databaseSupport(pool,userId,question){
   }catch(error){ return {answer:"KINGBOT could not verify that support record right now.",facts:[],riskFlags:["VERIFICATION_UNAVAILABLE"],nextAction:"Retry after the backend data service recovers."}; }
   return null;
 }
-export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker,userId}={}){
+async function connectionSupport(broker,userId){
+  if(!broker||!userId) return {answer:"I cannot inspect a private broker connection until you are signed in.",facts:[],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Authenticated broker context.",invalidation:"Not applicable."},riskFlags:["AUTHENTICATION_REQUIRED"],nextAction:"Sign in, connect your broker, then ask “what is my connection?”"};
+  try{
+    const status=await broker.getStatus(userId);
+    const connected=Boolean(status?.connected);
+    const snap=status?.accountSnapshot||{};
+    const facts=["Broker connected: "+connected,"Broker: "+(status?.broker||status?.provider||"—"),"Execution mode: "+(status?.executionMode||"—"),"Account type: "+(status?.accountType||snap.accountType||"—")];
+    if(snap.accountId) facts.push("Account ID: "+String(snap.accountId));
+    if(snap.currency) facts.push("Currency: "+String(snap.currency));
+    return {answer:connected?"KINGBOT verified that your broker connection is active.":"KINGBOT verified that no broker connection is currently active.",facts,technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:connected?"No connection action required.":"Connect a supported broker account.",invalidation:"Not applicable."},riskFlags:connected?[]:["BROKER_NOT_CONNECTED"],nextAction:connected?"Ask about your account, positions, balance, or runtime status.":"Open Broker Connect and complete authorization."};
+  }catch(error){
+    return {answer:"KINGBOT could not verify the broker connection state right now.",facts:[String(error?.message||"BROKER_STATUS_UNAVAILABLE").slice(0,180)],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Backend broker status.",invalidation:"Not applicable."},riskFlags:["BROKER_STATUS_UNAVAILABLE"],nextAction:"Retry after the broker service is reachable."};
+  }
+}
+
+async function runtimeSupport(pool,userId){
+  if(!pool||!userId) return {answer:"Sign in so KINGBOT can inspect the private bot runtime state.",facts:[],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Authenticated runtime context.",invalidation:"Not applicable."},riskFlags:["AUTHENTICATION_REQUIRED"],nextAction:"Sign in and ask again."};
+  try{
+    const q=await pool.query("SELECT bot_id,state,symbol,execution_mode,last_error,last_signal,updated_at FROM kingbot_bot_runtime WHERE user_id=$1 ORDER BY bot_id",[userId]);
+    if(!q.rows.length) return {answer:"KINGBOT found no stored bot runtime rows for your account.",facts:[],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Start or configure a bot.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Open the Bot Command Center to configure a bot."};
+    return {answer:"KINGBOT verified the current bot runtime state from the backend.",facts:q.rows.map(x=>String(x.bot_id)+": "+(x.state||"—")+" · "+(x.symbol||"—")+" · "+(x.execution_mode||"—")+(x.last_error?" · error: "+x.last_error:"")),technicalAnalysis:q.rows.filter(x=>x.last_signal).map(x=>String(x.bot_id)+" last signal: "+x.last_signal),setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Runtime diagnostics only.",invalidation:"Not applicable."},riskFlags:q.rows.some(x=>x.last_error)?["RUNTIME_ERRORS_PRESENT"]:[],nextAction:"Review any reported error or risk gate in the Bot Command Center."};
+  }catch{return null;}
+}
+
+function platformSupportReply(question){
+  const t=String(question||"").toLowerCase();
+  if(/\bwhat can you do\b|\bwhat do you do\b|\bcapabilities\b/.test(t)) return {answer:"I route each request to the right KINGBOT capability instead of forcing everything through market analysis.",facts:["Conversation: natural-language platform help","Account/connection: verified broker state","Market: verified quotes and technical snapshots","Bots/runtime: engine definitions and backend state","Risk: saved risk controls","Research: Google-backed web research when configured"],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Choose a capability or ask naturally.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask a normal question such as “what time is it?”, “what is my connection?”, or “analyze XAUUSD”."};
+  if(/\bhow does (kingbot|this platform) work\b|\bhow does it work\b/.test(t)) return {answer:"KINGBOT separates verified data from reasoning and execution: broker/runtime data is read from the backend, intelligence explains that data, and server-side risk and execution controls remain authoritative.",facts:["AI is not the execution authority.","Broker/account values must come from verified backend state.","Market analysis requires fresh market data."],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Ask for a specific subsystem.",invalidation:"Not applicable."},riskFlags:["EXECUTION_REMAINS_SERVER_CONTROLLED"],nextAction:"Ask about the broker connection, a bot engine, risk controls, or a supported market."};
+  return {answer:"I understand the request as a KINGBOT platform question, not a market-analysis request.",facts:["No market-analysis trigger was detected.","No unsupported account or market values were fabricated."],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"A specific platform question.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask your question directly and I will route it to the appropriate intelligence capability."};
+}
+
+export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker,userId,conversation=[]}={}){
   const requested=symbolFromText(question,symbol||"XAUUSD");
   const kind=intent(question);
+  const utility=utilityReply(question);
+  if(utility) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:"TIME",symbol:requested,reply:utility,verified:{native:true,timeSource:"server"}};
   if(kind==="CONVERSATION") return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:conversationalReply(question),verified:{native:true}};
+  if(kind==="CONNECTION_INTELLIGENCE"){
+    return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:await connectionSupport(broker,userId),verified:{broker:true,userSpecific:Boolean(userId)}};
+  }
+  if(kind==="RUNTIME_INTELLIGENCE"){
+    const runtime=await runtimeSupport(pool,userId);
+    if(runtime) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:runtime,verified:{runtime:true,userSpecific:Boolean(userId)}};
+  }
   if(kind==="STORE_INTELLIGENCE"){
     const support=await storeSupport(pool,userId,question);
     return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:{
@@ -246,7 +299,7 @@ export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker
     }catch{}
   }
 
-  const snapshot=await latestSnapshot(pool,requested,"5m");
+  if(kind==="PLATFORM_SUPPORT") return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:platformSupportReply(question),verified:{native:true}};\n\n  const snapshot=await latestSnapshot(pool,requested,"5m");
   const brain=snapshot?evaluateKingbotBrain(snapshot,{maxAgeMs:Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS||5000)}):null;
   const reply=nativeMarketAnswer({question,symbol:requested,quote,snapshot,brain});
   return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply,verified:{quote:Boolean(quote?.available),technicalSnapshot:Boolean(snapshot),brain:Boolean(brain)}};
