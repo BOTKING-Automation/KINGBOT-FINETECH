@@ -63,6 +63,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
 
     const context=buildContext({symbol,twelveData:feed,broker,botDefinitions:getBotDefinitions()});
     context.nativeKingbotAI=native.reply;
+    context.marketScanner=native.scanner||null;
     context.nativeProvider=native.provider;
     context.webResearch=native.sources||[];
     context.conversation=conversation;
