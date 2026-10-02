@@ -2685,3 +2685,273 @@ html.kb-nav-lock,html.kb-nav-lock body{overflow:hidden}
   #kb-command-trigger,#kb-command-backdrop,#kb-command-nav,.kb-nav-item,.kb-nav-search,.kb-nav-account a{transition:none !important}
   #kb-command-nav::after{animation:none}
 }
+
+
+/* =========================================================
+   CORE PRODUCT SURFACES — HIGH-TECH FINTECH SKIN
+========================================================= */
+
+#kb-ambient-layer{
+  position:fixed;
+  inset:0;
+  z-index:-4;
+  pointer-events:none;
+  overflow:hidden;
+}
+.kb-ambient-beam{
+  position:absolute;
+  width:42vw;
+  height:42vw;
+  max-width:720px;
+  max-height:720px;
+  border-radius:50%;
+  filter:blur(70px);
+  opacity:.10;
+  mix-blend-mode:screen;
+  animation:kbAmbientFloat 16s ease-in-out infinite alternate;
+}
+.kb-ambient-beam-a{left:-14vw;top:-18vw;background:radial-gradient(circle,rgba(25,230,255,.75),transparent 67%)}
+.kb-ambient-beam-b{right:-15vw;top:8vh;background:radial-gradient(circle,rgba(155,92,255,.72),transparent 68%);animation-delay:-5s}
+.kb-ambient-beam-c{left:25vw;bottom:-26vw;background:radial-gradient(circle,rgba(255,79,216,.42),transparent 70%);animation-delay:-9s}
+.kb-ambient-grid{
+  position:absolute;
+  inset:-10%;
+  opacity:.05;
+  background-image:
+    linear-gradient(rgba(255,255,255,.15) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.15) 1px,transparent 1px);
+  background-size:54px 54px;
+  mask-image:radial-gradient(circle at 50% 24%,#000 0,transparent 72%);
+}
+@keyframes kbAmbientFloat{
+  from{transform:translate3d(-2%,0,0) scale(1)}
+  to{transform:translate3d(3%,2%,0) scale(1.07)}
+}
+
+/* Dashboard */
+body.kb-ui-surface-index .wrap{
+  max-width:1440px;
+}
+body.kb-ui-surface-index .hero,
+body.kb-ui-surface-index .feats,
+body.kb-ui-surface-index .mock,
+body.kb-ui-surface-index .plat,
+body.kb-ui-surface-index .card{
+  position:relative;
+}
+body.kb-ui-surface-index .hero::after{
+  content:"";
+  position:absolute;
+  inset:-1px;
+  border-radius:28px;
+  pointer-events:none;
+  background:linear-gradient(110deg,transparent 12%,rgba(25,230,255,.13) 34%,rgba(155,92,255,.12) 62%,rgba(246,185,59,.10) 84%,transparent 96%);
+  filter:blur(18px);
+  opacity:.62;
+}
+body.kb-ui-surface-index .card,
+body.kb-ui-surface-index .mock,
+body.kb-ui-surface-index .plat{
+  border-color:rgba(255,255,255,.065) !important;
+  box-shadow:0 20px 70px rgba(0,0,0,.32),0 0 28px rgba(25,230,255,.035) !important;
+  transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease;
+}
+body.kb-ui-surface-index .card:hover,
+body.kb-ui-surface-index .mock:hover{
+  transform:translateY(-4px);
+  border-color:rgba(25,230,255,.18) !important;
+  box-shadow:0 26px 80px rgba(0,0,0,.38),0 0 35px rgba(25,230,255,.055) !important;
+}
+
+/* Terminal */
+body.kb-ui-surface-terminal .shell,
+body.kb-ui-surface-terminal .topbar-inner{
+  width:min(1720px,calc(100% - 24px));
+}
+body.kb-ui-surface-terminal .hero-main,
+body.kb-ui-surface-terminal .hero-engine,
+body.kb-ui-surface-terminal .panel,
+body.kb-ui-surface-terminal .metric,
+body.kb-ui-surface-terminal .sync,
+body.kb-ui-surface-terminal .market,
+body.kb-ui-surface-terminal .risk-card,
+body.kb-ui-surface-terminal .account-card,
+body.kb-ui-surface-terminal .signal-box{
+  isolation:isolate;
+}
+body.kb-ui-surface-terminal .hero-main::before,
+body.kb-ui-surface-terminal .hero-engine::before,
+body.kb-ui-surface-terminal .panel::before,
+body.kb-ui-surface-terminal .metric::before,
+body.kb-ui-surface-terminal .sync::before,
+body.kb-ui-surface-terminal .market::before,
+body.kb-ui-surface-terminal .risk-card::before,
+body.kb-ui-surface-terminal .account-card::before,
+body.kb-ui-surface-terminal .signal-box::before{
+  background-size:320% 320% !important;
+  animation-duration:7s !important;
+}
+body.kb-ui-surface-terminal .section-title,
+body.kb-ui-surface-terminal .hero h1,
+body.kb-ui-surface-terminal .engine-name{
+  text-shadow:0 0 22px rgba(25,255,114,.12),0 0 30px rgba(25,230,255,.06);
+}
+
+/* Bots */
+body.kb-ui-surface-bots .bot-grid{
+  gap:11px !important;
+}
+body.kb-ui-surface-bots .bot-card,
+body.kb-ui-surface-bots .panel,
+body.kb-ui-surface-bots .selection-toolbar,
+body.kb-ui-surface-bots .telemetry{
+  border-color:rgba(255,255,255,.065) !important;
+  box-shadow:0 18px 60px rgba(0,0,0,.30),inset 0 0 24px rgba(25,230,255,.012);
+  transition:transform .24s ease,border-color .24s ease,box-shadow .24s ease;
+}
+body.kb-ui-surface-bots .bot-card:hover{
+  transform:translateY(-3px);
+  border-color:rgba(25,230,255,.2) !important;
+  box-shadow:0 24px 75px rgba(0,0,0,.36),0 0 28px rgba(25,230,255,.05);
+}
+body.kb-ui-surface-bots .btn.primary,
+body.kb-ui-surface-bots .btn.warn{
+  position:relative;
+  overflow:hidden;
+}
+body.kb-ui-surface-bots .btn.primary::after,
+body.kb-ui-surface-bots .btn.warn::after{
+  content:"";
+  position:absolute;
+  top:-30%;
+  left:-20%;
+  width:34%;
+  height:160%;
+  transform:rotate(18deg);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);
+  animation:kbButtonSweep 4.5s linear infinite;
+  pointer-events:none;
+}
+@keyframes kbButtonSweep{
+  from{transform:translateX(-180%) rotate(18deg)}
+  to{transform:translateX(500%) rotate(18deg)}
+}
+
+/* Broker Connect */
+body.kb-ui-surface-broker-connect .broker{
+  transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease;
+}
+body.kb-ui-surface-broker-connect .broker:hover{
+  transform:translateY(-4px);
+  border-color:rgba(25,230,255,.2) !important;
+  box-shadow:0 24px 75px rgba(0,0,0,.36),0 0 34px rgba(25,230,255,.055);
+}
+body.kb-ui-surface-broker-connect .network-health,
+body.kb-ui-surface-broker-connect .mt5-cloud-banner,
+body.kb-ui-surface-broker-connect .mode-panel,
+body.kb-ui-surface-broker-connect .intel-panel{
+  position:relative;
+  overflow:hidden;
+}
+body.kb-ui-surface-broker-connect .network-health::after,
+body.kb-ui-surface-broker-connect .mt5-cloud-banner::after,
+body.kb-ui-surface-broker-connect .mode-panel::after,
+body.kb-ui-surface-broker-connect .intel-panel::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(120deg,transparent 38%,rgba(25,230,255,.035) 50%,transparent 62%);
+  transform:translateX(-80%);
+  animation:kbSurfaceSweep 8s ease-in-out infinite;
+}
+@keyframes kbSurfaceSweep{
+  0%,28%{transform:translateX(-80%)}
+  68%,100%{transform:translateX(80%)}
+}
+
+/* AI */
+body.kb-ui-surface-ai .glass{
+  box-shadow:0 22px 80px rgba(0,0,0,.36),inset 0 0 26px rgba(25,230,255,.018);
+}
+body.kb-ui-surface-ai .orb{
+  filter:drop-shadow(0 0 22px rgba(25,230,255,.14));
+}
+body.kb-ui-surface-ai .console{
+  border-color:rgba(25,230,255,.16) !important;
+  box-shadow:0 28px 95px rgba(0,0,0,.44),0 0 35px rgba(155,92,255,.05) !important;
+}
+body.kb-ui-surface-ai .telemetry-card{
+  transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease;
+}
+body.kb-ui-surface-ai .telemetry-card:hover{
+  transform:translateY(-2px);
+  border-color:rgba(25,230,255,.19) !important;
+  box-shadow:0 0 26px rgba(25,230,255,.04);
+}
+body.kb-ui-surface-ai .response-wrap,
+body.kb-ui-surface-ai .chat-shell{
+  scrollbar-color:rgba(155,92,255,.28) transparent;
+}
+
+/* Shared core page headings and controls. */
+body.kb-ui-surface-index main,
+body.kb-ui-surface-terminal .shell,
+body.kb-ui-surface-bots .shell,
+body.kb-ui-surface-broker-connect main,
+body.kb-ui-surface-ai .page{
+  position:relative;
+}
+body.kb-ui-surface-index main::before,
+body.kb-ui-surface-terminal .shell::before,
+body.kb-ui-surface-bots .shell::before,
+body.kb-ui-surface-broker-connect main::before,
+body.kb-ui-surface-ai .page::before{
+  content:"";
+  position:absolute;
+  top:0;
+  left:0;
+  width:34%;
+  height:1px;
+  background:linear-gradient(90deg,var(--kb-cyan),var(--kb-violet),transparent);
+  box-shadow:0 0 16px rgba(25,230,255,.4);
+  opacity:.8;
+  pointer-events:none;
+}
+body.kb-ui-surface-index .hero,
+body.kb-ui-surface-terminal .hero,
+body.kb-ui-surface-bots .top,
+body.kb-ui-surface-broker-connect .hero,
+body.kb-ui-surface-ai .hero{
+  animation:kbSurfaceEnter .48s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes kbSurfaceEnter{
+  from{opacity:.86;transform:translateY(7px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+@media(max-width:760px){
+  #kb-ambient-layer .kb-ambient-beam{opacity:.07}
+  body.kb-ui-surface-index .card,
+  body.kb-ui-surface-index .mock,
+  body.kb-ui-surface-bots .bot-card,
+  body.kb-ui-surface-broker-connect .broker{
+    transform:none !important;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  #kb-ambient-layer .kb-ambient-beam,
+  body.kb-ui-surface-index .hero,
+  body.kb-ui-surface-terminal .hero,
+  body.kb-ui-surface-bots .top,
+  body.kb-ui-surface-broker-connect .hero,
+  body.kb-ui-surface-ai .hero,
+  body.kb-ui-surface-bots .btn.primary::after,
+  body.kb-ui-surface-bots .btn.warn::after,
+  body.kb-ui-surface-broker-connect .network-health::after,
+  body.kb-ui-surface-broker-connect .mt5-cloud-banner::after,
+  body.kb-ui-surface-broker-connect .mode-panel::after,
+  body.kb-ui-surface-broker-connect .intel-panel::after{
+    animation:none !important;
+  }
+}

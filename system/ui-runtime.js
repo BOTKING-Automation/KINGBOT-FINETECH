@@ -162,8 +162,29 @@
     });
   }
 
+  function currentPage(){
+    return (window.location.pathname.split("/").filter(Boolean).pop() || "index.html").toLowerCase();
+  }
+
+  function applySurfaceClass(){
+    const page=currentPage().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "index";
+    document.body.classList.add("kb-ui-surface-"+page);
+    document.body.dataset.kbSurface=page;
+  }
+
+  function injectAmbientLayer(){
+    if(document.getElementById("kb-ambient-layer"))return;
+    const layer=document.createElement("div");
+    layer.id="kb-ambient-layer";
+    layer.setAttribute("aria-hidden","true");
+    layer.innerHTML='<span class="kb-ambient-beam kb-ambient-beam-a"></span><span class="kb-ambient-beam kb-ambient-beam-b"></span><span class="kb-ambient-beam kb-ambient-beam-c"></span><span class="kb-ambient-grid"></span>';
+    document.body.prepend(layer);
+  }
+
   function init(){
     initTheme();
+    applySurfaceClass();
+    injectAmbientLayer();
     document.body.classList.add("kb-ui-runtime-ready");
     decorateFreshness();
     decorateRiskMeters();
