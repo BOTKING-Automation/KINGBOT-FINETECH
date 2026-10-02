@@ -148,14 +148,19 @@ async function saveTradingViewSnapshot(pool, body) {
 
 async function latestTradingView(pool, symbols, timeframe) {
   if (!pool) return [];
-  const q = await pool.query(
-    `SELECT DISTINCT ON (symbol) symbol,timeframe,bar_time,payload,received_at
-       FROM kingbot_tradingview_snapshots
-      WHERE symbol = ANY($1) AND timeframe=$2
-      ORDER BY symbol,bar_time DESC`,
-    [symbols, timeframe]
-  );
-  return q.rows.map(r => ({ ...r.payload, symbol: r.symbol, timeframe: r.timeframe, barTime: r.bar_time, receivedAt: r.received_at }));
+  try {
+    const q = await pool.query(
+      `SELECT DISTINCT ON (symbol) symbol,timeframe,bar_time,payload,received_at
+         FROM kingbot_tradingview_snapshots
+        WHERE symbol = ANY($1) AND timeframe=$2
+        ORDER BY symbol,bar_time DESC`,
+      [symbols, timeframe]
+    );
+    return q.rows.map(r => ({ ...r.payload, symbol: r.symbol, timeframe: r.timeframe, barTime: r.bar_time, receivedAt: r.received_at }));
+  } catch (error) {
+    console.warn("[KINGBOT TV]", error?.message || error);
+    return [];
+  }
 }
 
 
@@ -275,7 +280,17 @@ async function collectQuotes(broker, userId, symbols) {
 }
 
 async function runMarketScan({ requireUser, pool, broker, twelveData, req, res }) {
-  const user = await requireUser(pool, req, res);
+  let user;
+  try {
+    user = await requireUser(pool, req, res);
+  } catch (error) {
+    console.error("[KINGBOT MARKET SCANNER AUTH]", error?.message || error);
+    return res.status(503).json({
+      ok:false,
+      error:"SCANNER_AUTH_SERVICE_UNAVAILABLE",
+      reason:"The scanner could not verify your KINGBOT session. Retry after the account service is available."
+    });
+  }
   if (!user) return null;
   const symbols = cleanSymbols(req.query?.symbols || req.body?.symbols).length ? cleanSymbols(req.query?.symbols || req.body?.symbols) : DEFAULT_SYMBOLS;
   const timeframe = cleanTimeframe(req.query?.timeframe || req.body?.timeframe);
@@ -332,6 +347,10 @@ async function runMarketScan({ requireUser, pool, broker, twelveData, req, res }
   }
 }
 
+export async function ensureAiMarketScannerSchema(pool) {
+  await ensureScannerSchema(pool);
+}
+
 export function registerAiMarketScanner(app, { requireUser, pool, broker, rateLimit }) {
   void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
 
@@ -355,7 +374,18 @@ export function registerAiMarketScanner(app, { requireUser, pool, broker, rateLi
   });
 
   app.get("/api/ai/market-scanner/status", async (req,res) => {
-    const user = await requireUser(pool, req, res); if (!user) return;
+    let user;
+    try {
+      user = await requireUser(pool, req, res);
+    } catch (error) {
+      console.error("[KINGBOT MARKET SCANNER STATUS AUTH]", error?.message || error);
+      return res.status(503).json({
+        ok:false,
+        error:"SCANNER_AUTH_SERVICE_UNAVAILABLE",
+        reason:"The scanner could not verify your KINGBOT session. Retry after the account service is available."
+      });
+    }
+    if (!user) return;
     const apiKey = String(process.env.XAI_API_KEY || "").trim();
     let brokerConnected=false, brokerName=null;
     try { const mapping=await broker.getMapping(user.id); brokerConnected=Boolean(mapping); brokerName=mapping?.provider || null; } catch {}
