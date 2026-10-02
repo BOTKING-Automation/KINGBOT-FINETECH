@@ -458,160 +458,104 @@ nav{
 }
 
 /* =========================================
-   HERO TITLE — 3D RGB LED LIGHT ANIMATION
+   HERO TITLE — CLEAN RGB LETTER GLOW
 ========================================= */
 
 .hero-title{
   position:relative;
-  perspective:900px;
-  transform-style:preserve-3d;
-  text-transform:uppercase;
 }
 
 .hero-led-line{
   position:relative;
   display:inline-block;
-  color:transparent;
-  -webkit-background-clip:text;
-  background-clip:text;
-  background-image:
-    linear-gradient(
-      115deg,
-      #ffd977 0%,
-      #f6b93b 12%,
-      #ff4d6d 28%,
-      #9b5cff 44%,
-      #4d8dff 58%,
-      #19e6ff 70%,
-      #2ee6a8 82%,
-      #f6b93b 94%,
-      #fff1bd 100%
-    );
-  background-size:300% 300%;
+  color:#f6b93b;
+  background:none;
+  -webkit-text-fill-color:initial;
   text-shadow:
-    0 0 7px rgba(246,185,59,.70),
-    0 0 18px rgba(25,230,255,.34),
-    0 0 38px rgba(155,92,255,.22),
-    0 7px 0 rgba(0,0,0,.38);
-  filter:
-    drop-shadow(0 0 9px rgba(246,185,59,.38))
-    drop-shadow(0 0 20px rgba(25,230,255,.20));
-  animation:
-    heroTextFastToSlow 16s cubic-bezier(.45,0,.55,1) infinite,
-    heroText3D 5.5s ease-in-out infinite;
-  transform-style:preserve-3d;
-  will-change:background-position,filter,transform;
+    0 0 5px rgba(246,185,59,.90),
+    0 0 14px rgba(155,92,255,.65),
+    0 0 28px rgba(25,230,255,.45),
+    0 0 46px rgba(255,77,109,.22);
+  filter:none;
+  animation:heroLetterGlow 14s linear infinite;
+  will-change:color,text-shadow;
 }
 
-/* Individual LED light points around the lettering */
-.hero-led-line::before{
-  content:"";
-  position:absolute;
-  inset:-8px -14px;
-  z-index:-1;
-  border-radius:16px;
-  background:
-    radial-gradient(circle at 8% 50%,rgba(246,185,59,.90) 0 2px,transparent 4px),
-    radial-gradient(circle at 24% 50%,rgba(155,92,255,.85) 0 2px,transparent 4px),
-    radial-gradient(circle at 42% 50%,rgba(71,135,255,.90) 0 2px,transparent 4px),
-    radial-gradient(circle at 60% 50%,rgba(25,230,255,.90) 0 2px,transparent 4px),
-    radial-gradient(circle at 78% 50%,rgba(35,247,163,.90) 0 2px,transparent 4px),
-    radial-gradient(circle at 94% 50%,rgba(255,77,109,.90) 0 2px,transparent 4px);
-  filter:blur(5px);
-  opacity:.72;
-  animation:heroLedPulse 2.4s ease-in-out infinite;
-  pointer-events:none;
-}
-
+.hero-led-line::before,
 .hero-led-line::after{
-  content:"";
-  position:absolute;
-  left:-4%;
-  top:0;
-  width:18%;
-  height:100%;
-  pointer-events:none;
-  background:linear-gradient(
-    90deg,
-    transparent,
-    rgba(255,255,255,.90),
-    rgba(25,230,255,.45),
-    transparent
-  );
-  filter:blur(2px);
-  mix-blend-mode:screen;
-  animation:heroLedSweep 3.2s linear infinite;
+  display:none;
 }
 
-@keyframes heroTextFastToSlow{
+@keyframes heroLetterGlow{
   0%{
-    background-position:0% 50%;
-    filter:
-      drop-shadow(0 0 11px rgba(246,185,59,.78))
-      drop-shadow(0 0 26px rgba(246,185,59,.36));
-  }
-  4%{
-    background-position:25% 40%;
-    filter:
-      drop-shadow(0 0 13px rgba(155,92,255,.82))
-      drop-shadow(0 0 30px rgba(155,92,255,.40));
-  }
-  8%{
-    background-position:52% 60%;
-    filter:
-      drop-shadow(0 0 13px rgba(71,135,255,.84))
-      drop-shadow(0 0 31px rgba(71,135,255,.40));
+    color:#ffd977;
+    text-shadow:
+      0 0 5px rgba(246,185,59,.95),
+      0 0 14px rgba(246,185,59,.72),
+      0 0 28px rgba(246,185,59,.40);
   }
   12%{
-    background-position:78% 40%;
-    filter:
-      drop-shadow(0 0 13px rgba(35,247,163,.84))
-      drop-shadow(0 0 31px rgba(35,247,163,.40));
+    color:#ffcf66;
+    text-shadow:
+      0 0 5px rgba(255,77,109,.90),
+      0 0 15px rgba(255,77,109,.70),
+      0 0 30px rgba(155,92,255,.42);
   }
-  16%{
-    background-position:100% 55%;
-    filter:
-      drop-shadow(0 0 14px rgba(255,77,109,.86))
-      drop-shadow(0 0 34px rgba(255,77,109,.42));
+  25%{
+    color:#b88cff;
+    text-shadow:
+      0 0 5px rgba(155,92,255,.95),
+      0 0 16px rgba(155,92,255,.75),
+      0 0 32px rgba(155,92,255,.42);
   }
-  30%{background-position:78% 45%}
-  50%{background-position:52% 58%}
-  70%{background-position:28% 42%}
-  85%{background-position:10% 55%}
+  38%{
+    color:#72b8ff;
+    text-shadow:
+      0 0 5px rgba(77,141,255,.95),
+      0 0 16px rgba(25,230,255,.72),
+      0 0 32px rgba(77,141,255,.42);
+  }
+  51%{
+    color:#62efff;
+    text-shadow:
+      0 0 5px rgba(25,230,255,.95),
+      0 0 16px rgba(25,230,255,.75),
+      0 0 32px rgba(25,230,255,.42);
+  }
+  64%{
+    color:#67efbd;
+    text-shadow:
+      0 0 5px rgba(46,230,168,.95),
+      0 0 16px rgba(46,230,168,.72),
+      0 0 32px rgba(46,230,168,.40);
+  }
+  77%{
+    color:#ff718a;
+    text-shadow:
+      0 0 5px rgba(255,92,122,.95),
+      0 0 16px rgba(255,92,122,.72),
+      0 0 32px rgba(255,92,122,.40);
+  }
+  90%{
+    color:#d4a1ff;
+    text-shadow:
+      0 0 5px rgba(155,92,255,.95),
+      0 0 16px rgba(155,92,255,.72),
+      0 0 30px rgba(246,185,59,.38);
+  }
   100%{
-    background-position:0% 50%;
-    filter:
-      drop-shadow(0 0 11px rgba(246,185,59,.78))
-      drop-shadow(0 0 26px rgba(246,185,59,.36));
+    color:#ffd977;
+    text-shadow:
+      0 0 5px rgba(246,185,59,.95),
+      0 0 14px rgba(246,185,59,.72),
+      0 0 28px rgba(246,185,59,.40);
   }
-}
-
-@keyframes heroText3D{
-  0%,100%{
-    transform:translateZ(0) rotateX(0deg);
-  }
-  50%{
-    transform:translateZ(8px) rotateX(.7deg);
-  }
-}
-
-@keyframes heroLedPulse{
-  0%,100%{opacity:.42;transform:scale(.99)}
-  50%{opacity:.92;transform:scale(1.018)}
-}
-
-@keyframes heroLedSweep{
-  0%{left:-22%;opacity:0}
-  12%{opacity:.9}
-  32%{left:105%;opacity:.72}
-  100%{left:105%;opacity:0}
 }
 
 @media (prefers-reduced-motion:reduce){
-  .hero-led-line,
-  .hero-led-line::before,
-  .hero-led-line::after{
+  .hero-led-line{
     animation:none;
+    color:#ffd977;
   }
 }
 
