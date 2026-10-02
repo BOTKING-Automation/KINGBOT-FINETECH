@@ -1896,574 +1896,627 @@ footer strong{
 <script>
 /* =========================================================
    KINGBOT ANALYTICS OS
-   Customer-facing analytics layer
+   LIVE TERMINAL INTEGRATION
    ========================================================= */
 
-const API = {
-    analytics: "/api/analytics",
-    account: "/api/account",
-    connection: "/api/connection"
+const TERMINAL_API="/api/terminal/snapshot";
+const TERMINAL_STREAM="/terminal/live";
+const ANALYTICS_API="/analytics";
+const ACCOUNT_API="/account";
+
+const state={
+    live:{abort:null,connected:false,reconnectTimer:null,reconnectDelay:1000,equity:[],peakEquity:null,lastSnapshotAt:null,lastEventAt:null},
+    account:null,
+    positions:[],
+    runtime:[],
+    risk:[],
+    history:{deals:[],realizedPnl:null,wins:0,losses:0,trades:0,grossProfit:0,grossLoss:0,maxDrawdownMoney:0},
+    cycle:0,
+    booted:false
 };
 
+const $=id=>document.getElementById(id);
+
+function safeNumber(value){
+    if(value===null||value===undefined||value==="")return null;
+    const n=Number(value);
+    return Number.isFinite(n)?n:null;
+}
+
+function formatMoney(value,currency="USD"){
+    const n=safeNumber(value);
+    if(n===null)return "—";
+    try{
+        return new Intl.NumberFormat(undefined,{style:"currency",currency:currency||"USD",maximumFractionDigits:2}).format(n);
+    }catch{
+        return n.toFixed(2);
+    }
+}
+
+function setGlobalStatus(status,detail=""){
+    const el=$("globalStatus");
+    if(!el)return;
+    const labels={live:"LIVE TERMINAL",syncing:"SYNCING",error:"DATA ERROR",standby:"DATA STANDBY"};
+    el.textContent=detail||labels[status]||"DATA STANDBY";
+}
+
+function markAvailable(...ids){
+    ids.forEach(id=>{
+        const el=$(id);
+        if(el)el.classList.remove("unavailable");
+    });
+}
+
+function clearMetric(id){
+    const el=$(id);
+    if(el){
+        el.textContent="—";
+        el.classList.add("unavailable");
+    }
+}
 
 /* ---------------------------------------------------------
    CHARTS
 --------------------------------------------------------- */
 
-const equityCtx =
-    document.getElementById("equityChart").getContext("2d");
+const equityCtx=$("equityChart").getContext("2d");
+const distributionCtx=$("distributionChart").getContext("2d");
 
-const distributionCtx =
-    document.getElementById("distributionChart").getContext("2d");
-
-
-const equityGradient =
-    equityCtx.createLinearGradient(0,0,0,390);
-
+const equityGradient=equityCtx.createLinearGradient(0,0,0,390);
 equityGradient.addColorStop(0,"rgba(25,230,255,.20)");
 equityGradient.addColorStop(1,"rgba(25,230,255,0)");
 
-
-const equityChart = new Chart(equityCtx,{
+const equityChart=new Chart(equityCtx,{
     type:"line",
-
     data:{
         labels:[],
         datasets:[
-            {
-                label:"Equity",
-                data:[],
-                borderColor:"#19e6ff",
-                backgroundColor:equityGradient,
-                fill:true,
-                tension:.35,
-                pointRadius:0,
-                borderWidth:2
-            },
-            {
-                label:"Drawdown",
-                data:[],
-                borderColor:"#ff4d6d",
-                backgroundColor:"transparent",
-                fill:false,
-                tension:.35,
-                pointRadius:0,
-                borderWidth:1.5
-            }
+            {label:"Equity",data:[],borderColor:"#19e6ff",backgroundColor:equityGradient,fill:true,tension:.35,pointRadius:0,borderWidth:2},
+            {label:"Drawdown",data:[],borderColor:"#ff4d6d",backgroundColor:"transparent",fill:false,tension:.35,pointRadius:0,borderWidth:1.5}
         ]
     },
-
     options:{
         responsive:true,
         maintainAspectRatio:false,
-
-        interaction:{
-            intersect:false,
-            mode:"index"
-        },
-
+        animation:false,
+        interaction:{intersect:false,mode:"index"},
         plugins:{
-            legend:{
-                display:false
-            },
-
+            legend:{display:false},
             tooltip:{
                 backgroundColor:"#080d1a",
                 borderColor:"rgba(255,255,255,.08)",
                 borderWidth:1,
-                titleFont:{
-                    family:"JetBrains Mono"
-                },
-                bodyFont:{
-                    family:"JetBrains Mono"
-                }
+                titleFont:{family:"JetBrains Mono"},
+                bodyFont:{family:"JetBrains Mono"}
             }
         },
-
         scales:{
-            x:{
-                display:false,
-                grid:{
-                    display:false
-                }
-            },
-
-            y:{
-                ticks:{
-                    color:"#56627c",
-                    font:{
-                        family:"JetBrains Mono",
-                        size:9
-                    }
-                },
-
-                grid:{
-                    color:"rgba(255,255,255,.035)"
-                }
-            }
+            x:{display:false,grid:{display:false}},
+            y:{ticks:{color:"#56627c",font:{family:"JetBrains Mono",size:9}},grid:{color:"rgba(255,255,255,.035)"}}
         }
     }
 });
 
-
-const distributionChart = new Chart(distributionCtx,{
+const distributionChart=new Chart(distributionCtx,{
     type:"bar",
-
     data:{
-        labels:[],
-        datasets:[
-            {
-                label:"Trade Outcomes",
-                data:[],
-                backgroundColor:[
-                    "rgba(35,247,163,.42)"
-                ],
-                borderWidth:0,
-                borderRadius:5
-            }
-        ]
+        labels:["WINS","LOSSES"],
+        datasets:[{
+            label:"Trade Outcomes",
+            data:[0,0],
+            backgroundColor:["rgba(35,247,163,.42)","rgba(255,77,109,.42)"],
+            borderWidth:0,
+            borderRadius:5
+        }]
     },
-
     options:{
         responsive:true,
         maintainAspectRatio:false,
-
-        plugins:{
-            legend:{
-                display:false
-            }
-        },
-
+        animation:false,
+        plugins:{legend:{display:false}},
         scales:{
-            x:{
-                ticks:{
-                    color:"#56627c",
-                    font:{
-                        family:"JetBrains Mono",
-                        size:8
-                    }
-                },
-
-                grid:{
-                    display:false
-                }
-            },
-
-            y:{
-                ticks:{
-                    color:"#56627c",
-                    font:{
-                        family:"JetBrains Mono",
-                        size:8
-                    }
-                },
-
-                grid:{
-                    color:"rgba(255,255,255,.035)"
-                }
-            }
+            x:{ticks:{color:"#56627c",font:{family:"JetBrains Mono",size:8}},grid:{display:false}},
+            y:{beginAtZero:true,ticks:{color:"#56627c",font:{family:"JetBrains Mono",size:8}},grid:{color:"rgba(255,255,255,.035)"}}
         }
     }
 });
 
-
 /* ---------------------------------------------------------
-   SAFE DATA HANDLING
+   AUTHENTICATED API
 --------------------------------------------------------- */
 
-function safeNumber(value){
-
-    if(
-        value === null ||
-        value === undefined ||
-        value === "" ||
-        Number.isNaN(Number(value))
-    ){
-        return null;
-    }
-
-    return Number(value);
+async function apiJson(path,options={}){
+    if(!window.KINGBOT_API?.json)throw new Error("API_NOT_READY");
+    return window.KINGBOT_API.json(path,{cache:"no-store",...options});
 }
 
-
-function displayMetric(value,suffix=""){
-
-    const n = safeNumber(value);
-
-    if(n === null){
-        return "—";
-    }
-
-    return `${n}${suffix}`;
+async function getAuthToken(){
+    const firebase=window.KINGBOT_FIREBASE;
+    const user=firebase?.auth?.currentUser;
+    if(!user)throw new Error("AUTHENTICATION_REQUIRED");
+    return user.getIdToken(false);
 }
-
-
-function formatMoney(value,currency="USD"){
-
-    const n = safeNumber(value);
-
-    if(n === null){
-        return "—";
-    }
-
-    try{
-
-        return new Intl.NumberFormat(
-            undefined,
-            {
-                style:"currency",
-                currency,
-                maximumFractionDigits:2
-            }
-        ).format(n);
-
-    }catch{
-
-        return n.toFixed(2);
-
-    }
-}
-
 
 /* ---------------------------------------------------------
-   CUSTOMER-FACING STATE
+   LIVE TERMINAL STATE
 --------------------------------------------------------- */
 
-function setGlobalStatus(state){
+function renderLiveAccount(account){
+    if(!account)return;
 
-    const el =
-        document.getElementById("globalStatus");
+    state.account={...(state.account||{}),...account};
 
-    if(state === "connected"){
+    const currency=state.account.currency||"USD";
+    const equity=safeNumber(state.account.equity);
+    const floating=safeNumber(state.account.floatingPnl);
+    const realized=state.history.realizedPnl;
+    const totalPnl=realized!==null&&floating!==null?realized+floating:(floating!==null?floating:realized);
 
-        el.textContent = "LIVE DATA";
-
-    }else{
-
-        el.textContent = "DATA STANDBY";
-
+    if(totalPnl!==null){
+        $("netPnl").textContent=formatMoney(totalPnl,currency);
+        markAvailable("netPnl");
     }
 
-}
+    const ddDaily=safeNumber(state.account.dailyDrawdownPct);
+    const ddTotal=safeNumber(state.account.totalDrawdownPct);
 
+    if(ddDaily!==null)$("dailyRiskBar").style.width=Math.min(100,(Math.abs(ddDaily)/5)*100)+"%";
+    if(ddTotal!==null)$("totalRiskBar").style.width=Math.min(100,(Math.abs(ddTotal)/10)*100)+"%";
 
-/* ---------------------------------------------------------
-   LOAD ANALYTICS
---------------------------------------------------------- */
+    const riskValues=[];
+    if(ddDaily!==null)riskValues.push(Math.abs(ddDaily)/5*100);
+    if(ddTotal!==null)riskValues.push(Math.abs(ddTotal)/10*100);
 
-async function refreshAnalytics(){
-
-    setGlobalStatus("loading");
-
-    try{
-
-        const response =
-            await window.KINGBOT_API.request(API.analytics,{
-                method:"GET",
-                credentials:"include",
-                headers:{
-                    "Accept":"application/json"
-                }
-            });
-
-        if(!response.ok){
-
-            throw new Error("Analytics unavailable");
-
-        }
-
-        const data =
-            await response.json();
-
-        renderAnalytics(data);
-
-        setGlobalStatus("connected");
-
-    }catch(error){
-
-        /*
-         Do not expose implementation details
-         to the customer.
-        */
-
-        setGlobalStatus("offline");
-
-        clearAnalyticsState();
-
+    if(riskValues.length){
+        $("riskUtilization").textContent=Math.max(...riskValues).toFixed(1)+"%";
+        markAvailable("riskUtilization");
     }
 
-}
+    if(equity!==null){
+        state.live.equity.push({time:new Date().toLocaleTimeString([],{hour12:false}),value:equity});
+        if(state.live.equity.length>90)state.live.equity.shift();
 
+        state.live.peakEquity=state.live.peakEquity===null?equity:Math.max(state.live.peakEquity,equity);
 
-/* ---------------------------------------------------------
-   RENDER VERIFIED ANALYTICS
---------------------------------------------------------- */
-
-function renderAnalytics(data){
-
-    if(!data){
-        clearAnalyticsState();
-        return;
-    }
-
-    /*
-      The backend currently returns authoritative runtime/risk telemetry.
-      Performance KPIs remain unavailable until verified broker history is present.
-      Never synthesize customer performance values.
-    */
-    if(!data.available){
-        [
-            "netPnl","returnValue","winRate","profitFactor",
-            "maxDrawdown","riskUtilization"
-        ].forEach(id=>{
-            const el=document.getElementById(id);
-            if(el) el.textContent="—";
+        const drawdownSeries=state.live.equity.map(point=>{
+            const dd=state.live.peakEquity===null?0:point.value-state.live.peakEquity;
+            return safeNumber(dd);
         });
+
+        equityChart.data.labels=state.live.equity.map(point=>point.time);
+        equityChart.data.datasets[0].data=state.live.equity.map(point=>point.value);
+        equityChart.data.datasets[1].data=drawdownSeries;
+        equityChart.update("none");
     }
 
-    if(Array.isArray(data.risk) && data.risk.length){
-        const activeKill = data.risk.some(x=>x.kill_switch);
-        const activeBots = Array.isArray(data.runtime)
-            ? data.runtime.filter(x=>x.state==="RUNNING").length
-            : 0;
-        const riskNote = document.getElementById("aiRisk");
-        if(riskNote){
-            riskNote.textContent =
-                activeKill
-                    ? "KILL SWITCH ACTIVE"
-                    : `${activeBots} bot runtime(s) reporting from the control plane`;
+    const openCount=Array.isArray(state.positions)?state.positions.length:safeNumber(state.account.positionCount);
+    const connectedLabel=String(state.account.broker||"BROKER").toUpperCase()+" · "+String(state.account.executionMode||"DEMO").toUpperCase();
+
+    setGlobalStatus("live",connectedLabel);
+
+    if($("aiPortfolio")){
+        $("aiPortfolio").textContent=openCount===null
+            ?"LIVE TELEMETRY"
+            :(String(openCount)+" OPEN POSITION"+(openCount===1?"":"S"));
+    }
+
+    if($("aiRisk")){
+        if(state.account.tradingEnabled===false){
+            $("aiRisk").textContent="TRADING DISABLED";
+        }else if(ddDaily!==null||ddTotal!==null){
+            const risk=Math.max(
+                ddDaily===null?0:Math.abs(ddDaily)/5*100,
+                ddTotal===null?0:Math.abs(ddTotal)/10*100
+            );
+            $("aiRisk").textContent="POLICY "+risk.toFixed(1)+"% USED";
+        }else{
+            const activeKills=state.risk.filter(x=>x.kill_switch).length;
+            $("aiRisk").textContent=activeKills?"KILL SWITCH ACTIVE":"POLICY TELEMETRY LIVE";
         }
     }
 
-    /* KPI */
-
-    document.getElementById("netPnl").textContent =
-        formatMoney(data.netPnl,data.currency || "USD");
-
-    document.getElementById("returnValue").textContent =
-        displayMetric(data.return,"%");
-
-    document.getElementById("winRate").textContent =
-        displayMetric(data.winRate,"%");
-
-    document.getElementById("profitFactor").textContent =
-        displayMetric(data.profitFactor);
-
-    document.getElementById("maxDrawdown").textContent =
-        displayMetric(data.maxDrawdown,"%");
-
-    document.getElementById("riskUtilization").textContent =
-        displayMetric(data.riskUtilization,"%");
-
-
-    /* EQUITY */
-
-    if(
-        Array.isArray(data.equity) &&
-        data.equity.length
-    ){
-
-        equityChart.data.labels =
-            data.equity.map(x => x.time || "");
-
-        equityChart.data.datasets[0].data =
-            data.equity.map(x => safeNumber(x.value));
-
-        equityChart.data.datasets[1].data =
-            Array.isArray(data.drawdown)
-                ? data.drawdown.map(x => safeNumber(x.value))
-                : [];
-
-        equityChart.update();
-
+    if($("aiInsight")){
+        const positionText=openCount===null
+            ?"Awaiting open-position telemetry."
+            :(String(openCount)+" open position"+(openCount===1?"":"s")+" synchronized from the Terminal.");
+        const pnlText=floating===null
+            ?"Floating P/L unavailable."
+            :("Floating P/L "+formatMoney(floating,currency)+".");
+        const equityText=equity===null
+            ?"Equity unavailable."
+            :("Account equity "+formatMoney(equity,currency)+".");
+        $("aiInsight").textContent="LIVE TERMINAL LINK · "+positionText+" "+pnlText+" "+equityText;
     }
-
-
-    /* DISTRIBUTION */
-
-    if(
-        Array.isArray(data.distribution) &&
-        data.distribution.length
-    ){
-
-        distributionChart.data.labels =
-            data.distribution.map(x => x.label);
-
-        distributionChart.data.datasets[0].data =
-            data.distribution.map(x => safeNumber(x.value));
-
-        distributionChart.update();
-
-    }
-
-
-    /* RISK */
-
-    if(data.risk){
-
-        setProgress(
-            "dailyRiskBar",
-            data.risk.dailyDrawdownPercent,
-            5
-        );
-
-        setProgress(
-            "totalRiskBar",
-            data.risk.totalDrawdownPercent,
-            10
-        );
-
-    }
-
-
-    /* AI */
-
-    if(data.ai){
-
-        document.getElementById("aiInsight").textContent =
-            data.ai.insight ||
-            "Analytics intelligence is awaiting sufficient verified data.";
-
-        document.getElementById("aiPerformance").textContent =
-            data.ai.performance ||
-            "AWAITING DATA";
-
-        document.getElementById("aiRisk").textContent =
-            data.ai.risk ||
-            "AWAITING DATA";
-
-        document.getElementById("aiPortfolio").textContent =
-            data.ai.portfolio ||
-            "AWAITING DATA";
-
-    }
-
 }
 
+function renderPositions(rows){
+    state.positions=Array.isArray(rows)?rows:[];
+    if($("aiPortfolio")){
+        $("aiPortfolio").textContent=String(state.positions.length)+" OPEN POSITION"+(state.positions.length===1?"":"S");
+    }
+}
 
-function setProgress(id,value,limit){
+function renderRuntime(rows){
+    state.runtime=Array.isArray(rows)?rows:[];
+    const running=state.runtime.filter(x=>String(x.state||"").toUpperCase()==="RUNNING").length;
+    if($("aiPerformance")){
+        $("aiPerformance").textContent=running
+            ?(String(running)+" ENGINE"+(running===1?"":"S")+" RUNNING")
+            :"NO ENGINE RUNNING";
+    }
+}
 
-    const element =
-        document.getElementById(id);
+function renderRisk(rows){
+    state.risk=Array.isArray(rows)?rows:[];
+}
 
-    const n = safeNumber(value);
+function renderStreamStatus(payload){
+    const streamState=String(payload?.state||"").toUpperCase();
+    if(streamState==="CONNECTED"){
+        state.live.connected=true;
+        state.live.reconnectDelay=1000;
+        setGlobalStatus("live","LIVE TERMINAL · 1S STREAM");
+    }else if(streamState==="ERROR"){
+        state.live.connected=false;
+        setGlobalStatus("error","TERMINAL STREAM ERROR");
+    }
+}
 
-    if(n === null){
-
-        element.style.width = "0%";
+function handleLiveEvent(eventName,payload){
+    state.live.lastEventAt=Date.now();
+    if(eventName==="status"){
+        renderStreamStatus(payload);
         return;
-
     }
-
-    const percentage =
-        Math.max(
-            0,
-            Math.min(
-                100,
-                (Math.abs(n) / limit) * 100
-            )
-        );
-
-    element.style.width =
-        percentage + "%";
-
+    if(eventName==="snapshot"){
+        renderLiveAccount(payload?.account||null);
+        renderPositions(payload?.positions||[]);
+    }
 }
-
 
 /* ---------------------------------------------------------
-   EMPTY / SAFE STATE
+   LIVE SSE CONNECTION
+--------------------------------------------------------- */
+
+function stopLiveStream(reconnect=false){
+    const live=state.live;
+    if(live.reconnectTimer){
+        clearTimeout(live.reconnectTimer);
+        live.reconnectTimer=null;
+    }
+    if(live.abort){
+        try{live.abort.abort();}catch{}
+        live.abort=null;
+    }
+    live.connected=false;
+    if(!reconnect)live.reconnectDelay=1000;
+}
+
+function scheduleLiveReconnect(){
+    const live=state.live;
+    if(live.reconnectTimer||document.hidden)return;
+
+    const delay=Math.min(8000,Math.max(750,Number(live.reconnectDelay)||1000));
+    live.reconnectDelay=Math.min(8000,delay*1.7);
+
+    live.reconnectTimer=setTimeout(()=>{
+        live.reconnectTimer=null;
+        startLiveStream();
+    },delay);
+}
+
+async function startLiveStream(){
+    stopLiveStream(true);
+    if(document.hidden||!window.KINGBOT_API?.baseUrl)return;
+
+    let controller=null;
+
+    try{
+        const token=await getAuthToken();
+        controller=new AbortController();
+        state.live.abort=controller;
+
+        const response=await fetch(window.KINGBOT_API.baseUrl+TERMINAL_STREAM,{
+            method:"GET",
+            headers:{Accept:"text/event-stream",Authorization:"Bearer "+token},
+            credentials:"omit",
+            cache:"no-store",
+            signal:controller.signal
+        });
+
+        if(!response.ok)throw new Error("LIVE_STREAM_HTTP_"+response.status);
+        if(!response.body)throw new Error("LIVE_STREAM_BODY_UNAVAILABLE");
+
+        state.live.connected=true;
+        setGlobalStatus("live","LIVE TERMINAL · 1S STREAM");
+
+        const reader=response.body.getReader();
+        const decoder=new TextDecoder();
+        let buffer="";
+
+        while(!controller.signal.aborted){
+            const {value,done}=await reader.read();
+            if(done)break;
+
+            buffer+=decoder.decode(value,{stream:true});
+
+            let boundary;
+            while((boundary=buffer.indexOf("\n\n"))>=0){
+                const frame=buffer.slice(0,boundary);
+                buffer=buffer.slice(boundary+2);
+
+                let eventName="message";
+                let dataText="";
+
+                for(const line of frame.split(/\r?\n/)){
+                    if(line.startsWith("event:")){
+                        eventName=line.slice(6).trim();
+                    }else if(line.startsWith("data:")){
+                        dataText+=line.slice(5).trim();
+                    }
+                }
+
+                if(!dataText)continue;
+
+                try{handleLiveEvent(eventName,JSON.parse(dataText));}catch{}
+            }
+        }
+
+        if(!controller.signal.aborted)throw new Error("LIVE_STREAM_DISCONNECTED");
+    }catch(error){
+        if(error?.name!=="AbortError"&&!document.hidden){
+            state.live.connected=false;
+            setGlobalStatus("syncing","LIVE TERMINAL · RECONNECTING");
+            scheduleLiveReconnect();
+        }
+    }finally{
+        if(state.live.abort===controller)state.live.abort=null;
+    }
+}
+
+/* ---------------------------------------------------------
+   VERIFIED HISTORY / RUNTIME
+--------------------------------------------------------- */
+
+function extractDealPnl(deal){
+    return safeNumber(
+        deal?.profit??
+        deal?.pnl??
+        deal?.realizedProfit??
+        deal?.realized_pnl??
+        deal?.closeProfit
+    );
+}
+
+function extractDealTime(deal){
+    return deal?.time||
+        deal?.closeTime||
+        deal?.close_time||
+        deal?.updateTime||
+        deal?.date||
+        deal?.timestamp||
+        null;
+}
+
+function calculateHistory(deals){
+    const rows=(Array.isArray(deals)?deals:[])
+        .map(deal=>({
+            pnl:extractDealPnl(deal),
+            time:extractDealTime(deal),
+            symbol:String(deal?.symbol||deal?.underlying_symbol||"").trim().toUpperCase()
+        }))
+        .filter(row=>row.pnl!==null);
+
+    let grossProfit=0;
+    let grossLoss=0;
+    let wins=0;
+    let losses=0;
+    let cumulative=0;
+    let peak=0;
+    let maxDrawdownMoney=0;
+
+    for(const row of rows.sort((a,b)=>new Date(a.time||0)-new Date(b.time||0))){
+        cumulative+=row.pnl;
+        peak=Math.max(peak,cumulative);
+        maxDrawdownMoney=Math.max(maxDrawdownMoney,peak-cumulative);
+        if(row.pnl>0){
+            wins++;
+            grossProfit+=row.pnl;
+        }else if(row.pnl<0){
+            losses++;
+            grossLoss+=Math.abs(row.pnl);
+        }
+    }
+
+    state.history={
+        deals,
+        realizedPnl:rows.length?rows.reduce((sum,row)=>sum+row.pnl,0):null,
+        wins,
+        losses,
+        trades:rows.length,
+        grossProfit,
+        grossLoss,
+        maxDrawdownMoney
+    };
+
+    const total=rows.length;
+    const winRate=total?(wins/total)*100:null;
+    const profitFactor=grossLoss>0?grossProfit/grossLoss:(grossProfit>0?null:0);
+
+    if(winRate!==null){
+        $("winRate").textContent=winRate.toFixed(2)+"%";
+        markAvailable("winRate");
+    }else{
+        clearMetric("winRate");
+    }
+
+    if(profitFactor!==null){
+        $("profitFactor").textContent=profitFactor.toFixed(2);
+        markAvailable("profitFactor");
+    }else{
+        clearMetric("profitFactor");
+    }
+
+    distributionChart.data.labels=["WINS","LOSSES"];
+    distributionChart.data.datasets[0].data=[wins,losses];
+    distributionChart.update("none");
+
+    if(total && state.account){
+        renderLiveAccount(state.account);
+    }
+}
+
+async function loadHistoryAndRuntime(){
+    const end=Date.now();
+    const selectedStart=$("startDate")?.value
+        ?new Date($("startDate").value+"T00:00:00")
+        :new Date(end-90*86400000);
+
+    try{
+        const query=ANALYTICS_API+
+            "?startTime="+encodeURIComponent(new Date(selectedStart.getTime()).toISOString())+
+            "&endTime="+encodeURIComponent(new Date(end).toISOString());
+
+        const data=await apiJson(query);
+
+        renderRuntime(data.runtime||[]);
+        renderRisk(data.risk||[]);
+
+        const deals=data?.broker?.data?.deals||
+            data?.broker?.deals||
+            data?.data?.deals||
+            data?.deals||
+            [];
+
+        calculateHistory(deals);
+
+        if(data?.available===false&&!state.live.connected){
+            setGlobalStatus("standby","BROKER DATA STANDBY");
+        }
+    }catch{
+        if(!state.live.connected)setGlobalStatus("error","ANALYTICS DATA UNAVAILABLE");
+    }
+}
+
+async function loadAccountRisk(){
+    try{
+        const data=await apiJson(ACCOUNT_API);
+        const account=data?.account||data?.data||data;
+        if(account)renderLiveAccount(account);
+    }catch{}
+}
+
+async function loadTerminalSnapshot(){
+    try{
+        const data=await apiJson(TERMINAL_API);
+        renderLiveAccount(data?.account||null);
+        renderPositions(data?.positions||[]);
+        if(data?.account){
+            setGlobalStatus("live","LIVE TERMINAL · SNAPSHOT");
+        }
+    }catch{
+        if(!state.live.connected)setGlobalStatus("standby","TERMINAL AWAITING BROKER");
+    }
+}
+
+/* ---------------------------------------------------------
+   RESET / FILTERS
 --------------------------------------------------------- */
 
 function clearAnalyticsState(){
+    state.live.equity=[];
+    state.live.peakEquity=null;
 
-    equityChart.data.labels = [];
-    equityChart.data.datasets[0].data = [];
-    equityChart.data.datasets[1].data = [];
+    equityChart.data.labels=[];
+    equityChart.data.datasets[0].data=[];
+    equityChart.data.datasets[1].data=[];
+    equityChart.update("none");
 
-    equityChart.update();
+    distributionChart.data.labels=["WINS","LOSSES"];
+    distributionChart.data.datasets[0].data=[0,0];
+    distributionChart.update("none");
 
+    ["netPnl","returnValue","winRate","profitFactor","maxDrawdown","riskUtilization"].forEach(clearMetric);
 
-    distributionChart.data.labels = [];
-    distributionChart.data.datasets[0].data = [];
-
-    distributionChart.update();
-
-
-    [
-        "netPnl",
-        "returnValue",
-        "winRate",
-        "profitFactor",
-        "maxDrawdown",
-        "riskUtilization"
-    ].forEach(id => {
-
-        const el =
-            document.getElementById(id);
-
-        el.textContent = "—";
-
-        el.classList.add("unavailable");
-
-    });
-
-
-    document.getElementById("dailyRiskBar")
-        .style.width = "0%";
-
-    document.getElementById("totalRiskBar")
-        .style.width = "0%";
-
+    if($("dailyRiskBar"))$("dailyRiskBar").style.width="0%";
+    if($("totalRiskBar"))$("totalRiskBar").style.width="0%";
 }
 
+async function refreshAll(){
+    const cycle=++state.cycle;
+    setGlobalStatus("syncing","SYNCING TERMINAL + ANALYTICS");
 
-/* ---------------------------------------------------------
-   FILTERS
---------------------------------------------------------- */
+    await loadTerminalSnapshot();
 
-[
-    "accountFilter",
-    "strategyFilter",
-    "symbolFilter",
-    "timeframeFilter",
-    "startDate",
-    "endDate"
-].forEach(id => {
+    await Promise.allSettled([
+        loadHistoryAndRuntime(),
+        loadAccountRisk()
+    ]);
 
-    document.getElementById(id)
-        .addEventListener("change",() => {
+    if(cycle!==state.cycle)return;
 
-            /*
-             Filters are intentionally kept
-             customer-facing. Their selected values
-             can later be passed to the verified
-             analytics service.
-            */
+    if(state.live.connected)setGlobalStatus("live","LIVE TERMINAL · 1S STREAM");
+}
 
-            refreshAnalytics();
+async function bootAnalytics(){
+    if(state.booted)return;
+    state.booted=true;
 
+    clearAnalyticsState();
+
+    ["accountFilter","strategyFilter","symbolFilter","timeframeFilter","startDate","endDate"].forEach(id=>{
+        const el=$(id);
+        if(!el)return;
+        el.addEventListener("change",()=>{
+            state.live.equity=[];
+            state.live.peakEquity=null;
+            void refreshAll();
         });
+    });
 
-});
+    await refreshAll();
+    void startLiveStream();
 
+    setInterval(()=>{
+        if(!document.hidden&&!state.live.connected)void refreshAll();
+    },15000);
 
-/* ---------------------------------------------------------
-   INITIAL STATE
---------------------------------------------------------- */
+    setInterval(()=>{
+        if(!document.hidden)void loadAccountRisk();
+    },10000);
 
-clearAnalyticsState();
+    document.addEventListener("visibilitychange",()=>{
+        if(document.hidden){
+            stopLiveStream(false);
+        }else{
+            void refreshAll();
+            void startLiveStream();
+        }
+    });
 
-refreshAnalytics();
+    window.addEventListener("pageshow",()=>{
+        void refreshAll();
+        void startLiveStream();
+    });
+}
 
+function waitForKingbotSession(){
+    const ready=window.KINGBOT_API?.json&&window.KINGBOT_FIREBASE?.auth?.currentUser;
+    if(ready){
+        void bootAnalytics();
+        return;
+    }
 
-/* ---------------------------------------------------------
-   PERIODIC REFRESH
---------------------------------------------------------- */
+    window.addEventListener("kingbot:session-change",()=>void bootAnalytics(),{once:true});
 
-setInterval(
-    refreshAnalytics,
-    30000
-);
+    document.addEventListener("DOMContentLoaded",()=>{
+        setTimeout(()=>{
+            if(!state.booted)void bootAnalytics();
+        },50);
+    },{once:true});
+}
+
+waitForKingbotSession();
 
 </script>
 <script src="system/session.js"></script>
