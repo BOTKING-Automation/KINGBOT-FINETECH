@@ -223,12 +223,74 @@ async function fetchTwelveDataTechnical(twelveData, symbols, timeframe) {
   if(!twelveData?.enabled)return [];
   return Promise.all(symbols.map(async symbol=>{
     try {
-      const snapshot=await twelveData.technicalSnapshot(symbol,timeframe);
+      const snapshot=await twelveData.technicalSnapshot(symbol,timeframe,{maxAgeMs:15000});
       return snapshot?{symbol,...snapshot}:null;
     } catch(error) {
       return {symbol,technicalError:String(error?.message||"TECHNICAL_DATA_UNAVAILABLE").slice(0,120)};
     }
   })).then(rows=>rows.filter(Boolean));
+}
+
+async function fetchPublicDerivQuotes(symbols) {
+  const requested=cleanSymbols(symbols);
+  if(!requested.length)return [];
+  const rows=await Promise.all(requested.map(async symbol=>{
+    try{
+      const quote=await publicDerivFeed.getQuote(symbol,{maxAgeMs:3000,timeoutMs:2500});
+      return {
+        symbol,
+        brokerSymbol:quote.brokerSymbol||null,
+        price:quote.price,
+        bid:quote.bid,
+        ask:quote.ask,
+        spread:quote.bid!=null&&quote.ask!=null?quote.ask-quote.bid:null,
+        time:quote.time||null,
+        timestamp:quote.epoch!=null?Number(quote.epoch)*1000:Date.now(),
+        available:true,
+        ageMs:Number(quote.ageMs||0),
+        source:quote.source||"Deriv public live feed"
+      };
+    }catch(error){
+      return {
+        symbol,
+        available:false,
+        source:"Deriv public live feed",
+        error:String(error?.message||"DERIV_PUBLIC_QUOTE_UNAVAILABLE").slice(0,120)
+      };
+    }
+  }));
+  return rows;
+}
+
+async function getFastStandaloneQuotes({ twelveData, symbols }) {
+  const normalized=cleanSymbols(symbols).length ? cleanSymbols(symbols) : DEFAULT_SYMBOLS;
+  if(twelveData?.enabled){
+    const tdQuotes=await twelveData.latestQuotes(normalized,{allowRestFallback:false});
+    const missing=tdQuotes.filter(q=>!q.available).map(q=>q.symbol);
+    if(!missing.length)return tdQuotes;
+    const deriv=await fetchPublicDerivQuotes(missing);
+    const derivMap=Object.fromEntries(deriv.map(q=>[q.symbol,q]));
+    return tdQuotes.map(q=>q.available?q:(derivMap[q.symbol]||q));
+  }
+  return fetchPublicDerivQuotes(normalized);
+}
+
+function overlayLiveQuotes(technical, quotes) {
+  const quoteMap=Object.fromEntries((quotes||[]).filter(q=>q?.available).map(q=>[q.symbol,q]));
+  return technical.map(item=>{
+    const quote=quoteMap[item.symbol];
+    if(!quote)return item;
+    return {
+      ...item,
+      price:finite(quote.price) ?? item.price,
+      close:finite(quote.price) ?? item.close,
+      bid:finite(quote.bid),
+      ask:finite(quote.ask),
+      spread:finite(quote.spread),
+      quoteTimestamp:quote.timestamp||null,
+      quoteAgeMs:Number(quote.ageMs??Math.max(0,Date.now()-Number(quote.timestamp||Date.now())))
+    };
+  });
 }
 
 async function askGrok({ technical, quotes, timeframe }) {
@@ -372,12 +434,20 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     };
   }
 
-  const directQuotes = twelveData?.enabled
-    ? await twelveData.latestQuotes(normalizedSymbols)
-    : [];
-  const derivData = directQuotes.some(q => q.available)
-    ? []
-    : await fetchPublicDerivData(normalizedSymbols,normalizedTimeframe);
+  const quotePromise = getFastStandaloneQuotes({ twelveData, symbols: normalizedSymbols });
+  const derivDataPromise = twelveData?.enabled
+    ? Promise.resolve([])
+    : fetchPublicDerivData(normalizedSymbols,normalizedTimeframe);
+  const technicalPromise = fetchTwelveDataTechnical(twelveData, normalizedSymbols, normalizedTimeframe);
+  const tvPromise = latestTradingView(pool, normalizedSymbols, normalizedTimeframe);
+
+  const [directQuotes, derivData, tdTechnical, tv] = await Promise.all([
+    quotePromise,
+    derivDataPromise,
+    technicalPromise,
+    tvPromise
+  ]);
+
   const derivQuotes = derivData.map(x => {
     if(!x.quote) return {symbol:x.symbol,available:false,source:"Deriv public live feed",error:x.quoteError||"DERIV_PUBLIC_QUOTE_UNAVAILABLE"};
     return {
@@ -396,15 +466,11 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
   const quotes=directQuotes.some(q=>q.available)
     ? directQuotes
     : derivQuotes;
-  const [tv, tdTechnical] = await Promise.all([
-    latestTradingView(pool, normalizedSymbols, normalizedTimeframe),
-    fetchTwelveDataTechnical(twelveData, normalizedSymbols, normalizedTimeframe)
-  ]);
   const combinedTechnical=[...tdTechnical,...derivData.map(x=>x.technical).filter(Boolean)];
   const technicalBySymbol=new Map();
   for(const item of combinedTechnical) if(!technicalBySymbol.has(item.symbol)) technicalBySymbol.set(item.symbol,item);
   const tdMap = Object.fromEntries([...technicalBySymbol.entries()].map(([k,v]) => [k,v]));
-  const technical = normalizedSymbols.map(symbol => {
+  let technical = normalizedSymbols.map(symbol => {
     const snapshot = tdMap[symbol] || tv.find(x => x.symbol === symbol);
     return snapshot
       ? {
@@ -413,7 +479,8 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
           timeframe: normalizedTimeframe,
           source: tdMap[symbol] ? "Twelve Data live OHLC" : "TradingView",
           barTime: snapshot.barTime,
-          dataFreshness: snapshot.receivedAt || snapshot.barTime
+          dataFreshness: snapshot.receivedAt || snapshot.barTime,
+          technicalCacheAgeMs: finite(snapshot.cacheAgeMs)
         }
       : {
           symbol,
@@ -422,6 +489,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
           source:"none"
         };
   });
+  technical = overlayLiveQuotes(technical, directQuotes);
 
   const tvMap = Object.fromEntries(tv.map(x => [x.symbol, x]));
   const technicalSource = tdTechnical.length
@@ -476,6 +544,8 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     model:ai.model,
     executionAuthority:"NONE",
     source:technicalSource,
+    liveQuoteSource:twelveData?.enabled ? "Twelve Data WebSocket + public fallback" : "Deriv public live feed",
+    scannerLatencyHint:"Quotes are served independently from AI analysis.",
     marketData:twelveData?.status ? twelveData.status() : {configured:false},
     symbols:normalizedSymbols,
     timeframe:normalizedTimeframe,
@@ -549,6 +619,43 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData }) {
       return res.status(400).json({ok:false,error:String(error?.message || "TRADINGVIEW_WEBHOOK_FAILED")});
     }
   });
+
+  const quoteLimiter = rateLimit({
+    windowMs:60*1000, limit:Number(process.env.AI_SCANNER_QUOTE_REQUESTS_PER_MINUTE || 30),
+    standardHeaders:"draft-8", legacyHeaders:false,
+    message:{ok:false,error:"AI scanner quote rate limit reached. Wait a moment and retry."}
+  });
+
+  const quoteHandler=async(req,res)=>{
+    const startedAt=Date.now();
+    try{
+      const symbols=req.query?.symbols || req.body?.symbols;
+      const quotes=await getFastStandaloneQuotes({twelveData,symbols});
+      const availableQuotes=quotes.filter(q=>q.available);
+      return res.json({
+        ok:true,
+        scanner:"KINGBOT AI MARKET SCANNER",
+        mode:"quotes",
+        executionAuthority:"NONE",
+        quotes,
+        quoteCount:availableQuotes.length,
+        generatedAt:new Date().toISOString(),
+        latencyMs:Date.now()-startedAt,
+        source:twelveData?.enabled ? "Twelve Data WebSocket + public fallback" : "Deriv public live feed",
+        brokerRequired:false
+      });
+    }catch(error){
+      console.error("[KINGBOT MARKET QUOTES]",error?.message||error);
+      return res.status(503).json({
+        ok:false,
+        error:"LIVE_MARKET_QUOTES_UNAVAILABLE",
+        reason:String(error?.message||"LIVE_MARKET_QUOTES_UNAVAILABLE").slice(0,180)
+      });
+    }
+  };
+
+  app.get("/api/ai/market-scanner/quotes",quoteLimiter,quoteHandler);
+  app.get("/api/market-scanner/quotes",quoteLimiter,quoteHandler);
 
   app.get("/api/ai/market-scanner/status", async (_req,res) => {
     const apiKey = String(process.env.XAI_API_KEY || "").trim();
