@@ -1,5 +1,6 @@
 import { getBotDefinitions } from "./bot-engines.js";
 import { evaluateKingbotBrain } from "./kingbot-brain.js";
+import { searchWeb, webSearchStatus } from "./kingbot-web-search.js";
 
 const SYMBOLS = ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 
@@ -15,13 +16,23 @@ function symbolFromText(text, fallback="XAUUSD"){
 }
 
 function intent(text){
-  const t=String(text||"").toLowerCase();
+  const t=String(text||"").toLowerCase().trim();
+  if(/^(hi|hello|hey|yo|good morning|good afternoon|good evening|howdy|greetings)\\b/.test(t)||/\\bhow are you\\b|\\bwho are you\\b|\\bwhat are you\\b|\\bthank you\\b|\\bthanks\\b|\\bbye\\b|\\bgood night\\b/.test(t)) return "CONVERSATION";
+  if(/google|search the web|search online|look up|find online|latest news|news about|research online|internet/.test(t)) return "WEB_RESEARCH";
   if(/trade|entry|signal|setup|buy|sell|long|short|gold|xau|eurusd|gbpusd|usdjpy|btcusd|market|analysis|forex/.test(t)) return "MARKET_INTELLIGENCE";
-  if(/risk|drawdown|exposure|stop loss|sl|take profit|tp/.test(t)) return "RISK_REVIEW";
+  if(/risk|drawdown|exposure|stop loss|\\bsl\\b|take profit|\\btp\\b/.test(t)) return "RISK_REVIEW";
   if(/bot|strateg|flipper|breakout|smc|ladder|strategic/.test(t)) return "BOT_INTELLIGENCE";
   if(/account|balance|equity|position|portfolio|broker|mt5|deriv/.test(t)) return "ACCOUNT_INTELLIGENCE";
   if(/price|quote|how much|current/.test(t)) return "LIVE_MARKET";
   return "PLATFORM_SUPPORT";
+}
+function conversationalReply(question){
+  const t=String(question||"").toLowerCase().trim();
+  if(/^(hi|hello|hey|yo|good morning|good afternoon|good evening|howdy|greetings)\\b/.test(t)) return {answer:"Hey! 👋 KINGBOT AI is online. I can chat with you, explain the platform, research information online, or use verified live market intelligence. What would you like to do?",facts:["Native KINGBOT conversational layer is active."],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Ask a question or choose an intelligence function.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask KINGBOT anything about the platform, bots, markets, risk, or online research."};
+  if(/\\bhow are you\\b/.test(t)) return {answer:"I'm online and ready to work. 🤖 Give me a question and I'll choose the right KINGBOT intelligence capability.",facts:["Native KINGBOT communication layer is active."],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Your next request.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Try: What can you do? or Analyze gold."};
+  if(/\\bwho are you\\b|\\bwhat are you\\b/.test(t)) return {answer:"I'm KINGBOT AI — the native intelligence and communication layer of KINGBOT FINTECH. I can communicate naturally, explain the five bot engines, inspect verified account and risk data, analyze supported live market data, and search Google when configured. I never invent live data or authorize trades from chat.",facts:["Provider: KINGBOT_NATIVE","Core: KINGBOT-CORE-1","Execution authority: deterministic strategy and risk gates"],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"A specific request.",invalidation:"Not applicable."},riskFlags:["EXECUTION_REMAINS_SERVER_CONTROLLED"],nextAction:"Tell me what you need."};
+  if(/\\bthank you\\b|\\bthanks\\b/.test(t)) return {answer:"You're welcome. 🤝 I'm here. Send me the next question whenever you're ready.",facts:[],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Your next request.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Continue the conversation."};
+  return {answer:"I'm ready. Tell me what you need and I'll route it to the appropriate KINGBOT intelligence capability.",facts:[],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Your request.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask a question."};
 }
 
 async function latestSnapshot(pool, symbol, timeframe="5m"){
@@ -104,6 +115,13 @@ async function databaseSupport(pool,userId,question){
 \nexport async function runNativeKingbotAI({question,symbol,twelveData,pool,broker,userId}={}){
   const requested=symbolFromText(question,symbol||"XAUUSD");
   const kind=intent(question);
+  if(kind==="CONVERSATION") return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:conversationalReply(question),verified:{native:true}};
+  if(kind==="WEB_RESEARCH"){
+    const search=await searchWeb(String(question||"").replace(/\\b(google|search the web|search online|look up|find online|research online|on the internet)\\b/gi,"").trim()||question,{limit:6});
+    if(!search.ok) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:{answer:"I can perform Google-backed research, but Google Search is not configured on the backend yet.",facts:[search.error||"GOOGLE_SEARCH_NOT_CONFIGURED",...(search.setup?[search.setup]:[])],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Google Search credentials.",invalidation:"No web search available."},riskFlags:["WEB_SEARCH_UNAVAILABLE"],nextAction:"Configure GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX on the backend."},verified:{google:false}};
+    const facts=search.results.map((r,i)=>(i+1)+". "+r.title+" — "+r.snippet+" — "+r.url);
+    return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:{answer:"I searched Google for “"+search.query+"” and found "+search.results.length+" result(s).",facts,technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No trading setup requested.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask me to summarize, compare, or investigate the sources."},sources:search.results,verified:{google:true}};
+  }
   const quotes=twelveData?.enabled?twelveData.quotes([requested]):[];
   const quote=quotes[0]||null;
 
