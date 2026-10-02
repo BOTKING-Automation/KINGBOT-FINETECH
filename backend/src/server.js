@@ -25,6 +25,7 @@ import { registerAiMarketScanner } from "./ai-market-scanner.js";
 import { registerTerminalLive } from "./terminal-live.js";
 import { registerElevenLabsVoice } from "./elevenlabs-voice.js";
 import { registerAiIntelligence } from "./ai-intelligence.js";
+import { webSearchStatus } from "./kingbot-web-search.js";
 import { registerAiAgent } from "./ai-agent.js";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { evaluateKingbotBrain } from "./kingbot-brain.js";
@@ -212,7 +213,8 @@ app.get("/api/health", (_req, res) => {
     passwordRecoveryEmailReady: true,
     voiceReady: Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID),
     voiceProvider: "elevenlabs",
-    voiceModel: process.env.ELEVENLABS_MODEL || "eleven_flash_v2_5"
+    voiceModel: process.env.ELEVENLABS_MODEL || "eleven_flash_v2_5",
+    webResearch: webSearchStatus()
   });
 });
 
