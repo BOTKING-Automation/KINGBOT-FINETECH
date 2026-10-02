@@ -342,6 +342,34 @@ export class DerivMarketFeed {
     });
   }
 
+  async getHistoricalCandles(symbol,{timeframe="5m",limit=120,timeoutMs=5000}={}) {
+    const s=this.normalize(symbol);
+    const granularityMap={"1m":60,"2m":120,"3m":180,"4m":240,"5m":300,"6m":360,"10m":600,"12m":720,"15m":900,"20m":1200,"30m":1800,"1h":3600,"2h":7200,"3h":10800,"4h":14400,"6h":21600,"8h":28800,"12h":43200,"1d":86400,"1w":604800,"1mn":2592000};
+    const granularity=granularityMap[String(timeframe||"5m").toLowerCase()]||300;
+    const count=Math.max(20,Math.min(1000,Number(limit)||120));
+    await this.connect();
+    const reqId=this.nextReqId();
+    return new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{
+        this.requestWaiters.delete(reqId);
+        reject(new Error("DERIV_HISTORICAL_CANDLES_TIMEOUT"));
+      },Math.max(1500,Number(timeoutMs)||5000));
+      this.requestWaiters.set(reqId,{
+        resolve:(data)=>{
+          clearTimeout(timer);
+          this.requestWaiters.delete(reqId);
+          if(data?.error){ reject(new Error(data.error.message||"DERIV_HISTORICAL_CANDLES_FAILED")); return; }
+          const candles=Array.isArray(data?.candles)?data.candles:[];
+          const rows=candles.map(c=>({time:c?.epoch?new Date(Number(c.epoch)*1000).toISOString():null,open:finite(c?.open),high:finite(c?.high),low:finite(c?.low),close:finite(c?.close),volume:finite(c?.tick_count)})).filter(c=>c.time&&[c.open,c.high,c.low,c.close].every(Number.isFinite));
+          if(rows.length<20){ reject(new Error("INSUFFICIENT_HISTORICAL_CANDLES")); return; }
+          resolve(rows);
+        },
+        reject:(error)=>{ clearTimeout(timer); this.requestWaiters.delete(reqId); reject(error); }
+      });
+      try{ this.send({ticks_history:s,end:"latest",count,style:"candles",granularity,req_id:reqId}); }
+      catch(error){ clearTimeout(timer); this.requestWaiters.delete(reqId); reject(error); }
+    });
+  }
   async forceReconnect() {
     if (this.closed) this.closed = false;
     this.destroySocket();
