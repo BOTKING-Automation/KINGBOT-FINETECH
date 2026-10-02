@@ -3927,9 +3927,9 @@ loadPreview();
 
 /* =========================================================
    KINGBOT INFRASTRUCTURE — INTERNAL MOVING LIGHT ENGINE
-   The exact uploaded artwork is drawn into a canvas. Bright
-   artwork pixels are recolored/pulsed directly so the neon
-   lights appear to travel through the image itself.
+   Exact artwork rendered to canvas. Neon pixels, AI brain,
+   robot highlights and illuminated infrastructure change
+   colour directly inside the artwork.
 ========================================================= */
 
 (function initInfrastructureLightEngine(){
@@ -4070,6 +4070,74 @@ loadPreview();
 
   }
 
+  function zoneStrength(nx,ny,t){
+
+    /* CENTRAL AI / BRAIN ZONE */
+    const brainDx =
+      (nx - 0.49) / 0.105;
+
+    const brainDy =
+      (ny - 0.54) / 0.125;
+
+    const brainDistance =
+      brainDx*brainDx +
+      brainDy*brainDy;
+
+    const brainPulse =
+      Math.max(
+        0,
+        Math.sin(
+          t * 2.75
+        )
+      );
+
+    const brain =
+      Math.exp(
+        -brainDistance * 2.8
+      ) *
+      (
+        0.48 +
+        brainPulse * 0.42
+      );
+
+    /* RIGHT-SIDE ROBOT ZONE */
+    const robotDx =
+      (nx - 0.835) / 0.205;
+
+    const robotDy =
+      (ny - 0.52) / 0.34;
+
+    const robotDistance =
+      robotDx*robotDx +
+      robotDy*robotDy;
+
+    const robotWave =
+      .5 +
+      .5 *
+      Math.sin(
+        t * 2.15 -
+        nx * 8.0 +
+        ny * 3.0
+      );
+
+    const robot =
+      Math.exp(
+        -robotDistance * 2.15
+      ) *
+      (
+        0.44 +
+        robotWave * 0.46
+      );
+
+    return {
+      brain:
+        Math.min(1,brain),
+      robot:
+        Math.min(1,robot)
+    };
+
+  }
+
   function render(now){
 
     if(document.hidden){
@@ -4134,19 +4202,21 @@ loadPreview();
       const avg =
         (r+g+b)/3;
 
+      const saturation =
+        max ?
+        (max-min)/max :
+        0;
+
       /*
-        Keep the original dark architecture untouched.
-        Animate both saturated neon pixels and very bright
-        white/gold/cyan light pixels.
+        Base neon detection:
+        keep dark architecture untouched, animate only pixels
+        that are already luminous/saturated in the exact artwork.
       */
       const neonScore =
         Math.max(
-          (max-min)/255,
-          (avg-150)/105
+          saturation,
+          (avg-125)/130
         );
-
-      if(neonScore < 0.16)
-        continue;
 
       const p =
         i / 4;
@@ -4163,11 +4233,13 @@ loadPreview();
       const ny =
         y / h;
 
-      /*
-        Four moving light fields. Each moves at a different
-        speed/angle so the color appears to travel through
-        the actual illuminated artwork rather than simply pulse.
-      */
+      const zones =
+        zoneStrength(
+          nx,
+          ny,
+          t
+        );
+
       const wave1 =
         Math.sin(
           nx * 15.0 -
@@ -4190,30 +4262,18 @@ loadPreview();
         );
 
       const movingEnergy =
-        Math.max(
-          0,
-          wave1
-        ) * .42 +
-        Math.max(
-          0,
-          wave2
-        ) * .28 +
-        Math.max(
-          0,
-          wave3
-        ) * .18;
+        Math.max(0,wave1) * .42 +
+        Math.max(0,wave2) * .28 +
+        Math.max(0,wave3) * .18;
 
-      /*
-        Local traveling spark zones emulate light moving along
-        the existing neon structures.
-      */
       const path1 =
         Math.exp(
           -Math.pow(
             y -
             (
               h * .50 +
-              Math.sin(t * 1.1) * h * .14
+              Math.sin(t * 1.1) *
+              h * .14
             ),
             2
           ) /
@@ -4226,7 +4286,8 @@ loadPreview();
             y -
             (
               h * .70 +
-              Math.sin(t * 1.35 + 2) * h * .11
+              Math.sin(t * 1.35 + 2) *
+              h * .11
             ),
             2
           ) /
@@ -4234,53 +4295,131 @@ loadPreview();
         );
 
       const pathEnergy =
-        Math.max(
-          path1,
-          path2
-        ) * .30;
-
-      const pulse =
-        .72 +
-        Math.sin(
-          t * 3.4 +
-          nx * 8 +
-          ny * 4
-        ) * .16;
-
-      const strength =
-        Math.min(
-          .62,
-          Math.max(
-            .08,
-            neonScore * .50 +
-            movingEnergy * .28 +
-            pathEnergy
-          ) * pulse
-        );
-
-      const lightColor =
-        colorAt(
-          cycle +
-          nx * .68 +
-          ny * .18
-        );
+        Math.max(path1,path2) * .30;
 
       /*
-        Add a moving chromatic tint while retaining the original
-        artwork color and luminance.
+        The brain and robot receive their own stronger animated
+        colour field, so their illuminated surfaces visibly change
+        colour rather than only receiving the global effect.
+      */
+      const brainStrength =
+        zones.brain *
+        (
+          0.72 +
+          0.28 *
+          Math.max(
+            0,
+            Math.sin(
+              t*4.2 +
+              nx*9
+            )
+          )
+        );
+
+      const robotStrength =
+        zones.robot *
+        (
+          0.66 +
+          0.34 *
+          Math.max(
+            0,
+            Math.sin(
+              t*3.25 -
+              nx*7 +
+              ny*5
+            )
+          )
+        );
+
+      const active =
+        Math.max(
+          0,
+          neonScore
+        );
+
+      if(
+        active < 0.12 &&
+        brainStrength < 0.12 &&
+        robotStrength < 0.12
+      ){
+        continue;
+      }
+
+      /*
+        A faster colour orbit drives the core neon lights.
+        Brain and robot use phase offsets so they do not all
+        change colour simultaneously.
+      */
+      const basePhase =
+        cycle +
+        nx * .68 +
+        ny * .18;
+
+      const brainPhase =
+        cycle * 1.35 +
+        0.18 +
+        t * .015;
+
+      const robotPhase =
+        cycle * 1.10 +
+        0.42 -
+        t * .012;
+
+      const baseColor =
+        colorAt(basePhase);
+
+      const brainColor =
+        colorAt(brainPhase);
+
+      const robotColor =
+        colorAt(robotPhase);
+
+      let color = baseColor;
+
+      let strength =
+        Math.min(
+          .68,
+          Math.max(
+            .08,
+            active * .48 +
+            movingEnergy * .30 +
+            pathEnergy
+          )
+        );
+
+      if(brainStrength > strength){
+        color = brainColor;
+        strength = Math.min(
+          .82,
+          strength + brainStrength * .55
+        );
+      }
+
+      if(robotStrength > strength){
+        color = robotColor;
+        strength = Math.min(
+          .78,
+          strength + robotStrength * .48
+        );
+      }
+
+      /*
+        Preserve original luminance and details while tinting
+        the exact pixels. This makes the internal neon elements
+        look illuminated instead of being replaced by a flat filter.
       */
       const tint =
         strength *
         Math.min(
           1,
-          .60 + neonScore
+          .55 + active
         );
 
       data[i] =
         Math.min(
           255,
           r +
-          (lightColor[0]-r) *
+          (color[0]-r) *
           tint
         );
 
@@ -4288,7 +4427,7 @@ loadPreview();
         Math.min(
           255,
           g +
-          (lightColor[1]-g) *
+          (color[1]-g) *
           tint
         );
 
@@ -4296,37 +4435,37 @@ loadPreview();
         Math.min(
           255,
           b +
-          (lightColor[2]-b) *
+          (color[2]-b) *
           tint
         );
 
       /*
-        Brighten only the active light pixels so the traveling
-        color reads as illumination, not a flat color filter.
+        Extra localized flare for the brain and robot highlights.
       */
-      const flare =
-        movingEnergy * .11 +
-        pathEnergy * .12;
+      const coreFlare =
+        brainStrength * .15 +
+        robotStrength * .11 +
+        movingEnergy * .07;
 
       data[i] =
         Math.min(
           255,
           data[i] +
-          data[i] * flare
+          data[i] * coreFlare
         );
 
       data[i+1] =
         Math.min(
           255,
           data[i+1] +
-          data[i+1] * flare
+          data[i+1] * coreFlare
         );
 
       data[i+2] =
         Math.min(
           255,
           data[i+2] +
-          data[i+2] * flare
+          data[i+2] * coreFlare
         );
 
     }
