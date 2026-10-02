@@ -25,6 +25,8 @@ import { registerAiMarketScanner } from "./ai-market-scanner.js";
 import { registerTerminalLive } from "./terminal-live.js";
 import { registerElevenLabsVoice } from "./elevenlabs-voice.js";
 import { registerAiIntelligence } from "./ai-intelligence.js";
+import { registerAiAgent } from "./ai-agent.js";
+import { TwelveDataFeed } from "./twelve-data-feed.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -38,6 +40,8 @@ const AI_PROVIDER = XAI_API_KEY ? "xai" : (GEMINI_API_KEY ? "gemini" : "none");
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const pool = DATABASE_URL ? new pg.Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false } }) : null;
 const broker = new UserBrokerManager({pool});
+const twelveData = new TwelveDataFeed();
+twelveData.start();
 const partners = new PartnerManager({pool});
 
 app.disable("x-powered-by");
@@ -176,7 +180,8 @@ function firstFinite(...values){
 }
 
 registerTerminalSnapshot(app, { requireUser, pool, broker, firstFinite });
-registerAiMarketScanner(app, { requireUser, pool, broker, rateLimit });
+registerAiMarketScanner(app, { requireUser, pool, broker, rateLimit, twelveData });
+registerAiAgent(app, { requireUser, pool, broker, rateLimit, twelveData });
 registerTerminalLive(app, { requireUser, pool, broker, firstFinite });
 registerElevenLabsVoice(app, { requireUser, pool, rateLimit });
 registerAiIntelligence(app, { requireUser, pool, broker });
