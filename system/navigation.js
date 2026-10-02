@@ -14,8 +14,7 @@
     ["security-center.html","Security Center","⌾","Security and API credentials"],
     ["support-center.html","Support","✉","Customer support operations"],
     ["compliance.html","Compliance","◇","KYC and compliance center"],
-    ["developer.html","Developer API","⌘","Read-only integration API"],
-    ["fintech-ops.html","Fintech Ops","▣","Internal fintech control plane"],
+    ["admin-entry.html","Admin OS","▣","Administrator command center","admin"],
     ["ai.html","AI Intelligence","✦","AI intelligence layer"],
     ["scanner.html","AI Scanner","◎","High-intelligence market scanner"],
     ["pattern.html","Patterns","◉","Pattern intelligence"],
@@ -50,7 +49,7 @@
   const protectedPages=new Set([
     "index.html","terminal.html","analytics.html","ai.html","scanner.html",
     "bots.html","settings.html","subscription.html","broker-connect.html",
-    "partner-revenue.html","pattern.html","vps-dashboard.html","reports.html","security-center.html","support-center.html","developer.html","fintech-ops.html","compliance.html"
+    "partner-revenue.html","pattern.html","vps-dashboard.html","reports.html","security-center.html","support-center.html","compliance.html"
   ]);
 
   function accountMarkup(authState){
