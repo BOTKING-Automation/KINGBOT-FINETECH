@@ -112,6 +112,23 @@ export class TwelveDataFeed {
     }, 5000);
   }
 
+  async technicalSnapshot(symbol, timeframe="5m") {
+    if(!this.enabled) return null;
+    const intervalMap={ "1m":"1min","3m":"3min","5m":"5min","15m":"15min","30m":"30min","1h":"1h","2h":"2h","4h":"4h","1d":"1day","1w":"1week" };
+    const interval=intervalMap[String(timeframe).toLowerCase()]||"5min";
+    const tdSymbol=normalizeSymbol(symbol);
+    const url="https://api.twelvedata.com/time_series?symbol="+encodeURIComponent(tdSymbol)+"&interval="+encodeURIComponent(interval)+"&outputsize=120&order=ASC&apikey="+encodeURIComponent(this.apiKey);
+    const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),9000);
+    try {
+      const res=await fetch(url,{signal:controller.signal,headers:{Accept:"application/json"}});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok || data?.status==="error" || !Array.isArray(data?.values)) throw new Error(data?.message||"TWELVE_DATA_TIME_SERIES_FAILED");
+      const bars=data.values.map(x=>({datetime:x.datetime,open:finite(x.open),high:finite(x.high),low:finite(x.low),close:finite(x.close),volume:finite(x.volume)})).filter(x=>[x.open,x.high,x.low,x.close].every(Number.isFinite));
+      if(bars.length<60) throw new Error("INSUFFICIENT_OHLC_DATA");
+      return { ...deriveTechnicalFromBars(bars), symbol:kingbotSymbol(tdSymbol), twelveDataSymbol:tdSymbol, timeframe, barsUsed:bars.length, source:"Twelve Data REST time_series" };
+    } finally { clearTimeout(timer); }
+  }
+
   quotes(symbols) {
     return symbols.map(symbol => {
       const tdSymbol = normalizeSymbol(symbol);
