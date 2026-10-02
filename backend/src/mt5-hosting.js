@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { Router } from "express";
+import { mt5BridgeRegistry } from "./mt5-bridge.js";
 
 const NODE_TOKEN_TTL_DAYS = 30;
 const HEARTBEAT_TIMEOUT_MS = 20_000;
@@ -102,10 +103,18 @@ export function createMt5HostingRouter({pool,requireUser}={}){
     if(!node)return res.status(401).json({ok:false,error:"HOST_NODE_TOKEN_INVALID"});
     await pool.query("UPDATE kingbot_mt5_host_nodes SET status='ONLINE',last_heartbeat_at=NOW(),updated_at=NOW() WHERE id=$1",[node.id]);
     const deployments=await pool.query(
-      "SELECT id,user_id,status,bot_id,execution_mode,account_id FROM kingbot_mt5_host_deployments WHERE node_id=$1 AND status IN ('PROVISIONING','RUNNING','PAUSED') ORDER BY created_at",
+      "SELECT id,user_id,status,bot_id,execution_mode,broker_provider,account_id,last_heartbeat_at FROM kingbot_mt5_host_deployments WHERE node_id=$1 AND status IN ('PROVISIONING','RUNNING','PAUSED') ORDER BY created_at",
       [node.node_id]
     );
-    res.json({ok:true,nodeId:node.node_id,serverTime:new Date().toISOString(),deployments:deployments.rows});
+    const enriched=deployments.rows.map(deployment=>{
+      let bridgeConnected=false;
+      if(String(deployment.broker_provider||"").toLowerCase()==="mt5-bridge"){
+        const bridge=mt5BridgeRegistry.getState(deployment.user_id);
+        bridgeConnected=Boolean(bridge&&String(bridge.login||"")===String(deployment.account_id||""));
+      }
+      return {...deployment,bridgeConnected};
+    });
+    res.json({ok:true,nodeId:node.node_id,serverTime:new Date().toISOString(),deployments:enriched});
   });
 
   router.post("/node/deployment-state",async(req,res)=>{
