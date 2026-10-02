@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { TwelveDataFeed } from "./twelve-data-feed.js";
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
@@ -209,7 +210,7 @@ async function collectQuotes(broker, userId, symbols) {
   }));
 }
 
-async function runMarketScan({ requireUser, pool, broker, req, res }) {
+async function runMarketScan({ requireUser, pool, broker, twelveData, req, res }) {
   const user = await requireUser(pool, req, res);
   if (!user) return null;
   const symbols = cleanSymbols(req.query?.symbols || req.body?.symbols).length ? cleanSymbols(req.query?.symbols || req.body?.symbols) : DEFAULT_SYMBOLS;
@@ -219,7 +220,12 @@ async function runMarketScan({ requireUser, pool, broker, req, res }) {
     const mapping = await broker.getMapping(user.id);
     if (!mapping) return res.status(503).json({ ok:false, error:"BROKER_NOT_CONNECTED", code:"BROKER_NOT_CONNECTED", scanner:"KINGBOT AI MARKET SCANNER", message:"Connect a broker account before running the market scanner." });
 
-    const [quotes, tv] = await Promise.all([collectQuotes(broker, user.id, symbols), latestTradingView(pool, symbols, timeframe)]);
+    const directQuotes = twelveData?.enabled ? twelveData.quotes(symbols) : [];
+    const brokerQuotes = await collectQuotes(broker, user.id, symbols);
+    const quotes = directQuotes.length && directQuotes.some(q => q.available)
+      ? directQuotes
+      : brokerQuotes;
+    const [tv] = await Promise.all([latestTradingView(pool, symbols, timeframe)]);
     const technical = tv.map(snapshot => ({ symbol:snapshot.symbol, ...technicalEngine(snapshot), timeframe, source:"TradingView", barTime:snapshot.barTime }));
     const tvMap = Object.fromEntries(tv.map(x => [x.symbol, x]));
     for (const q of quotes) {
@@ -232,7 +238,9 @@ async function runMarketScan({ requireUser, pool, broker, req, res }) {
 
     return res.json({
       ok:true, scanner:"KINGBOT AI MARKET SCANNER", provider:ai.provider, model:ai.model,
-      executionAuthority:"NONE", source:"TradingView webhook + broker quote",
+      executionAuthority:"NONE",
+      source: twelveData?.enabled ? "Twelve Data WebSocket + TradingView webhook" : "TradingView webhook + broker quote",
+      marketData: twelveData?.status ? twelveData.status() : { configured:false },
       symbols, timeframe, quotes, technical, tradingViewSnapshots:tvMap,
       analysis:ai.analysis || JSON.stringify({
         market_regime: technical.some(x=>x.bias==="BULLISH") ? "BULLISH" : technical.some(x=>x.bias==="BEARISH") ? "BEARISH" : "MIXED",
@@ -280,13 +288,14 @@ export function registerAiMarketScanner(app, { requireUser, pool, broker, rateLi
     try { const q=await pool.query("SELECT COUNT(*)::int AS count FROM kingbot_tradingview_snapshots WHERE received_at > NOW() - INTERVAL '10 minutes'"); tvCount=q.rows[0]?.count || 0; } catch {}
     return res.json({
       ok:true, scanner:"KINGBOT AI MARKET SCANNER", aiReady:Boolean(apiKey), provider:apiKey?"xai":"none",
+      marketData: twelveData.status(),
       model:apiKey?String(process.env.XAI_MODEL || "grok-4.7"):null, brokerConnected, broker:brokerName,
       tradingViewConnected:tvCount>0, tradingViewSnapshotsLast10m:tvCount, webhookConfigured:Boolean(process.env.TRADINGVIEW_WEBHOOK_SECRET),
       defaultSymbols:DEFAULT_SYMBOLS
     });
   });
 
-  const scanHandler=async(req,res)=>{ await runMarketScan({requireUser,pool,broker,req,res}); };
+  const scanHandler=async(req,res)=>{ await runMarketScan({requireUser,pool,broker,twelveData,req,res}); };
   app.get("/api/ai/market-scanner",limiter,scanHandler);
   app.post("/api/ai/market-scanner",limiter,scanHandler);
   app.get("/api/market-scanner",limiter,scanHandler);
