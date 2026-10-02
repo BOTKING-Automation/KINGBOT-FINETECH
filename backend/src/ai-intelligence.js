@@ -69,7 +69,7 @@ export function registerAiIntelligence(app, { requireUser, pool, broker } = {}) 
 
       const runtimeResult = pool
         ? await pool.query(
-            "SELECT bot_id,state,execution_mode,symbol,timeframe,last_signal,last_run_at,last_error,updated_at FROM kingbot_bot_runtime WHERE user_id=$1 ORDER BY bot_id",
+            "SELECT r.bot_id,r.state,COALESCE(rs.execution_mode,'DEMO') AS execution_mode,r.symbol,r.timeframe,r.last_signal,r.last_run_at,r.last_error,r.updated_at FROM kingbot_bot_runtime r LEFT JOIN kingbot_bot_risk_settings rs ON rs.user_id=r.user_id AND rs.bot_id=r.bot_id WHERE r.user_id=$1 ORDER BY r.bot_id",
             [user.id]
           )
         : { rows: [] };
