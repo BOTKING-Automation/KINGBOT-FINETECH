@@ -11,6 +11,7 @@
     ["analytics.html","Analytics","▦","Performance intelligence"],
     ["ai.html","AI Intelligence","✦","AI intelligence layer"],
     ["scanner.html","AI Scanner","◎","High-intelligence market scanner"],
+    ["pattern.html","Patterns","◉","Pattern intelligence"],
     ["academy.html","Academy","◇","Education & research"],
     ["about.html","About","◎","KINGBOT FINTECH"],
     ["contact.html","Contact","✉","Support & contact"],
