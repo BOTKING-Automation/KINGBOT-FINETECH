@@ -566,8 +566,8 @@ async function refreshConnectionLock(){
 function renderAccounts(list){
   const items=Array.isArray(list)?list:[];
   $("accountList").innerHTML=items.map((a,i)=>{
-    const id=String(a.id||a.accountId||"");
-    const type=String(a.accountType||"").toLowerCase();
+    const id=String(a.account_id||a.id||a.accountId||"");
+    const type=String(a.account_type||a.accountType||"").toLowerCase();
     const mode=type==="real"?"LIVE · REAL":"DEMO · BROKER EXECUTION";
     const balance=a.balance==null?"—":Number(a.balance).toLocaleString(undefined,{maximumFractionDigits:2});
     const label=type==="real"?"DERIV REAL ACCOUNT":"DERIV DEMO ACCOUNT";
@@ -645,7 +645,7 @@ $("authorizeBtn").addEventListener("click",async()=>{
       const r=await fetch(API_BASE+"/broker/deriv/oauth/connect",{
         method:"POST",
         headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},
-        body:JSON.stringify({connection,accountId:selectedAccount,accountType})
+        body:JSON.stringify({pendingId:String(connection?.pendingId||""),accountId:selectedAccount,accountType})
       });
       const d=await r.json().catch(()=>({}));
       if(!r.ok||!d.connected)throw new Error(d.reason||d.error||"Deriv account connection failed.");
