@@ -1,6 +1,7 @@
 import { getBotDefinitions } from "./bot-engines.js";
 import { evaluateKingbotBrain } from "./kingbot-brain.js";
 import { searchWeb, webSearchStatus } from "./kingbot-web-search.js";
+import { getPlans, BOT_NAMES } from "./subscriptions.js";
 
 const SYMBOLS = ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 
@@ -19,6 +20,7 @@ function intent(text){
   const t=String(text||"").toLowerCase().trim();
   if(/^(hi|hello|hey|yo|good morning|good afternoon|good evening|howdy|greetings)\b/.test(t)||/\bhow are you\b|\bwho are you\b|\bwhat are you\b|\bthank you\b|\bthanks\b|\bbye\b|\bgood night\b/.test(t)) return "CONVERSATION";
   if(/google|search the web|search online|look up|find online|latest news|news about|research online|internet/.test(t)) return "WEB_RESEARCH";
+  if(/store|shop|product|pricing|price|plan|subscription|buy|purchase|checkout|payment|mpesa|license|upgrade|professional|institutional|basic/.test(t)) return "STORE_INTELLIGENCE";
   if(/trade|entry|signal|setup|buy|sell|long|short|gold|xau|eurusd|gbpusd|usdjpy|btcusd|market|analysis|forex/.test(t)) return "MARKET_INTELLIGENCE";
   if(/risk|drawdown|exposure|stop loss|\bsl\b|take profit|\btp\b/.test(t)) return "RISK_REVIEW";
   if(/bot|strateg|flipper|breakout|smc|ladder|strategic/.test(t)) return "BOT_INTELLIGENCE";
@@ -93,6 +95,72 @@ function nativeMarketAnswer({question,symbol,quote,snapshot,brain}){
 }
 
 
+function storeCatalog(){
+  const plans=getPlans();
+  return Object.values(plans).map(p=>({
+    id:p.id,name:p.name,priceUsd:p.priceUsd,billing:p.billing,
+    botLimit:p.botLimit,bots:p.bots.map(id=>({id,name:BOT_NAMES[id]||id})),
+    selectableBots:p.selectableBots.map(id=>({id,name:BOT_NAMES[id]||id})),
+    features:[...p.features]
+  }));
+}
+
+async function storeSupport(pool,userId,question){
+  const t=String(question||"").toLowerCase();
+  const catalog=storeCatalog();
+  const requestedPlan=Object.values(getPlans()).find(p =>
+    t.includes(p.id) || t.includes(p.name.toLowerCase()) ||
+    (p.id==="starter" && /basic/.test(t)) ||
+    (p.id==="pro" && /professional/.test(t))
+  );
+  if(/my|my order|my payment|payment status|purchase status|subscription status|what did i buy|what do i own|my plan|my access/.test(t)){
+    if(!pool||!userId) return {answer:"Sign in so KINGBOT can securely inspect your private store records.",facts:[],riskFlags:["AUTHENTICATION_REQUIRED"],nextAction:"Sign in and ask again."};
+    try{
+      await pool.query("UPDATE kingbot_subscriptions SET status='expired' WHERE status='active' AND expires_at IS NOT NULL AND expires_at<=NOW()");
+      const [sub,payments,entitlements]=await Promise.all([
+        pool.query("SELECT plan_id,status,started_at,expires_at,approved_at FROM kingbot_subscriptions WHERE user_id=$1 ORDER BY started_at DESC LIMIT 5",[userId]),
+        pool.query("SELECT plan_id,status,amount_kes,submitted_at,reviewed_at,selected_bot_id FROM kingbot_payments WHERE user_id=$1 ORDER BY submitted_at DESC LIMIT 10",[userId]),
+        pool.query("SELECT e.bot_id,e.active,s.plan_id,s.status,s.expires_at FROM kingbot_bot_entitlements e LEFT JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 ORDER BY e.granted_at DESC LIMIT 20",[userId])
+      ]);
+      return {
+        answer:"KINGBOT verified your private store, payment and entitlement records.",
+        facts:[
+          ...sub.rows.map(x=>`Subscription: ${x.plan_id||"—"} · ${x.status||"—"} · expires ${x.expires_at||"—"}`),
+          ...payments.rows.map(x=>`Payment: ${x.plan_id||"—"} · ${x.status||"—"} · KES ${x.amount_kes??"—"} · submitted ${x.submitted_at||"—"}`),
+          ...entitlements.rows.filter(x=>x.active).map(x=>`Active entitlement: ${BOT_NAMES[x.bot_id]||x.bot_id} · ${x.plan_id||"—"} · expires ${x.expires_at||"—"}`)
+        ],
+        riskFlags:[],
+        nextAction:"Use the Subscription Command Center for payment submission or access details."
+      };
+    }catch{
+      return {answer:"KINGBOT could not verify your private store records right now.",facts:[],riskFlags:["STORE_DATA_UNAVAILABLE"],nextAction:"Retry when the billing database is available."};
+    }
+  }
+  if(requestedPlan){
+    const p=requestedPlan;
+    const bots=p.bots.map(id=>BOT_NAMES[id]||id).join(", ");
+    const selectable=p.selectableBots.map(id=>BOT_NAMES[id]||id).join(" or ");
+    return {
+      answer:`${p.name} is a ${p.billing} KINGBOT plan at ${p.priceUsd}. The store currently lists ${p.botLimit} bot entitlement(s).`,
+      facts:[
+        `Plan ID: ${p.id}`,
+        `Price: ${p.priceUsd} / ${p.billing}`,
+        `Included engines: ${bots}`,
+        ...(p.selectableBots.length?[`Selectable entry engine: ${selectable}`]:[]),
+        ...p.features.map(x=>`Feature: ${x}`)
+      ],
+      riskFlags:[],
+      nextAction:"Open the Subscription Command Center to select the plan and submit the M-Pesa payment reference."
+    };
+  }
+  return {
+    answer:"KINGBOT Store is the subscription and access layer for the five-engine ecosystem. I can explain the plans, included bots, payment flow, or verify your private subscription and payment records.",
+    facts:catalog.map(p=>`${p.name}: ${p.priceUsd}/${p.billing} · ${p.botLimit} bot(s) · ${p.bots.map(b=>b.name).join(", ")}`),
+    riskFlags:[],
+    nextAction:"Ask: “What is in the Professional plan?”, “How do I buy?”, or “What is my subscription status?”"
+  };
+}
+
 async function databaseSupport(pool,userId,question){
   if(!pool||!userId)return null;
   const t=String(question||"").toLowerCase();
@@ -116,6 +184,15 @@ async function databaseSupport(pool,userId,question){
   const requested=symbolFromText(question,symbol||"XAUUSD");
   const kind=intent(question);
   if(kind==="CONVERSATION") return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:conversationalReply(question),verified:{native:true}};
+  if(kind==="STORE_INTELLIGENCE"){
+    const support=await storeSupport(pool,userId,question);
+    return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:{
+      ...support,
+      technicalAnalysis:[],
+      setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Not a market setup request.",invalidation:"Not applicable."}
+    },verified:{store:true,userSpecific:Boolean(userId)}};
+  }
+
   if(kind==="WEB_RESEARCH"){
     const search=await searchWeb(String(question||"").replace(/\b(google|search the web|search online|look up|find online|research online|on the internet)\b/gi,"").trim()||question,{limit:6});
     if(!search.ok) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:{answer:"I can perform Google-backed research, but Google Search is not configured on the backend yet.",facts:[search.error||"GOOGLE_SEARCH_NOT_CONFIGURED",...(search.setup?[search.setup]:[])],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Google Search credentials.",invalidation:"No web search available."},riskFlags:["WEB_SEARCH_UNAVAILABLE"],nextAction:"Configure GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX on the backend."},verified:{google:false}};
