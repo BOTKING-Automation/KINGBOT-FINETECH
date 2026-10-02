@@ -51,7 +51,15 @@
       const timestamp=el.dataset.kbFreshness||el.getAttribute("data-timestamp");
       const maxAge=Math.max(250,Number(el.dataset.kbMaxAge||5000));
       const warningAge=Math.max(250,Number(el.dataset.kbWarningAge||Math.min(maxAge,2500)));
-      const age=ageMs(timestamp);
+      let age=ageMs(timestamp);
+      if(age==null && el.dataset.kbAgeValue==="true"){
+        const match=String(el.textContent||"").match(/(-?\\d+(?:\\.\\d+)?)\\s*(ms|s|m|h)?/i);
+        if(match){
+          const n=Number(match[1]),unit=String(match[2]||"ms").toLowerCase();
+          const multiplier=unit==="h"?3600000:unit==="m"?60000:unit==="s"?1000:1;
+          age=Math.max(0,n*multiplier);
+        }
+      }
       el.classList.remove("is-live","is-warning","is-stale");
       if(age==null){
         el.classList.add("is-stale");
