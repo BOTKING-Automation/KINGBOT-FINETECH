@@ -1177,7 +1177,7 @@ h2{
 }
 
 /* =========================================
-   KINGBOT INFRASTRUCTURE — IMAGE-INTERNAL LIGHT ENGINE
+   KINGBOT INFRASTRUCTURE — CLEAN FULL-WIDTH ART
 ========================================= */
 
 .infra-section{
@@ -1185,13 +1185,19 @@ h2{
   width:100%;
   overflow:hidden;
   background:#020611;
-  padding:0;
+  padding:0 !important;
   isolation:isolate;
+}
+
+.infra-section::after{
+  display:none;
 }
 
 .infra-visual{
   position:relative;
   width:100%;
+  max-width:1664px;
+  margin:0 auto;
   overflow:hidden;
   background:#020611;
   line-height:0;
@@ -1200,15 +1206,25 @@ h2{
 #kingbotInfraCanvas{
   display:block;
   width:100%;
+  max-width:1664px;
   height:auto;
+  margin:0 auto;
   background:#020611;
   image-rendering:auto;
 }
 
-@media(max-width:700px){
+@media(max-width:1664px){
+  .infra-visual,
   #kingbotInfraCanvas{
     width:100%;
-    height:auto;
+  }
+}
+
+@media(max-width:700px){
+  .infra-visual,
+  #kingbotInfraCanvas{
+    width:100%;
+    max-width:none;
   }
 }
 
@@ -2369,7 +2385,7 @@ footer{
   <div class="infra-visual">
     <canvas
       id="kingbotInfraCanvas"
-      aria-label="KINGBOT Infrastructure — Built for Modern Trading"
+      aria-label="KINGBOT Fintech trading infrastructure artwork"
     ></canvas>
   </div>
 
