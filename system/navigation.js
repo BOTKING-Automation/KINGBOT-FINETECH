@@ -14,6 +14,7 @@
     ["partner-revenue.html","Partner Revenue","◌","Broker referral intelligence"],
     ["analytics.html","Analytics","▦","Performance intelligence"],
     ["ai.html","AI Intelligence","✦","AI intelligence layer"],
+    ["scanner.html","AI Scanner","◫","Live AI market scanner"],
     ["academy.html","Academy","◇","Education & research"],
     ["about.html","About","◎","KINGBOT FINTECH"],
     ["contact.html","Contact","✉","Support & contact"],
@@ -431,29 +432,6 @@
         window.location.replace("access-stable.html");
       }
     });
-
-      const state=root.querySelector(".kb-menu-state");
-      if(state){
-        state.innerHTML=authenticated
-          ? '<span class="kb-menu-dot"></span>AUTHENTICATED'
-          : '<span class="kb-menu-dot"></span>SYSTEM ONLINE';
-      }
-
-      document.querySelectorAll("[data-kb-auth-cta]").forEach(el=>{
-        if(authenticated){
-          el.textContent="DASHBOARD →";
-          el.setAttribute("href","index.html");
-          el.classList.remove("kb-guest-only");
-        }else{
-          el.textContent=el.dataset.guestText||"ENTER KINGBOT →";
-          el.setAttribute("href","access-stable.html#signin");
-        }
-      });
-
-      document.querySelectorAll("[data-kb-guest-only]").forEach(el=>{
-        el.hidden=authenticated;
-      });
-    }
 
     function syncAuthUI(detail){
       const authenticated = detail?.authenticated === true ||
