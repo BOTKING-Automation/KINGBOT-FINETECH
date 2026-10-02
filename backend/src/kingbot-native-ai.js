@@ -344,14 +344,29 @@ export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker
       };
     }
     const facts=search.results.map(r=>String(r.rank)+". "+r.title+(r.publishedAt?" · "+r.publishedAt:"")+" — "+r.snippet+" — "+r.url);
+    let marketContext=null;
+    if(kind==="MARKET_RESEARCH"){
+      const quote=twelveData?.enabled ? (twelveData.quotes([requested])||[])[0]||null : null;
+      const snapshot=await latestSnapshot(pool,requested,"5m");
+      const brain=snapshot ? evaluateKingbotBrain(snapshot,{maxAgeMs:Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS||5000)}) : null;
+      marketContext={
+        quote:quote?.available?{symbol:quote.symbol,price:quote.price,bid:quote.bid,ask:quote.ask,time:quote.time}:null,
+        technicalSnapshot:snapshot?{symbol:snapshot.symbol,timeframe:snapshot.timeframe,price:snapshot.price,receivedAt:snapshot.receivedAt}:null,
+        brain:brain?{signal:brain.decision.signal,direction:brain.decision.direction,confidence:brain.decision.confidence,engineAgreement:brain.decision.engineAgreement,reasons:brain.decision.reasons}:null
+      };
+      if(marketContext.quote)facts.unshift("LIVE MARKET CONTEXT · "+requested+" price "+String(marketContext.quote.price)+" at "+String(marketContext.quote.time||"—"));
+      if(marketContext.technicalSnapshot)facts.unshift("TECHNICAL SNAPSHOT · "+String(marketContext.technicalSnapshot.timeframe)+" received "+String(marketContext.technicalSnapshot.receivedAt||"—"));
+      if(!marketContext.quote&&!marketContext.technicalSnapshot)facts.unshift("LIVE MARKET CONTEXT · unavailable; Google research is available but price/structure was not verified.");
+    }
     const answer=kind==="MARKET_RESEARCH"
-      ? "KINGBOT searched Google for current external information relevant to "+requested+" and returned "+search.results.length+" result(s). Market interpretation still requires live market data."
+      ? "KINGBOT combined current Google research with the market context available from the trading-data layer for "+requested+". Research and market observations are kept separate from execution authorization."
       : "KINGBOT searched Google for “"+search.query+"” and returned "+search.results.length+" result(s). The source metadata is preserved for the reasoning layer.";
     return {
       provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,
-      reply:{answer,facts,technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No direct execution request.",invalidation:"Research is informational and is not execution authorization."},riskFlags:[],nextAction:kind==="MARKET_RESEARCH"?"Ask for a combined market and news analysis.":"Ask me to summarize, compare, or investigate the sources."},
+      reply:{answer,facts,technicalAnalysis:marketContext?.brain?[String(marketContext.brain.signal)+" · direction "+String(marketContext.brain.direction)+" · "+String(marketContext.brain.confidence)+"% confluence confidence"]:[ ],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No direct execution request.",invalidation:"Research is informational and is not execution authorization."},riskFlags:["AI_RESEARCH_IS_NOT_EXECUTION_AUTHORIZATION"],nextAction:kind==="MARKET_RESEARCH"?"Ask KINGBOT for a deeper market/news synthesis.":"Ask me to summarize, compare, or investigate the sources."},
       sources:search.results,
-      verified:{google:true,freshnessDays:fresh}
+      research:{google:true,freshnessDays:fresh,marketContext},
+      verified:{google:true,freshnessDays:fresh,marketContext:Boolean(marketContext)}
     };
   }
     const search=await searchWeb(String(question||"").replace(/\b(google|search the web|search online|look up|find online|research online|on the internet)\b/gi,"").trim()||question,{limit:6});
