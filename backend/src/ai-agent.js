@@ -8,7 +8,7 @@ const DEFAULT_SYMBOLS=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 const MODEL=String(process.env.GEMINI_AGENT_MODEL||process.env.GEMINI_MODEL||"gemini-2.5-flash-lite").trim();
 const API_KEY=String(process.env.GEMINI_API_KEY||"").trim();
 const ai=API_KEY?new GoogleGenAI({apiKey:API_KEY}):null;
-const EXTERNAL_PROVIDER=String(process.env.KINGBOT_AI_EXTERNAL_PROVIDER||"none").trim().toLowerCase();
+const EXTERNAL_PROVIDER=String(process.env.KINGBOT_AI_EXTERNAL_PROVIDER || (API_KEY?"gemini":"none")).trim().toLowerCase();
 
 const SYSTEM=`You are KINGBOT AI, the proprietary intelligence agent for KINGBOT FINTECH.
 You are a market-intelligence and platform-operations agent, not a profit predictor.
@@ -64,6 +64,8 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     const context=buildContext({symbol,twelveData:feed,broker,botDefinitions:getBotDefinitions()});
     context.nativeKingbotAI=native.reply;
     context.nativeProvider=native.provider;
+    context.webResearch=native.sources||[];
+    context.conversation=conversation;
     let account=null,positions=[];
     try{
       const status=await broker.getStatus(user.id);
@@ -81,6 +83,13 @@ ${question}
 VERIFIED KINGBOT CONTEXT:
 ${JSON.stringify(context)}
 
+
+RESEARCH RULES:
+- If webResearch contains results, treat them as source material, not guaranteed truth.
+- Do not invent facts that are absent from the supplied sources.
+- For current or news questions, identify the relevant source title or URL when relying on it.
+- Separate researched facts from KINGBOT market interpretation and uncertainty.
+- Conversation history is context only; verified backend data takes precedence.
 Respond with JSON:
 {
  "answer":"...",
