@@ -81,7 +81,27 @@ function nativeMarketAnswer({question,symbol,quote,snapshot,brain}){
   };
 }
 
-export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker,userId}={}){
+
+async function databaseSupport(pool,userId,question){
+  if(!pool||!userId)return null;
+  const t=String(question||"").toLowerCase();
+  try{
+    if(/subscription|plan|billing|access|expire/.test(t)){
+      const q=await pool.query("SELECT plan_id,status,expires_at,created_at FROM kingbot_subscriptions WHERE user_id=$1 ORDER BY created_at DESC LIMIT 5",[userId]);
+      return {answer:"KINGBOT verified your subscription records.",facts:q.rows.map(x=>`Plan ${x.plan_id||"—"} · status ${x.status||"—"} · expires ${x.expires_at||"—"}`),riskFlags:[],nextAction:"Open the subscription page for the full entitlement view."};
+    }
+    if(/history|trade history|deals|past trades|performance/.test(t)){
+      const q=await pool.query("SELECT bot_id,symbol,side,volume,status,execution_mode,created_at,error_message FROM kingbot_execution_journal WHERE user_id=$1 ORDER BY created_at DESC LIMIT 20",[userId]);
+      return {answer:"KINGBOT retrieved the latest execution journal records.",facts:q.rows.map(x=>`${x.created_at} · ${x.bot_id} · ${x.symbol} · ${x.side} · ${x.volume} · ${x.status} · ${x.execution_mode}`),riskFlags:[],nextAction:"Use Analytics for the complete performance breakdown."};
+    }
+    if(/risk|drawdown|kill switch|risk limit/.test(t)){
+      const q=await pool.query("SELECT bot_id,daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,execution_mode,kill_switch FROM kingbot_bot_risk_settings WHERE user_id=$1 ORDER BY bot_id",[userId]);
+      return {answer:"KINGBOT verified the saved risk controls for your bot engines.",facts:q.rows.map(x=>`${x.bot_id}: trade risk ${x.max_risk_per_trade_pct}% · daily DD ${x.daily_drawdown_pct}% · total DD ${x.total_drawdown_pct}% · max positions ${x.max_positions} · mode ${x.execution_mode} · kill switch ${Boolean(x.kill_switch)}`),riskFlags:[],nextAction:"Keep risk controls server-side and review them before enabling execution."};
+    }
+  }catch(error){ return {answer:"KINGBOT could not verify that support record right now.",facts:[],riskFlags:["VERIFICATION_UNAVAILABLE"],nextAction:"Retry after the backend data service recovers."}; }
+  return null;
+}
+\nexport async function runNativeKingbotAI({question,symbol,twelveData,pool,broker,userId}={}){
   const requested=symbolFromText(question,symbol||"XAUUSD");
   const kind=intent(question);
   const quotes=twelveData?.enabled?twelveData.quotes([requested]):[];
@@ -105,6 +125,11 @@ export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker
         nextAction:"Ask KINGBOT to analyze a specific symbol for current verified market conditions."
       }
     };
+  }
+
+  if(["RISK_REVIEW","PLATFORM_SUPPORT"].includes(kind) && userId){
+    const support=await databaseSupport(pool,userId,question);
+    if(support) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:{...support,technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Not a market setup request.",invalidation:"Not applicable."}}};
   }
 
   if(kind==="ACCOUNT_INTELLIGENCE" && broker && userId){
