@@ -665,31 +665,46 @@ h1{
   50%{opacity:.95;transform:scale(1.015)}
 }
 
-@keyframes heroBotImageGlow{
+@keyframes heroBotColorCycle{
   0%,100%{
     filter:
-      drop-shadow(0 0 14px rgba(25,230,255,.36))
-      drop-shadow(0 0 34px rgba(25,230,255,.18));
+      hue-rotate(0deg)
+      saturate(1.35)
+      brightness(1.08)
+      drop-shadow(0 0 18px rgba(246,185,59,.70))
+      drop-shadow(0 0 52px rgba(246,185,59,.38));
   }
   20%{
     filter:
-      drop-shadow(0 0 16px rgba(71,135,255,.40))
-      drop-shadow(0 0 38px rgba(71,135,255,.20));
+      hue-rotate(228deg)
+      saturate(1.55)
+      brightness(1.10)
+      drop-shadow(0 0 20px rgba(155,92,255,.78))
+      drop-shadow(0 0 58px rgba(155,92,255,.44));
   }
   40%{
     filter:
-      drop-shadow(0 0 18px rgba(155,92,255,.44))
-      drop-shadow(0 0 42px rgba(155,92,255,.22));
+      hue-rotate(178deg)
+      saturate(1.55)
+      brightness(1.10)
+      drop-shadow(0 0 20px rgba(71,135,255,.80))
+      drop-shadow(0 0 60px rgba(71,135,255,.45));
   }
   60%{
     filter:
-      drop-shadow(0 0 18px rgba(255,79,216,.42))
-      drop-shadow(0 0 42px rgba(255,79,216,.20));
+      hue-rotate(108deg)
+      saturate(1.55)
+      brightness(1.12)
+      drop-shadow(0 0 20px rgba(35,247,163,.80))
+      drop-shadow(0 0 60px rgba(35,247,163,.44));
   }
   80%{
     filter:
-      drop-shadow(0 0 18px rgba(246,185,59,.44))
-      drop-shadow(0 0 42px rgba(246,185,59,.22));
+      hue-rotate(318deg)
+      saturate(1.65)
+      brightness(1.12)
+      drop-shadow(0 0 21px rgba(255,77,109,.82))
+      drop-shadow(0 0 62px rgba(255,77,109,.46));
   }
 }
 
@@ -703,7 +718,7 @@ h1{
 
   border-radius:23px;
 
-  animation:heroBotImageGlow 8s ease-in-out infinite;
+  animation:heroBotColorCycle 10s ease-in-out infinite;
   will-change:filter,transform;
 
   background:
