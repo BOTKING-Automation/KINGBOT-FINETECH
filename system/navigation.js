@@ -1,98 +1,97 @@
-/* KINGBOT FINTECH — Global high-tech navigation shell */
+/* KINGBOT FINTECH — Global Command Navigator v2 */
 (function(window, document){
   "use strict";
 
-  const links = [
-    ["index.html","Overview","⌂","Core platform"],
-    ["markets.html","Markets","◈","Live market intelligence"],
-    ["terminal.html","Terminal","⌁","Trading terminal"],
-    ["bots.html","Bots","◉","Automated trading systems"],
-    ["broker-connect.html","Broker Connect","⚡","Secure broker execution"],
-    ["vps-dashboard.html","VPS Dashboard","▣","User-owned VPS & MT5 hosting"],
-    ["partner-revenue.html","Partner Revenue","◌","Broker referral intelligence"],
-    ["analytics.html","Analytics","▦","Performance intelligence"],
-    ["reports.html","Reports","▤","Trading and account reports"],
-    ["security-center.html","Security Center","⌾","Security and API credentials"],
-    ["support-center.html","Support","✉","Customer support operations"],
-    ["compliance.html","Compliance","◇","KYC and compliance center"],
-    ["admin-entry.html","Admin OS","▣","Administrator command center","admin"],
-    ["ai.html","AI Intelligence","✦","AI intelligence layer"],
-    ["scanner.html","AI Scanner","◎","High-intelligence market scanner"],
-    ["pattern.html","Patterns","◉","Pattern intelligence"],
-    ["academy.html","Academy","◇","Education & research"],
-    ["technical-analysis-ai-book.html","TA AI Book","▤","Technical analysis intelligence book"],
-    ["about.html","About","◎","KINGBOT FINTECH"],
-    ["contact.html","Contact","✉","Support & contact"],
-    ["settings.html","Settings","⚙","Account controls"],
-    ["legal.html","Legal Center","▤","Terms & risk disclosure"]
+  const GROUPS = [
+    {
+      id:"trade",
+      label:"TRADE & EXECUTION",
+      icon:"◈",
+      items:[
+        ["index.html","Overview","⌂","Core platform command view"],
+        ["markets.html","Markets","◈","Live market intelligence"],
+        ["terminal.html","Terminal","⌁","Execution terminal & telemetry"],
+        ["bots.html","Bots","◉","Five automated trading engines"],
+        ["broker-connect.html","Broker Connect","⚡","Broker authorization & account binding"],
+        ["vps-dashboard.html","VPS Dashboard","▣","MT5 / VPS runtime hosting"]
+      ]
+    },
+    {
+      id:"intelligence",
+      label:"INTELLIGENCE",
+      icon:"✦",
+      items:[
+        ["analytics.html","Analytics","▦","Performance & risk intelligence"],
+        ["reports.html","Reports","▤","Trading and account reports"],
+        ["ai.html","AI Intelligence","✦","KINGBOT intelligence console"],
+        ["scanner.html","AI Scanner","◎","Live market scanning"],
+        ["pattern.html","Patterns","◉","Pattern intelligence"],
+        ["technical-analysis-ai-book.html","TA AI Book","▤","Technical analysis research"],
+        ["academy.html","Academy","◇","Education & research"]
+      ]
+    },
+    {
+      id:"account",
+      label:"ACCOUNT & OPERATIONS",
+      icon:"◇",
+      items:[
+        ["profile.html","Profile","◎","Identity & account profile"],
+        ["subscription.html","Subscription","◆","Plan & access management"],
+        ["partner-revenue.html","Partner Revenue","◌","Broker referral intelligence"],
+        ["security-center.html","Security Center","⌾","Security & credentials"],
+        ["compliance.html","Compliance","◇","KYC & compliance center"],
+        ["support-center.html","Support","✉","Customer support operations"],
+        ["settings.html","Settings","⚙","Account controls"]
+      ]
+    },
+    {
+      id:"company",
+      label:"COMPANY",
+      icon:"◎",
+      items:[
+        ["about.html","About","◎","KINGBOT FINTECH"],
+        ["contact.html","Contact","✉","Client services & partnerships"],
+        ["legal.html","Legal Center","▤","Terms, privacy & risk disclosure"],
+        ["admin-entry.html","Admin OS","▣","Restricted administrator command center","admin"]
+      ]
+    }
   ];
 
-  const guestAccountLinks = [
+  const GUEST_ACCOUNT = [
     ["subscription.html","Subscription"],
     ["access-stable.html#signin","Sign in"],
     ["access-stable.html#signup","Create account"]
   ];
 
-  const protectedPages = new Set([
-    "index.html","terminal.html","analytics.html","ai.html","scanner.html",
+  const PROTECTED = new Set([
+    "index.html","markets.html","terminal.html","analytics.html","ai.html","scanner.html",
     "bots.html","settings.html","subscription.html","broker-connect.html",
     "partner-revenue.html","pattern.html","vps-dashboard.html","reports.html",
-    "security-center.html","support-center.html","compliance.html"
+    "security-center.html","support-center.html","compliance.html","profile.html"
   ]);
 
-  const API_BASE = "https://kingbot-fintech-api-etfv.onrender.com/api";
+  const API_BASE="https://kingbot-fintech-api-etfv.onrender.com/api";
 
   function currentPage(){
-    return (window.location.pathname.split("/").filter(Boolean).pop() || "index.html").toLowerCase();
-  }
-
-  function injectFallbackStyle(){
-    if(document.getElementById("kb-compact-nav-style")) return;
-    const style=document.createElement("style");
-    style.id="kb-compact-nav-style";
-    style.textContent=[
-      "#kb-compact-nav{position:fixed;top:42px;right:14px;z-index:2147483000;font-family:Inter,system-ui,sans-serif}",
-      "#kb-compact-nav .kb-nav-trigger{display:grid;place-items:center;border:1px solid rgba(255,255,255,.13);border-radius:17px;background:rgba(4,9,22,.9);color:#eef4ff;cursor:pointer}",
-      "#kb-compact-nav .kb-menu{position:absolute;top:64px;right:0;opacity:0;pointer-events:none;visibility:hidden;transition:.18s}",
-      "#kb-compact-nav .kb-menu.kb-open{opacity:1;pointer-events:auto;visibility:visible}"
-    ].join("");
-    document.head.appendChild(style);
-  }
-
-  function ensureRuntime(){
-    if(window.KINGBOT_UI)return Promise.resolve(window.KINGBOT_UI);
-    return new Promise(resolve=>{
-      const existing=document.querySelector('script[data-kb-ui-runtime="true"]');
-      if(existing){existing.addEventListener("load",()=>resolve(window.KINGBOT_UI||null),{once:true});setTimeout(()=>resolve(window.KINGBOT_UI||null),900);return;}
-      const script=document.createElement("script");
-      script.src=new URL("system/ui-runtime.js",window.location.href).href;
-      script.dataset.kbUiRuntime="true";
-      script.onload=()=>resolve(window.KINGBOT_UI||null);
-      script.onerror=()=>resolve(null);
-      document.head.appendChild(script);
-    });
+    return (window.location.pathname.split("/").filter(Boolean).pop()||"index.html").toLowerCase();
   }
 
   function escapeHtml(value){
     return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
   }
 
-  function accountMarkup(authState){
-    const authenticated=Boolean(authState?.authenticated);
-    const verified=Boolean(authState?.user?.verified);
-    if(authenticated&&verified){
-      const name=escapeHtml(String(authState.user?.name||authState.user?.email||"ACCOUNT").trim());
-      return '<a href="index.html" data-kb-account>Dashboard</a>' +
-        '<a href="subscription.html" data-kb-account>Subscription</a>' +
-        '<a href="admin-entry.html" data-kb-account>Admin</a>' +
-        '<a href="#" data-kb-logout>Logout · '+name+'</a>';
-    }
-    if(authenticated&&!verified){
-      return '<a href="verify.html" data-kb-account>Verify email</a>' +
-        '<a href="#" data-kb-signin>Continue</a>' +
-        '<a href="access-stable.html#signin" data-kb-account>Sign in</a>';
-    }
-    return guestAccountLinks.map(([href,name])=>'<a href="'+href+'" data-kb-account>'+name+'</a>').join("");
+  function ensureRuntime(){
+    if(window.KINGBOT_UI)return Promise.resolve(window.KINGBOT_UI);
+    return new Promise(resolve=>{
+      const script=document.querySelector('script[data-kb-ui-runtime="true"]')||document.querySelector('script[src*="ui-runtime.js"]');
+      if(script){script.addEventListener("load",()=>resolve(window.KINGBOT_UI||null),{once:true});setTimeout(()=>resolve(window.KINGBOT_UI||null),700);return;}
+      const s=document.createElement("script");
+      s.src=new URL("system/ui-runtime.js",window.location.href).href;
+      s.dataset.kbUiRuntime="true";
+      s.onload=()=>resolve(window.KINGBOT_UI||null);
+      s.onerror=()=>resolve(null);
+      document.head.appendChild(s);
+    });
   }
 
   async function resolveAuthState(){
@@ -103,152 +102,221 @@
     try{return await window.KINGBOT_SESSION.check();}catch{return {authenticated:false,verified:false,user:null};}
   }
 
-  function renderAccount(root,authState){
-    const box=root?.querySelector(".kb-menu-account");
-    if(!box)return;
-    box.innerHTML=accountMarkup(authState);
-    box.querySelector("[data-kb-logout]")?.addEventListener("click",async e=>{
-      e.preventDefault();
-      const logout=window.KINGBOT_SESSION?.logout;
-      if(logout)await logout({redirect:true});
-      else location.replace("access-stable.html#signin");
-    });
-    box.querySelector("[data-kb-signin]")?.addEventListener("click",e=>{
-      e.preventDefault();
-      location.replace("verify.html?return="+encodeURIComponent(window.location.pathname+window.location.search+window.location.hash));
-    });
+  async function resolveAccessState(){
+    if(!window.KINGBOT_ACCESS)return null;
+    try{
+      if(!window.KINGBOT_ACCESS.state.loaded)await window.KINGBOT_ACCESS.initialize();
+      return window.KINGBOT_ACCESS.getState();
+    }catch{return null;}
   }
 
-  function protectNavClicks(root){
-    root.querySelectorAll(".kb-menu-grid a[data-kb-protected]").forEach(a=>{
-      a.addEventListener("click",async e=>{
-        const state=window.KINGBOT_SESSION?.getState?.() || await resolveAuthState();
-        if(!state.authenticated){
-          e.preventDefault();
-          location.replace("access-stable.html?return="+encodeURIComponent(a.getAttribute("href")||"")+"#signin");
-          return;
-        }
-        if(!state.user?.verified){
-          e.preventDefault();
-          location.replace("verify.html?return="+encodeURIComponent(a.getAttribute("href")||""));
-        }
-      });
-    });
+  function accountMarkup(authState){
+    const authenticated=Boolean(authState?.authenticated);
+    const verified=Boolean(authState?.user?.verified);
+    if(authenticated&&verified){
+      const name=escapeHtml(String(authState.user?.name||authState.user?.email||"ACCOUNT").trim());
+      return '<a href="profile.html" class="kb-nav-account-link" data-kb-account>Profile</a>'+
+        '<a href="subscription.html" class="kb-nav-account-link" data-kb-account>Subscription</a>'+
+        '<a href="admin-entry.html" class="kb-nav-account-link" data-kb-account data-kb-admin-entry>Admin</a>'+
+        '<a href="#" class="kb-nav-account-link" data-kb-logout>Logout · '+name+'</a>';
+    }
+    if(authenticated&&!verified){
+      return '<a href="verify.html" class="kb-nav-account-link" data-kb-account>Verify</a>'+
+        '<a href="#" class="kb-nav-account-link" data-kb-signin>Continue</a>'+
+        '<a href="access-stable.html#signin" class="kb-nav-account-link" data-kb-account>Sign in</a>';
+    }
+    return GUEST_ACCOUNT.map(([href,name])=>'<a href="'+href+'" class="kb-nav-account-link" data-kb-account>'+name+'</a>').join("");
   }
 
-  async function refreshApiState(root){
-    const pill=root?.querySelector("[data-kb-api-status]");
+  function iconDot(group){
+    return '<span class="kb-nav-group-icon">'+group.icon+'</span>';
+  }
+
+  function groupMarkup(group,page){
+    const itemMarkup=group.items.map(([href,name,icon,desc,role])=>{
+      const active=href.toLowerCase()===page;
+      const protectedAttr=PROTECTED.has(href.toLowerCase())?' data-kb-protected="true"':'';
+      const adminAttr=role==="admin"?' data-kb-admin-link="true"':'';
+      return '<a href="'+href+'" class="kb-nav-item'+(active?' is-active':'')+'"'+protectedAttr+adminAttr+'>'+
+        '<span class="kb-nav-item-icon">'+icon+'</span>'+
+        '<span class="kb-nav-item-copy"><strong>'+name+'</strong><small>'+desc+'</small></span>'+
+        (active?'<span class="kb-nav-active-dot" aria-hidden="true"></span>':'')+
+      '</a>';
+    }).join("");
+    return '<section class="kb-nav-group" data-group="'+group.id+'">'+
+      '<div class="kb-nav-group-head">'+iconDot(group)+'<span>'+group.label+'</span><b>'+String(group.items.length).padStart(2,"0")+'</b></div>'+
+      '<div class="kb-nav-group-items">'+itemMarkup+'</div>'+
+    '</section>';
+  }
+
+  function filterItems(root,query){
+    const q=String(query||"").trim().toLowerCase();
+    let visible=0;
+    root.querySelectorAll(".kb-nav-item").forEach(item=>{
+      const text=item.textContent.toLowerCase();
+      const show=!q||text.includes(q);
+      item.hidden=!show;
+      if(show)visible++;
+    });
+    root.querySelectorAll(".kb-nav-group").forEach(group=>{
+      const count=[...group.querySelectorAll(".kb-nav-item")].filter(x=>!x.hidden).length;
+      group.hidden=count===0;
+    });
+    const result=root.querySelector("[data-kb-search-count]");
+    if(result)result.textContent=q?(visible+" MODULE"+(visible===1?"":"S")+" MATCHED"):"23 MODULES";
+  }
+
+  async function refreshApi(root){
+    const pill=root.querySelector("[data-kb-api]");
     if(!pill)return;
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),2500);
     try{
-      const res=await fetch(API_BASE+"/health",{method:"GET",headers:{Accept:"application/json"},cache:"no-store",credentials:"omit",signal:controller.signal});
-      const data=await res.json().catch(()=>({}));
-      const live=res.ok && data?.ok!==false;
+      const r=await fetch(API_BASE+"/health",{headers:{Accept:"application/json"},cache:"no-store",credentials:"omit",signal:controller.signal});
+      const d=await r.json().catch(()=>({}));
+      const live=r.ok&&d?.ok!==false;
       pill.classList.toggle("is-live",live);
       pill.classList.toggle("is-offline",!live);
-      const label=pill.querySelector("span");
-      if(label)label.textContent=live?"API · LIVE":"API · OFFLINE";
+      pill.querySelector("span").textContent=live?"API LIVE":"API OFFLINE";
     }catch{
       pill.classList.remove("is-live");
       pill.classList.add("is-offline");
-      const label=pill.querySelector("span");
-      if(label)label.textContent="API · OFFLINE";
+      pill.querySelector("span").textContent="API OFFLINE";
     }finally{clearTimeout(timer);}
   }
 
-  function themeControls(){
-    return '<div class="kb-menu-control-row">' +
-      '<span class="kb-menu-control-title">VISUAL CORE / THEME</span>' +
-      '<span class="kb-menu-control-actions">' +
-      '<button type="button" class="kb-menu-control-btn" data-kb-theme="cyan" aria-label="Use cyan theme">CYAN</button>' +
-      '<button type="button" class="kb-menu-control-btn" data-kb-theme="violet" aria-label="Use violet theme">VIOLET</button>' +
-      '<button type="button" class="kb-menu-control-btn" data-kb-theme="gold" aria-label="Use gold theme">GOLD</button>' +
-      '</span></div>';
+  async function updateAdminVisibility(root){
+    const access=await resolveAccessState();
+    const admin=access?.isAdmin===true;
+    root.querySelectorAll("[data-kb-admin-link]").forEach(link=>{
+      link.classList.toggle("is-admin-available",admin);
+      const note=link.querySelector("small");
+      if(note&&!admin)note.textContent="Restricted administrator access";
+    });
+    const badge=root.querySelector("[data-kb-admin-badge]");
+    if(badge)badge.textContent=admin?"ADMIN VERIFIED":"ADMIN RESTRICTED";
   }
 
   async function build(){
-    if(document.getElementById("kb-compact-nav"))return;
+    if(document.getElementById("kb-command-nav"))return;
     if(document.querySelector(".verify-shell,.auth-shell,.auth-card"))return;
 
-    injectFallbackStyle();
     await ensureRuntime();
 
     const page=currentPage();
-    const pageLinks=links.map(([href,name,icon,desc,role])=>{
-      const active=href.toLowerCase()===page;
-      const protectedAttr=protectedPages.has(href.toLowerCase())?' data-kb-protected="true"':'';
-      const roleAttr=role==='admin'?' data-kb-role="admin"':'';
-      return '<a href="'+href+'"'+(active?' class="kb-active"':'')+protectedAttr+roleAttr+'>' +
-        '<span class="kb-menu-icon">'+icon+'</span>' +
-        '<span><span class="kb-menu-name">'+name+'</span><span class="kb-menu-sub">'+desc+'</span></span>' +
-        '</a>';
-    }).join("");
-
     const authState=await resolveAuthState();
-    const root=document.createElement("div");
-    root.id="kb-compact-nav";
+
+    const root=document.createElement("aside");
+    root.id="kb-command-nav";
     root.innerHTML=
-      '<a href="index.html" class="kb-brand-link" aria-label="KINGBOT Overview">' +
-        '<img class="kb-fintech-logo" src="assets/images/kingbot-fintech-logo.png" alt="KINGBOT">' +
-      '</a>' +
-      '<button class="kb-nav-trigger" type="button" aria-label="Open navigation menu" aria-expanded="false">☰</button>' +
-      '<div class="kb-menu" aria-hidden="true">' +
-        themeControls() +
-        '<div class="kb-menu-grid">'+pageLinks+'</div>' +
-        '<div class="kb-menu-account">'+accountMarkup(authState)+'</div>' +
-      '</div>';
+      '<a class="kb-command-brand" href="index.html" aria-label="KINGBOT Overview">'+
+        '<img src="assets/images/kingbot-fintech-logo.png" alt="KINGBOT">'+
+        '<span><strong>KINGBOT</strong><small>FINTECH COMMAND</small></span>'+
+      '</a>'+
+      '<div class="kb-command-head">'+
+        '<div><span class="kb-command-kicker">NAVIGATION / SYSTEM CORE</span><h2>Command Center</h2><small>All customer platform modules in one control surface.</small></div>'+
+        '<button type="button" class="kb-nav-close" aria-label="Close navigation">×</button>'+
+      '</div>'+
+      '<div class="kb-command-status">'+
+        '<span class="kb-command-status-pill is-live" data-kb-api><i></i><span>API CHECKING</span></span>'+
+        '<span class="kb-command-status-pill is-live"><i></i><span>RISK GATED</span></span>'+
+        '<span class="kb-command-status-pill"><i></i><span>NON-CUSTODIAL</span></span>'+
+      '</div>'+
+      '<label class="kb-nav-search"><span>⌕</span><input type="search" aria-label="Search platform modules" placeholder="Search modules…" autocomplete="off"><kbd>⌘K</kbd></label>'+
+      '<div class="kb-nav-result"><span data-kb-search-count>23 MODULES</span><span>ESC TO CLOSE</span></div>'+
+      '<div class="kb-nav-scroll">'+GROUPS.map(g=>groupMarkup(g,page)).join("")+'</div>'+
+      '<div class="kb-nav-account"><div class="kb-nav-account-title"><span>ACCOUNT CHANNEL</span><b data-kb-admin-badge>ADMIN STATUS</b></div>'+accountMarkup(authState)+'</div>'+
+      '<div class="kb-nav-footer"><span>CONSISTENCY · RESILIENCE · INNOVATION</span><button type="button" class="kb-nav-theme" data-kb-theme="cyan" aria-label="Cyan theme">CYAN</button></div>';
 
     document.body.appendChild(root);
 
-    const trigger=root.querySelector(".kb-nav-trigger");
-    const menu=root.querySelector(".kb-menu");
-    const close=()=>{
-      menu.classList.remove("kb-open");
-      menu.setAttribute("aria-hidden","true");
-      trigger.setAttribute("aria-expanded","false");
-    };
+    const trigger=document.createElement("button");
+    trigger.id="kb-command-trigger";
+    trigger.type="button";
+    trigger.className="kb-command-trigger";
+    trigger.setAttribute("aria-label","Open KINGBOT Command Center");
+    trigger.setAttribute("aria-expanded","false");
+    trigger.innerHTML='<span></span><span></span><span></span><b>MENU</b>';
+    document.body.appendChild(trigger);
+
+    const backdrop=document.createElement("button");
+    backdrop.id="kb-command-backdrop";
+    backdrop.type="button";
+    backdrop.setAttribute("aria-label","Close navigation");
+    document.body.appendChild(backdrop);
+
     const open=()=>{
-      menu.classList.add("kb-open");
-      menu.setAttribute("aria-hidden","false");
+      root.classList.add("is-open");
+      backdrop.classList.add("is-open");
+      trigger.classList.add("is-open");
       trigger.setAttribute("aria-expanded","true");
+      root.querySelector(".kb-nav-search input")?.focus({preventScroll:true});
+      document.documentElement.classList.add("kb-nav-lock");
+    };
+    const close=()=>{
+      root.classList.remove("is-open");
+      backdrop.classList.remove("is-open");
+      trigger.classList.remove("is-open");
+      trigger.setAttribute("aria-expanded","false");
+      document.documentElement.classList.remove("kb-nav-lock");
     };
 
-    trigger.addEventListener("click",()=>menu.classList.contains("kb-open")?close():open());
-    root.querySelectorAll(".kb-menu-grid a,.kb-menu-account a").forEach(a=>a.addEventListener("click",close));
-    document.addEventListener("keydown",e=>{if(e.key==="Escape")close();});
+    trigger.addEventListener("click",()=>root.classList.contains("is-open")?close():open());
+    root.querySelector(".kb-nav-close").addEventListener("click",close);
+    backdrop.addEventListener("click",close);
+    document.addEventListener("keydown",e=>{
+      if(e.key==="Escape")close();
+      if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();open();}
+    });
+
+    const input=root.querySelector(".kb-nav-search input");
+    input.addEventListener("input",()=>filterItems(root,input.value));
 
     root.querySelectorAll("[data-kb-theme]").forEach(btn=>{
       btn.addEventListener("click",()=>{
         window.KINGBOT_UI?.applyTheme(btn.dataset.kbTheme);
-        const current=document.documentElement.dataset.kbTheme||"cyan";
-        root.querySelectorAll("[data-kb-theme]").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.kbTheme===current)));
+        btn.textContent=(window.KINGBOT_UI?.getTheme?.()||"cyan").toUpperCase();
       });
     });
 
-    renderAccount(root,authState);
-    protectNavClicks(root);
+    root.querySelectorAll("[data-kb-logout]").forEach(a=>a.addEventListener("click",async e=>{
+      e.preventDefault();
+      const logout=window.KINGBOT_SESSION?.logout;
+      if(logout)await logout({redirect:true});else location.replace("access-stable.html#signin");
+    }));
 
-    const status=document.createElement("div");
-    status.className="kb-system-bar";
-    status.innerHTML='<div class="kb-system-bar__inner">' +
-      '<span class="kb-system-pill is-live"><i></i><span>SESSION · READY</span></span>' +
-      '<span class="kb-system-pill" data-kb-api-status><i></i><span>API · CHECKING</span></span>' +
-      '<span class="kb-system-pill"><i></i><span>EXECUTION · RISK-GATED</span></span>' +
-      '<span class="kb-system-pill"><i></i><span>MODEL · NON-CUSTODIAL</span></span>' +
-      '</div>';
-    document.body.appendChild(status);
+    root.querySelector("[data-kb-signin]")?.addEventListener("click",e=>{
+      e.preventDefault();
+      location.replace("verify.html?return="+encodeURIComponent(window.location.pathname+window.location.search+window.location.hash));
+    });
 
-    await refreshApiState(status);
-    const refreshTimer=setInterval(()=>refreshApiState(status),30000);
+    root.querySelectorAll("[data-kb-protected]").forEach(a=>a.addEventListener("click",async e=>{
+      const state=window.KINGBOT_SESSION?.getState?.()||await resolveAuthState();
+      if(!state.authenticated){e.preventDefault();location.replace("access-stable.html?return="+encodeURIComponent(a.getAttribute("href")||"")+"#signin");return;}
+      if(!state.user?.verified){e.preventDefault();location.replace("verify.html?return="+encodeURIComponent(a.getAttribute("href")||""));}
+    }));
 
-    window.addEventListener("pagehide",()=>clearInterval(refreshTimer),{once:true});
-    window.addEventListener("kingbot:session-change",e=>renderAccount(root,e.detail||window.KINGBOT_SESSION?.getState?.()||{authenticated:false,verified:false}));
+    root.querySelectorAll(".kb-nav-item").forEach(a=>a.addEventListener("click",close));
+    window.addEventListener("kingbot:session-change",async e=>{
+      const next=e.detail||await resolveAuthState();
+      const box=root.querySelector(".kb-nav-account");
+      box.querySelectorAll(".kb-nav-account-link,[data-kb-admin-entry]").forEach(x=>x.remove());
+      box.insertAdjacentHTML("beforeend",accountMarkup(next));
+      box.querySelectorAll("[data-kb-logout]").forEach(x=>x.addEventListener("click",async ev=>{
+        ev.preventDefault();const logout=window.KINGBOT_SESSION?.logout;if(logout)await logout({redirect:true});
+      }));
+      await updateAdminVisibility(root);
+    });
+
+    await updateAdminVisibility(root);
+    await refreshApi(root);
+    const timer=setInterval(()=>refreshApi(root),30000);
+    window.addEventListener("pagehide",()=>clearInterval(timer),{once:true});
 
     window.KINGBOT_NAV={
       open,close,current:currentPage,
-      refresh:async()=>renderAccount(root,await resolveAuthState()),
-      apiRefresh:()=>refreshApiState(status)
+      refresh:async()=>{await updateAdminVisibility(root);await refreshApi(root);},
+      search:(q)=>{input.value=q;filterItems(root,q);open();}
     };
   }
 
