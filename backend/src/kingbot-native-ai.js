@@ -19,6 +19,8 @@ function symbolFromText(text, fallback="XAUUSD"){
 function intent(text){
   const t=String(text||"").toLowerCase().trim();
   if(/^(hi|hello|hey|yo|good morning|good afternoon|good evening|howdy|greetings)\b/.test(t)||/\bhow are you\b|\bwho are you\b|\bwhat are you\b|\bthank you\b|\bthanks\b|\bbye\b|\bgood night\b/.test(t)) return "CONVERSATION";
+  if(/^(what is|what's|tell me about|explain)\s+(kingbot|kingbot fintech|this platform|the platform)\b/.test(t)
+    ||/\bwhat does kingbot do\b|\bwhat is kingbot fintech\b|\bwhat can kingbot do\b/.test(t)) return "KINGBOT_KNOWLEDGE";
   if(/\bwhat time is it\b|\bcurrent time\b|\bwhat is the time\b|\bwhat's the time\b|\btime now\b|\bwhat day is it\b|\bwhat date is it\b|\btoday'?s date\b|\bcurrent date\b/.test(t)) return "TIME";
   if(/\b(my )?(broker )?(connection|connected|connect|disconnect|connection status)\b|\bwhich broker\b|\bbroker status\b|\bderiv connection\b|\bmt5 connection\b/.test(t)) return "CONNECTION_INTELLIGENCE";
   if(/\b(account|balance|equity|margin|free margin|position|positions|portfolio|account status)\b/.test(t)) return "ACCOUNT_INTELLIGENCE";
@@ -39,6 +41,78 @@ function utilityReply(question){
     return {answer:"The current East Africa Time (EAT) is "+eat+".",facts:["EAT timezone: Africa/Nairobi (UTC+3).","Server UTC: "+utc],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No market analysis requested.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask KINGBOT your next question."};
   }
   return null;
+}
+
+function kingbotKnowledgeReply(question){
+  const t=String(question||"").toLowerCase().trim();
+
+  if(/\bdoes kingbot hold my money\b|\bis kingbot a broker\b|\bkingbot a broker\b|\bwho is the broker\b/.test(t)){
+    return {
+      answer:"KINGBOT FINTECH is a trading-technology and automation platform; it is not itself a broker or a bank. Broker accounts remain with the connected broker, while KINGBOT provides the intelligence, strategy, risk and automation layer around the authorized account.",
+      facts:[
+        "KINGBOT: trading technology, intelligence and automation layer.",
+        "Broker: the external trading account provider.",
+        "Account data: read from verified backend/broker connections when available.",
+        "Execution: subject to broker validation plus KINGBOT server-side strategy and risk controls."
+      ],
+      technicalAnalysis:[],
+      setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No market setup requested.",invalidation:"Not applicable."},
+      riskFlags:["BROKER_AND_PLATFORM_ARE_SEPARATE"],
+      nextAction:"Ask “how does KINGBOT work?” or “what are the five KINGBOT engines?”"
+    };
+  }
+
+  if(/\bcan kingbot trade\b|\bdoes kingbot trade\b|\bkingbot execute trades\b|\bcan it execute\b/.test(t)){
+    return {
+      answer:"KINGBOT is designed to automate trading only through an authorized broker connection and the platform's server-side execution path. AI chat itself is not the execution authority.",
+      facts:[
+        "Broker authorization is required.",
+        "Strategy engines generate candidate actions from market context.",
+        "Risk controls evaluate whether execution is allowed.",
+        "The execution layer sends broker orders only after its own validation gates.",
+        "AI conversation cannot bypass those controls or independently authorize a live order."
+      ],
+      technicalAnalysis:[],
+      setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"A verified broker connection and strategy/risk conditions.",invalidation:"Execution controls reject invalid or unauthorized requests."},
+      riskFlags:["EXECUTION_REMAINS_SERVER_CONTROLLED"],
+      nextAction:"Ask about broker connection, risk controls, or a specific bot engine."
+    };
+  }
+
+  if(/\bfive (kingbot )?(bot|strategy|engine)s?\b|\bwhat are the (five|5)\b.*\bkingbot\b/.test(t)){
+    const defs=getBotDefinitions();
+    return {
+      answer:"KINGBOT currently defines five specialized strategy engines. They share the platform's risk architecture but use different market-selection logic and time horizons.",
+      facts:Object.values(defs).map(d=>d.name+" · "+d.mode),
+      technicalAnalysis:Object.values(defs).map(d=>d.name+": "+d.strategies.join(", ")+" · regime "+d.timeframeProfile.regime+" · setup "+d.timeframeProfile.setup+" · execution "+d.timeframeProfile.execution),
+      setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Choose a specific engine for deeper explanation.",invalidation:"Not applicable."},
+      riskFlags:["STRATEGY_DESCRIPTIONS_ARE_NOT_PERFORMANCE_GUARANTEES"],
+      nextAction:"Ask “explain KINGBOT SMC PRO” or “explain LADDER FLIP V8”."
+    };
+  }
+
+  return {
+    answer:"KINGBOT FINTECH is the trading-technology operating layer behind the KINGBOT ecosystem. It combines broker connectivity, verified market/account telemetry, specialized strategy engines, risk controls, runtime automation, analytics and an AI intelligence interface.",
+    facts:[
+      "MARKET DATA: broker quotes and supported external market feeds provide verified inputs when connected.",
+      "INTELLIGENCE: KINGBOT AI explains platform state, account context, strategy logic and market information.",
+      "STRATEGY: five engines — Strategic, Flipper, Breakout, SMC PRO and Ladder Flip V8.",
+      "RISK: server-side drawdown, position, spread, stale-data and kill-switch controls.",
+      "RUNTIME: worker services manage configured bot cycles and record state, signals and execution telemetry.",
+      "EXECUTION: broker orders remain outside the conversational AI layer and require the platform's authorization and risk gates.",
+      "TRUST: account-specific values are shown only when verified by backend sources."
+    ],
+    technicalAnalysis:[
+      "Strategic: trend-following, mean-reversion, volatility-regime and multi-factor consensus.",
+      "Flipper: micro-momentum, impulse continuation, rapid reversal and spread filtering.",
+      "Breakout: range compression, level breakout, volatility confirmation and retest continuation.",
+      "SMC PRO: market structure, liquidity sweeps, order blocks, fair-value gaps and displacement.",
+      "Ladder Flip V8: EMA20/EMA50 trend gate, ADX strength, RSI confirmation, velocity pyramiding and staircase profit-lock logic."
+    ],
+    setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Ask for a subsystem, engine, broker, risk layer or market analysis.",invalidation:"Not applicable."},
+    riskFlags:["AI_OUTPUT_IS_DECISION_SUPPORT","NO_PROFIT_GUARANTEE"],
+    nextAction:"Ask a specific follow-up such as “how does KINGBOT work?”, “what is SMC PRO?”, or “what is my connection?”"
+  };
 }
 
 function conversationalReply(question){
@@ -227,6 +301,9 @@ export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker
   const requested=symbolFromText(question,symbol||"XAUUSD");
   const kind=intent(question);
   const utility=utilityReply(question);
+  if(kind==="KINGBOT_KNOWLEDGE"){
+    return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:kingbotKnowledgeReply(question),verified:{platformKnowledge:true,engineDefinitions:true}};
+  }
   if(utility) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:"TIME",symbol:requested,reply:utility,verified:{native:true,timeSource:"server"}};
   if(kind==="CONVERSATION") return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:conversationalReply(question),verified:{native:true}};
   if(kind==="CONNECTION_INTELLIGENCE"){
