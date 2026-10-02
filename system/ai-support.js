@@ -227,11 +227,11 @@
   function renderHealth() {
     const h = state.health;
     if (!h) return;
-    const aiReady = Boolean(state.puterReady || h.aiReady);
+    const aiReady = Boolean(h.nativeReady || h.aiReady || h.ok);
     const apiReady = Boolean(h.ok);
     const dbReady = Boolean(h.accountServiceReady);
-    const provider = String(h.aiProvider || "").toLowerCase();
-    const model = String(h.aiModel || "");
+    const provider = String(h.externalProvider || h.aiProvider || "native").toLowerCase();
+    const model = String(h.aiModel || h.model || "KINGBOT-CORE-1");
 
     if (!state.puterReady) {
       setTelemetry(
@@ -542,11 +542,9 @@
     setInterval(loadContext, 20000);
     loadHealth();
     /* Native KINGBOT AI is the production chat path. No browser AI provider is required. */
-    initPuter().catch(() => {
-      setTelemetry("aiCoreStatus", "OFFLINE", "bad");
-      setText("coreStateLabel", "PUTER AI UNAVAILABLE");
-      setText("coreStateSub", "The conversational AI service could not be initialized in this browser.");
-    });
+    setTelemetry("aiCoreStatus", "KINGBOT NATIVE", "good");
+    setText("coreStateLabel", "KINGBOT NATIVE AI ONLINE");
+    setText("coreStateSub", "Native KINGBOT intelligence is active. External browser AI providers are not required.");
     window.setTimeout(loadContext, 700);
     window.addEventListener("kingbot:session-change", () => loadContext());
     window.addEventListener("kingbot:access-ready", () => loadContext(), { once: true });
