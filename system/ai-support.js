@@ -440,6 +440,7 @@
 
       hideTyping();
       addHistory("assistant", answer);
+      window.dispatchEvent(new CustomEvent("kingbot:ai-response", { detail: { text: answer } }));
 
       state.lastQueryAt = new Date();
       setText("lastQuery", state.lastQueryAt.toLocaleTimeString());
