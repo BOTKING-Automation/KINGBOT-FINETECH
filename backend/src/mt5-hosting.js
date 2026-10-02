@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import { Router } from "express";
-import { mt5BridgeRegistry } from "./mt5-bridge.js";
 
 const NODE_TOKEN_TTL_DAYS = 30;
 const HEARTBEAT_TIMEOUT_MS = 20_000;
