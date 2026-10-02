@@ -36,6 +36,7 @@ IMPORTANT:
         "analytics.html",
         "ai.html",
         "scanner.html",
+        "gold-signals.html",
         "bots.html",
         "settings.html",
         "subscription.html",
