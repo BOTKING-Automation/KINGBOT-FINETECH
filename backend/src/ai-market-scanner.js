@@ -299,7 +299,8 @@ async function runMarketScan({ requireUser, pool, broker, twelveData, req, res }
       ? directQuotes
       : brokerQuotes;
     const [tv, tdTechnical] = await Promise.all([latestTradingView(pool, symbols, timeframe), fetchTwelveDataTechnical(twelveData, symbols, timeframe)]);
-    const tdMap=Object.fromEntries(tdTechnical.map(x=>[x.symbol,x]));\n    const technical = symbols.map(symbol => { const snapshot=tdMap[symbol] || tv.find(x=>x.symbol===symbol); return snapshot ? { symbol, ...technicalEngine(snapshot), timeframe, source:tdMap[symbol] ? "Twelve Data live OHLC" : "TradingView", barTime:snapshot.barTime, dataFreshness:snapshot.receivedAt||snapshot.barTime } : { symbol, ...technicalEngine(null), timeframe, source:"none" }; });
+    const tdMap = Object.fromEntries(tdTechnical.map(x => [x.symbol, x]));
+    const technical = symbols.map(symbol => { const snapshot=tdMap[symbol] || tv.find(x=>x.symbol===symbol); return snapshot ? { symbol, ...technicalEngine(snapshot), timeframe, source:tdMap[symbol] ? "Twelve Data live OHLC" : "TradingView", barTime:snapshot.barTime, dataFreshness:snapshot.receivedAt||snapshot.barTime } : { symbol, ...technicalEngine(null), timeframe, source:"none" }; });
     const tvMap = Object.fromEntries(tv.map(x => [x.symbol, x]));
     const technicalSource = tdTechnical.length ? "Twelve Data live OHLC + live quote WebSocket" : (tv.length ? "TradingView webhook + live quote feed" : "live quotes only");
     for (const q of quotes) {
