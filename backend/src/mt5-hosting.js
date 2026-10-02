@@ -53,6 +53,7 @@ export function createMt5HostingRouter({pool,requireUser}={}){
     if(!mapping.rowCount)return res.status(409).json({ok:false,error:"BROKER_CONNECTION_REQUIRED",message:"Connect and verify a broker account before provisioning hosted MT5."});
     const brokerProvider=String(mapping.rows[0].provider||"").toLowerCase();
     const brokerAccountId=String(mapping.rows[0].account_id||"").trim();
+    if(brokerProvider!=="mt5-bridge")return res.status(409).json({ok:false,error:"NATIVE_MT5_HOST_REQUIRES_MT5_BRIDGE",message:"Hosted MT5 currently provisions only through the verified native MT5 bridge route."});
     const brokerMode=String(mapping.rows[0].execution_mode||"DEMO").toUpperCase();
     if(brokerMode!==executionMode)return res.status(409).json({ok:false,error:"EXECUTION_MODE_BROKER_MISMATCH",brokerExecutionMode:brokerMode,requestedExecutionMode:executionMode});
     if(executionMode==="LIVE"&&!mapping.rows[0].live_execution_authorized)
