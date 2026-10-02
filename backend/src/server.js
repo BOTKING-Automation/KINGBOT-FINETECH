@@ -27,6 +27,7 @@ import { registerElevenLabsVoice } from "./elevenlabs-voice.js";
 import { registerAiIntelligence } from "./ai-intelligence.js";
 import { registerAiAgent } from "./ai-agent.js";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
+import { evaluateKingbotBrain } from "./kingbot-brain.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -64,6 +65,18 @@ app.get("/api/subscription/status", async (req,res)=>{
 app.use("/api/bots", createBotEngineRouter({ pool }));
 app.use("/api/runtime", createBotRuntimeRouter({ pool, broker }));
 app.use("/api/mt5/bridge", createMt5BridgeRouter({ pool, broker }));
+
+app.post("/api/ai/brain", async (req,res)=>{
+  try{
+    const user=await requireUser(pool,req,res); if(!user)return;
+    const market=req.body?.market||req.body||{};
+    const result=evaluateKingbotBrain(market,{maxAgeMs:Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS||5000)});
+    res.json(result);
+  }catch(error){
+    console.error("[KINGBOT BRAIN]",error?.message||error);
+    res.status(500).json({ok:false,error:"KINGBOT_BRAIN_FAILED",message:String(error?.message||"Brain evaluation failed").slice(0,220)});
+  }
+});
 
 function base64Url(buffer){return Buffer.from(buffer).toString("base64url");}
 function derivOauthConfig(){
