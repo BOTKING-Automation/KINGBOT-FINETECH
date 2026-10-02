@@ -28,6 +28,7 @@ import { registerAiIntelligence } from "./ai-intelligence.js";
 import { registerAiAgent } from "./ai-agent.js";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { evaluateKingbotBrain } from "./kingbot-brain.js";
+import { createMt5HostingRouter, ensureMt5HostingSchema } from "./mt5-hosting.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -65,6 +66,7 @@ app.get("/api/subscription/status", async (req,res)=>{
 app.use("/api/bots", createBotEngineRouter({ pool }));
 app.use("/api/runtime", createBotRuntimeRouter({ pool, broker }));
 app.use("/api/mt5/bridge", createMt5BridgeRouter({ pool, broker }));
+app.use("/api/mt5/hosting", createMt5HostingRouter({ pool, requireUser }));
 
 app.post("/api/ai/brain", async (req,res)=>{
   try{
@@ -219,7 +221,7 @@ app.use((_req, res) => {
   res.status(404).json({ ok: false, error: "Route not found." });
 });
 
-ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => partners.ensureSchema()).then(() => {
+ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => partners.ensureSchema()).then(() => {
   app.listen(PORT, () => {
     console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
     void startWorker().then(() => {}).catch((error) => console.error("[KINGBOT WORKER]", error?.message || error));
