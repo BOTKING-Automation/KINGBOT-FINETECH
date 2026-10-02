@@ -42,7 +42,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
 .scan-body{padding:15px}.scan-summary{min-height:160px;padding:14px;border:1px solid rgba(25,230,255,.12);border-radius:13px;background:rgba(25,230,255,.04)}
 .summary-text{margin-top:9px;color:#dce6fa;font-size:11px;line-height:1.7;white-space:pre-wrap}
 .detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
-.detail{padding:11px;border:1px solid var(--line);border-radius:11px}.detail span{display:block;color:var(--muted);font:800 7px "JetBrains Mono"}.detail strong{display:block;margin-top:5px;font:900 10px "JetBrains Mono"}
+.detail{padding:11px;border:1px solid var(--line);border-radius:11px}.detail span{display:block;color:var(--muted);font:800 7px "JetBrains Mono"}.detail strong{display:block;margin-top:5px;font:900 10px "JetBrains Mono"}.pending-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}.pending-card{padding:11px;border:1px solid rgba(25,230,255,.12);border-radius:11px;background:rgba(255,255,255,.018)}.pending-card span{display:block;color:var(--muted);font:800 7px "JetBrains Mono"}.pending-card strong{display:block;margin-top:6px;font:900 10px "JetBrains Mono"}.pending-card small{display:block;margin-top:5px;color:var(--muted);font-size:8px;line-height:1.5}
 .empty{padding:40px;text-align:center;color:var(--muted);font:800 9px "JetBrains Mono"}
 .toast{position:fixed;right:18px;bottom:18px;z-index:500;max-width:360px;padding:11px 13px;border-radius:10px;background:rgba(4,8,18,.96);font:800 8px "JetBrains Mono";opacity:0;transition:.22s}
 .toast.show{opacity:1}.toast.good{color:var(--green)}.toast.bad{color:var(--red)}
@@ -126,6 +126,9 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
         <div id="technicalFound" style="margin-top:7px;color:#dce6fa;font-size:10px;line-height:1.7"></div>
         <div style="margin-top:12px;color:var(--muted);font:800 7px 'JetBrains Mono'">REASON</div>
         <div id="reasonValue" style="margin-top:7px;color:#dce6fa;font-size:10px;line-height:1.7"></div>
+        <div style="margin-top:14px;color:var(--cyan);font:900 8px 'JetBrains Mono'">PREDICTED PENDING-ORDER MAP</div>
+        <div id="pendingOrderMeta" style="margin-top:5px;color:var(--muted);font-size:8px;line-height:1.5"></div>
+        <div id="pendingOrderGrid" class="pending-grid"></div>
       </div>
       </div>
       <div class="detail-grid">
@@ -198,6 +201,8 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       if(parsed){regime=parsed.market_regime||"—"; ranked=parsed.ranked_symbols||[];}
     }catch{}
     if(!ranked.length && Array.isArray(data.technical)) ranked=data.technical;
+    const technicalMap=Object.fromEntries((data.technical||[]).map(x=>[x.symbol,x]));
+    ranked=ranked.map(item=>({...item,pendingOrderZones:item.pendingOrderZones||technicalMap[item.symbol]?.pendingOrderZones||null}));
     qs("regime").textContent=String(regime).toUpperCase();
     const first=ranked[0]||{};
     const panel=qs("signalPanel");
@@ -212,6 +217,26 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       qs("invalidValue").textContent=first.invalidation||"—";
       qs("technicalFound").textContent=Array.isArray(first.technicalAnalysis)?first.technicalAnalysis.join(" · "):(first.reason||"—");
       qs("reasonValue").textContent=first.reason||first.rationale||"—";
+
+      const pending=first.pendingOrderZones;
+      const pendingMeta=qs("pendingOrderMeta");
+      const pendingGrid=qs("pendingOrderGrid");
+      if(pendingMeta) pendingMeta.textContent=pending
+        ? "Structural inference only · actual broker pending orders are not visible to the scanner."
+        : "Pending-order inference is waiting for price + ATR structure.";
+      if(pendingGrid){
+        const buyLimit=pending?.buyLimitZones?.[0];
+        const sellLimit=pending?.sellLimitZones?.[0];
+        const buyStop=pending?.buyStopTriggers?.[0];
+        const sellStop=pending?.sellStopTriggers?.[0];
+        const cards=[
+          ["BUY LIMIT", buyLimit ? (fmt(buyLimit.zone?.[0])+" — "+fmt(buyLimit.zone?.[1])) : "—", buyLimit ? ("Confidence "+buyLimit.confidence+"/100") : "No zone"],
+          ["SELL LIMIT", sellLimit ? (fmt(sellLimit.zone?.[0])+" — "+fmt(sellLimit.zone?.[1])) : "—", sellLimit ? ("Confidence "+sellLimit.confidence+"/100") : "No zone"],
+          ["BUY STOP", buyStop ? fmt(buyStop.trigger) : "—", buyStop ? ("Confidence "+buyStop.confidence+"/100") : "No trigger"],
+          ["SELL STOP", sellStop ? fmt(sellStop.trigger) : "—", sellStop ? ("Confidence "+sellStop.confidence+"/100") : "No trigger"]
+        ];
+        pendingGrid.innerHTML=cards.map(([label,value,meta])=>'<div class="pending-card"><span>'+label+'</span><strong>'+value+'</strong><small>'+meta+'</small></div>').join("");
+      }
     }
     const body=qs("rankingBody");
     if(!ranked.length){
