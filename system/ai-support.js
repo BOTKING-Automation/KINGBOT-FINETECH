@@ -403,7 +403,7 @@
       const models = await window.puter.ai.listModels();
       state.puterModels = Array.isArray(models) ? models : [];
       const ids = state.puterModels.map(item => String(item?.id || ""));
-      const preferred = ["gpt-5.6-luna", "gpt-5.5", "claude-sonnet-4-6", "gemini-3.1-flash-lite"];
+      const preferred = ["gemini-3.1-flash-lite", "gpt-5.5", "claude-sonnet-4-6", "gpt-5.6-luna"];
       state.puterModel = preferred.find(id => ids.includes(id)) || state.puterModel;
     } catch {}
     setTelemetry("aiCoreStatus", "PUTER ONLINE", "good");
@@ -423,11 +423,11 @@
       "AI is not the execution authority. Never instruct the browser to bypass server-side broker validation, deterministic risk controls, or the KINGBOT worker.",
       "If the user asks to execute a trade, explain that execution must pass the platform's server-side risk and broker controls.",
       "VERIFIED KINGBOT CONTEXT:",
-      JSON.stringify(context || { available: false }, null, 2)
+      JSON.stringify(context || { available: false })
     ].join("\n");
     return [
       { role: "system", content: system },
-      ...conversation.map(item => ({ role: item.role, content: item.content })),
+      ...conversation.slice(-4).map(item => ({ role: item.role, content: String(item.content || "").slice(0, 1800) })),
       { role: "user", content: clean }
     ];
   }
@@ -457,8 +457,8 @@
       model: state.puterModel,
       stream: true,
       temperature: 0.2,
-      max_tokens: 2400,
-      compaction: true
+      max_tokens: 900,
+      compaction: false
     });
     const body = createStreamingBubble();
     if (!body) throw new Error("AI_CHAT_CONTAINER_UNAVAILABLE");
@@ -524,16 +524,16 @@
     showTyping();
 
     try {
-      if (!state.context) {
-        try { await loadContext(); } catch {}
-      }
+      // Do not block the AI response on broker telemetry.
+      // The context panel refreshes independently; the AI can answer immediately.
+      if (!state.context) void loadContext();
 
       const conversation = state.messages
         .slice(0, -1)
-        .slice(-10)
+        .slice(-4)
         .map(item => ({
           role: item.role,
-          content: String(item.content || "").slice(0, 4000)
+          content: String(item.content || "").slice(0, 1800)
         }));
 
       const answer = await streamPuterAnswer(clean, conversation);
