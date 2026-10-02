@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KINGBOT — Technical Analysis AI Book</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="system/platform.css">
+<style>
+:root{--bg:#030611;--panel:#071126;--panel2:#040a18;--line:rgba(255,255,255,.09);--text:#eef5ff;--muted:#8391ad;--cyan:#19e6ff;--gold:#f6c34b;--violet:#9b5cff;--green:#27e6a4}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{background:radial-gradient(circle at 15% 0,rgba(25,230,255,.12),transparent 26%),radial-gradient(circle at 88% 4%,rgba(155,92,255,.11),transparent 28%),linear-gradient(145deg,#02040d,#05091a 55%,#02040b)}
+main{width:min(1460px,calc(100% - 30px));margin:auto;padding:34px 0 80px}
+.hero,.panel,.chapter,.rule{border:1px solid var(--line);background:linear-gradient(145deg,rgba(9,18,40,.94),rgba(3,7,18,.98));border-radius:22px;box-shadow:0 24px 80px rgba(0,0,0,.34)}
+.hero{padding:44px;position:relative;overflow:hidden}.hero:after{content:"";position:absolute;width:420px;height:420px;right:-180px;top:-240px;border-radius:50%;background:radial-gradient(circle,rgba(25,230,255,.18),transparent 70%);pointer-events:none}
+.eyebrow{color:var(--cyan);font:800 9px "JetBrains Mono";letter-spacing:.22em}.hero h1{margin:15px 0 12px;font:900 clamp(34px,5vw,70px) Orbitron;letter-spacing:-.04em;background:linear-gradient(100deg,var(--gold),#fff,var(--cyan),var(--violet));-webkit-background-clip:text;color:transparent}.lead{max-width:920px;color:#aebad2;font-size:14px;line-height:1.8}.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.chip{padding:7px 10px;border:1px solid rgba(25,230,255,.18);border-radius:999px;color:#bcd6ea;background:rgba(25,230,255,.04);font:700 7px "JetBrains Mono"}
+.layout{display:grid;grid-template-columns:280px 1fr;gap:14px;margin-top:14px}.toc{padding:18px;position:sticky;top:78px;height:max-content}.toc a{display:block;padding:10px;border-radius:10px;color:#8f9bb4;text-decoration:none;font:700 8px "JetBrains Mono";border:1px solid transparent}.toc a:hover{color:#fff;border-color:rgba(25,230,255,.15);background:rgba(25,230,255,.03)}
+.content{display:grid;gap:12px}.chapter{padding:24px}.chapter-num{color:var(--cyan);font:800 8px "JetBrains Mono";letter-spacing:.16em}.chapter h2{margin:7px 0 12px;font:800 18px Orbitron}.chapter ul{margin:0;padding-left:18px}.chapter li{margin:8px 0;color:#aeb9d0;font-size:11px;line-height:1.65}.principle{margin-top:15px;padding:13px;border-left:3px solid var(--gold);background:rgba(246,195,75,.045);color:#c8d2e4;font-size:10px;line-height:1.7}
+.rules{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.rule{padding:16px}.rule strong{display:block;color:var(--cyan);font:800 8px "JetBrains Mono"}.rule span{display:block;margin-top:7px;color:#aeb9d0;font-size:10px;line-height:1.5}
+.footer-note{margin-top:14px;padding:15px 17px;border-radius:13px;border:1px solid rgba(255,255,255,.07);color:#8995ad;font-size:10px;line-height:1.7}
+@media(max-width:900px){.layout{grid-template-columns:1fr}.toc{position:static}.rules{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){main{width:calc(100% - 20px);padding-top:22px}.hero{padding:26px 21px}.rules{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div data-kingbot-navigation></div>
+<main>
+<section class="hero">
+<div class="eyebrow">KINGBOT AI / KNOWLEDGE SYSTEM</div>
+<h1>TECHNICAL ANALYSIS AI BOOK.</h1>
+<p class="lead">The evidence-first methodology reference behind KINGBOT's technical intelligence. It teaches the system how to read structure, trend, momentum, volatility, liquidity and confirmation without inventing market facts.</p>
+<div class="meta"><span class="chip">12 CHAPTERS</span><span class="chip">EVIDENCE-FIRST</span><span class="chip">SCANNER CONNECTED</span><span class="chip">NO EXECUTION AUTHORITY</span></div>
+</section>
+
+<div class="layout">
+<aside class="hero toc">
+<div class="eyebrow">CONTENTS</div>
+<div id="toc" style="margin-top:10px"></div>
+</aside>
+<section class="content" id="content"></section>
+</div>
+
+<div class="rules">
+<div class="rule"><strong>STRUCTURE</strong><span>Structure before indicators.</span></div>
+<div class="rule"><strong>CONTEXT</strong><span>Context before patterns.</span></div>
+<div class="rule"><strong>VOLATILITY</strong><span>ATR before fixed distances.</span></div>
+<div class="rule"><strong>RISK</strong><span>Invalidation before execution.</span></div>
+</div>
+
+<div class="footer-note">Education is not financial advice. Technical analysis describes observable market behavior and can be wrong. Predicted pending-order zones are structural inference, not confirmation of hidden broker orders or guaranteed future price movement.</div>
+</main>
+
+<script src="system/navigation.js"></script>
+<script>
+const chapters=[
+["Market Structure","Read swing highs/lows first. Higher highs and higher lows support bullish structure; lower highs and lower lows support bearish structure. BOS is continuation evidence; CHOCH is a possible transition and requires confirmation.","Structure is the foundation of the KINGBOT technical layer."],
+["Trend and Multi-Timeframe Context","Use higher timeframes for context and lower timeframes for timing. EMA20/EMA50 alignment can support directional context, while timeframe disagreement should be treated as mixed evidence.","Do not force a direction when timeframes conflict."],
+["Support and Resistance","Treat support and resistance as areas. Give more weight to repeated reactions, structural levels and liquidity relevance. A break is stronger with momentum or a successful retest.","Levels are zones, not magical exact prices."],
+["Candles and Price Action","Read candle body, range, wick rejection and location. Displacement is decisive movement through meaningful structure and must be interpreted in context.","An isolated candle is not a complete setup."],
+["Momentum: RSI and MACD","RSI is momentum context, not a standalone trigger. RSI above 50 can support bullish momentum and below 50 bearish momentum. MACD relative to signal can confirm momentum but may lag structure.","Indicators confirm evidence; they do not replace structure."],
+["Volatility and ATR","ATR measures recent price-range volatility and helps scale buffers, stops and zones. High ATR changes expected movement size, not direction.","Use volatility-aware distances across instruments."],
+["Liquidity, Sweeps and FVG","Infer liquidity from visible highs/lows and obvious reaction points. A sweep can be identified when price exceeds a visible level and closes back through it. FVG is contextual imbalance evidence.","KINGBOT does not claim hidden institutional orders without an explicit data source."],
+["Order Blocks and Displacement","Use order-block concepts as structural reaction zones. Combine displacement, BOS/CHOCH and location. Define invalidation before any execution decision.","A zone is a hypothesis until price confirms it."],
+["Pending-Order Inference","BUY LIMIT zones are inferred below current price around support and bullish confluence. SELL LIMIT zones are inferred above current price around resistance and bearish confluence. BUY STOP and SELL STOP triggers sit beyond structural levels with volatility buffers.","Predicted zones are observable-structure inference, not broker-confirmed pending orders."],
+["Setup Confirmation","Separate observation from confirmation. Every setup should specify bias, trigger, entry condition, invalidation and risk context. WAIT and NO_TRADE are valid outputs when evidence is incomplete or conflicting.","Uncertainty should be represented, not hidden."],
+["Risk Architecture","Technical analysis does not remove risk. Position sizing, stops, exposure, drawdown and kill-switch rules belong to the risk layer. AI chat cannot bypass those controls.","Execution authorization remains outside the AI explanation layer."],
+["KINGBOT Scanner Method","Verify live quotes, build technical structure from OHLC, cross-check trend/momentum/volatility/structure/liquidity/FVG evidence, create a deterministic state, then let AI synthesize verified evidence.","Evidence first. Explanation second. Execution last."]
+];
+const toc=document.getElementById("toc"),content=document.getElementById("content");
+chapters.forEach((c,i)=>{
+ const id="chapter-"+(i+1);
+ toc.insertAdjacentHTML("beforeend",'<a href="#'+id+'">'+String(i+1).padStart(2,"0")+' · '+c[0].toUpperCase()+'</a>');
+ content.insertAdjacentHTML("beforeend",'<article class="chapter" id="'+id+'"><div class="chapter-num">CHAPTER '+String(i+1).padStart(2,"0")+'</div><h2>'+c[0]+'</h2><ul><li>'+c[1]+'</li></ul><div class="principle"><strong>BOOK PRINCIPLE:</strong> '+c[2]+'</div></article>');
+});
+</script>
+</body>
+</html>
