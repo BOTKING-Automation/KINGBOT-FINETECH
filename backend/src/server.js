@@ -223,7 +223,7 @@ app.use((_req, res) => {
   res.status(404).json({ ok: false, error: "Route not found." });
 });
 
-ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => ensureAiMarketScannerSchema(pool)).then(() => partners.ensureSchema(pool)).then(() => {
+ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => ensureAiMarketScannerSchema(pool)).then(() => partners.ensureSchema()).then(() => {
   app.listen(PORT, () => {
     console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
     void startWorker().then(() => {}).catch((error) => console.error("[KINGBOT WORKER]", error?.message || error));
