@@ -1,7 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getBotDefinitions } from "./bot-engines.js";
-import { runNativeKingbotAI, webSearchStatus } from "./kingbot-native-ai.js";
+import { runNativeKingbotAI } from "./kingbot-native-ai.js";
+import { webSearchStatus } from "./kingbot-web-search.js";
 
 const DEFAULT_SYMBOLS=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 const MODEL=String(process.env.GEMINI_AGENT_MODEL||process.env.GEMINI_MODEL||"gemini-2.5-flash-lite").trim();
