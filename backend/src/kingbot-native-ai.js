@@ -180,7 +180,7 @@ async function databaseSupport(pool,userId,question){
   }catch(error){ return {answer:"KINGBOT could not verify that support record right now.",facts:[],riskFlags:["VERIFICATION_UNAVAILABLE"],nextAction:"Retry after the backend data service recovers."}; }
   return null;
 }
-\nexport async function runNativeKingbotAI({question,symbol,twelveData,pool,broker,userId}={}){
+export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker,userId}={}){
   const requested=symbolFromText(question,symbol||"XAUUSD");
   const kind=intent(question);
   if(kind==="CONVERSATION") return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:conversationalReply(question),verified:{native:true}};
