@@ -1,12 +1,12 @@
 import "dotenv/config";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getDerivMarketFeed } from "./deriv-market-feed.js";
-import { DerivTraderClient } from "./deriv-trader-client.js";
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
 const publicDerivFeed = getDerivMarketFeed();
-const publicDerivClient = new DerivTraderClient({ executionMode:"DEMO" });
+const publicDerivTechnicalCache = new Map();
+const PUBLIC_TECHNICAL_CACHE_MS = Math.max(5000, Number(process.env.KINGBOT_SCANNER_TECHNICAL_CACHE_MS || 15000));
 
 function cleanSymbols(value) {
   const input = Array.isArray(value) ? value : String(value || "").split(",");
@@ -386,6 +386,21 @@ async function askGrok({ technical, quotes, timeframe }) {
   return { provider: "xai", model, analysis };
 }
 
+async function fetchCachedPublicDerivTechnical(symbol, timeframe) {
+  const key=String(symbol).toUpperCase()+":"+String(timeframe).toLowerCase();
+  const cached=publicDerivTechnicalCache.get(key);
+  const age=cached ? Date.now()-Number(cached.cachedAt||0) : Infinity;
+  if(cached?.technical && age<=PUBLIC_TECHNICAL_CACHE_MS) {
+    return {...cached.technical, technicalCacheAgeMs:Math.max(0,age)};
+  }
+  const bars=await publicDerivFeed.getHistoricalCandles(symbol,{timeframe,limit:120,timeoutMs:5000});
+  const technical=deriveTechnicalFromBars((Array.isArray(bars)?bars:[]).map(b=>({...b,datetime:b.time})));
+  if(!technical) throw new Error("INSUFFICIENT_HISTORICAL_CANDLES");
+  const snapshot={...technical,symbol,timeframe,source:"Deriv public live OHLC",barTime:technical.barTime||bars.at(-1)?.time||null,receivedAt:new Date().toISOString()};
+  publicDerivTechnicalCache.set(key,{technical:snapshot,cachedAt:Date.now()});
+  return {...snapshot,technicalCacheAgeMs:0};
+}
+
 async function fetchPublicDerivData(symbols, timeframe) {
   const rows = await Promise.all(symbols.map(async symbol => {
     let quote = null;
@@ -393,26 +408,12 @@ async function fetchPublicDerivData(symbols, timeframe) {
     let quoteError = null;
     let technicalError = null;
     try {
-      quote = await publicDerivFeed.getQuote(symbol,{maxAgeMs:3000,timeoutMs:7000});
+      quote = await publicDerivFeed.getQuote(symbol,{maxAgeMs:3000,timeoutMs:2000});
     } catch(error) {
       quoteError = String(error?.message||"DERIV_PUBLIC_QUOTE_UNAVAILABLE").slice(0,140);
     }
     try {
-      const bars = await publicDerivClient.getHistoricalCandles(symbol,timeframe,120);
-      technical = deriveTechnicalFromBars((Array.isArray(bars)?bars:[]).map(b => ({
-        ...b,
-        datetime:b.time
-      })));
-      if(technical) {
-        technical = {
-          ...technical,
-          symbol,
-          timeframe,
-          source:"Deriv public live OHLC",
-          barTime:technical.barTime || bars.at(-1)?.time || null,
-          receivedAt:new Date().toISOString()
-        };
-      }
+      technical = await fetchCachedPublicDerivTechnical(symbol,timeframe);
     } catch(error) {
       technicalError = String(error?.message||"DERIV_PUBLIC_OHLC_UNAVAILABLE").slice(0,140);
     }
@@ -420,7 +421,6 @@ async function fetchPublicDerivData(symbols, timeframe) {
   }));
   return rows;
 }
-
 async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
   const normalizedSymbols = cleanSymbols(symbols).length ? cleanSymbols(symbols) : DEFAULT_SYMBOLS;
   const normalizedTimeframe = cleanTimeframe(timeframe);
@@ -477,7 +477,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
           symbol,
           ...technicalEngine(snapshot),
           timeframe: normalizedTimeframe,
-          source: tdMap[symbol] ? "Twelve Data live OHLC" : "TradingView",
+          source: tdMap[symbol]?.source || (tv.find(x => x.symbol === symbol) ? "TradingView" : "live OHLC"),
           barTime: snapshot.barTime,
           dataFreshness: snapshot.receivedAt || snapshot.barTime,
           technicalCacheAgeMs: finite(snapshot.cacheAgeMs)
