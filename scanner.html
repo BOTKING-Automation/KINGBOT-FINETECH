@@ -110,6 +110,24 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       <div class="scan-summary"><strong style="color:var(--cyan);font:900 9px JetBrains Mono">MARKET INTELLIGENCE</strong>
         <div id="summaryText" class="summary-text">Sign in, connect a broker, then run the scanner.</div>
       </div>
+      <div id="signalPanel" class="signal-panel" style="display:none;margin-top:12px;padding:14px;border:1px solid rgba(25,230,255,.14);border-radius:13px;background:rgba(5,10,24,.72)">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <div class="detail"><span>SIGNAL</span><strong id="signalValue">—</strong></div>
+          <div class="detail"><span>ENTRY</span><strong id="entryValue">—</strong></div>
+          <div class="detail"><span>SCORE</span><strong id="scoreValue">—</strong></div>
+        </div>
+        <div class="detail-grid">
+          <div class="detail"><span>STOP LOSS</span><strong id="slValue">—</strong></div>
+          <div class="detail"><span>TP1 / TP2</span><strong id="tpValue">—</strong></div>
+          <div class="detail"><span>WAIT FOR</span><strong id="waitValue">—</strong></div>
+          <div class="detail"><span>INVALIDATION</span><strong id="invalidValue">—</strong></div>
+        </div>
+        <div style="margin-top:12px;color:var(--muted);font:800 7px 'JetBrains Mono'">TECHNICAL ANALYSIS FOUND</div>
+        <div id="technicalFound" style="margin-top:7px;color:#dce6fa;font-size:10px;line-height:1.7"></div>
+        <div style="margin-top:12px;color:var(--muted);font:800 7px 'JetBrains Mono'">REASON</div>
+        <div id="reasonValue" style="margin-top:7px;color:#dce6fa;font-size:10px;line-height:1.7"></div>
+      </div>
+      </div>
       <div class="detail-grid">
         <div class="detail"><span>SYMBOLS</span><strong id="scannedCount">—</strong></div>
         <div class="detail"><span>QUOTES</span><strong id="availableCount">—</strong></div>
@@ -186,24 +204,40 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
   function renderScan(data){
     qs("scannedCount").textContent=String((data.symbols||[]).length);
     qs("availableCount").textContent=String(data.quoteCount??(data.quotes||[]).filter(q=>q.available).length);
-    qs("analysisMeta").textContent=(data.provider||"—")+" · "+(data.model||"");
+    qs("analysisMeta").textContent=(data.provider||"KINGBOT ENGINE")+" · "+(data.model||"deterministic technical engine");
     qs("summaryText").textContent=data.analysis||"No analysis returned.";
     let regime="—", ranked=[];
     try{
       const parsed=typeof data.analysis==="string"?JSON.parse(data.analysis.match(/\{[\s\S]*\}/)?.[0]||"null"):null;
       if(parsed){regime=parsed.market_regime||"—"; ranked=parsed.ranked_symbols||[];}
     }catch{}
+    if(!ranked.length && Array.isArray(data.technical)) ranked=data.technical;
     qs("regime").textContent=String(regime).toUpperCase();
+    const first=ranked[0]||{};
+    const panel=qs("signalPanel");
+    if(first.symbol && panel){
+      panel.style.display="block";
+      qs("signalValue").textContent=String(first.signal||"WAIT").replaceAll("_"," ");
+      qs("entryValue").textContent=fmt(first.entry);
+      qs("scoreValue").textContent=first.score==null?"—":String(first.score)+"/100";
+      qs("slValue").textContent=fmt(first.sl);
+      qs("tpValue").textContent=fmt(first.tp1)+" / "+fmt(first.tp2);
+      qs("waitValue").textContent=first.waitFor||"—";
+      qs("invalidValue").textContent=first.invalidation||"—";
+      qs("technicalFound").textContent=Array.isArray(first.technicalAnalysis)?first.technicalAnalysis.join(" · "):(first.reason||"—");
+      qs("reasonValue").textContent=first.reason||first.rationale||"—";
+    }
     const body=qs("rankingBody");
     if(!ranked.length){
-      body.innerHTML='<tr><td colspan="5"><div class="empty">NO RANKED SYMBOLS IN AI OUTPUT</div></td></tr>';
+      body.innerHTML='<tr><td colspan="5"><div class="empty">NO VERIFIED TECHNICAL SNAPSHOTS YET</div></td></tr>';
       return;
     }
     const qmap=Object.fromEntries((data.quotes||[]).map(q=>[q.symbol,q]));
     body.innerHTML=ranked.map(r=>{
       const q=qmap[r.symbol]||{};
       const bias=String(r.bias||"NEUTRAL").toUpperCase();
-      return '<tr><td class="mono">'+r.symbol+'</td><td><span class="bias '+bias+'">'+bias+'</span></td><td class="mono">'+fmt(q.price)+'</td><td class="mono">'+fmt(q.spread)+'</td><td>'+String(r.rationale||"—").replace(/[<>]/g,"")+'</td></tr>';
+      const rationale=String(r.reason||r.rationale||"—").replace(/[<>]/g,"");
+      return '<tr><td class="mono">'+r.symbol+'</td><td><span class="bias '+bias+'">'+bias+'</span></td><td class="mono">'+fmt(q.price??r.entry)+'</td><td class="mono">'+fmt(q.spread)+'</td><td>'+rationale+'</td></tr>';
     }).join("");
   }
 
@@ -244,7 +278,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       qs("brokerState").textContent="CONNECTED"; qs("brokerState").className="good";
       qs("aiState").textContent=data.provider==="xai"?"GROK ONLINE":(data.provider==="none"?"QUOTES ONLY":"AI ONLINE");
       qs("aiState").className=data.provider==="none"?"warn":"good";
-      qs("coreSub").textContent=(data.model||"Scanner")+" · quotes live";
+      qs("coreSub").textContent=(data.source||"TradingView linked")+" · "+(data.tradingViewCount||0)+" snapshots · quotes live";
       qs("scanState").textContent="QUOTES READY";
       toast("Broker quotes synchronized.","good");
       return data;
