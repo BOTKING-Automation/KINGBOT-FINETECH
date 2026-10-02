@@ -44,7 +44,7 @@ body{margin:0;min-height:100vh;background:
 .status-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.status-card{padding:13px;border:1px solid rgba(255,255,255,.06);border-radius:13px;background:rgba(255,255,255,.018)}.status-card .k{color:#60708d;font:800 6px "JetBrains Mono";letter-spacing:.12em}.status-card .v{margin-top:7px;color:#eef3ff;font:900 14px "JetBrains Mono"}.status-card .s{margin-top:4px;color:#687894;font-size:7px}
 .plan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.plan{padding:15px;border:1px solid rgba(255,255,255,.07);border-radius:15px;background:linear-gradient(145deg,rgba(10,17,36,.9),rgba(3,8,18,.98))}.plan .plan-name{font:900 12px Orbitron;color:#f6b93b}.plan .price{margin-top:9px;font:900 23px "JetBrains Mono";color:#eef3ff}.plan .price small{font-size:7px;color:#667590}.plan .meta{margin-top:7px;color:#71809b;font-size:7px;line-height:1.55}.plan .feature{margin-top:4px;color:#9ba8bd;font-size:7px}.plan .feature:before{content:"✓ ";color:#23f7a3}
 .switch{display:flex;align-items:center;gap:8px;color:#8b98ad;font:800 7px "JetBrains Mono"}.switch input{appearance:none;width:36px;height:19px;border-radius:999px;background:#111c32;border:1px solid rgba(255,255,255,.1);position:relative;cursor:pointer}.switch input:before{content:"";position:absolute;width:13px;height:13px;left:2px;top:2px;border-radius:50%;background:#667590;transition:.18s}.switch input:checked{background:rgba(255,77,109,.16);border-color:rgba(255,77,109,.3)}.switch input:checked:before{transform:translateX(17px);background:#ff4d6d;box-shadow:0 0 12px rgba(255,77,109,.5)}
-.activity{max-height:650px;overflow:auto;display:grid;gap:7px}.code{padding:10px;margin-top:7px;border:1px solid rgba(25,230,255,.09);border-radius:9px;background:#020711;color:#9aeefe;font:800 8px "JetBrains Mono"}.event{padding:10px;border-left:2px solid rgba(25,230,255,.28);background:rgba(255,255,255,.018);border-radius:8px}.event-top{display:flex;justify-content:space-between;gap:10px;color:#aeb8cb;font:800 7px "JetBrains Mono"}.event-name{color:var(--a)}.event-meta{margin-top:4px;color:#667590;font-size:7px;line-height:1.5;word-break:break-word}
+.activity{max-height:650px;overflow:auto;display:grid;gap:7px}.code{padding:10px;margin-top:7px;border:1px solid rgba(25,230,255,.09);border-radius:9px;background:#020711;color:#9aeefe;font:800 8px "JetBrains Mono"}.code{padding:10px;margin-top:7px;border:1px solid rgba(25,230,255,.09);border-radius:9px;background:#020711;color:#9aeefe;font:800 8px "JetBrains Mono"}.event{padding:10px;border-left:2px solid rgba(25,230,255,.28);background:rgba(255,255,255,.018);border-radius:8px}.event-top{display:flex;justify-content:space-between;gap:10px;color:#aeb8cb;font:800 7px "JetBrains Mono"}.event-name{color:var(--a)}.event-meta{margin-top:4px;color:#667590;font-size:7px;line-height:1.5;word-break:break-word}
 .empty{padding:25px;text-align:center;color:#64728d;font-size:8px;border:1px dashed rgba(255,255,255,.08);border-radius:12px}.muted{color:#697794!important}.hero-note{padding:13px 15px;border:1px solid rgba(25,230,255,.11);border-left:2px solid var(--a);border-radius:12px;background:rgba(25,230,255,.025);color:#8090ad;font-size:8px;line-height:1.65}.danger-note{border-left-color:var(--bad);border-color:rgba(255,77,109,.13);background:rgba(255,77,109,.025)}
 .toast{position:fixed;right:20px;bottom:20px;z-index:2147483001;max-width:430px;padding:13px 15px;border-radius:12px;border:1px solid rgba(25,230,255,.22);background:rgba(3,8,18,.96);color:#edf3ff;font:800 9px "JetBrains Mono";box-shadow:0 15px 45px rgba(0,0,0,.4);display:none}.toast.show{display:block}.toast.ok{border-color:rgba(35,247,163,.22)}.toast.err{border-color:rgba(255,77,109,.22)}
 @media(max-width:1300px){.metrics{grid-template-columns:repeat(4,1fr)}.cards{grid-template-columns:repeat(3,1fr)}.grid-2{grid-template-columns:1fr}}
@@ -92,6 +92,7 @@ body{margin:0;min-height:100vh;background:
     <button class="tab" data-tab="risk">07 · RISK</button>
     <button class="tab" data-tab="ai">08 · AI & SECURITY</button>
     <button class="tab" data-tab="audit">09 · AUDIT</button>
+    <button class="tab" data-tab="developer">10 · DEVELOPER API</button>
     <button class="tab" data-tab="developer">10 · DEVELOPER API</button>
   </nav>
 
@@ -173,6 +174,22 @@ body{margin:0;min-height:100vh;background:
       <section class="panel accent"><div class="panel-head"><div><h3>AI ACCESS POLICY</h3><span>DECISION SUPPORT</span></div></div><div class="hero-note">KINGBOT Intelligence is available to the verified administrator without a subscription. Customer AI access remains plan-gated; account-specific answers use server-generated broker/runtime/risk context and should not invent account values.</div></section>
       <section class="panel"><div class="panel-head"><div><h3>AUTHENTICATION</h3><span>IDENTITY LAYER</span></div></div><div class="hero-note">Firebase Authentication verifies identity and email status. Admin authorization is then checked by the KINGBOT backend against configured administrator email access.</div></section>
       <section class="panel warn"><div class="panel-head"><div><h3>SECRETS</h3><span>PROTECTED</span></div></div><div class="hero-note">Gemini, Firebase Admin, broker tokens and encryption keys are backend environment secrets and are intentionally never rendered in this console.</div></section>
+    </div>
+  </section>
+
+  <section class="tab-panel" data-tab-panel="developer">
+    <div class="section-head"><div><h2>DEVELOPER API CONTROL</h2><p>Administrator-only developer integration documentation and credential controls.</p></div><span class="section-tag">ADMIN ONLY · READ ACCESS API</span></div>
+    <div class="grid-2">
+      <section class="panel accent"><div class="panel-head"><div><h3>API BOUNDARY</h3><span>VERSIONED INTEGRATION</span></div></div>
+        <div class="hero-note">Base endpoint: <b>/api/developer/v1</b><br>Authentication: <b>X-API-Key: kb_live_…</b><br>Scopes: <b>profile:read</b>, <b>account:read</b>, <b>bots:read</b>, <b>trades:read</b>.</div>
+        <div class="panel" style="margin-top:12px"><div class="panel-head"><div><h3>ENDPOINTS</h3><span>READ ONLY</span></div></div>
+          <div class="code">GET /profile</div><div class="code">GET /account</div><div class="code">GET /bots</div><div class="code">GET /trades</div>
+        </div>
+      </section>
+      <aside class="panel warn"><div class="panel-head"><div><h3>SECURITY BOUNDARY</h3><span>NO TRADE WRITE ACCESS</span></div></div>
+        <div class="hero-note">Developer credentials are hashed server-side. API access cannot place trades, modify risk, disconnect brokers, or move customer funds. Credential creation and revocation remain administrator-controlled.</div>
+        <div class="action-row" style="margin-top:12px"><button class="btn cyan" onclick="document.querySelector('[data-tab=ai]').click()">OPEN AI & SECURITY</button></div>
+      </aside>
     </div>
   </section>
 
