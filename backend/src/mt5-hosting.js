@@ -46,10 +46,18 @@ export function createMt5HostingRouter({pool,requireUser}={}){
       [user.id]
     );
     if(q.rowCount)return res.status(409).json({ok:false,error:"MT5_HOST_ALREADY_PROVISIONING"});
+    const nodeQ=await pool.query(
+      "SELECT n.node_id FROM kingbot_mt5_host_nodes n
+       LEFT JOIN kingbot_mt5_host_deployments d ON d.node_id=n.node_id AND d.status IN ('PROVISIONING','RUNNING','PAUSED')
+       WHERE n.revoked=FALSE AND n.status='ONLINE' AND n.expires_at>NOW()
+       GROUP BY n.node_id ORDER BY COUNT(d.id) ASC, MIN(n.updated_at) ASC LIMIT 1"
+    );
+    if(!nodeQ.rowCount)return res.status(503).json({ok:false,error:"NO_MT5_HOST_NODE_AVAILABLE"});
+    const nodeId=nodeQ.rows[0].node_id;
     const deploymentId=crypto.randomUUID();
     await pool.query(
-      "INSERT INTO kingbot_mt5_host_deployments(id,user_id,status,bot_id,execution_mode,created_at,updated_at) VALUES($1,$2,'PROVISIONING',$3,$4,NOW(),NOW())",
-      [deploymentId,user.id,botId,executionMode]
+      "INSERT INTO kingbot_mt5_host_deployments(id,user_id,node_id,status,bot_id,execution_mode,created_at,updated_at) VALUES($1,$2,$3,'PROVISIONING',$4,$5,NOW(),NOW())",
+      [deploymentId,user.id,nodeId,botId,executionMode]
     );
     res.status(202).json({
       ok:true,deploymentId,status:"PROVISIONING",botId,executionMode,
