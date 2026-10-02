@@ -18,9 +18,36 @@ main{width:min(1320px,calc(100% - 28px));margin:auto;padding:78px 0 60px}
 .card{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,rgba(7,15,28,.96),rgba(3,8,16,.985));box-shadow:0 24px 80px rgba(0,0,0,.34)}
 .hero-copy{padding:24px}.eyebrow{color:var(--cyan);font:900 8px "JetBrains Mono";letter-spacing:.16em}.hero h1{margin:11px 0 7px;font:900 clamp(28px,4vw,48px) Orbitron;letter-spacing:-.035em;line-height:1}.hero h1 span{color:var(--cyan)}.hero p{max-width:760px;color:#7b8aa3;font-size:10px;line-height:1.72;margin:0}.pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:15px}.pill{padding:6px 8px;border:1px solid rgba(255,255,255,.06);border-radius:7px;color:#6e7c96;background:rgba(255,255,255,.016);font:800 6px "JetBrains Mono"}.side{padding:18px}.side-title{color:#586780;font:800 7px "JetBrains Mono";letter-spacing:.11em}.state{margin-top:13px;padding:13px;border-radius:12px;border:1px solid rgba(35,247,163,.14);background:rgba(35,247,163,.025)}.state strong{font:900 12px Orbitron;color:var(--green)}.state span{display:block;margin-top:6px;color:#75849d;font:600 7px "JetBrains Mono";line-height:1.55}.section{margin-top:13px}.section-head{display:flex;align-items:end;justify-content:space-between;gap:10px;margin:0 2px 8px}.section-title{font:900 12px Orbitron;letter-spacing:.08em}.section-sub{margin-top:4px;color:#62718a;font-size:8px}.section-code{color:#4e5d73;font:800 6px "JetBrains Mono";letter-spacing:.12em}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.panel{padding:16px}.panel h2{margin:0;font:900 10px Orbitron;letter-spacing:.08em}.panel-copy{margin-top:5px;color:#65748c;font:600 7px "JetBrains Mono";line-height:1.5}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:13px}.field.full{grid-column:1/-1}.field label{display:block;margin-bottom:5px;color:#77869f;font:800 6px "JetBrains Mono";letter-spacing:.06em}.field input,.field select{width:100%;height:39px;border:1px solid rgba(255,255,255,.08);border-radius:9px;background:#030811;color:#edf4ff;padding:0 10px;outline:none;font:700 7.5px "JetBrains Mono"}.field input:focus,.field select:focus{border-color:rgba(25,230,255,.34);box-shadow:0 0 0 2px rgba(25,230,255,.05)}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.btn{border:0;border-radius:8px;padding:10px 12px;background:linear-gradient(90deg,var(--gold),#ffe39a,var(--cyan));color:#03070d;font:900 7px "JetBrains Mono";cursor:pointer}.btn.alt{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);color:#8d9ab0}.btn:disabled{opacity:.45;cursor:not-allowed}.status{margin-top:9px;min-height:19px;color:#70809a;font:700 6.5px "JetBrains Mono";line-height:1.55}.security{margin-top:12px;padding:10px;border:1px solid rgba(35,247,163,.1);border-radius:9px;background:rgba(35,247,163,.018);color:#73839b;font:600 6px "JetBrains Mono";line-height:1.6}.security strong{color:#9ce7c4}.deployment-list{display:grid;gap:8px;margin-top:13px}.deploy{padding:11px;border:1px solid rgba(255,255,255,.06);border-radius:10px;background:rgba(255,255,255,.018)}.deploy-top{display:flex;justify-content:space-between;gap:8px}.deploy-id{color:#b7c5d9;font:800 7px "JetBrains Mono";overflow:hidden;text-overflow:ellipsis}.deploy-state{font:900 6px "JetBrains Mono";color:var(--green)}.deploy-state.wait{color:var(--gold)}.deploy-state.err{color:var(--red)}.deploy-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:9px}.mini span{display:block;color:#536179;font:700 5.5px "JetBrains Mono"}.mini strong{display:block;margin-top:4px;color:#c8d4e6;font:800 6.5px "JetBrains Mono";overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.command{display:none;margin-top:12px}.command.show{display:block}.command textarea{width:100%;min-height:92px;resize:vertical;border:1px solid rgba(25,230,255,.11);border-radius:9px;background:#02070d;color:#a9eddb;padding:10px;font:700 6.5px "JetBrains Mono";outline:none}@media(max-width:900px){.hero{grid-template-columns:1fr}.grid{grid-template-columns:1fr}}@media(max-width:650px){main{width:calc(100% - 14px);padding-top:68px}.fields{grid-template-columns:1fr}.field.full{grid-column:auto}.deploy-grid{grid-template-columns:1fr 1fr}}
+.hud-bg{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:-1}
+.hud-bg:before{content:"";position:absolute;inset:-20%;background:conic-gradient(from 90deg,rgba(25,230,255,.025),rgba(155,92,255,.07),rgba(255,79,216,.035),rgba(246,185,59,.025),rgba(25,230,255,.025));filter:blur(34px);animation:hudRotate 18s linear infinite}
+.hud-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(25,230,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(155,92,255,.035) 1px,transparent 1px);background-size:52px 52px;mask-image:radial-gradient(circle at 50% 15%,#000,transparent 74%);opacity:.35}
+.hud-particle{position:absolute;width:3px;height:3px;border-radius:50%;background:var(--c);box-shadow:0 0 14px var(--c);animation:particleFloat var(--d) linear infinite;opacity:.8}
+@keyframes hudRotate{to{transform:rotate(360deg)}}@keyframes particleFloat{0%{transform:translate3d(0,16px,0);opacity:0}15%{opacity:.8}85%{opacity:.55}100%{transform:translate3d(var(--x),-110px,0);opacity:0}}
+.card{transition:transform .28s ease,border-color .28s ease,box-shadow .28s ease}.card:hover{border-color:rgba(25,230,255,.15);box-shadow:0 28px 90px rgba(0,0,0,.42),0 0 35px rgba(25,230,255,.045)}
+.hero-copy{min-height:258px}.hero-copy:before{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 20%,rgba(25,230,255,.055) 45%,transparent 68%);transform:translateX(-110%);animation:sweep 6s ease-in-out infinite;pointer-events:none}
+@keyframes sweep{0%,55%{transform:translateX(-110%)}75%,100%{transform:translateX(110%)}}
+.eyebrow{animation:eyebrowPulse 2.8s ease-in-out infinite}.eyebrow:after{content:"";display:inline-block;width:44px;height:1px;margin-left:4px;vertical-align:middle;background:linear-gradient(90deg,var(--cyan),transparent);animation:linePulse 2.1s ease-in-out infinite}
+@keyframes eyebrowPulse{50%{text-shadow:0 0 16px rgba(25,230,255,.48)}}@keyframes linePulse{50%{width:80px;opacity:.45}}
+.hero h1 span{display:inline-block;animation:titleGlow 3.6s ease-in-out infinite}@keyframes titleGlow{50%{text-shadow:0 0 22px rgba(25,230,255,.42),0 0 44px rgba(155,92,255,.15)}}
+.side{position:relative}.side:before{content:"";position:absolute;width:190px;height:190px;right:-75px;top:-75px;border:1px solid rgba(25,230,255,.18);border-radius:50%;box-shadow:0 0 40px rgba(25,230,255,.06),inset 0 0 35px rgba(155,92,255,.05);animation:orbitRing 7s linear infinite}.side:after{content:"";position:absolute;width:95px;height:95px;right:-27px;top:-27px;border:1px dashed rgba(255,79,216,.18);border-radius:50%;animation:orbitRingReverse 4.5s linear infinite}
+@keyframes orbitRing{to{transform:rotate(360deg)}}@keyframes orbitRingReverse{to{transform:rotate(-360deg)}}
+.state{position:relative;overflow:hidden}.state:after{content:"";position:absolute;left:-40%;right:-40%;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--green),var(--cyan),transparent);box-shadow:0 0 14px rgba(35,247,163,.5);animation:stateScan 3.5s linear infinite}@keyframes stateScan{to{transform:translateY(85px)}}
+.control-rail{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.06);border-radius:15px;overflow:hidden;margin-top:13px}
+.rail-node{position:relative;padding:13px 12px;background:linear-gradient(145deg,rgba(8,16,30,.92),rgba(4,9,17,.98));overflow:hidden}.rail-node:before{content:"";position:absolute;left:12px;right:12px;bottom:0;height:1px;background:linear-gradient(90deg,transparent,var(--rail),transparent);box-shadow:0 0 13px color-mix(in srgb,var(--rail) 75%,transparent);animation:railPulse 2.4s ease-in-out infinite}.rail-node:nth-child(2){--rail:var(--cyan);animation-delay:.4s}.rail-node:nth-child(3){--rail:var(--violet);animation-delay:.8s}.rail-node:nth-child(4){--rail:var(--green);animation-delay:1.2s}.rail-node:first-child{--rail:var(--gold)}
+.rail-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.rail-label{color:#5d6b82;font:800 6px "JetBrains Mono";letter-spacing:.08em}.rail-led{width:6px;height:6px;border-radius:50%;background:var(--rail);box-shadow:0 0 12px var(--rail);animation:ledBlink 1.6s ease-in-out infinite}.rail-value{margin-top:7px;color:#dbe6f5;font:900 8px "JetBrains Mono"}.rail-sub{margin-top:4px;color:#536177;font:600 5.5px "JetBrains Mono"}
+@keyframes railPulse{50%{opacity:.25;transform:scaleX(.7)}}@keyframes ledBlink{50%{opacity:.35;transform:scale(.75)}}
+.section-title{position:relative}.section-title:before{content:"";display:inline-block;width:22px;height:2px;vertical-align:middle;margin-right:7px;background:linear-gradient(90deg,var(--gold),var(--cyan));box-shadow:0 0 12px rgba(25,230,255,.3);animation:titleLine 2s ease-in-out infinite}@keyframes titleLine{50%{width:38px}}
+.panel{position:relative}.panel:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 20%,rgba(155,92,255,.028) 48%,transparent 66%);transform:translateX(-100%);animation:panelSweep 8s linear infinite}@keyframes panelSweep{0%,65%{transform:translateX(-100%)}85%,100%{transform:translateX(100%)}}
+.field input,.field select{transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease}.field input:focus,.field select:focus{transform:translateY(-1px)}
+.btn{position:relative;overflow:hidden}.btn:after{content:"";position:absolute;top:0;bottom:0;width:45%;left:-55%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.38),transparent);transform:skewX(-18deg);animation:btnSweep 4.5s ease-in-out infinite;pointer-events:none}@keyframes btnSweep{0%,60%{left:-55%}78%,100%{left:125%}}
+.deploy{transition:transform .2s ease,border-color .2s ease,background .2s ease}.deploy:hover{transform:translateX(3px);border-color:rgba(25,230,255,.14);background:rgba(25,230,255,.022)}
+.profile-scan{margin-top:12px;height:4px;border-radius:999px;background:rgba(255,255,255,.04);overflow:hidden}.profile-scan i{display:block;height:100%;width:42%;background:linear-gradient(90deg,var(--gold),var(--cyan),var(--violet));box-shadow:0 0 15px rgba(25,230,255,.4);animation:profileScan 2.8s ease-in-out infinite}@keyframes profileScan{0%{transform:translateX(-120%);width:30%}50%{width:58%}100%{transform:translateX(220%);width:30%}}
+@media(max-width:650px){.control-rail{grid-template-columns:1fr 1fr}.rail-node{min-height:72px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}}
 </style>
 </head>
 <body>
+<div class="hud-bg" aria-hidden="true"><div class="hud-grid"></div><div id="hudParticles"></div></div>
 <div data-kingbot-navigation></div>
 <main>
   <section class="hero">
@@ -36,6 +63,13 @@ main{width:min(1320px,calc(100% - 28px));margin:auto;padding:78px 0 60px}
       <div class="security"><strong>NOTE:</strong> The VPS agent runs inside your Windows VPS. KINGBOT does not need ongoing RDP/SSH access after the agent is enrolled.</div>
     </aside>
   </section>
+
+  <div class="control-rail" aria-label="VPS execution pipeline">
+    <div class="rail-node"><div class="rail-top"><span class="rail-label">01 · VPS HOST</span><i class="rail-led"></i></div><div class="rail-value">SECURE NODE</div><div class="rail-sub">USER-OWNED WINDOWS</div></div>
+    <div class="rail-node"><div class="rail-top"><span class="rail-label">02 · MT5</span><i class="rail-led"></i></div><div class="rail-value">ACCOUNT BOUND</div><div class="rail-sub">SERVER + LOGIN VERIFIED</div></div>
+    <div class="rail-node"><div class="rail-top"><span class="rail-label">03 · KINGBOT EA</span><i class="rail-led"></i></div><div class="rail-value">BRIDGE READY</div><div class="rail-sub">HEARTBEAT MONITORED</div></div>
+    <div class="rail-node"><div class="rail-top"><span class="rail-label">04 · EXECUTION</span><i class="rail-led"></i></div><div class="rail-value">CONTROLLED ROUTE</div><div class="rail-sub">DEMO / LIVE GATED</div></div>
+  </div>
 
   <section class="section">
     <div class="section-head"><div><div class="section-title">VPS CONFIGURATION</div><div class="section-sub">Enter the server and exact MT5 account details.</div></div><div class="section-code">PROFILE / SECURE STORAGE</div></div>
@@ -54,7 +88,7 @@ main{width:min(1320px,calc(100% - 28px));margin:auto;padding:78px 0 60px}
       </div>
       <div class="security"><strong>SECURITY:</strong> Sensitive VPS and MT5 credentials are encrypted by the KINGBOT backend. Password fields are cleared from the page after a successful save and are never stored in browser localStorage.</div>
       <div class="actions"><button class="btn" id="saveProfile">SAVE VPS + MT5 CONFIG</button><button class="btn alt" id="reloadProfile">RELOAD SAVED PROFILE</button></div>
-      <div class="status" id="profileStatus">No VPS profile loaded.</div>
+      <div class="status" id="profileStatus">No VPS profile loaded.</div><div class="profile-scan" aria-hidden="true"><i></i></div>
     </div>
   </section>
 
@@ -212,7 +246,31 @@ $("deploy").addEventListener("click",async()=>{
   finally{btn.disabled=false;btn.textContent="DEPLOY TO MY VPS";}
 });
 $("refresh").addEventListener("click",load);
+function initHudParticles(){
+  const root=$("hudParticles");if(!root)return;
+  const colors=["#19e6ff","#9b5cff","#ff4fd8","#f6b93b","#23f7a3"];
+  const count=28;
+  for(let i=0;i<count;i++){
+    const p=document.createElement("span");
+    p.className="hud-particle";
+    p.style.left=(Math.random()*100)+"%";
+    p.style.top=(70+Math.random()*35)+"%";
+    p.style.setProperty("--x",(Math.random()*160-80)+"px");
+    p.style.setProperty("--d",(7+Math.random()*10)+"s");
+    p.style.setProperty("--c",colors[i%colors.length]);
+    p.style.animationDelay=(-Math.random()*12)+"s";
+    root.appendChild(p);
+  }
+}
+document.querySelectorAll(".card").forEach(card=>{
+  card.addEventListener("pointermove",e=>{
+    const r=card.getBoundingClientRect(),x=((e.clientX-r.left)/r.width)*100,y=((e.clientY-r.top)/r.height)*100;
+    card.style.backgroundImage="radial-gradient(circle at "+x+"% "+y+"%,rgba(25,230,255,.055),transparent 34%),linear-gradient(145deg,rgba(7,15,28,.96),rgba(3,8,16,.985))";
+  });
+  card.addEventListener("pointerleave",()=>{card.style.backgroundImage="";});
+});
 applyMode();
+initHudParticles();
 load();
 setInterval(load,15000);
 })();
