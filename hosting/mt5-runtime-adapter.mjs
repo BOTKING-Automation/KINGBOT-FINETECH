@@ -22,6 +22,8 @@ const BOT_EA_SOURCES={
   "smc-pro":"KINGBOT_SMC_PRO.mq5",
   "ladder-flip":"KINGBOT_LADDER_FLIP_V8.mq5"
 };
+const BRIDGE_EA_FILE="KINGBOT_MT5_BRIDGE.ex5";
+const BRIDGE_EA_SOURCE="KINGBOT_MT5_BRIDGE.mq5";
 
 function clean(value,max=240){return String(value??"").trim().slice(0,max);}
 async function exists(file){try{await fs.access(file);return true;}catch{return false;}}
@@ -37,6 +39,59 @@ async function run(command,args=[],timeoutMs=30000){
   });
 }
 
+function safeLine(value,max=1000){
+  return String(value??"").replace(/[\r\n]/g,"").slice(0,max);
+}
+function utf16(text){return "\uFEFF"+String(text||"");}
+function buildMt5Config(config,terminalRoot,expertSet){
+  const mt5=config?.mt5||{};
+  const executionMode=String(config?.executionMode||"DEMO").toUpperCase();
+  const bridgeUrl=safeLine(mt5.bridgeUrl||"");
+  const ackUrl=safeLine(mt5.ackUrl||"");
+  const urls=[bridgeUrl.replace(/\/api\/mt5\/bridge\/poll$/,"")].filter(Boolean).join(",");
+  const common=[
+    "[Common]",
+    "Login="+safeLine(mt5.login,64),
+    "Server="+safeLine(mt5.server,160),
+    "Password="+safeLine(mt5.password,512),
+    "KeepPrivate=1",
+    "NewsEnable=1",
+    "",
+    "[Experts]",
+    "AllowLiveTrading=1",
+    "AllowDllImport=0",
+    "Enabled=1",
+    "Account=1",
+    "Profile=0",
+    "WebRequest=1",
+    "WebRequestUrl="+safeLine(urls,2000),
+    "",
+    "[StartUp]",
+    "Expert=KINGBOT\\"+"KINGBOT_MT5_BRIDGE",
+    "ExpertParameters=KINGBOT_MT5_BRIDGE.set",
+    "Symbol="+safeLine(mt5.symbol||"XAUUSD",40),
+    "Period="+safeLine(mt5.timeframe||"M1",20),
+    ""
+  ].join("\r\n");
+  const set=[
+    "BridgeURL="+bridgeUrl,
+    "AckURL="+ackUrl,
+    "BridgeToken="+safeLine(mt5.bridgeToken,512),
+    "WatchSymbolsCSV=XAUUSD,EURUSD,GBPUSD,BTCUSD",
+    "PollMilliseconds=500",
+    "HistoryRefreshMilliseconds=10000",
+    "HTTPTimeoutMilliseconds=4500",
+    "MagicNumber=870055",
+    "AllowRemoteTrading=true",
+    "AllowLiveExecution="+(executionMode==="LIVE"?"true":"false"),
+    "HistoryDealLimit=40",
+    "HistoryOrderLimit=40",
+    ""
+  ].join("\r\n");
+  return {common:utf16(common),set};
+}
+
+
 export class Mt5RuntimeAdapter{
   constructor({terminalExe=TERMINAL_EXE,metaeditorExe=METAEDITOR_EXE,runtimeRoot=RUNTIME_ROOT,sourceRoot=SOURCE_ROOT}={}){
     this.terminalExe=terminalExe;
@@ -46,18 +101,22 @@ export class Mt5RuntimeAdapter{
     this.processes=new Map();
   }
 
-  async preflight(){
+  async preflight(options={}){
+    const terminalExe=clean(options.terminalExe||this.terminalExe,400);
+    const metaeditorExe=clean(options.metaeditorExe||this.metaeditorExe,400);
     if(process.platform!=="win32")return {ok:false,error:"MT5_HOST_REQUIRES_WINDOWS_RUNTIME"};
-    if(!(await exists(this.terminalExe)))return {ok:false,error:"MT5_TERMINAL_NOT_FOUND",terminalExe:this.terminalExe};
-    return {ok:true,terminalExe:this.terminalExe,metaeditorAvailable:await exists(this.metaeditorExe),runtimeRoot:this.runtimeRoot};
+    if(!(await exists(terminalExe)))return {ok:false,error:"MT5_TERMINAL_NOT_FOUND",terminalExe};
+    return {ok:true,terminalExe,metaeditorAvailable:await exists(metaeditorExe),metaeditorExe,runtimeRoot:this.runtimeRoot};
   }
 
-  async prepareDeployment(deployment){
+  async prepareDeployment(deployment,runtimeConfig=null){
     const id=clean(deployment?.id,100);
-    const botId=clean(deployment?.bot_id||"strategic",60).toLowerCase();
+    const botId=clean(deployment?.bot_id||runtimeConfig?.botId||"strategic",60).toLowerCase();
     if(!id)throw new Error("DEPLOYMENT_ID_REQUIRED");
     if(!BOT_EA_FILES[botId])throw new Error("UNSUPPORTED_BOT_ID");
-    const check=await this.preflight();
+    const configuredTerminal=clean(runtimeConfig?.mt5?.terminalPath||this.terminalExe,400);
+    const configuredMetaEditor=clean(runtimeConfig?.mt5?.metaeditorPath||this.metaeditorExe,400);
+    const check=await this.preflight({terminalExe:configuredTerminal,metaeditorExe:configuredMetaEditor});
     if(!check.ok)throw new Error(check.error);
 
     const terminalRoot=path.join(this.runtimeRoot,id);
@@ -69,7 +128,7 @@ export class Mt5RuntimeAdapter{
       botId,
       executionMode:String(deployment.execution_mode||"DEMO").toUpperCase(),
       terminalRoot,
-      terminalExe:this.terminalExe,
+      terminalExe:configuredTerminal,
       eaFile:BOT_EA_FILES[botId],
       preparedAt:new Date().toISOString(),
       host:os.hostname()
@@ -81,12 +140,36 @@ export class Mt5RuntimeAdapter{
 
     if(await exists(compiled)){
       await fs.copyFile(compiled,path.join(expertsRoot,BOT_EA_FILES[botId]));
-    }else if(await exists(source)&&await exists(this.metaeditorExe)){
-      const compile=await run(this.metaeditorExe,["/compile:"+source,"/log"],120000);
+    }else if(await exists(source)&&await exists(configuredMetaEditor)){
+      const compile=await run(configuredMetaEditor,["/compile:"+source,"/log"],120000);
       if(compile.code!==0||!(await exists(compiled)))throw new Error("EA_COMPILE_FAILED");
       await fs.copyFile(compiled,path.join(expertsRoot,BOT_EA_FILES[botId]));
     }else{
       throw new Error("EA_ARTIFACT_NOT_AVAILABLE");
+    }
+
+    if(runtimeConfig?.mt5?.bridgeToken){
+      const bridgeSource=path.join(this.sourceRoot,BRIDGE_EA_SOURCE);
+      const bridgeCompiled=path.join(this.sourceRoot,BRIDGE_EA_FILE);
+      const bridgeTarget=path.join(expertsRoot,BRIDGE_EA_FILE);
+      if(await exists(bridgeCompiled)){
+        await fs.copyFile(bridgeCompiled,bridgeTarget);
+      }else if(await exists(bridgeSource)&&await exists(configuredMetaEditor)){
+        const compile=await run(configuredMetaEditor,["/compile:"+bridgeSource,"/log"],120000);
+        if(compile.code!==0||!(await exists(bridgeCompiled)))throw new Error("MT5_BRIDGE_COMPILE_FAILED");
+        await fs.copyFile(bridgeCompiled,bridgeTarget);
+      }else{
+        throw new Error("MT5_BRIDGE_ARTIFACT_NOT_AVAILABLE");
+      }
+
+      const presetsRoot=path.join(terminalRoot,"MQL5","Presets");
+      await fs.mkdir(presetsRoot,{recursive:true});
+      const cfg=buildMt5Config(runtimeConfig,terminalRoot,path.join(presetsRoot,"KINGBOT_MT5_BRIDGE.set"));
+      await fs.writeFile(path.join(presetsRoot,"KINGBOT_MT5_BRIDGE.set"),cfg.set,"utf8");
+      await fs.writeFile(path.join(terminalRoot,"kingbot-start.ini"),cfg.common,{encoding:"utf16le"});
+      manifest.userVps=true;
+      manifest.bridgeEa=BRIDGE_EA_FILE;
+      manifest.startupConfig=path.join(terminalRoot,"kingbot-start.ini");
     }
     return manifest;
   }
@@ -94,9 +177,15 @@ export class Mt5RuntimeAdapter{
   async launchDeployment(deployment){
     const id=clean(deployment?.id,100);
     const manifest=JSON.parse(await fs.readFile(path.join(this.runtimeRoot,id,"deployment.json"),"utf8"));
-    const child=spawn(this.terminalExe,["/portable"],{cwd:manifest.terminalRoot,detached:true,stdio:"ignore",windowsHide:true});
+    const args=["/portable"];
+    const startupConfig=String(manifest.startupConfig||"").trim();
+    if(startupConfig)args.push("/config:"+startupConfig);
+    const child=spawn(String(manifest.terminalExe||this.terminalExe),args,{cwd:manifest.terminalRoot,detached:true,stdio:"ignore",windowsHide:true});
     child.unref();
-    this.processes.set(id,{pid:child.pid,startedAt:Date.now(),terminalData:manifest.terminalRoot});
+    this.processes.set(id,{pid:child.pid,startedAt:Date.now(),terminalData:manifest.terminalRoot,terminalExe:manifest.terminalExe});
+    if(startupConfig){
+      setTimeout(()=>{void fs.rm(startupConfig,{force:true}).catch(()=>{});},15000);
+    }
     return {pid:child.pid,startedAt:new Date().toISOString(),terminalData:manifest.terminalRoot};
   }
 
