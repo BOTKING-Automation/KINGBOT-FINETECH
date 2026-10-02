@@ -83,3 +83,29 @@ https://docs.cloud.google.com/free/docs/free-cloud-features
 - Keep broker credential storage inside the existing encrypted broker manager.
 - Keep live execution behind explicit authorization and deterministic risk gates.
 - The AI agent remains supervisory; it does not replace the local execution/risk path.
+
+
+## User-owned Windows VPS deployment
+
+KINGBOT also supports a customer-managed Windows VPS path. The customer enters the VPS host/port, Windows account, MT5 server/login/trading password, terminal path, symbol, timeframe, selected strategy, and DEMO/LIVE mode in Broker Connect.
+
+The backend stores the sensitive VPS and MT5 credentials encrypted with `BROKER_CREDENTIALS_KEY`. The browser does not persist those secrets in localStorage. A short-lived enrollment token is generated for the customer's VPS agent; after enrollment the VPS uses a scoped node token.
+
+Flow:
+
+1. In **Broker Connect → DERIV MT5 + CLOUD**, fill **USER-OWNED WINDOWS VPS · FULL MT5 SETUP**.
+2. Click **SAVE VPS CONFIG**.
+3. Click **GENERATE AGENT TOKEN** and copy the generated PowerShell command.
+4. On the Windows VPS, clone/copy the KINGBOT repository, open PowerShell in the repository root, and run the generated command.
+5. The agent registers the VPS to the customer's profile and polls for deployment work.
+6. Click **DEPLOY TO MY VPS** in Broker Connect.
+7. The host agent claims the deployment, obtains the scoped MT5 runtime configuration over HTTPS, prepares the selected EA and MT5 bridge, starts MT5 with a custom startup configuration, and waits for the bridge heartbeat.
+8. The deployment is marked `RUNNING` only after the exact MT5 account reports a live bridge heartbeat.
+
+The hosting layer is deliberately account-bound. A user VPS cannot claim another user's deployment, and deployment-state updates are scoped to the registered node/profile.
+
+### Credential handling
+
+The VPS operating-system password is collected only to complete the saved VPS profile; the running agent does not need it for normal operation because the agent is already running inside the VPS session. MT5 login/password are used only by the Windows-side MT5 startup configuration. The bridge token is stored encrypted server-side and delivered only to the scoped VPS agent for that deployment.
+
+For live trading, the platform requires explicit `ENABLE_LIVE_TRADING` confirmation and the selected account must be a REAL account.
