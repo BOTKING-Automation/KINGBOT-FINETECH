@@ -17,10 +17,6 @@
     lastQueryAt: null,
     messages: [],
     storageKey: "KINGBOT_AI_CHAT_V2",
-    puterReady: false,
-    puterModel: "gemini-3.1-flash-lite",
-    puterModels: [],
-    puterInitPromise: null
   };
 
   function byId(id) {
@@ -233,28 +229,22 @@
     const provider = String(h.externalProvider || h.aiProvider || "native").toLowerCase();
     const model = String(h.aiModel || h.model || "KINGBOT-CORE-1");
 
-    if (!state.puterReady) {
-      setTelemetry(
-        "aiCoreStatus",
-        aiReady ? (provider === "xai" ? "GROK ONLINE" : "AI ONLINE") : "OFFLINE",
-        aiReady ? "good" : "bad"
-      );
-    } else {
-      setTelemetry("aiCoreStatus", "PUTER ONLINE", "good");
-    }
+    setTelemetry(
+      "aiCoreStatus",
+      aiReady ? "KINGBOT NATIVE" : "OFFLINE",
+      aiReady ? "good" : "bad"
+    );
     setTelemetry("apiStatus", apiReady ? "LIVE" : "OFFLINE", apiReady ? "good" : "bad");
     setTelemetry("dataServiceStatus", dbReady ? "READY" : "WAITING", dbReady ? "good" : "warn");
 
     setText(
       "coreStateLabel",
-      aiReady ? (provider === "xai" ? "GROK AI CORE ONLINE" : "AI CORE ONLINE") : "AI CORE UNAVAILABLE"
+      aiReady ? "KINGBOT NATIVE AI ONLINE" : "AI CORE UNAVAILABLE"
     );
     setText(
       "coreStateSub",
       aiReady
-        ? (provider === "xai"
-            ? "Grok 4.7 is connected through the secured KINGBOT backend" + (model ? " · " + model : "") + "."
-            : "Secure intelligence endpoint is responding.")
+        ? "Native KINGBOT intelligence is active through the secured backend" + (model ? " · " + model : "") + "."
         : "Server AI is not configured or is unavailable."
     );
   }
@@ -541,7 +531,7 @@
     setChatState("READY");
     setInterval(loadContext, 20000);
     loadHealth();
-    /* Native KINGBOT AI is the production chat path. No browser AI provider is required. */
+    /* Native KINGBOT AI is the production chat path. No browser AI provider is loaded. */
     setTelemetry("aiCoreStatus", "KINGBOT NATIVE", "good");
     setText("coreStateLabel", "KINGBOT NATIVE AI ONLINE");
     setText("coreStateSub", "Native KINGBOT intelligence is active. External browser AI providers are not required.");
