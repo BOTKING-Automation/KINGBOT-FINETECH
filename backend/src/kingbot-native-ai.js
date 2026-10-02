@@ -416,7 +416,9 @@ export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker
     }catch{}
   }
 
-  if(kind==="PLATFORM_SUPPORT") return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:platformSupportReply(question),verified:{native:true}};\n\n  const snapshot=await latestSnapshot(pool,requested,"5m");
+  if(kind==="PLATFORM_SUPPORT") return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:platformSupportReply(question),verified:{native:true}};
+
+  const snapshot=await latestSnapshot(pool,requested,"5m");
   const brain=snapshot?evaluateKingbotBrain(snapshot,{maxAgeMs:Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS||5000)}):null;
   const reply=nativeMarketAnswer({question,symbol:requested,quote,snapshot,brain});
   return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply,verified:{quote:Boolean(quote?.available),technicalSnapshot:Boolean(snapshot),brain:Boolean(brain)}};
