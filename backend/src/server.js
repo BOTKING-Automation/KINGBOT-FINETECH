@@ -346,7 +346,9 @@ app.get("/api/health", (_req, res) => {
     internalLedger: false,
     centralizedRiskControl: true,
     workerHeartbeatMonitoring: true,
-    brokerReconciliation: true
+    brokerReconciliation: true,
+    adaptiveIntelligence: true,
+    adaptiveOutcomeLearning: true
   });
 });
 
