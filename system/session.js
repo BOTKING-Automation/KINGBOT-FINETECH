@@ -94,12 +94,17 @@ const session={
    if(!fb){
     applyFirebaseUser(null);
    }else{
-    const user=window.KINGBOT_FIREBASE.auth.currentUser||fb;
+    let user=window.KINGBOT_FIREBASE.auth.currentUser||fb;
     if(!user){
       applyFirebaseUser(null);
     }else{
       // Firebase is the source of truth for browser authentication.
-      // Do not block protected-page startup on Render/backend latency.
+      // Refresh only an unverified session so a just-completed email verification
+      // becomes visible without adding a network round-trip to already-verified users.
+      if(user.emailVerified!==true){
+        try{await user.reload();}catch{}
+        user=window.KINGBOT_FIREBASE.auth.currentUser||user;
+      }
       applyFirebaseUser(user);
 
       // Refresh backend account linkage opportunistically in the background.
