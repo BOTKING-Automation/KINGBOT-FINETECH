@@ -67,6 +67,39 @@
     });
   }
 
+  function installGlobalNotifications(){
+    if(document.getElementById("kb-global-toast")) return;
+    const host=document.createElement("div");
+    host.id="kb-global-toast";
+    host.className="kb-global-toast-host";
+    host.setAttribute("aria-live","polite");
+    host.setAttribute("aria-atomic","true");
+    document.body.appendChild(host);
+    window.addEventListener("kingbot:event",event=>{
+      const data=event?.detail||{};
+      const type=String(data.eventType||"").toUpperCase();
+      const payload=data.payload||{};
+      const important=/BROKER_CONNECTED|BROKER_DISCONNECTED|BOT_RUNTIME_STARTED|BOT_RUNTIME_STOPPED|ORDER_SUBMITTED|RISK_BLOCKED|GLOBAL_KILL|EXECUTION_REJECTED|BOT_WORKER_ERROR/.test(type);
+      if(!important)return;
+      const card=document.createElement("div");
+      card.className="kb-global-toast "+(/ERROR|REJECT|DISCONNECT|BLOCK|KILL/.test(type)?"warn":"");
+      const label=type.replaceAll("_"," ");
+      const detail=payload.symbol||payload.botId||payload.provider||payload.reason||"KINGBOT ecosystem";
+      card.innerHTML="<strong>"+label+"</strong><span>"+String(detail).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))+"</span>";
+      host.appendChild(card);
+      setTimeout(()=>{card.classList.add("hide");setTimeout(()=>card.remove(),240);},4200);
+    });
+  }
+
+
+  function installGlobalNotificationStyle(){
+    if(document.getElementById("kb-global-toast-style"))return;
+    const style=document.createElement("style");
+    style.id="kb-global-toast-style";
+    style.textContent=".kb-global-toast-host{position:fixed;right:14px;bottom:14px;z-index:2147483005;display:grid;gap:8px;width:min(340px,calc(100vw - 28px));pointer-events:none}.kb-global-toast{display:grid;gap:3px;padding:10px 12px;border:1px solid rgba(35,247,163,.16);border-radius:12px;background:rgba(4,10,20,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 18px 50px rgba(0,0,0,.42);color:#eaf7ff;transform:translateY(0);opacity:1;transition:opacity .24s ease,transform .24s ease}.kb-global-toast strong{font:800 8px Orbitron,sans-serif;letter-spacing:.06em}.kb-global-toast span{color:#7f93ad;font:700 7px JetBrains Mono,monospace}.kb-global-toast.warn{border-color:rgba(255,77,109,.19)}.kb-global-toast.warn strong{color:#ff9aaa}.kb-global-toast.hide{opacity:0;transform:translateY(5px)}";
+    document.head.appendChild(style);
+  }
+
   function networkUi(){
     const update=()=>{
       state.network=navigator.onLine!==false;
@@ -217,6 +250,8 @@
     networkUi();
     performanceBudget();
     globalRuntimeErrors();
+    installGlobalNotificationStyle();
+    installGlobalNotifications();
     connectEventStream();
     window.addEventListener("kingbot:session-change",event=>{
       if(event?.detail?.authenticated===true) void connectEventStream();
