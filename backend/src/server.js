@@ -39,7 +39,7 @@ import { registerIntelligenceOrchestrator, ensureIntelligenceOrchestratorSchema 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT || 10000);
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const XAI_MODEL = process.env.XAI_MODEL || "grok-4.7";
 const XAI_API_KEY = process.env.XAI_API_KEY || "";
@@ -335,6 +335,9 @@ app.get("/api/health", (_req, res) => {
     aiReady: Boolean(XAI_API_KEY || GEMINI_API_KEY),
     aiProvider: AI_PROVIDER,
     aiModel: AI_PROVIDER === "xai" ? XAI_MODEL : (AI_PROVIDER === "gemini" ? GEMINI_MODEL : null),
+    deepReasoningReady: Boolean(GEMINI_API_KEY),
+    deepReasoningModel: GEMINI_API_KEY ? GEMINI_MODEL : null,
+    deepReasoningLevel: GEMINI_API_KEY ? "HIGH" : "DETERMINISTIC_FALLBACK",
     accountServiceReady: true,
     passwordRecoveryEmailReady: true,
     voiceReady: Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID),
