@@ -5,6 +5,8 @@ import { searchWeb, webSearchStatus } from "./kingbot-web-search.js";
 import { getPlans, BOT_NAMES } from "./subscriptions.js";
 import { searchTechnicalAnalysisBook, technicalAnalysisBookContext } from "./technical-analysis-book.js";
 import { buildCognitivePlan, capabilitySet, identitySnapshot, qualityAudit } from "./kingbot-intelligence-core.js";
+import { orchestrateKingbotIntelligence } from "./intelligence-orchestrator.js";
+import { loadAdaptivePerformance } from "./adaptive-intelligence.js";
 
 const SYMBOLS = ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 
@@ -422,35 +424,77 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
         const ranked=Array.isArray(parsed?.ranked_symbols)?parsed.ranked_symbols:[];
         const rankedItem=ranked.find(x=>x.symbol===requested)||item;
         const quote=(scan.quotes||[]).find(x=>x.symbol===requested)||null;
-        const signal=rankedItem?.signal||item?.signal||"DATA_INSUFFICIENT";
+        const market={
+          ...item,
+          ...quote,
+          symbol:requested,
+          timeframe:String(scan.timeframe||"5m").toLowerCase(),
+          timestamp:quote?.timestamp ? new Date(quote.timestamp).toISOString() : (item?.dataFreshness||item?.barTime||null)
+        };
+        const adaptivePerformance=await loadAdaptivePerformance(pool,{userId,symbol:requested});
+        const orchestration=await orchestrateKingbotIntelligence({
+          market,
+          riskContext:{},
+          options:{},
+          memory:[],
+          adaptivePerformance
+        });
+        const signal=orchestration?.routing?.direction==="BUY"
+          ?"ENTRY_CANDIDATE_BUY"
+          :orchestration?.routing?.direction==="SELL"
+            ?"ENTRY_CANDIDATE_SELL"
+            :"WAIT";
+        const selectedEngine=orchestration?.routing?.selectedEngine||"NO_ROUTE";
+        const summary=orchestration?.summary?.summary||"KINGBOT did not find sufficient aligned evidence for a routed candidate.";
+        const analystFacts=(orchestration?.analysts||[]).flatMap(a=>[
+          String(a.name||a.id||"ANALYST")+": "+String(a.bias||"NEUTRAL"),
+          ...(Array.isArray(a.evidence)?a.evidence.slice(0,3).map(v=>String(v)):[])
+        ]).slice(0,10);
+        const riskFlags=[...(orchestration?.riskCouncil?.blocks||[]),...(orchestration?.riskCouncil?.flags||[])];
+        if(!riskFlags.includes("EXECUTION_AUTHORIZATION_NOT_GRANTED"))riskFlags.push("EXECUTION_AUTHORIZATION_NOT_GRANTED");
         return {
           provider:"KINGBOT_NATIVE",
           model:"KINGBOT-CORE-1",
           intent:kind,
           symbol:requested,
           scanner:scan,
+          orchestration,
           reply:{
-            answer:"KINGBOT AI analyzed live "+requested+" data through the standalone market scanner. Current engine state: "+String(signal).replaceAll("_"," ")+" with "+String(rankedItem?.score??item?.score??0)+"% technical confluence.",
+            answer:"KINGBOT CORE completed a multi-stage intelligence pass on live "+requested+" data: "+summary,
             facts:[
+              "Identity: KINGBOT INTELLIGENCE CORE",
+              "Cognitive loop: IDENTIFY → OBSERVE → CORRELATE → CHALLENGE → ADAPT → VERIFY → EXPLAIN",
               "Market source: "+String(scan.source||"live market-data engine"),
-              "Broker connection required for scan: false",
               "Timeframe: "+String(scan.timeframe||"5m"),
-              ...(quote?.available?["Live quote: "+quote.price]:[])
+              ...(quote?.available?["Verified quote: "+quote.price]:[]),
+              ...(selectedEngine!=="NO_ROUTE"?["Strategy route: "+selectedEngine]:["Strategy route: no candidate"]),
+              ...analystFacts
             ],
-            technicalAnalysis:Array.isArray(rankedItem?.technicalAnalysis)?rankedItem.technicalAnalysis:[],
+            technicalAnalysis:[
+              ...(Array.isArray(rankedItem?.technicalAnalysis)?rankedItem.technicalAnalysis:[]),
+              ...(orchestration?.analysts||[]).flatMap(a=>Array.isArray(a.evidence)?a.evidence.slice(0,2):[]).map(v=>String(v))
+            ].slice(0,14),
             setup:{
               signal,
-              entry:rankedItem?.entry??item?.entry??null,
-              waitFor:rankedItem?.waitFor||item?.waitFor||"Fresh confirmation is required.",
-              invalidation:rankedItem?.invalidation||item?.invalidation||"Technical structure invalidation."
+              entry:orchestration?.tradePlan?.entry??rankedItem?.entry??item?.entry??null,
+              waitFor:orchestration?.tradePlan?.entry
+                ? "Deterministic risk gate must verify the plan before execution."
+                : (orchestration?.summary?.watch||[]).join(" · ") || "Wait for stronger aligned evidence.",
+              invalidation:orchestration?.tradePlan?.stop??rankedItem?.invalidation??item?.invalidation??"Structure invalidation or stale data."
             },
-            riskFlags:["SCANNER_INDEPENDENT_OF_BROKER","EXECUTION_AUTHORIZATION_NOT_GRANTED"],
-            nextAction:signal==="ENTRY_CONFIRMING"
-              ?"Pass the setup through the deterministic risk gate before any execution."
-              :"Wait for stronger verified confluence."
+            riskFlags,
+            nextAction:orchestration?.routing?.selectedEngine && !(orchestration?.riskCouncil?.blocks||[]).length
+              ?"Review the routed trade-plan through the deterministic risk gate; chat remains non-executing."
+              :"Wait, improve data quality, or resolve the reported risk blockers."
           },
           sources:[],
-          verified:{standaloneScanner:true,liveQuote:Boolean(quote?.available),technicalData:Boolean(scan.technicalCount)}
+          verified:{
+            standaloneScanner:true,
+            liveQuote:Boolean(quote?.available),
+            technicalData:Boolean(scan.technicalCount),
+            multiAgentOrchestration:true,
+            adaptiveContext:true
+          }
         };
       }
       return {
