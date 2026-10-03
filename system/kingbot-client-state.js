@@ -46,9 +46,15 @@
     if(state.loading)return;
     state.loading=true;emit("refresh:start");
     try{
+      try{state.auth=await request("/api/auth/session",{forceToken:false});}
+      catch(error){
+        state.auth={ok:false,authenticated:false,error:String(error?.message||error)};
+        state.broker=null;state.account=null;state.subscription=null;state.risk=null;state.market=null;
+        emit(reason+":guest");
+        return {...state};
+      }
       const tasks=[
-        ["auth",request("/api/auth/session",{forceToken:false})],
-        ["broker",request("/api/broker/status")],
+        ["broker",request("/api/connection")],
         ["subscription",request("/api/subscription/status")],
         ["risk",request("/api/execution-control")]
       ];
