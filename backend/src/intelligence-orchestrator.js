@@ -481,7 +481,7 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
     res.json({
       ok: true,
       orchestrator: "KINGBOT INTELLIGENCE ORCHESTRATOR",
-      version: "1.0.0",
+      version: "2.0.0",
       agents: ["TECHNICAL ANALYST", "REGIME ANALYST", "MACRO + SENTIMENT ANALYST", "EXECUTION CONDITIONS ANALYST", "BULL RESEARCHER", "BEAR RESEARCHER", "RISK COUNCIL", "STRATEGY ROUTER"],
       engines: BOT_IDS,
       aiSynthesis: Boolean(ai),
@@ -524,6 +524,5 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
       const status=/NOT_FOUND|REQUIRED|INVALID/.test(message)?400:503;
       res.status(status).json({ok:false,error:message});
     }
-  });
   });
 }
