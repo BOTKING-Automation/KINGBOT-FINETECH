@@ -467,6 +467,18 @@
       return '<a href="'+href+'">'+name+'</a>';
     }).join("");
 
+    const skip=document.createElement("a");
+    skip.className="kb-skip-link";
+    skip.href="#main";
+    skip.textContent="Skip to content";
+    document.body.appendChild(skip);
+
+    const live=document.createElement("div");
+    live.className="kb-live-region";
+    live.setAttribute("aria-live","polite");
+    live.id="kb-live-region";
+    document.body.appendChild(live);
+
     const root=document.createElement("div");
     root.id="kb-compact-nav";
     root.innerHTML=
@@ -487,6 +499,8 @@
       '</div>';
 
     document.body.appendChild(root);
+    document.querySelector("main")?.setAttribute("id","main");
+    document.documentElement.classList.add("kb-page-enter");
 
     const trigger=root.querySelector(".kb-nav-trigger");
     const menu=root.querySelector(".kb-menu");
@@ -503,6 +517,7 @@
 
     trigger.addEventListener("click",()=>menu.classList.contains("kb-open")?close():open());
     root.querySelectorAll("a").forEach(a=>a.addEventListener("click",close));
+    root.querySelectorAll("a[href]").forEach(a=>a.addEventListener("mouseenter",()=>window.KINGBOT_PERFORMANCE?.prefetch?.(a.getAttribute("href")),{passive:true}));
     root.querySelector("[data-kb-logout]")?.addEventListener("click",async event=>{
       event.preventDefault();
       close();
