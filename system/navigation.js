@@ -40,6 +40,7 @@
 
   const links = [
     ["index.html","Overview","⌂","Core platform"],
+    ["command-center.html","Command Center","◎","Unified trading control"],
     ["markets.html","Markets","◈","Live market intelligence"],
     ["terminal.html","Terminal","⌁","Trading terminal"],
     ["bots.html","Bots","◉","Automated trading systems"],
