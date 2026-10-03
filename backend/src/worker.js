@@ -269,10 +269,20 @@ async function reconcileBrokerState(userId,status,positions){
   const brokerPositionIds=new Set(positions.flatMap(positionIdentities).map(String));
   let journalOpen=journal.rowCount;
   let knownMatches=0;
+  let closedMatches=0;
   const unresolved=[];
+  let recentDeals=[];
+  try{
+    const trades=await broker.getTrades({userId,startTime:new Date(Date.now()-24*60*60*1000),endTime:new Date()});
+    recentDeals=Array.isArray(trades?.data?.deals)?trades.data.deals:[];
+  }catch(error){
+    console.warn("[KINGBOT RECON] trade history unavailable",JSON.stringify({userId,provider,error:String(error?.message||"TRADE_HISTORY_UNAVAILABLE").slice(0,180)}));
+  }
+  const brokerHistoryRefs=new Set(recentDeals.flatMap(orderExecutionIds).map(String));
   for(const row of journal.rows){
     const refs=orderExecutionIds(row.broker_result);
     if(refs.some(ref=>brokerPositionIds.has(String(ref)))){knownMatches++;continue;}
+    if(refs.some(ref=>brokerHistoryRefs.has(String(ref)))){closedMatches++;continue;}
     if(refs.length)unresolved.push({clientId:row.client_id,botId:row.bot_id,symbol:row.symbol,refs:refs.slice(0,12)});
   }
   const mismatch=unresolved.length;
@@ -282,16 +292,18 @@ async function reconcileBrokerState(userId,status,positions){
     brokerPositions:positions.length,
     journalOpen,
     knownPositionMatches:knownMatches,
+    closedTradeMatches:closedMatches,
     unresolvedReferences:mismatch,
     checkedAt:new Date().toISOString()
   };
   await pool.query(
-    `INSERT INTO kingbot_broker_reconciliation(user_id,provider,account_id,status,broker_positions,journal_open,known_position_matches,unresolved_references,details,checked_at)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,NOW())
+    `INSERT INTO kingbot_broker_reconciliation(user_id,provider,account_id,status,broker_positions,journal_open,known_position_matches,closed_trade_matches,unresolved_references,details,checked_at)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,NOW())
      ON CONFLICT(user_id,provider,account_id) DO UPDATE SET status=EXCLUDED.status,broker_positions=EXCLUDED.broker_positions,
        journal_open=EXCLUDED.journal_open,known_position_matches=EXCLUDED.known_position_matches,
-       unresolved_references=EXCLUDED.unresolved_references,details=EXCLUDED.details,checked_at=NOW()`,
-    [userId,provider,accountId,data.status,data.brokerPositions,data.journalOpen,data.knownPositionMatches,data.unresolvedReferences,JSON.stringify({unresolved})]
+       closed_trade_matches=EXCLUDED.closed_trade_matches,unresolved_references=EXCLUDED.unresolved_references,
+       details=EXCLUDED.details,checked_at=NOW()`,
+    [userId,provider,accountId,data.status,data.brokerPositions,data.journalOpen,data.knownPositionMatches,data.closedTradeMatches,data.unresolvedReferences,JSON.stringify({unresolved,recentDealCount:recentDeals.length})]
   );
   if(mismatch>0){
     await audit(userId,"BROKER_RECONCILIATION_MISMATCH",{provider,accountId,...data,unresolved:unresolved.slice(0,20)});
