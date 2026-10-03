@@ -9,6 +9,7 @@ import { orchestrateKingbotIntelligence } from "./intelligence-orchestrator.js";
 import { loadAdaptivePerformance } from "./adaptive-intelligence.js";
 import { think } from "./kingbot-cognitive-engine.js";
 import { conversationalReply, conversationSignals, conversationFrame } from "./kingbot-dialogue-cortex.js";
+import { createKingbotAgent, agentAnswer } from "./kingbot-agent-core.js";
 import { getMarketPageSnapshot } from "./market-page-feed.js";
 
 const SYMBOLS = ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
@@ -441,6 +442,15 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
   const userFrame=conversationFrame(question,conversation);
   const requested=symbolFromText(effectiveQuestion,symbol||"XAUUSD");
   const kind=intent(effectiveQuestion,conversation);
+  const agent=createKingbotAgent({
+    question,
+    intent:kind,
+    symbol:requested,
+    conversation,
+    frame:userFrame,
+    thinkingLevel,
+    verified:{}
+  });
   const utility=utilityReply(effectiveQuestion);
   if(kind==="TECHNICAL_ANALYSIS_BOOK"){
     return {
@@ -859,6 +869,16 @@ export async function runNativeKingbotAI(input = {}) {
     }
   };
 
+  const publicAnswer = agentAnswer(
+    result?.reply?.answer || "I’m here. Tell me what you want to work through.",
+    conversationFrame(input?.question || "", input?.conversation || [])
+  );
+  const publicReply = {
+    ...(result?.reply || {}),
+    answer: publicAnswer,
+    agent: agent.snapshot
+  };
+
   return {
     ...result,
     conversationState: {
@@ -870,8 +890,17 @@ export async function runNativeKingbotAI(input = {}) {
     cognition: {
       plan,
       capabilities: [...capabilities, "PROPRIETARY_REASONING_KERNEL"],
-      userFrame: conversationFrame(input?.question || "", input?.conversation || [])
+      userFrame: conversationFrame(input?.question || "", input?.conversation || []),
+      agentPlan: agent.plan
     },
-    reply
+    reply: {
+      ...publicReply,
+      intelligence: {
+        identity: identity.id,
+        mode: plan.mode,
+        capabilities: [...capabilities, "PROPRIETARY_REASONING_KERNEL"],
+        authority: "NONE"
+      }
+    }
   };
 }
