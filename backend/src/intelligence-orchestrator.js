@@ -31,7 +31,9 @@ const upper = v => String(v || "").trim().toUpperCase();
 const lower = v => String(v || "").trim().toLowerCase();
 
 function freshness(value, maxAgeMs = 5000) {
-  const t = Date.parse(value || "");
+  const t = value instanceof Date ? value.getTime() : Number.isFinite(Number(value)) && String(value).trim() !== ""
+    ? (Number(value) > 2e10 ? Number(value) : Number(value) * 1000)
+    : Date.parse(value || "");
   if (!Number.isFinite(t)) return { ok: false, ageMs: null, reason: "MARKET_TIMESTAMP_MISSING" };
   const ageMs = Math.max(0, Date.now() - t);
   return { ok: ageMs <= maxAgeMs, ageMs, reason: ageMs <= maxAgeMs ? null : "MARKET_DATA_STALE" };
@@ -234,9 +236,11 @@ function riskCouncil(market, engines, riskContext = {}) {
 }
 
 function chooseEngine(engines, debate) {
-  const sorted = [...engines].sort((a, b) => b.fit - a.fit || Math.abs(b.score) - Math.abs(a.score));
+  const sorted = [...engines]
+    .filter(engine => engine.strategyMatch)
+    .sort((a, b) => b.fit - a.fit || Math.abs(b.score) - Math.abs(a.score));
   const top = sorted[0] || null;
-  if (!top) return { selectedEngine: null, reason: "NO_ENGINE" };
+  if (!top) return { selectedEngine: null, reason: "NO_ENGINE_MEETS_THRESHOLD" };
   const direction = top.score > 0 ? "BUY" : top.score < 0 ? "SELL" : "HOLD";
   if (debate.direction !== "NEUTRAL" && ((debate.direction === "BULLISH" && direction !== "BUY") || (debate.direction === "BEARISH" && direction !== "SELL"))) {
     return { selectedEngine: null, reason: "ENGINE_DEBATE_DIVERGENCE", candidate: top };
@@ -288,7 +292,7 @@ function cacheKey(market, options = {}) {
   });
 }
 
-export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {} } = {}) {
+export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {}, memory = [] } = {}) {
   const market = normalizeMarket(inputMarket);
   const key = cacheKey(market, options);
   const cached = cache.get(key);
@@ -312,6 +316,13 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
 
   const result = {
     ok: true,
+    memoryContext: memory.slice(0, 5).map(row => ({
+      selectedEngine: row.selected_engine || null,
+      direction: row.direction || null,
+      confidence: num(row.confidence),
+      regime: row.regime || null,
+      createdAt: row.created_at || null
+    })),
     orchestrator: "KINGBOT INTELLIGENCE ORCHESTRATOR",
     version: "1.0.0",
     generatedAt: new Date().toISOString(),
@@ -351,6 +362,61 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
   return result;
 }
 
+
+export async function ensureIntelligenceOrchestratorSchema(pool) {
+  if (!pool) return;
+  await pool.query(\`
+    CREATE TABLE IF NOT EXISTS kingbot_ai_intelligence_memory (
+      id BIGSERIAL PRIMARY KEY,
+      user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,
+      symbol TEXT NOT NULL,
+      timeframe TEXT NOT NULL,
+      selected_engine TEXT,
+      direction TEXT,
+      confidence NUMERIC(6,2),
+      regime TEXT,
+      result JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  \`);
+  await pool.query("CREATE INDEX IF NOT EXISTS idx_kingbot_ai_intelligence_memory_user_symbol ON kingbot_ai_intelligence_memory(user_id, symbol, created_at DESC)");
+}
+
+async function loadIntelligenceMemory(pool, userId, symbol) {
+  if (!pool || !userId || !symbol) return [];
+  try {
+    const q = await pool.query(
+      "SELECT selected_engine,direction,confidence,regime,result,created_at FROM kingbot_ai_intelligence_memory WHERE user_id=$1 AND symbol=$2 ORDER BY created_at DESC LIMIT 5",
+      [userId, symbol]
+    );
+    return q.rows;
+  } catch (error) {
+    console.warn("[KINGBOT ORCHESTRATOR MEMORY]", error?.message || error);
+    return [];
+  }
+}
+
+async function recordIntelligenceMemory(pool, userId, result) {
+  if (!pool || !userId || !result?.market?.symbol) return;
+  try {
+    await pool.query(
+      "INSERT INTO kingbot_ai_intelligence_memory(user_id,symbol,timeframe,selected_engine,direction,confidence,regime,result) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb)",
+      [
+        userId,
+        result.market.symbol,
+        result.market.timeframe || "unknown",
+        result.routing?.selectedEngine || null,
+        result.routing?.direction || "HOLD",
+        Number(result.summary?.confidence ?? 0),
+        result.summary?.regime || result.market?.regime || null,
+        JSON.stringify(result)
+      ]
+    );
+  } catch (error) {
+    console.warn("[KINGBOT ORCHESTRATOR MEMORY WRITE]", error?.message || error);
+  }
+}
+
 export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelveData } = {}) {
   app.post("/api/ai/intelligence/orchestrate", async (req, res) => {
     try {
@@ -366,12 +432,19 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
         market = { ...(technical || {}), ...(quote || {}), symbol, timeframe, timestamp: quote?.timestamp ? new Date(quote.timestamp).toISOString() : (technical?.dataFreshness || technical?.barTime || null) };
         market.aiScanner = { provider: scan?.provider || "none", model: scan?.model || null, source: scan?.source || null, aiError: scan?.aiError || null };
       }
+      const memory = await loadIntelligenceMemory(pool, user.id, symbol);
       const result = await orchestrateKingbotIntelligence({
         market,
         riskContext: req.body?.riskContext || {},
-        options: { botId: req.body?.botId || null }
+        options: { botId: req.body?.botId || null },
+        memory
       });
-      res.json({ ...result, brokerExecution: "NOT_AUTHORIZED_BY_ORCHESTRATOR" });
+      await recordIntelligenceMemory(pool, user.id, result);
+      res.json({
+        ...result,
+        brokerExecution: "NOT_AUTHORIZED_BY_ORCHESTRATOR",
+        memory: { available: memory.length > 0, entries: memory.length }
+      });
     } catch (error) {
       console.error("[KINGBOT ORCHESTRATOR]", error?.message || error);
       res.status(502).json({ ok: false, error: "KINGBOT_INTELLIGENCE_ORCHESTRATOR_FAILED", reason: String(error?.message || "ORCHESTRATOR_FAILED").slice(0, 220) });
@@ -389,6 +462,7 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
       engines: BOT_IDS,
       aiSynthesis: Boolean(ai),
       model: ai ? MODEL : null,
+      memoryPersistence: Boolean(pool),
       executionAuthority: "NONE",
       cacheMs: CACHE_MS
     });
