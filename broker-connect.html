@@ -417,7 +417,7 @@ function selectBroker(slug){
   $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION"; $("verifyBtn").style.display=(selected==="deriv"||selected==="derivmt5")?"none":"inline-flex"; $("executionMode").value=selectedExecution;
   if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
   textFor();showDrawer();
-  if(selected==="derivmt5")void loadMt5VpsProfile();
+  if(selected==="derivmt5"){void loadVpsSyntheticSymbols();void loadMt5VpsProfile();}
   if(selected==="exness")trackExnessPartner();
   else if(selected==="derivmt5")trackBrokerPartner("deriv");
   else trackBrokerPartner(selected);
@@ -552,6 +552,24 @@ async function deployMt5ToCloud(){
     status.textContent=String(e.message||"Cloud deployment failed.");
     btn.disabled=false;btn.textContent="DEPLOY TO KINGBOT CLOUD";
   }
+}
+async function loadVpsSyntheticSymbols(){
+  const select=$("vpsSymbol");
+  if(!select || select.dataset.syntheticLoaded==="1")return;
+  try{
+    const r=await fetch(API_BASE+"/markets/synthetics",{cache:"no-store"});
+    if(!r.ok)return;
+    const d=await r.json().catch(()=>({}));
+    for(const item of (d.markets||[]).slice(0,60)){
+      const id=String(item.symbol||"").trim().toUpperCase();
+      if(!id || [...select.options].some(o=>o.value===id))continue;
+      const o=document.createElement("option");
+      o.value=id;
+      o.textContent=String(item.name||id);
+      select.appendChild(o);
+    }
+    select.dataset.syntheticLoaded="1";
+  }catch{}
 }
 function setVpsExecutionMode(){
   const mode=$("vpsExecutionMode").value||selectedExecution;
