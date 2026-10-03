@@ -409,9 +409,11 @@
 
   async function runBackendAgent(clean, conversation) {
     const symbol = byId("symbolSelect")?.value || "XAUUSD";
+    const timeframe = byId("timeframeSelect")?.value || "15m";
+    const thinkingLevel = byId("thinkingLevelSelect")?.value || "EXPERT";
     const data = await requestJson(API_BASE + "/ai/agent", {
       method: "POST",
-      body: JSON.stringify({ message: clean, symbol, conversation: conversation.slice(-4) })
+      body: JSON.stringify({ message: clean, symbol, timeframe, thinkingLevel, conversation: conversation.slice(-4) })
     });
     const reply = data?.reply || {};
     renderIdentity(data);
