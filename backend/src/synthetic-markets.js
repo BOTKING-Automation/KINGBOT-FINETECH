@@ -15,7 +15,7 @@ const SYNTHETIC_FAMILIES = [
 const normalizeName = value => String(value || "").replace(/\s+/g," ").trim();
 
 export function classifySyntheticSymbol(row = {}) {
-  const name = normalizeName(row.underlying_symbol_name || row.display_name || row.market_display_name || row.symbol_name || "");
+  const name = normalizeName(row.underlying_symbol_name || row.display_name || row.market_display_name || row.symbol_name || row.name || "");
   const symbol = String(row.underlying_symbol || row.symbol || row.display_symbol || "").trim();
   const text = name || symbol;
   const family = SYNTHETIC_FAMILIES.find(item => item.match.test(text)) || SYNTHETIC_FAMILIES.at(-1);
@@ -30,8 +30,10 @@ export function classifySyntheticSymbol(row = {}) {
 }
 
 export function isSyntheticSymbol(row = {}) {
+  const rawType = String(row.underlying_symbol_type || row.symbol_type || row.market_type || "").toLowerCase();
   const symbol = classifySyntheticSymbol(row);
-  return Boolean(symbol.symbol) && symbol.family !== "other"
+  return rawType.includes("synthetic") || rawType.includes("derived")
+    || (Boolean(symbol.symbol) && symbol.family !== "other")
     || /^(R_|1HZ|BOOM|CRASH|JUMP|STPRNG|STEP|RB|DEX)/i.test(symbol.symbol || "");
 }
 
