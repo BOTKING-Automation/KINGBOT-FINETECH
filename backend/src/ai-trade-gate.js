@@ -1,354 +1,187 @@
-import { GoogleGenAI } from "@google/genai";
+/*
+ * KINGBOT CORTEX TRADE GATE
+ * Backward-compatible API; no external AI dependency.
+ * The deterministic strategy engine and risk engine remain authoritative.
+ */
 import { getBotDefinitions } from "./bot-engines.js";
 
-const MODEL = process.env.GEMINI_TRADE_MODEL || process.env.GEMINI_MODEL || "gemini-3.8-flash";
-const API_KEY = String(process.env.GEMINI_API_KEY || "").trim();
-const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
-
+const MODEL = "KINGBOT-CORTEX-1";
 const signalCache = new Map();
 const inflight = new Map();
-const COOLDOWN_MS = Math.max(1500, Number(process.env.GEMINI_TRADE_COOLDOWN_MS || 2500));
-const TTL_MS = Math.max(4000, Number(process.env.GEMINI_TRADE_SIGNAL_TTL_MS || 6500));
-
-// AI is a strategy supervisor by default, not a single point of failure for execution.
-// Set GEMINI_EXECUTION_GATE=1 (or "gated") when an installation explicitly wants
-// Gemini confirmation to be mandatory before the deterministic engine may submit.
-export function aiExecutionGateEnabled(){
-  const mode=String(process.env.GEMINI_EXECUTION_GATE||"advisory").trim().toLowerCase();
-  return mode==="1"||mode==="true"||mode==="gated";
-}
+const COOLDOWN_MS = Math.max(1500, Number(process.env.KINGBOT_CORTEX_COOLDOWN_MS || 2500));
+const TTL_MS = Math.max(4000, Number(process.env.KINGBOT_CORTEX_SIGNAL_TTL_MS || 6500));
 
 const STRATEGY_PROFILES = {
-  strategic: {
-    mode: "multi-strategy",
-    objective: "Select only a clear directional opportunity when trend, momentum, structure, volatility regime and mean-reversion context agree.",
-    rules: ["trend-following", "mean-reversion", "volatility-regime", "multi-factor-consensus"]
-  },
-  flipper: {
-    mode: "high-speed-flipping",
-    objective: "Detect short-horizon impulse continuation or rapid reversal while rejecting poor spread and unstable conditions.",
-    rules: ["micro-momentum", "impulse-continuation", "rapid-reversal", "spread-filter"]
-  },
-  breakout: {
-    mode: "breakout-momentum",
-    objective: "Trade only meaningful range/level breaks with volatility confirmation and preferably a valid retest.",
-    rules: ["range-compression", "level-breakout", "volatility-confirmation", "retest-continuation"]
-  },
-  "smc-pro": {
-    mode: "smart-money-concepts",
-    objective: "Require a coherent market-structure and liquidity sequence, with displacement plus order-block/fair-value-gap context where supplied.",
-    rules: ["market-structure", "liquidity-sweep", "order-block", "fair-value-gap", "displacement"]
-  },
-  "ladder-flip": {
-    mode: "v8-adaptive-ladder",
-    objective: "Identify a directional V8 entry that can safely initiate the ladder; preserve the engine's EMA20/EMA50, ADX14, RSI14, spread, velocity and risk gates.",
-    rules: ["ema20-50-trend-gate", "adx-strength-gate", "rsi-confirmation", "velocity-pyramiding", "staircase-profit-lock", "risk-governor"]
-  }
+  strategic: { rules:["trend","momentum","structure","volatility"] },
+  flipper: { rules:["momentum","velocity","spread","reversal"] },
+  breakout: { rules:["breakout","retest","volatility","momentum"] },
+  "smc-pro": { rules:["structure","liquiditySweep","displacement","orderBlock","fairValueGap"] },
+  "ladder-flip": { rules:["ema","adx","rsi","velocity","spread"] }
 };
 
-const SIGNAL_SCHEMA = {
-  type: "object",
-  properties: {
-    engine: { type: "string" },
-    direction: { type: "string" },
-    strategyMatch: { type: "boolean" },
-    trigger: { type: "string" },
-    riskFlags: { type: "array", items: { type: "string" } },
-    reason: { type: "string" }
-  },
-  required: ["engine", "direction", "strategyMatch", "trigger", "riskFlags", "reason"]
+const num=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
+const upper=v=>String(v||"").toUpperCase();
+const candidateDirection=v=>{
+  const s=upper(v);
+  return s==="LONG_CANDIDATE"||s==="BUY"?"BUY":s==="SHORT_CANDIDATE"||s==="SELL"?"SELL":null;
 };
-
-const SYSTEM = `You are the KINGBOT strategy intelligence engine.
-Your job is to understand the specified bot engine and produce a strategy-specific market signal.
-
-Hard rules:
-- The supplied market snapshot and deterministic analysis are the only market facts you may use.
-- Never invent price, spread, candle, broker, account, position, or risk data.
-- You must target EXACTLY the supplied engine id. Do not route a signal to another engine.
-- Learn the strategy from the supplied strategy profile and bot definition. Do not use a generic trading strategy in its place.
-- Return BUY, SELL, or HOLD only.
-- If the strategy conditions are not sufficiently aligned, return HOLD.
-- strategyMatch must be true only when the setup actually fits the supplied engine.
-- Do not set stop loss, take profit, stake, leverage, lot size, or broker parameters. Those remain deterministic engine/risk-engine responsibilities.
-- Keep trigger and reason concise and factual.
-Return JSON only.`;
-
-function safeJson(value){
-  try{return JSON.parse(String(value||"").trim());}catch{return null;}
-}
-
-function keyFor(userId,botId){
-  return String(userId)+":"+String(botId);
-}
-
-function directionFromCandidate(signal){
-  return signal==="LONG_CANDIDATE"?"BUY":signal==="SHORT_CANDIDATE"?"SELL":null;
-}
+const keyFor=(userId,botId)=>String(userId)+":"+String(botId);
 
 function snapshotFingerprint({botId,market,analysis}={}){
-  // Do not fingerprint raw bid/ask/price: those change every tick and would defeat
-  // the short-lived AI cache. Deterministic validation still runs on every worker cycle.
-  const atr=Math.max(Number(market?.atr||0),1e-12);
-  const price=Number(market?.price||0);
-  const priceBucket=Math.round(price/(atr*0.20));
-  const spreadBucket=Math.round(Number(market?.spread||0)/(atr*0.05));
+  const atr=Math.max(num(market?.atr),1e-12);
+  const price=num(market?.price);
   return JSON.stringify({
-    botId,
-    symbol:market?.symbol,
-    timeframe:market?.timeframe,
-    priceBucket,
-    spreadBucket,
-    atr:Number(market?.atr||0),
-    volatility:Number(market?.volatility||0),
-    trend:Number(market?.trend||0),
-    momentum:Number(market?.momentum||0),
-    structure:String(market?.structure||""),
-    liquiditySweep:Boolean(market?.liquiditySweep),
-    orderBlock:Boolean(market?.orderBlock),
-    fairValueGap:Boolean(market?.fairValueGap),
-    displacement:Boolean(market?.displacement),
-    breakout:Boolean(market?.breakout),
-    retest:Boolean(market?.retest),
-    volume:Number(market?.volume||0),
-    adx:Number(market?.adx||0),
-    rsi:Number(market?.rsi||0),
-    emaFast:Number(market?.emaFast||0),
-    emaSlow:Number(market?.emaSlow||0),
-    velocityPoints:Number(market?.velocityPoints||0),
+    botId,symbol:market?.symbol,timeframe:market?.timeframe,
+    priceBucket:Math.round(price/(atr*.2)),
+    spreadBucket:Math.round(num(market?.spread)/(atr*.05)),
+    atr:num(market?.atr),volatility:num(market?.volatility),trend:num(market?.trend),
+    momentum:num(market?.momentum),structure:String(market?.structure||""),
+    liquiditySweep:Boolean(market?.liquiditySweep),orderBlock:Boolean(market?.orderBlock),
+    fairValueGap:Boolean(market?.fairValueGap),displacement:Boolean(market?.displacement),
+    breakout:Boolean(market?.breakout),retest:Boolean(market?.retest),
+    adx:num(market?.adx),rsi:num(market?.rsi),emaFast:num(market?.emaFast),
+    emaSlow:num(market?.emaSlow),velocityPoints:num(market?.velocityPoints),
     deterministicSignal:String(analysis?.signal||"NO_SIGNAL"),
-    deterministicScoreBucket:Math.round(Number(analysis?.score||0)/2),
-    deterministicReason:String(analysis?.reason||""),
-    multiTimeframe:compactTimeframeFingerprint(market?.multiTimeframe)
+    deterministicScore:num(analysis?.score),
+    reason:String(analysis?.reason||"")
   });
 }
 
-function compactTimeframeFingerprint(value){
-  const clean=(item)=>item?({
-    timeframe:item.timeframe,
-    available:Boolean(item.available),
-    trend:Number(item.trend||0),
-    momentum:Number(item.momentum||0),
-    volatility:Number(item.volatility||0),
-    structure:String(item.structure||""),
-    adx:Number(item.adx||0),
-    rsi:Number(item.rsi||0),
-    emaFast:Number(item.emaFast||0),
-    emaSlow:Number(item.emaSlow||0),
-    breakout:Boolean(item.breakout),
-    retest:Boolean(item.retest)
-  }):null;
-  return {
-    profile:value?.profile||null,
-    regime:clean(value?.regime),
-    setup:clean(value?.setup),
-    execution:clean(value?.execution)
-  };
+function directionFromMarket(market={},analysis={}){
+  const trend=num(market.trend);
+  const momentum=num(market.momentum);
+  const score=trend*.55+momentum*.45;
+  if(score>.10)return "BUY";
+  if(score<-.10)return "SELL";
+  const s=candidateDirection(analysis.signal);
+  return s||"HOLD";
 }
 
-function normalizeSignal({botId,parsed}={}){
-  const direction=["BUY","SELL","HOLD"].includes(parsed?.direction) ? parsed.direction : "HOLD";
-  const engine=String(parsed?.engine||"");
-  return {
-    engine,
-    direction,
-    strategyMatch:Boolean(parsed?.strategyMatch),
-    trigger:String(parsed?.trigger||"NO_VALID_SETUP").slice(0,140),
-    riskFlags:Array.isArray(parsed?.riskFlags)
-      ? parsed.riskFlags.slice(0,8).map(x=>String(x).slice(0,100))
-      : [],
-    reason:String(parsed?.reason||"No strategy-specific signal.").slice(0,260),
-    engineAccepted:engine===String(botId),
-    at:Date.now()
-  };
-}
-
-export function getAiStrategySignal({userId,botId,market,analysis}={}){
-  if(!ai||!userId||!botId||!analysis)return null;
-  const item=signalCache.get(keyFor(userId,botId));
-  if(!item)return null;
-  if(Date.now()-item.at>TTL_MS)return null;
-  const fingerprint=snapshotFingerprint({botId,market,analysis});
-  if(item.fingerprint!==fingerprint)return null;
-  return item;
-}
-
-export async function warmAiStrategySignal({userId,botId,market,analysis,risk,tradePlan}={}){
-  if(!ai||!userId||!botId||!analysis)return null;
+function evaluateNativeSignal({botId,market={},analysis={},risk={}}={}){
   const profile=STRATEGY_PROFILES[botId];
   const bot=getBotDefinitions()[botId];
   if(!profile||!bot)return null;
 
-  const key=keyFor(userId,botId);
-  const now=Date.now();
-  const cached=signalCache.get(key);
-  if(cached && now-cached.at<COOLDOWN_MS && cached.fingerprint===snapshotFingerprint({botId,market,analysis})) return cached;
-  if(inflight.has(key)) return inflight.get(key);
+  const direction=directionFromMarket(market,analysis);
+  const dir=direction==="BUY"?1:direction==="SELL"?-1:0;
+  const trend=num(market.trend), momentum=num(market.momentum), velocity=num(market.velocityPoints);
+  const spread=num(market.spread), atr=Math.max(num(market.atr),1e-12);
+  const spreadRatio=Math.abs(spread)/atr;
+  const rsi=num(market.rsi), adx=num(market.adx), fast=num(market.emaFast), slow=num(market.emaSlow);
+  const tests=[];
 
-  const marketPayload={
-    symbol:market?.symbol,
-    timeframe:market?.timeframe,
-    price:Number(market?.price||0),
-    bid:Number(market?.bid||0),
-    ask:Number(market?.ask||0),
-    spread:Number(market?.spread||0),
-    atr:Number(market?.atr||0),
-    volatility:Number(market?.volatility||0),
-    trend:Number(market?.trend||0),
-    momentum:Number(market?.momentum||0),
-    volume:Number(market?.volume||0),
-    structure:String(market?.structure||""),
-    liquiditySweep:Boolean(market?.liquiditySweep),
-    orderBlock:Boolean(market?.orderBlock),
-    fairValueGap:Boolean(market?.fairValueGap),
-    displacement:Boolean(market?.displacement),
-    breakout:Boolean(market?.breakout),
-    retest:Boolean(market?.retest),
-    adx:Number(analysis?.adx14||market?.adx||0),
-    rsi:Number(analysis?.rsi14||market?.rsi||0),
-    emaFast:Number(analysis?.ema20||market?.emaFast||0),
-    emaSlow:Number(analysis?.ema50||market?.emaSlow||0),
-    velocityPoints:Number(analysis?.velocityPoints||market?.velocityPoints||0),
-    multiTimeframe:compactTimeframeFingerprint(market?.multiTimeframe)
-  };
+  if(botId==="strategic"){
+    tests.push(["trend",Math.abs(trend)>=.35,Math.abs(trend)*25]);
+    tests.push(["momentum",Math.sign(momentum)===dir&&Math.abs(momentum)>=.30,Math.abs(momentum)*20]);
+    tests.push(["structure",["bullish","bearish"].includes(String(market.structure||"").toLowerCase()),10]);
+    tests.push(["volatility",num(market.volatility)>0&&num(market.volatility)<.90,10]);
+  } else if(botId==="flipper"){
+    tests.push(["momentum",Math.sign(momentum)===dir&&Math.abs(momentum)>=.45,20]);
+    tests.push(["velocity",Math.sign(velocity)===dir&&Math.abs(velocity)>=.20,22]);
+    tests.push(["spread",spreadRatio<=.20,18]);
+    tests.push(["directional trend",Math.sign(trend)===dir||Math.abs(trend)<.20,15]);
+  } else if(botId==="breakout"){
+    tests.push(["breakout",Boolean(market.breakout)&&Math.sign(trend||momentum)===dir,28]);
+    tests.push(["retest",Boolean(market.retest),20]);
+    tests.push(["volatility",num(market.volatility)>=.35,16]);
+    tests.push(["momentum",Math.sign(momentum)===dir&&Math.abs(momentum)>=.30,16]);
+  } else if(botId==="smc-pro"){
+    tests.push(["structure",String(market.structure||"").toLowerCase()===(dir>0?"bullish":"bearish"),24]);
+    tests.push(["liquidity sweep",Boolean(market.liquiditySweep),18]);
+    tests.push(["displacement",Boolean(market.displacement),18]);
+    tests.push(["order block/FVG",Boolean(market.orderBlock||market.fairValueGap),15]);
+  } else if(botId==="ladder-flip"){
+    tests.push(["EMA trend",fast>0&&slow>0&&((fast>slow&&dir>0)||(fast<slow&&dir<0)),23]);
+    tests.push(["ADX",adx>=18,18]);
+    tests.push(["RSI",rsi>0&&((dir>0&&rsi>=52&&rsi<=72)||(dir<0&&rsi<=48&&rsi>=28)),17]);
+    tests.push(["velocity",Math.sign(velocity)===dir&&Math.abs(velocity)>=.10,16]);
+    tests.push(["spread",spreadRatio<=.25,12]);
+  }
 
-  const aiInput={
+  const evidence=tests.filter(x=>x[1]).map(x=>x[0]);
+  const score=Math.round(tests.length?tests.reduce((s,x)=>s+(x[1]?x[2]:0),0)/tests.reduce((s,x)=>s+x[2],0)*100:0);
+  const baseline=Number(analysis?.score||0);
+  const strategyMatch=dir!==0&&score>=65&&baseline>=50&&!(risk?.blocks||[]).length;
+  const signal=dir===0||!strategyMatch?"HOLD":direction;
+  const flags=[];
+  if((risk?.blocks||[]).length)flags.push(...risk.blocks.map(String));
+  if(spreadRatio>.25)flags.push("SPREAD_ELEVATED");
+  if(score<65)flags.push("STRATEGY_ALIGNMENT_BELOW_CORTEX_THRESHOLD");
+  if(baseline<50)flags.push("DETERMINISTIC_BASELINE_BELOW_THRESHOLD");
+
+  return {
     engine:botId,
-    strategyProfile:profile,
-    timeframeProfile:bot.timeframeProfile||{},
-    botDefinition:{
-      name:bot.name,
-      mode:bot.mode,
-      signalThreshold:bot.signalThreshold,
-      strategies:bot.strategies,
-      tradePlan:bot.tradePlan,
-      risk:bot.risk,
-      v8:bot.v8||null
-    },
-    deterministicAnalysis:analysis,
-    market:marketPayload,
-    risk:risk||{},
-    tradePlan:tradePlan||null
+    direction:signal,
+    strategyMatch,
+    trigger:evidence.length?evidence.join(" + "):"NO_VALID_SETUP",
+    riskFlags:flags.slice(0,8),
+    reason:(strategyMatch?"CORTEX strategy alignment confirmed from deterministic features. ":"CORTEX rejected the candidate because alignment is insufficient. ")+"Evidence: "+(evidence.join(", ")||"none")+".",
+    engineAccepted:true,
+    score,
+    evidence,
+    at:Date.now(),
+    expiresAt:Date.now()+TTL_MS,
+    model:MODEL,
+    source:"KINGBOT_CORTEX"
   };
+}
 
-  const prompt=`TARGET ENGINE: ${botId}
-TIMEFRAME PROFILE: ${JSON.stringify(bot.timeframeProfile || {})}
-STRATEGY PROFILE:
-${JSON.stringify(profile)}
+export function aiExecutionGateEnabled(){
+  // The legacy environment variable is intentionally ignored. KINGBOT Cortex
+  // is advisory and deterministic execution/risk controls remain authoritative.
+  return false;
+}
 
-BOT DEFINITION:
-${JSON.stringify(aiInput.botDefinition)}
+export function getAiStrategySignal({userId,botId,market,analysis}={}){
+  if(!userId||!botId||!analysis)return null;
+  const item=signalCache.get(keyFor(userId,botId));
+  if(!item||Date.now()-item.at>TTL_MS)return null;
+  if(item.fingerprint!==snapshotFingerprint({botId,market,analysis}))return null;
+  return item;
+}
 
-LIVE MARKET + ENGINE FEATURES:
-${JSON.stringify(marketPayload)}
-
-DETERMINISTIC ENGINE ANALYSIS:
-${JSON.stringify(analysis)}
-
-RISK CONTEXT:
-${JSON.stringify(risk||{})}
-
-TRADE PLAN CONTEXT:
-${JSON.stringify(tradePlan||null)}
-
-Produce the next strategy-specific signal for TARGET ENGINE ${botId}. The signal is a candidate for that engine, not permission to bypass deterministic validation or risk controls.`;
-
-  const run=(async()=>{
-    try{
-      const response=await ai.models.generateContent({
-        model:MODEL,
-        contents:prompt,
-        config:{
-          systemInstruction:SYSTEM,
-          maxOutputTokens:220,
-          responseMimeType:"application/json",
-          responseSchema:SIGNAL_SCHEMA,
-          thinkingConfig:{thinkingLevel:"low"}
-        }
-      });
-      const parsed=safeJson(response.text);
-      const item={
-        ...normalizeSignal({botId,parsed}),
-        fingerprint:snapshotFingerprint({botId,market,analysis}),
-        expiresAt:Date.now()+TTL_MS,
-        model:MODEL
-      };
-      signalCache.set(key,item);
-      return item;
-    }catch(error){
-      console.error("[KINGBOT AI SIGNAL]",error?.message||error);
-      const item={
-        engine:botId,
-        direction:"HOLD",
-        strategyMatch:false,
-        trigger:"AI_UNAVAILABLE",
-        riskFlags:["AI_SIGNAL_UNAVAILABLE"],
-        reason:"Gemini strategy signal unavailable; deterministic engine remains authoritative unless AI execution gating is explicitly enabled.",
-        engineAccepted:true,
-        fingerprint:snapshotFingerprint({botId,market,analysis}),
-        at:Date.now(),
-        expiresAt:Date.now()+2000,
-        model:MODEL
-      };
-      signalCache.set(key,item);
-      return item;
-    }finally{
-      inflight.delete(key);
-    }
-  })();
-
+export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={}){
+  if(!userId||!botId||!analysis)return null;
+  const fingerprint=snapshotFingerprint({botId,market,analysis});
+  const key=keyFor(userId,botId);
+  const cached=signalCache.get(key);
+  if(cached&&Date.now()-cached.at<COOLDOWN_MS&&cached.fingerprint===fingerprint)return cached;
+  if(inflight.has(key))return inflight.get(key);
+  const run=Promise.resolve().then(()=>{
+    const item={...evaluateNativeSignal({botId,market,analysis,risk}),fingerprint};
+    signalCache.set(key,item);
+    return item;
+  }).finally(()=>inflight.delete(key));
   inflight.set(key,run);
   return run;
 }
 
 export function routeAiSignalToEngine({botId,signal,candidateSignal}={}){
   const target=String(botId||"");
-  const direction=String(signal?.direction||"HOLD");
-  const candidateDirection=directionFromCandidate(candidateSignal);
+  const direction=upper(signal?.direction||"HOLD");
+  const candidate=candidateDirection(candidateSignal);
   const engineAccepted=Boolean(signal?.engineAccepted)&&String(signal?.engine||"")===target;
   const strategyAccepted=Boolean(signal?.strategyMatch);
-  const directionAccepted=!candidateDirection||candidateDirection===direction;
+  const directionAccepted=!candidate||candidate===direction;
   const confirm=engineAccepted&&strategyAccepted&&direction!=="HOLD"&&directionAccepted;
-  let status="AI_CONFIRMATION_REJECTED";
-  if(confirm)status="AI_ENGINE_SIGNAL_CONFIRMED";
-  else if(direction==="HOLD"||!signal)status="AI_SIGNAL_HOLD";
-  else if(!engineAccepted)status="AI_ENGINE_ROUTE_MISMATCH";
-  else if(!strategyAccepted)status="AI_STRATEGY_MISMATCH";
-  else if(!directionAccepted)status="AI_ENGINE_DIRECTION_MISMATCH";
-  return {
-    ...(signal||{}),
-    confirm,
-    status,
-    candidateDirection:candidateDirection||null
-  };
+  let status="CORTEX_CONFIRMATION_REJECTED";
+  if(confirm)status="CORTEX_ENGINE_SIGNAL_CONFIRMED";
+  else if(direction==="HOLD"||!signal)status="CORTEX_SIGNAL_HOLD";
+  else if(!engineAccepted)status="CORTEX_ENGINE_ROUTE_MISMATCH";
+  else if(!strategyAccepted)status="CORTEX_STRATEGY_MISMATCH";
+  else status="CORTEX_DIRECTION_MISMATCH";
+  return {...(signal||{}),confirm,status,candidateDirection:candidate||null};
 }
 
-// Backward-compatible exports used by older worker code.
 export function getAiTradeConfirmation({userId,botId,signal,market,analysis}={}){
-  const aiSignal=getAiStrategySignal({userId,botId,market,analysis});
-  if(!aiSignal)return null;
-  return routeAiSignalToEngine({botId,signal:aiSignal,candidateSignal:signal});
+  const x=getAiStrategySignal({userId,botId,market,analysis});
+  return x?routeAiSignalToEngine({botId,signal:x,candidateSignal:signal}):null;
 }
-
-export async function warmAiTradeConfirmation({userId,botId,signal,market,analysis,risk,tradePlan}={}){
-  const aiSignal=await warmAiStrategySignal({userId,botId,market,analysis,risk,tradePlan});
-  if(!aiSignal)return null;
-  return routeAiSignalToEngine({botId,signal:aiSignal,candidateSignal:signal});
+export async function warmAiTradeConfirmation({userId,botId,signal,market,analysis,risk}={}){
+  const x=await warmAiStrategySignal({userId,botId,market,analysis,risk});
+  return x?routeAiSignalToEngine({botId,signal:x,candidateSignal:signal}):null;
 }
-
 export function aiTradeGateStatus({userId,botId}={}){
-  const item=signalCache.get(keyFor(userId,botId));
-  if(!item)return {ready:false};
-  return {
-    ready:Date.now()-item.at<=TTL_MS,
-    engine:item.engine,
-    direction:item.direction,
-    strategyMatch:Boolean(item.strategyMatch),
-    engineAccepted:Boolean(item.engineAccepted),
-    trigger:item.trigger,
-    reason:item.reason,
-    riskFlags:item.riskFlags||[],
-    expiresAt:item.expiresAt,
-    model:item.model
-  };
+  const x=signalCache.get(keyFor(userId,botId));
+  return !x?{ready:false}:{ready:Date.now()-x.at<=TTL_MS,engine:x.engine,direction:x.direction,strategyMatch:Boolean(x.strategyMatch),engineAccepted:Boolean(x.engineAccepted),trigger:x.trigger,reason:x.reason,riskFlags:x.riskFlags||[],expiresAt:x.expiresAt,model:x.model,source:"KINGBOT_CORTEX"};
 }
