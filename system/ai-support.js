@@ -123,7 +123,7 @@
     const row = document.createElement("div");
     row.id = "chatTyping";
     row.className = "chat-message assistant";
-    row.innerHTML = '<div class="chat-bubble"><div class="chat-role">KINGBOT INTELLIGENCE · DEEP COGNITIVE PASS</div><div class="chat-typing"><i></i><i></i><i></i></div><div style="margin-top:8px;font:700 7px JetBrains Mono;color:var(--muted);letter-spacing:.08em">IDENTIFY → OBSERVE → CORRELATE → CHALLENGE → ADAPT → VERIFY</div></div>';
+    row.innerHTML = '<div class="chat-bubble"><div class="chat-role">KINGBOT INTELLIGENCE · ANALYZING</div><div class="chat-typing"><i></i><i></i><i></i></div><div style="margin-top:8px;font:700 7px JetBrains Mono;color:var(--muted);letter-spacing:.08em">Checking the relevant KINGBOT systems…</div></div>';
     container.appendChild(row);
     container.scrollTop = container.scrollHeight;
   }
@@ -460,26 +460,8 @@
     renderIdentity(data);
     let answer = String(reply.answer || data?.message || "KINGBOT AI returned no answer.");
 
-    const reasoning = [];
-    if (Array.isArray(reply.reasoningSummary) && reply.reasoningSummary.length) {
-      reasoning.push("COGNITIVE SYNTHESIS\n" + reply.reasoningSummary.slice(0,6).map(x => "• " + String(x)).join("\n"));
-    }
-    if (Array.isArray(reply.evidenceFor) && reply.evidenceFor.length) {
-      reasoning.push("EVIDENCE FOR\n" + reply.evidenceFor.slice(0,6).map(x => "• " + String(x)).join("\n"));
-    }
-    if (Array.isArray(reply.evidenceAgainst) && reply.evidenceAgainst.length) {
-      reasoning.push("COUNTER-EVIDENCE\n" + reply.evidenceAgainst.slice(0,6).map(x => "• " + String(x)).join("\n"));
-    }
-    if (Array.isArray(reply.uncertainties) && reply.uncertainties.length) {
-      reasoning.push("UNCERTAINTIES\n" + reply.uncertainties.slice(0,6).map(x => "• " + String(x)).join("\n"));
-    }
-    if (Array.isArray(reply.alternativeHypotheses) && reply.alternativeHypotheses.length) {
-      reasoning.push("ALTERNATIVE HYPOTHESES\n" + reply.alternativeHypotheses.slice(0,5).map(x => "• " + String(x)).join("\n"));
-    }
-    if (Array.isArray(reply.validationSteps) && reply.validationSteps.length) {
-      reasoning.push("VALIDATION STEPS\n" + reply.validationSteps.slice(0,5).map(x => "• " + String(x)).join("\n"));
-    }
-    if (reasoning.length) answer += "\n\n" + reasoning.join("\n\n");
+    // Internal cognitive telemetry is never rendered in the user-facing chat.
+    // The response should read like a real assistant, not a debug trace.
 
     const sources = Array.isArray(data?.sources) ? data.sources.slice(0,6) : [];
     if(sources.length){
@@ -557,7 +539,7 @@
       state.lastQueryAt = new Date();
       setText("lastQuery", state.lastQueryAt.toLocaleTimeString());
       setChatState("KINGBOT CORTEX ONLINE");
-      showToast("KINGBOT Cortex completed the cognitive pass.", "good");
+      showToast("KINGBOT response ready.", "good");
     } catch (error) {
       hideTyping();
       const messageText = error?.message || "KINGBOT AI is temporarily unavailable.";
