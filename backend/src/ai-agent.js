@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getBotDefinitions } from "./bot-engines.js";
 import { runNativeKingbotAI } from "./kingbot-native-ai.js";
