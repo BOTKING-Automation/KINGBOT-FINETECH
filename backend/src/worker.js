@@ -14,6 +14,7 @@ import { ensureSubscriptionSchema, expireStaleSubscriptions } from "./subscripti
 import { isAdminUser } from "./admin-access.js";
 import { ensureBotEngineSchema } from "./bot-engines.js";
 import { ensureBotRuntimeSchema } from "./bot-runtime.js";
+import { ensureGlobalRiskSchema, getGlobalRiskState, globalExecutionGate, recordWorkerHeartbeat } from "./global-risk.js";
 
 const { Pool } = pg;
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined }) : null;
@@ -37,6 +38,7 @@ async function ensureWorkerSchema(){
   await ensureBotEngineSchema(pool);
   await ensureBotRuntimeSchema(pool);
   await broker.ensureSchema();
+  await ensureGlobalRiskSchema(pool);
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_account_risk_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,baseline_date DATE NOT NULL,day_start_equity NUMERIC NOT NULL,peak_equity NUMERIC NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,provider,account_id))");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_execution_journal (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,execution_mode TEXT NOT NULL,symbol TEXT NOT NULL,side TEXT NOT NULL,volume NUMERIC NOT NULL,status TEXT NOT NULL,broker_result JSONB,error_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
 }
@@ -44,6 +46,26 @@ async function ensureWorkerSchema(){
 async function audit(userId,event,metadata){
   await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,$2,$3::jsonb)",[userId,event,JSON.stringify(metadata)]);
 }
+
+async function getGlobalRisk(){
+  const now=Date.now();
+  if(now-globalRiskCacheAt<GLOBAL_RISK_CACHE_MS)return globalRiskCache;
+  globalRiskCache=await getGlobalRiskState(pool);
+  globalRiskCacheAt=now;
+  return globalRiskCache;
+}
+
+async function heartbeat(details={}){
+  const now=Date.now();
+  if(now-lastHeartbeatWrite<HEARTBEAT_MS)return;
+  lastHeartbeatWrite=now;
+  await recordWorkerHeartbeat(pool,{workerId:WORKER_ID,workerRole:"execution",status:stopping?"STOPPING":"RUNNING",details:{
+    pollMs:WORKER_POLL_MS,maxParallelBots:MAX_PARALLEL_BOTS,
+    activeExecutions:activeExecutionKeys.size,
+    ...details
+  }}).catch(error=>console.warn("[KINGBOT HEARTBEAT] failed:",error?.message||error));
+}
+
 
 function indicators(candles=[]){
   const rows=candles.filter(x=>Number.isFinite(Number(x.open))&&Number.isFinite(Number(x.high))&&Number.isFinite(Number(x.low))&&Number.isFinite(Number(x.close))).slice(-100);
@@ -204,6 +226,14 @@ const ACCOUNT_CACHE_MS=2500;
 const POSITION_CACHE_MS=5000;
 const LOSS_CACHE_MS=5000;
 const CANDLE_CACHE_MIN_MS=5000;
+const GLOBAL_RISK_CACHE_MS=Math.max(500,Number(process.env.KINGBOT_GLOBAL_RISK_CACHE_MS||1500));
+const HEARTBEAT_MS=Math.max(2000,Number(process.env.KINGBOT_HEARTBEAT_MS||5000));
+const RECONCILIATION_MS=Math.max(5000,Number(process.env.KINGBOT_RECONCILIATION_MS||15000));
+const WORKER_ID=String(process.env.KINGBOT_WORKER_ID||process.env.RENDER_INSTANCE_ID||"execution-"+process.pid).trim();
+let globalRiskCache={tradingPaused:false,globalKillSwitch:false,reason:null};
+let globalRiskCacheAt=0;
+let lastHeartbeatWrite=0;
+const reconciliationCache=new Map();
 
 function ladderKey(userId,botId){return String(userId)+":"+String(botId);}
 function accountCacheKey(userId){return String(userId);}
@@ -222,6 +252,51 @@ async function getWorkerPositions(userId){
   if(cached && Date.now()-cached.at<POSITION_CACHE_MS)return cached.data;
   const data=(await broker.getPositions(userId)).data||[];
   workerPositionCache.set(key,{at:Date.now(),data});
+  return data;
+}
+
+async function reconcileBrokerState(userId,status,positions){
+  const provider=String(status?.broker||"").toLowerCase();
+  const accountId=String(status?.accountId||"");
+  if(!provider||!accountId)return {status:"UNKNOWN",checked:false};
+  const key=String(userId)+":"+provider+":"+accountId;
+  const cached=reconciliationCache.get(key);
+  if(cached&&Date.now()-cached.at<RECONCILIATION_MS)return cached.data;
+  const journal=await pool.query(
+    "SELECT client_id,bot_id,symbol,side,status,broker_result,created_at FROM kingbot_execution_journal WHERE user_id=$1 AND status IN ('SUBMITTED','PENDING') AND created_at>NOW()-INTERVAL '24 hours' ORDER BY created_at DESC LIMIT 200",
+    [userId]
+  );
+  const brokerPositionIds=new Set(positions.flatMap(positionIdentities).map(String));
+  let journalOpen=journal.rowCount;
+  let knownMatches=0;
+  const unresolved=[];
+  for(const row of journal.rows){
+    const refs=orderExecutionIds(row.broker_result);
+    if(refs.some(ref=>brokerPositionIds.has(String(ref)))){knownMatches++;continue;}
+    if(refs.length)unresolved.push({clientId:row.client_id,botId:row.bot_id,symbol:row.symbol,refs:refs.slice(0,12)});
+  }
+  const mismatch=unresolved.length;
+  const data={
+    checked:true,
+    status:mismatch===0?"MATCHED":"MISMATCH",
+    brokerPositions:positions.length,
+    journalOpen,
+    knownPositionMatches:knownMatches,
+    unresolvedReferences:mismatch,
+    checkedAt:new Date().toISOString()
+  };
+  await pool.query(
+    `INSERT INTO kingbot_broker_reconciliation(user_id,provider,account_id,status,broker_positions,journal_open,known_position_matches,unresolved_references,details,checked_at)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,NOW())
+     ON CONFLICT(user_id,provider,account_id) DO UPDATE SET status=EXCLUDED.status,broker_positions=EXCLUDED.broker_positions,
+       journal_open=EXCLUDED.journal_open,known_position_matches=EXCLUDED.known_position_matches,
+       unresolved_references=EXCLUDED.unresolved_references,details=EXCLUDED.details,checked_at=NOW()`,
+    [userId,provider,accountId,data.status,data.brokerPositions,data.journalOpen,data.knownPositionMatches,data.unresolvedReferences,JSON.stringify({unresolved})]
+  );
+  if(mismatch>0){
+    await audit(userId,"BROKER_RECONCILIATION_MISMATCH",{provider,accountId,...data,unresolved:unresolved.slice(0,20)});
+  }
+  reconciliationCache.set(key,{at:Date.now(),data});
   return data;
 }
 async function getWorkerCandles(userId,symbol,timeframe,limit=100){
@@ -795,11 +870,16 @@ async function execute(row){
   if(riskStateQ.rowCount){dayStart=riskStateQ.rows[0].baseline_date===today?Number(riskStateQ.rows[0].day_start_equity):Number(account.equity);peak=Math.max(Number(riskStateQ.rows[0].peak_equity)||Number(account.equity),Number(account.equity));}
   await pool.query("INSERT INTO kingbot_account_risk_state(user_id,provider,account_id,baseline_date,day_start_equity,peak_equity,updated_at) VALUES($1,$2,$3,$4,$5,$6,NOW()) ON CONFLICT(user_id,provider,account_id) DO UPDATE SET baseline_date=EXCLUDED.baseline_date,day_start_equity=EXCLUDED.day_start_equity,peak_equity=EXCLUDED.peak_equity,updated_at=NOW()",[userId,status.broker,status.accountId,today,dayStart,peak]);
   const losses=await consecutiveLosses(userId);
-  const authorization=authorizeOrder({limits:s,executionMode:s.executionMode,killSwitch:s.killSwitch,equity:Number(account.equity),dayStartEquity:dayStart,peakEquity:peak,openPositions:positions.length,requestedRiskPct:s.maxRiskPerTradePct,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,dataAgeMs:Date.now()-quoteTime,consecutiveLosses:losses,skipSpreadAtr:botId==="ladder-flip"&&String(status.broker||"").toLowerCase()==="deriv"});
+  const globalRisk=await getGlobalRisk();
+  const globalGate=globalExecutionGate(globalRisk);
+  const reconciliation=await reconcileBrokerState(userId,status,positions).catch(error=>({
+    checked:false,status:"ERROR",reason:String(error?.message||"BROKER_RECONCILIATION_FAILED").slice(0,180)
+  }));
+  const authorization=authorizeOrder({limits:s,executionMode:s.executionMode,killSwitch:s.killSwitch,globalKillSwitch:globalRisk.globalKillSwitch,globalTradingPaused:globalRisk.tradingPaused,equity:Number(account.equity),dayStartEquity:dayStart,peakEquity:peak,openPositions:positions.length,requestedRiskPct:s.maxRiskPerTradePct,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,dataAgeMs:Date.now()-quoteTime,consecutiveLosses:losses,skipSpreadAtr:botId==="ladder-flip"&&String(status.broker||"").toLowerCase()==="deriv"});
   const risk=authorization?.risk
     ? {...authorization.risk,allowed:Boolean(authorization.allowed),reason:authorization.reason||null}
     : authorization;
-  trace("RISK_EVALUATED",{signal:analysis.signal,score:analysis.score,riskAllowed:Boolean(risk?.allowed),blocked:risk?.blockedReasons||[],reason:risk?.reason||null});
+  trace("RISK_EVALUATED",{signal:analysis.signal,score:analysis.score,riskAllowed:Boolean(risk?.allowed),blocked:risk?.blockedReasons||[],reason:risk?.reason||null,globalExecution:globalGate,brokerReconciliation:reconciliation?.status||"UNKNOWN"});
 
   const aiMarket={
     symbol:config.symbol,timeframe:executionTimeframe,price:(bid+ask)/2,bid,ask,
@@ -953,6 +1033,8 @@ async function execute(row){
 
 async function cycle(){
   if(stopping||!pool)return;
+  await heartbeat();
+  await getGlobalRisk();
   if(Date.now()-lastSubscriptionSweep>30000){
     lastSubscriptionSweep=Date.now();
     await expireStaleSubscriptions(pool);
@@ -994,7 +1076,8 @@ export async function startWorker(){
     throw new Error("DATABASE_URL_REQUIRED");
   }
   await ensureWorkerSchema();
-  console.log("[KINGBOT WORKER] real broker execution loop started");
+  await heartbeat({startup:true});
+  console.log("[KINGBOT WORKER] real broker execution loop started with centralized risk control");
   const loop=async()=>{try{await cycle();}catch(error){console.error("[KINGBOT WORKER]",error?.message||error);}if(!stopping)timer=setTimeout(loop,WORKER_POLL_MS);};
   await loop();
 }
