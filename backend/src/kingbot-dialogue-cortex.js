@@ -266,7 +266,7 @@ function variantIndex(question,conversation=[]) {
 function responseBase(answer,nextAction="Tell me what you want to work on.",extra={}) {
   return {
     answer,
-    facts:["Native KINGBOT Dialogue Cortex interpreted the request using current text, semantic cues and recent conversation context; no external language model was used."],
+    facts:["KINGBOT is using the current request and relevant conversation context to keep the response on topic."],
     technicalAnalysis:[],
     setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No market setup requested.",invalidation:"Not applicable."},
     riskFlags:[],
