@@ -266,7 +266,7 @@ export function createFintechOpsRouter({pool}){
     try{
       const source=await pool.query("SELECT id,user_id,plan_id,amount_kes,mpesa_code,status,submitted_at,reviewed_at FROM kingbot_payments ORDER BY submitted_at DESC LIMIT 1000");let synced=0,skipped=0;
       for(const p of source.rows){const ref="subscription:"+p.mpesa_code;const q=await pool.query(`INSERT INTO kingbot_payment_intents(user_id,provider,external_reference,purpose,amount,currency,status,metadata,created_at,updated_at)
-        VALUES($1,'mpesa',$2,'subscription',$3,'KES',$4,$5::jsonb,COALESCE($6,NOW()),COALESCE($7,NOW())) ON CONFLICT(provider,external_reference) DO NOTHING RETURNING id`,[p.user_id,ref,Number(p.amount_kes||0),String(p.status||"pending").toLowerCase(),JSON.stringify({sourcePaymentId:p.id,planId:p.plan_id,mpesaCode:p.mpesa_code}),p.submitted_at,p.reviewed_at||p.submitted_at]);if(q.rowCount)synced++;else skipped();}
+        VALUES($1,'mpesa',$2,'subscription',$3,'KES',$4,$5::jsonb,COALESCE($6,NOW()),COALESCE($7,NOW())) ON CONFLICT(provider,external_reference) DO NOTHING RETURNING id`,[p.user_id,ref,Number(p.amount_kes||0),String(p.status||"pending").toLowerCase(),JSON.stringify({sourcePaymentId:p.id,planId:p.plan_id,mpesaCode:p.mpesa_code}),p.submitted_at,p.reviewed_at||p.submitted_at]);if(q.rowCount)synced++;else skipped++;}
       await audit(pool,a.id,"PAYMENT_SUBSCRIPTION_SYNC",{synced,skipped});res.json({ok:true,synced,skipped});
     }catch(error){res.status(500).json({ok:false,error:"Payment synchronization failed."});}
   });
