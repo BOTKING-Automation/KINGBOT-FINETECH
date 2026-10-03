@@ -245,13 +245,13 @@ export async function clearExecutionHalt(pool,{userId,provider,accountId,source=
   return q.rowCount>0;
 }
 
-export async function validateExecutionGovernance(pool,{userId,userEmail,botId,provider,accountId,symbol,executionMode}={}){
+export async function validateExecutionGovernance(pool,{userId,userEmail,botId,provider,accountId,accountType="*",symbol,executionMode}={}){
   const blocked=[];
   if(!pool)return {allowed:false,blockedReasons:["DATABASE_REQUIRED"]};
   const control=await pool.query(`SELECT halted,reason FROM kingbot_execution_controls WHERE user_id=$1 AND provider=$2 AND account_id=$3`,[userId,provider,accountId]);
   if(control.rowCount&&control.rows[0].halted)blocked.push("ACCOUNT_EXECUTION_HALTED");
   const reg=await pool.query(`SELECT status FROM kingbot_broker_registry WHERE provider=$1 AND (account_type='*' OR account_type=$2) AND bot_id=$3
-    ORDER BY CASE WHEN account_type=$2 THEN 0 ELSE 1 END LIMIT 1`,[provider,"*",botId]);
+    ORDER BY CASE WHEN account_type=$2 THEN 0 ELSE 1 END LIMIT 1`,[provider,accountType||"*",botId]);
   if(reg.rowCount&&String(reg.rows[0].status)==="RESTRICTED")blocked.push("BROKER_BOT_RESTRICTED");
   if(symbol){
     const blackout=await pool.query(`SELECT id,reason,starts_at,ends_at,severity FROM kingbot_market_blackouts
@@ -265,6 +265,7 @@ export async function validateExecutionGovernance(pool,{userId,userEmail,botId,p
     const l=licenses.rows[0];
     if(l.revoked_at||String(l.status)!=="ACTIVE")blocked.push("BOT_LICENSE_INACTIVE");
     if(l.expires_at && new Date(l.expires_at).getTime()+LICENSE_GRACE_SECONDS*1000<=Date.now())blocked.push("BOT_LICENSE_EXPIRED");
+    if(l.broker_account_id && String(l.broker_account_id)!==String(accountId||""))blocked.push("BOT_LICENSE_ACCOUNT_MISMATCH");
   }
   if(executionMode==="LIVE"&&String(userEmail||"").length===0)blocked.push("LIVE_IDENTITY_REQUIRED");
   return {allowed:blocked.length===0,blockedReasons:blocked};
