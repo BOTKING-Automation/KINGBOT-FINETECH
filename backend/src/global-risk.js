@@ -40,6 +40,7 @@ export async function ensureGlobalRiskSchema(pool){
     checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY(user_id,provider,account_id)
   )`);
+  await pool.query("ALTER TABLE kingbot_broker_reconciliation ADD COLUMN IF NOT EXISTS closed_trade_matches INTEGER NOT NULL DEFAULT 0;");
   await pool.query("CREATE INDEX IF NOT EXISTS kingbot_worker_heartbeat_seen_idx ON kingbot_worker_heartbeats(last_seen_at DESC);");
 }
 
