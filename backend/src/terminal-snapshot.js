@@ -58,14 +58,34 @@ export function registerTerminalSnapshot(app, { requireUser, pool, broker, first
         accountResult.status === "fulfilled"
           ? accountResult.value?.data || accountResult.value || entry.accountInfo || {}
           : entry.accountInfo || {};
+      if (accountResult.status !== "fulfilled") {
+        return res.status(503).json({
+          ok:false,
+          error:"BROKER_ACCOUNT_DATA_UNAVAILABLE",
+          reason:String(accountResult.reason?.message||"ACCOUNT_DATA_UNAVAILABLE").slice(0,300)
+        });
+      }
+      if (positionsResult.status !== "fulfilled") {
+        return res.status(503).json({
+          ok:false,
+          error:"BROKER_POSITIONS_UNAVAILABLE",
+          reason:String(positionsResult.reason?.message||"POSITIONS_UNAVAILABLE").slice(0,300)
+        });
+      }
+      if (ordersResult.status !== "fulfilled") {
+        return res.status(503).json({
+          ok:false,
+          error:"BROKER_ORDERS_UNAVAILABLE",
+          reason:String(ordersResult.reason?.message||"ORDERS_UNAVAILABLE").slice(0,300)
+        });
+      }
+
       const positionSource =
-        positionsResult.status === "fulfilled"
-          ? Array.isArray(positionsResult.value?.data)
-            ? positionsResult.value.data
-            : Array.isArray(positionsResult.value)
-              ? positionsResult.value
-              : []
-          : [];
+        Array.isArray(positionsResult.value?.data)
+          ? positionsResult.value.data
+          : Array.isArray(positionsResult.value)
+            ? positionsResult.value
+            : [];
       const positionRows = positionSource.map(mapPosition);
       const orderSource = ordersResult.status === "fulfilled"
         ? Array.isArray(ordersResult.value?.data) ? ordersResult.value.data : Array.isArray(ordersResult.value) ? ordersResult.value : []
