@@ -19,7 +19,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html{background:var(--bg);scroll-behavior:auto}
 body{
-  min-height:100vh;color:var(--text);font-family:Inter,sans-serif;position:relative;
+  min-height:0;color:var(--text);font-family:Inter,sans-serif;position:relative;
   background:
     radial-gradient(circle at 12% 2%,rgba(25,255,114,.13),transparent 25%),
     radial-gradient(circle at 88% 8%,rgba(25,230,255,.10),transparent 23%),
@@ -42,7 +42,7 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 @keyframes lightSweep{0%{transform:translateX(-130%) rotate(12deg)}100%{transform:translateX(430%) rotate(12deg)}}
 a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 .mono{font-family:"JetBrains Mono",monospace}.orbitron{font-family:Orbitron,sans-serif}
-.shell{width:min(1640px,calc(100% - 30px));margin:0 auto;padding:18px 0 18px}
+.shell{width:min(1640px,calc(100% - 30px));margin:0 auto;padding:18px 0 0}.kb-terminal-page{min-height:0!important;height:auto!important}
 .topbar{
   position:sticky;top:0;z-index:50;border-bottom:1px solid rgba(25,255,114,.12);
   background:rgba(1,7,4,.84);backdrop-filter:blur(20px);
@@ -298,7 +298,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 @media(max-width:480px){.grid-4{grid-template-columns:1fr}.sync-grid{grid-template-columns:1fr}.hero h1{font-size:28px}.plan-grid{grid-template-columns:repeat(2,1fr)}.quote-grid{grid-template-columns:1fr 1fr}.hero-actions .btn{width:100%}}
 </style>
 </head>
-<body>
+<body class="kb-terminal-page">
 <div data-kingbot-navigation></div>
 
 <header class="topbar">
@@ -635,6 +635,23 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 
 <div class="toast" id="toast"><strong id="toastTitle">KINGBOT</strong><span id="toastMessage">—</span></div>
 
+<script>
+(function(){
+  function clampTerminalDocument(){
+    const main=document.querySelector("main.shell");
+    if(!main)return;
+    const rect=main.getBoundingClientRect();
+    const contentBottom=Math.max(0,Math.ceil(rect.bottom+window.scrollY));
+    document.documentElement.style.minHeight="0";
+    document.body.style.minHeight="0";
+    document.body.style.height=Math.max(contentBottom,window.innerHeight)+"px";
+  }
+  window.addEventListener("load",()=>requestAnimationFrame(clampTerminalDocument),{once:true});
+  window.addEventListener("resize",()=>requestAnimationFrame(clampTerminalDocument));
+  window.setTimeout(clampTerminalDocument,1200);
+  window.setTimeout(clampTerminalDocument,3000);
+})();
+</script>
 <script src="system/session.js?v=20261001-terminal"></script>
 <script>
 (function(){
