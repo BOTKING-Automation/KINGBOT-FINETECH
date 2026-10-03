@@ -107,7 +107,9 @@ export class Mt5BridgeRegistry{
     const mt5Login=clean(login,64),mt5Server=clean(server,120);
     if(!/^\d+$/.test(mt5Login))return {ok:false,status:400,error:"MT5_LOGIN_REQUIRED"};
     const active=await this.pool.query("SELECT provider,account_id,execution_mode FROM kingbot_broker_accounts WHERE user_id=$1 AND enabled=TRUE ORDER BY updated_at DESC LIMIT 1",[row.user_id]);
-    if(active.rowCount&&String(active.rows[0].provider).toLowerCase()!=="mt5-bridge")
+    const activeProvider=active.rowCount?String(active.rows[0].provider||"").toLowerCase():"";
+    const legacyDerivSwitch=activeProvider==="deriv";
+    if(active.rowCount&&activeProvider!=="mt5-bridge"&&activeProvider!=="deriv")
       return {ok:false,status:409,error:"BROKER_ALREADY_CONNECTED"};
     if(active.rowCount&&String(active.rows[0].account_id)!==mt5Login)
       return {ok:false,status:409,error:"MT5_BRIDGE_ACCOUNT_MISMATCH"};
@@ -127,7 +129,9 @@ export class Mt5BridgeRegistry{
     if(!active.rowCount){
       return {ok:true,needsMapping:true,userId:row.user_id,tokenId:row.id,login:mt5Login,server:mt5Server,accountType:terminalMode,mode:expected,displayMode:displayMode(expected),connected:true};
     }
-    return {ok:true,userId:row.user_id,tokenId:row.id,login:mt5Login,server:mt5Server,accountType:terminalMode,mode:expected,displayMode:displayMode(expected),connected:true};
+    const response={ok:true,userId:row.user_id,tokenId:row.id,login:mt5Login,server:mt5Server,accountType:terminalMode,mode:expected,displayMode:displayMode(expected),connected:true};
+    if(legacyDerivSwitch)response.migrateFrom="deriv";
+    return response;
   }
 
   async queueCommand({userId,command}={}){
