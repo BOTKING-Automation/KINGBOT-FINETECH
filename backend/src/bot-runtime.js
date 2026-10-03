@@ -42,7 +42,7 @@ export function createBotRuntimeRouter({pool,broker}){
 
   router.get("/",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
-    const bots=await Promise.all(Object.values(getBotDefinitions()).map(async b=>{const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id),entitled=await entitlement(pool,user.id,b.id,user.email);return {botId:b.id,name:b.name,mode:b.mode||null,entitled,runtime:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||b.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null,signalThreshold:b.signalThreshold||null,tradePlan:b.tradePlan||null,strategies:b.strategies||[]};}));
+    const bots=await Promise.all(Object.values(getBotDefinitions()).map(async b=>{const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id),entitled=await entitlement(pool,user.id,b.id,user.email);return {botId:b.id,name:b.name,mode:b.mode||null,entitled,runtime:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||bot.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null,signalThreshold:b.signalThreshold||null,tradePlan:b.tradePlan||null,strategies:b.strategies||[]};}));
     res.json({ok:true,bots});
   });
 
@@ -67,26 +67,27 @@ export function createBotRuntimeRouter({pool,broker}){
       ok:true,
       selectedBotId,
       updatedAt:q.rows[0].updated_at,
-      bot:{botId:bot.id,name:bot.name,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||b.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null}
+      bot:{botId:bot.id,name:bot.name,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||bot.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null}
     });
   });
 
   router.post("/selection",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
     const botId=String(req.body?.botId||"").trim();
-    if(!getBotDefinitions()[botId])return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
+    const bot=getBotDefinitions()[botId];
+    if(!bot)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
     if(!(await entitlement(pool,user.id,botId,user.email)))return res.status(403).json({ok:false,error:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     await claimActiveBot(pool,user.id,botId);
     await audit(pool,user.id,"BOT_SELECTION_SAVED",{botId});
     const r=await runtime(pool,user.id,botId),s=await settings(pool,user.id,botId);
-    res.json({ok:true,selectedBotId:botId,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||b.timeframeProfile?.execution||"5m"});
+    res.json({ok:true,selectedBotId:botId,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||bot.timeframeProfile?.execution||"5m"});
   });
   router.get("/:botId",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
     const b=getBotDefinitions()[req.params.botId];if(!b)return res.status(404).json({ok:false,error:"BOT_NOT_FOUND"});
     if(!(await entitlement(pool,user.id,b.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id);
-    res.json({ok:true,botId:b.id,state:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||b.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null,signalThreshold:b.signalThreshold||null,tradePlan:b.tradePlan||null,strategies:b.strategies||[]});
+    res.json({ok:true,botId:b.id,state:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||bot.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null,signalThreshold:b.signalThreshold||null,tradePlan:b.tradePlan||null,strategies:b.strategies||[]});
   });
 
   router.post("/:botId/start",async(req,res)=>{
