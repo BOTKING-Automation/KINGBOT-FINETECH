@@ -1,0 +1,396 @@
+import { GoogleGenAI } from "@google/genai";
+import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
+import { runStandaloneMarketScan } from "./ai-market-scanner.js";
+
+const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
+const MODEL = String(process.env.GEMINI_ORCHESTRATOR_MODEL || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite");
+const API_KEY = String(process.env.GEMINI_API_KEY || "").trim();
+const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
+const CACHE_MS = Math.max(2500, Number(process.env.KINGBOT_INTELLIGENCE_CACHE_MS || 7000));
+const cache = new Map();
+
+const SYNTHESIS_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    regime: { type: "string" },
+    bias: { type: "string" },
+    confidence: { type: "number" },
+    selectedEngine: { type: "string" },
+    summary: { type: "string" },
+    risks: { type: "array", items: { type: "string" } },
+    watch: { type: "array", items: { type: "string" } }
+  },
+  required: ["regime", "bias", "confidence", "selectedEngine", "summary", "risks", "watch"]
+};
+
+const num = (v, fallback = null) => Number.isFinite(Number(v)) ? Number(v) : fallback;
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+const bool = v => Boolean(v);
+const upper = v => String(v || "").trim().toUpperCase();
+const lower = v => String(v || "").trim().toLowerCase();
+
+function freshness(value, maxAgeMs = 5000) {
+  const t = Date.parse(value || "");
+  if (!Number.isFinite(t)) return { ok: false, ageMs: null, reason: "MARKET_TIMESTAMP_MISSING" };
+  const ageMs = Math.max(0, Date.now() - t);
+  return { ok: ageMs <= maxAgeMs, ageMs, reason: ageMs <= maxAgeMs ? null : "MARKET_DATA_STALE" };
+}
+
+function normalizeMarket(input = {}) {
+  return {
+    symbol: upper(input.symbol),
+    timeframe: lower(input.timeframe || "15m"),
+    price: num(input.price ?? input.close, 0),
+    bid: num(input.bid),
+    ask: num(input.ask),
+    spread: num(input.spread, 0),
+    atr: num(input.atr ?? input.atr14, 0),
+    volatility: num(input.volatility, 0),
+    trend: clamp(num(input.trend ?? input.trendScore, 0), -1, 1),
+    momentum: clamp(num(input.momentum, 0), -1, 1),
+    volume: clamp(num(input.volume ?? input.volumeScore, 0), 0, 1),
+    structure: lower(input.structure || "unknown"),
+    liquiditySweep: bool(input.liquiditySweep),
+    orderBlock: bool(input.orderBlock),
+    fairValueGap: bool(input.fairValueGap ?? input.fvg),
+    displacement: bool(input.displacement),
+    breakout: bool(input.breakout),
+    retest: bool(input.retest),
+    adx: num(input.adx ?? input.adx14),
+    rsi: num(input.rsi ?? input.rsi14),
+    emaFast: num(input.emaFast ?? input.ema20),
+    emaSlow: num(input.emaSlow ?? input.ema50),
+    velocityPoints: num(input.velocityPoints, 0),
+    timestamp: input.timestamp || input.time || input.receivedAt || null,
+    multiTimeframe: input.multiTimeframe || null
+  };
+}
+
+function analyzeTechnical(m) {
+  const structureScore = m.structure === "bullish" ? 1 : m.structure === "bearish" ? -1 : 0;
+  const smc = (m.liquiditySweep ? 0.25 : 0) + (m.displacement ? 0.2 : 0) + (m.orderBlock ? 0.1 : 0) + (m.fairValueGap ? 0.1 : 0);
+  const breakout = m.breakout ? 0.25 : 0;
+  const retest = m.retest ? 0.12 : 0;
+  const score = clamp((m.trend * 0.35) + (m.momentum * 0.2) + (structureScore * 0.2) + smc + breakout + retest, -1, 1);
+  return {
+    id: "technical",
+    name: "TECHNICAL ANALYST",
+    score: Math.round(score * 100),
+    bias: score > 0.18 ? "BULLISH" : score < -0.18 ? "BEARISH" : "NEUTRAL",
+    evidence: [
+      "trend=" + m.trend.toFixed(2),
+      "momentum=" + m.momentum.toFixed(2),
+      "structure=" + m.structure,
+      "liquiditySweep=" + (m.liquiditySweep ? "yes" : "no"),
+      "displacement=" + (m.displacement ? "yes" : "no"),
+      "FVG=" + (m.fairValueGap ? "yes" : "no"),
+      "breakout=" + (m.breakout ? "yes" : "no")
+    ],
+    status: "VERIFIED_MARKET_FEATURES"
+  };
+}
+
+function analyzeRegime(m) {
+  const trendMagnitude = Math.abs(m.trend);
+  const vol = m.volatility;
+  const regime = trendMagnitude >= 0.55
+    ? (vol >= 0.65 ? "TRENDING_VOLATILE" : "TRENDING")
+    : (vol >= 0.65 ? "EXPANSION" : vol <= 0.12 ? "LOW_VOLATILITY" : "RANGE");
+  const score = clamp((m.trend * 55) + (m.momentum * 25) + ((vol - 0.5) * 15), -100, 100);
+  return {
+    id: "regime",
+    name: "REGIME ANALYST",
+    score: Math.round(score),
+    regime,
+    bias: score > 15 ? "BULLISH" : score < -15 ? "BEARISH" : "NEUTRAL",
+    evidence: ["trendMagnitude=" + trendMagnitude.toFixed(2), "volatility=" + vol.toFixed(2), "momentum=" + m.momentum.toFixed(2)],
+    status: "REGIME_CLASSIFIED"
+  };
+}
+
+function analyzeExecution(m) {
+  const atr = Math.max(Math.abs(m.atr || 0), 1e-12);
+  const spreadRatio = Math.abs(m.spread || 0) / atr;
+  const stale = freshness(m.timestamp, Math.max(3000, Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)));
+  const quality = clamp(100 - spreadRatio * 100 - (stale.ok ? 0 : 45), 0, 100);
+  const flags = [];
+  if (!m.symbol) flags.push("SYMBOL_MISSING");
+  if (!(m.price > 0)) flags.push("PRICE_MISSING");
+  if (!(m.atr > 0)) flags.push("ATR_MISSING");
+  if (!stale.ok) flags.push(stale.reason);
+  if (spreadRatio > 0.25) flags.push("SPREAD_ELEVATED_VS_ATR");
+  return {
+    id: "execution",
+    name: "EXECUTION CONDITIONS ANALYST",
+    score: Math.round(quality),
+    bias: "NEUTRAL",
+    spreadRatio: Number(spreadRatio.toFixed(4)),
+    stale: !stale.ok,
+    dataAgeMs: stale.ageMs,
+    flags,
+    status: flags.length ? "CAUTION" : "EXECUTION_CONTEXT_READY"
+  };
+}
+
+function analyzeMacroAndSentiment(input) {
+  const macro = input.macro || input.macroContext || {};
+  const sentiment = input.sentiment || input.sentimentContext || {};
+  const news = input.news || input.newsContext || {};
+  const available = [macro, sentiment, news].some(x => x && Object.keys(x).length);
+  const biasValues = [macro?.bias, sentiment?.bias, news?.bias].filter(Boolean).map(upper);
+  const bullish = biasValues.filter(v => v.includes("BULL")).length;
+  const bearish = biasValues.filter(v => v.includes("BEAR")).length;
+  const bias = bullish === bearish ? "NEUTRAL" : bullish > bearish ? "BULLISH" : "BEARISH";
+  return {
+    id: "context",
+    name: "MACRO + SENTIMENT ANALYST",
+    score: bias === "BULLISH" ? 50 : bias === "BEARISH" ? -50 : 0,
+    bias,
+    available,
+    evidence: available ? { macro, sentiment, news } : null,
+    status: available ? "CONTEXT_ATTACHED" : "WAITING_FOR_CONTEXT"
+  };
+}
+
+function engineFit(botId, market, regime) {
+  const result = evaluateBot(botId, market);
+  let fit = clamp(Math.abs(Number(result.score || 0)), 0, 100);
+  if (botId === "smc-pro") {
+    if (market.liquiditySweep) fit += 8;
+    if (market.displacement) fit += 7;
+    if (market.orderBlock || market.fairValueGap) fit += 5;
+  }
+  if (botId === "breakout") {
+    if (market.breakout) fit += 10;
+    if (market.retest) fit += 7;
+  }
+  if (botId === "flipper") {
+    if (Math.abs(market.momentum) >= 0.55) fit += 8;
+    if (market.spread > 0 && market.atr > 0 && market.spread / market.atr < 0.15) fit += 8;
+  }
+  if (botId === "ladder-flip") {
+    if (Number.isFinite(market.adx) && market.adx >= 18) fit += 7;
+    if (Number.isFinite(market.rsi) && ((result.score > 0 && market.rsi >= 50) || (result.score < 0 && market.rsi <= 50))) fit += 6;
+  }
+  if (botId === "strategic" && String(regime.regime).startsWith("TRENDING")) fit += 6;
+  return {
+    botId,
+    name: getBotDefinitions()[botId]?.name || botId,
+    signal: result.signal || "NO_SIGNAL",
+    score: Number(result.score || 0),
+    fit: Math.round(clamp(fit, 0, 100)),
+    strategyMatch: Math.abs(Number(result.score || 0)) >= Number(getBotDefinitions()[botId]?.signalThreshold || 75),
+    reason: result.reason || "No reason supplied",
+    timeframeProfile: getBotDefinitions()[botId]?.timeframeProfile || {}
+  };
+}
+
+function buildDebate(analysts, engines, market) {
+  const bullCase = [];
+  const bearCase = [];
+  for (const agent of analysts) {
+    if (agent.bias === "BULLISH") bullCase.push(agent.name + ": " + agent.score);
+    if (agent.bias === "BEARISH") bearCase.push(agent.name + ": " + agent.score);
+  }
+  for (const engine of engines) {
+    if (engine.signal === "LONG_CANDIDATE") bullCase.push(engine.name + ": " + engine.score);
+    if (engine.signal === "SHORT_CANDIDATE") bearCase.push(engine.name + ": " + engine.score);
+  }
+  if (market.liquiditySweep && market.displacement) bullCase.push("SMC sequence: sweep + displacement present");
+  if (market.breakout && market.retest) bullCase.push("Breakout + retest confirmed");
+  return {
+    bullCase: bullCase.slice(0, 10),
+    bearCase: bearCase.slice(0, 10),
+    direction: bullCase.length > bearCase.length ? "BULLISH" : bearCase.length > bullCase.length ? "BEARISH" : "NEUTRAL",
+    balance: { bullCount: bullCase.length, bearCount: bearCase.length, delta: bullCase.length - bearCase.length },
+    status: "ADVERSARIAL_REVIEW_COMPLETE"
+  };
+}
+
+function riskCouncil(market, engines, riskContext = {}) {
+  const blocks = [];
+  const flags = [];
+  if (!(market.price > 0) || !(market.atr > 0)) blocks.push("MARKET_DATA_INCOMPLETE");
+  if (Number(market.spread) > 0 && Number(market.atr) > 0 && Number(market.spread) / Number(market.atr) > Number(riskContext.maxSpreadAtrRatio ?? 0.25)) blocks.push("SPREAD_GATE");
+  const stale = freshness(market.timestamp, Number(riskContext.staleDataMs || 5000));
+  if (!stale.ok) blocks.push(stale.reason || "STALE_DATA");
+  if (bool(riskContext.killSwitch)) blocks.push("BOT_KILL_SWITCH");
+  if (bool(riskContext.globalKillSwitch)) blocks.push("GLOBAL_KILL_SWITCH");
+  if (bool(riskContext.globalTradingPaused)) blocks.push("GLOBAL_TRADING_PAUSED");
+  if (upper(riskContext.executionMode || "DEMO") === "LIVE" && !bool(riskContext.liveAuthorized)) blocks.push("LIVE_NOT_AUTHORIZED");
+  if (!engines.some(e => e.strategyMatch)) flags.push("NO_ENGINE_MEETS_SIGNAL_THRESHOLD");
+  const bestFit = Math.max(...engines.map(e => e.fit), 0);
+  const advisory = bestFit >= 82 ? "NORMAL" : "ELEVATED";
+  return {
+    status: blocks.length ? "BLOCKED" : advisory,
+    blocks,
+    flags,
+    aggressiveCase: "Maximum engine fit " + Math.round(bestFit) + "/100",
+    conservativeCase: flags.length ? flags.join(", ") : "No additional deterministic advisory risk flags.",
+    neutralCase: blocks.length ? "Hard blockers present: " + blocks.join(", ") : "No hard blocker detected by this advisory council.",
+    executionAuthority: "NONE"
+  };
+}
+
+function chooseEngine(engines, debate) {
+  const sorted = [...engines].sort((a, b) => b.fit - a.fit || Math.abs(b.score) - Math.abs(a.score));
+  const top = sorted[0] || null;
+  if (!top) return { selectedEngine: null, reason: "NO_ENGINE" };
+  const direction = top.score > 0 ? "BUY" : top.score < 0 ? "SELL" : "HOLD";
+  if (debate.direction !== "NEUTRAL" && ((debate.direction === "BULLISH" && direction !== "BUY") || (debate.direction === "BEARISH" && direction !== "SELL"))) {
+    return { selectedEngine: null, reason: "ENGINE_DEBATE_DIVERGENCE", candidate: top };
+  }
+  return { selectedEngine: top.botId, candidate: top, reason: "HIGHEST_STRATEGY_FIT" };
+}
+
+const safeParse = value => {
+  try { return JSON.parse(String(value || "")); } catch { return null; }
+};
+
+async function synthesize(payload) {
+  if (!ai) return { provider: "deterministic", model: null, result: null };
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL,
+      contents: JSON.stringify(payload),
+      config: {
+        systemInstruction: "You are the KINGBOT Intelligence Orchestrator. Synthesize only supplied verified evidence. Never invent market data. You are advisory and have ZERO execution authority. Explain disagreement. Return compact JSON.",
+        maxOutputTokens: 500,
+        responseMimeType: "application/json",
+        responseSchema: SYNTHESIS_SCHEMA,
+        thinkingConfig: { thinkingLevel: "low" }
+      }
+    });
+    const parsed = safeParse(response.text);
+    if (!parsed) throw new Error("ORCHESTRATOR_AI_INVALID_JSON");
+    return { provider: "gemini", model: MODEL, result: parsed };
+  } catch (error) {
+    return { provider: "deterministic", model: null, result: null, error: String(error?.message || "AI_SYNTHESIS_FAILED").slice(0, 160) };
+  }
+}
+
+function cacheKey(market, options = {}) {
+  return JSON.stringify({
+    symbol: market.symbol,
+    timeframe: market.timeframe,
+    price: market.price,
+    atr: market.atr,
+    spread: market.spread,
+    trend: market.trend,
+    momentum: market.momentum,
+    structure: market.structure,
+    liquiditySweep: market.liquiditySweep,
+    displacement: market.displacement,
+    breakout: market.breakout,
+    retest: market.retest,
+    botId: options.botId || null
+  });
+}
+
+export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {} } = {}) {
+  const market = normalizeMarket(inputMarket);
+  const key = cacheKey(market, options);
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.at <= CACHE_MS) return { ...cached.result, cached: true };
+
+  const technical = analyzeTechnical(market);
+  const regime = analyzeRegime(market);
+  const execution = analyzeExecution(market);
+  const context = analyzeMacroAndSentiment(inputMarket);
+  const analysts = [technical, regime, context, execution];
+  const engines = BOT_IDS.map(id => engineFit(id, market, regime));
+  const debate = buildDebate(analysts, engines, market);
+  const routing = chooseEngine(engines, debate);
+  const risk = riskCouncil(market, engines, riskContext);
+
+  let tradePlan = null;
+  if (routing.selectedEngine && routing.candidate && risk.blocks.length === 0) {
+    const side = routing.candidate.score > 0 ? "BUY" : routing.candidate.score < 0 ? "SELL" : "HOLD";
+    if (side !== "HOLD") tradePlan = getTradePlan(routing.selectedEngine, market, side);
+  }
+
+  const result = {
+    ok: true,
+    orchestrator: "KINGBOT INTELLIGENCE ORCHESTRATOR",
+    version: "1.0.0",
+    generatedAt: new Date().toISOString(),
+    market: { ...market, freshness: freshness(market.timestamp, Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)) },
+    analysts,
+    debate,
+    engines,
+    routing: { ...routing, direction: routing.candidate ? (routing.candidate.score > 0 ? "BUY" : routing.candidate.score < 0 ? "SELL" : "HOLD") : "HOLD" },
+    tradePlan,
+    riskCouncil: risk,
+    execution: {
+      authority: "NONE",
+      authorized: false,
+      nextStep: risk.blocks.length
+        ? "Resolve deterministic risk blockers."
+        : routing.selectedEngine
+          ? "Pass TradePlan through the deterministic risk engine before execution."
+          : "Wait for stronger aligned evidence."
+    }
+  };
+
+  const synthesis = await synthesize(result);
+  result.aiSynthesis = synthesis;
+  result.summary = synthesis.result || {
+    regime: regime.regime,
+    bias: debate.direction,
+    confidence: Math.round(clamp((Math.max(...engines.map(e => e.fit), 0) * 0.45) + (Math.abs(debate.balance.delta) * 5 * 0.25) + (execution.score * 0.30), 0, 100)),
+    selectedEngine: routing.selectedEngine || "",
+    summary: routing.selectedEngine
+      ? "KINGBOT routed the current market state toward " + routing.selectedEngine + " from deterministic strategy fit and adversarial evidence."
+      : "KINGBOT did not route a live candidate because the evidence is not sufficiently aligned.",
+    risks: [...risk.blocks, ...risk.flags],
+    watch: engines.filter(e => !e.strategyMatch).slice(0, 3).map(e => e.botId + ": below strategy threshold")
+  };
+
+  cache.set(key, { at: Date.now(), result });
+  return result;
+}
+
+export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelveData } = {}) {
+  app.post("/api/ai/intelligence/orchestrate", async (req, res) => {
+    try {
+      const user = await requireUser(pool, req, res);
+      if (!user) return;
+      let market = req.body?.market && typeof req.body.market === "object" ? req.body.market : null;
+      const symbol = upper(req.body?.symbol || market?.symbol || "XAUUSD");
+      const timeframe = lower(req.body?.timeframe || market?.timeframe || "15m");
+      if (!market || !(Number(market.price) > 0)) {
+        const scan = await runStandaloneMarketScan({ pool, twelveData, symbols: symbol, timeframe });
+        const technical = Array.isArray(scan?.technical) ? scan.technical.find(x => x.symbol === symbol) || scan.technical[0] : null;
+        const quote = Array.isArray(scan?.quotes) ? scan.quotes.find(x => x.symbol === symbol) || scan.quotes[0] : null;
+        market = { ...(technical || {}), ...(quote || {}), symbol, timeframe, timestamp: quote?.timestamp ? new Date(quote.timestamp).toISOString() : (technical?.dataFreshness || technical?.barTime || null) };
+        market.aiScanner = { provider: scan?.provider || "none", model: scan?.model || null, source: scan?.source || null, aiError: scan?.aiError || null };
+      }
+      const result = await orchestrateKingbotIntelligence({
+        market,
+        riskContext: req.body?.riskContext || {},
+        options: { botId: req.body?.botId || null }
+      });
+      res.json({ ...result, brokerExecution: "NOT_AUTHORIZED_BY_ORCHESTRATOR" });
+    } catch (error) {
+      console.error("[KINGBOT ORCHESTRATOR]", error?.message || error);
+      res.status(502).json({ ok: false, error: "KINGBOT_INTELLIGENCE_ORCHESTRATOR_FAILED", reason: String(error?.message || "ORCHESTRATOR_FAILED").slice(0, 220) });
+    }
+  });
+
+  app.get("/api/ai/intelligence/status", async (req, res) => {
+    const user = await requireUser(pool, req, res);
+    if (!user) return;
+    res.json({
+      ok: true,
+      orchestrator: "KINGBOT INTELLIGENCE ORCHESTRATOR",
+      version: "1.0.0",
+      agents: ["TECHNICAL ANALYST", "REGIME ANALYST", "MACRO + SENTIMENT ANALYST", "EXECUTION CONDITIONS ANALYST", "BULL RESEARCHER", "BEAR RESEARCHER", "RISK COUNCIL", "STRATEGY ROUTER"],
+      engines: BOT_IDS,
+      aiSynthesis: Boolean(ai),
+      model: ai ? MODEL : null,
+      executionAuthority: "NONE",
+      cacheMs: CACHE_MS
+    });
+  });
+}
