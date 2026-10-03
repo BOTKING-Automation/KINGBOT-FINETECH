@@ -1248,7 +1248,10 @@ body.kb-terminal-page:after{opacity:.13!important}
     $("balance").textContent=fmtMoney(a.balance,currency);$("equity").textContent=fmtMoney(a.equity,currency);$("floatingPnl").textContent=fmtMoney(a.floatingPnl,currency);$("dailyPnl").textContent=fmtMoney(a.dailyPnl,currency);$("margin").textContent=fmtMoney(a.margin,currency);$("freeMargin").textContent=fmtMoney(a.freeMargin,currency);$("positionCount").textContent=Number.isFinite(Number(a.positionCount))?String(a.positionCount):"—";$("drawdown").textContent=Number.isFinite(Number(a.totalDrawdownPct))?Number(a.totalDrawdownPct).toFixed(2)+"%":"—";
     $("floatingPnl").className="metric-value "+classForPnl(a.floatingPnl);$("dailyPnl").className="metric-value "+classForPnl(a.dailyPnl);
     $("broker").textContent=String(a.broker||"—").toUpperCase();$("accountId").textContent=a.accountId||"—";$("accountType").textContent=String(a.accountType||"—").toUpperCase();$("currency").textContent=currency||"—";$("executionMode").textContent=String(a.executionMode||"—").toUpperCase();$("tradingStatus").textContent=a.tradingEnabled===true?"ENABLED":a.tradingEnabled===false?"DISABLED":"UNKNOWN";
-    const demo=String(a.executionMode||"").toUpperCase()==="PAPER"||String(a.executionMode||"").toUpperCase()==="DEMO"||String(a.accountType||"").toUpperCase()==="DEMO";$("accountState").textContent=demo?"CONNECTED · DEMO":"CONNECTED · LIVE";$("accountState").style.color="var(--green)";$("accountNote").textContent="Broker-authoritative account telemetry received from the secured connection.";
+    const mode=String(a.executionMode||"").toUpperCase(),type=String(a.accountType||"").toUpperCase();
+    const demo=mode==="PAPER"||mode==="DEMO"||type==="DEMO";
+    const live=mode==="LIVE"||type==="REAL";
+    $("accountState").textContent=demo?"CONNECTED · DEMO":live?"CONNECTED · LIVE":"CONNECTED";$("accountState").style.color="var(--green)";$("accountNote").textContent="Broker-authoritative account telemetry received from the secured connection.";
     $("accountBadge").textContent=demo?"DEMO":"LIVE";$("syncAccountMain").textContent=(a.accountId||"ACCOUNT")+" · "+(Number.isFinite(Number(a.balance))?("BAL "+fmtMoney(a.balance,currency)):"ACCOUNT DATA");$("itTapePositions").textContent=Number.isFinite(Number(a.positionCount))?String(a.positionCount):"—";$("itAccountId").textContent=a.accountId||"—";$("itBroker").textContent=String(a.broker||"—").toUpperCase();$("itExecMode").textContent=String(a.executionMode||"—").toUpperCase();$("syncAccountState").textContent="LIVE";$("syncAccountState").className="sync-state live";
   }
 
@@ -1356,7 +1359,7 @@ body.kb-terminal-page:after{opacity:.13!important}
       const side=String(p.side||p.type||p.positionSide||"—").toUpperCase();
       const entry=positionNumber(p.entry,p.openPrice,p.entryPrice,p.open_price);
       const current=positionNumber(p.current,p.currentPrice,p.marketPrice,p.current_spot,p.current_tick,p.bidPrice,p.bid_price);
-      const volume=positionNumber(p.volume,p.lots,p.quantity,p.stake,p.buy_price);
+      const volume=positionNumber(p.volume,p.lots,p.quantity,p.stake);
       const sl=positionNumber(p.stopLoss,p.sl,p.stop_loss);
       const tp=positionNumber(p.takeProfit,p.tp,p.take_profit);
       const swap=positionNumber(p.swap,p.swapAmount,p.swap_amount);
@@ -1390,7 +1393,7 @@ body.kb-terminal-page:after{opacity:.13!important}
   });
   function renderOrders(rows){
     rows=Array.isArray(rows)?rows:[];$("ordersBadge").textContent=rows.length+" ORDERS";
-    $("ordersTable").innerHTML=rows.length?rows.map(o=>"<tr><td>"+esc(fmtTime(o.time))+"</td><td>"+esc(o.symbol)+"</td><td>"+esc(o.side)+"</td><td>"+esc(o.volume)+"</td><td>"+esc(o.price)+"</td><td><span class=\"pill\">"+esc(o.status||"OPEN")+"</span></td></tr>").join(""):"<tr><td colspan=\"6\"><div class=\"empty\"><strong>NO ORDER RECORDS</strong><span>No confirmed broker orders were returned.</span></div></td></tr>";
+    $("ordersTable").innerHTML=rows.length?rows.map(o=>"<tr><td>"+esc(fmtTime(o.time))+"</td><td>"+esc(o.symbol)+"</td><td>"+esc(o.side)+"</td><td>"+esc(o.volume)+"</td><td>"+esc(o.price)+"</td><td><span class=\"pill\">"+esc(o.status||"UNKNOWN")+"</span></td></tr>").join(""):"<tr><td colspan=\"6\"><div class=\"empty\"><strong>NO ORDER RECORDS</strong><span>No confirmed broker orders were returned.</span></div></td></tr>";
   }
 
   function tradeValue(...values){for(const value of values){const n=Number(value);if(Number.isFinite(n))return n}return null}
