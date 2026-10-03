@@ -266,7 +266,7 @@ async function reconcileBrokerState(userId,status,positions){
   const cached=reconciliationCache.get(key);
   if(cached&&Date.now()-cached.at<RECONCILIATION_MS)return cached.data;
   const journal=await pool.query(
-    "SELECT client_id,bot_id,symbol,side,status,broker_result,created_at FROM kingbot_execution_journal WHERE user_id=$1 AND status IN ('SUBMITTED','PENDING') AND created_at>NOW()-INTERVAL '24 hours' ORDER BY created_at DESC LIMIT 200",
+    "SELECT client_id,decision_id,bot_id,symbol,side,status,broker_result,created_at FROM kingbot_execution_journal WHERE user_id=$1 AND status IN ('SUBMITTED','PENDING') AND created_at>NOW()-INTERVAL '24 hours' ORDER BY created_at DESC LIMIT 200",
     [userId]
   );
   const brokerPositionIds=new Set(positions.flatMap(positionIdentities).map(String));
@@ -285,7 +285,22 @@ async function reconcileBrokerState(userId,status,positions){
   for(const row of journal.rows){
     const refs=orderExecutionIds(row.broker_result);
     if(refs.some(ref=>brokerPositionIds.has(String(ref)))){knownMatches++;continue;}
-    if(refs.some(ref=>brokerHistoryRefs.has(String(ref)))){closedMatches++;continue;}
+    if(refs.some(ref=>brokerHistoryRefs.has(String(ref)))){
+      closedMatches++;
+      if(row.decision_id){
+        const matchedDeal=recentDeals.find(deal=>orderExecutionIds(deal).some(ref=>refs.includes(String(ref))));
+        const profit=Number(matchedDeal?.profit);
+        if(Number.isFinite(profit)){
+          const outcome=profit>0?"WIN":profit<0?"LOSS":"BREAKEVEN";
+          try{
+            await settleAdaptiveDecision(pool,userId,{decisionId:String(row.decision_id),outcome,pnl:profit});
+          }catch(error){
+            console.warn("[KINGBOT ADAPTIVE] settlement skipped",JSON.stringify({decisionId:row.decision_id,error:String(error?.message||"SETTLEMENT_FAILED").slice(0,160)}));
+          }
+        }
+      }
+      continue;
+    }
     if(refs.length)unresolved.push({clientId:row.client_id,botId:row.bot_id,symbol:row.symbol,refs:refs.slice(0,12)});
   }
   const mismatch=unresolved.length;
@@ -370,7 +385,7 @@ async function recordExecutionAdaptiveDecision({userId,botId,config,analysis,ris
     market:{
       symbol:String(config?.symbol||"").toUpperCase(),
       timeframe:String(config?.timeframe||"5m"),
-      price:Number(analysis?.price||0),
+      price:Number(analysis?.price ?? analysis?.market?.price ?? 0),
       atr:Number(analysis?.atr||0),
       volatility:Number(analysis?.volatility||0),
       trend:Number(analysis?.trend||0),
@@ -693,7 +708,7 @@ async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,pos
     const sl=ladderPrice(side==="BUY"?entry-stopDistance:entry+stopDistance,ls.point);
     const clientId="kbv8_"+crypto.randomUUID();
     const volume=volumes[i];
-    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,decision_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,decisionId,s.executionMode,config.symbol,side,volume]);
+    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,decision_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,adaptiveExecutionDecision?.decisionId||null,s.executionMode,config.symbol,side,volume]);
     if(!journal.rowCount)continue;
     try{
       await broker.assertExecutionAuthorized(userId);
