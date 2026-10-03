@@ -140,10 +140,10 @@ string ResolveSymbol(string requested)
    string wanted=Upper(requested);
    if(wanted=="")return _Symbol;
    if(SymbolInfoInteger(wanted,SYMBOL_EXIST)>0)return wanted;
-   int total=SymbolsTotal(true);
+   int total=SymbolsTotal(false);
    for(int i=0;i<total;i++)
    {
-      string s=SymbolName(i,true);
+      string s=SymbolName(i,false);
       if(Upper(s)==wanted)return s;
       if(StringFind(Upper(s),wanted,0)==0)return s;
    }
