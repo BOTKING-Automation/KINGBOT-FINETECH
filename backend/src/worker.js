@@ -491,7 +491,7 @@ function derivStakePlan(rawLots,budget,minStake=1){
   const distributable=Math.max(0,budget-floor*maxAffordable);
   return lots.map(x=>floor+distributable*(Number(x||0)/Math.max(weight,1e-12)));
 }
-async function executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity}){
+async function executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity,decisionId=null}){
   const baseCfg=getBotDefinitions()[botId].v8||LADDER_V8_DEFAULTS;
   const cfg={...baseCfg,baseLot:Number(s.lotSize)||Number(baseCfg.baseLot)||LADDER_V8_DEFAULTS.baseLot};
   if(!withinLadderSession(new Date(),cfg))return {action:"SESSION_BLOCKED",state:null};
@@ -661,7 +661,7 @@ async function executeLadderV8DerivManage({userId,botId,config,s,account,quote,p
   return {action,state:nextState,velocity:v};
 }
 
-async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,positions,spec,velocity}){
+async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,positions,spec,velocity,decisionId=null}){
   const cfg=getBotDefinitions()[botId].v8||LADDER_V8_DEFAULTS;
   if(!withinLadderSession(new Date(),cfg))return {action:"SESSION_BLOCKED",state:null};
   if(quote.ask<=quote.bid||!Number.isFinite(quote.ask)||!Number.isFinite(quote.bid))return {action:"INVALID_BROKER_QUOTE",state:null};
@@ -911,6 +911,20 @@ async function execute(row){
   const spread=ask-bid;
   const velocityKey=ladderKey(userId,botId);
   const ladderCfg=getBotDefinitions()[botId]?.v8||LADDER_V8_DEFAULTS;
+  let adaptiveExecutionDecision=null;
+  const adaptiveExecutionEligible=Boolean(
+    analysis.ok &&
+    analysis.signal!=="NO_SIGNAL" &&
+    risk?.allowed &&
+    (!aiExecutionGateEnabled() || aiTradeGate?.confirm)
+  );
+  if(adaptiveExecutionEligible){
+    try{
+      adaptiveExecutionDecision=await recordExecutionAdaptiveDecision({userId,botId,config,analysis,risk,account,aiTradeGate,aiStrategySignal});
+    }catch(error){
+      console.warn("[KINGBOT ADAPTIVE] decision record failed:",error?.message||error);
+    }
+  }
   if(botId==="ladder-flip"){
     const sampleList=updateVelocitySamples(ladderVelocityBuffers.get(velocityKey)||[],(bid+ask)/2,Date.now(),ladderCfg);
     ladderVelocityBuffers.set(velocityKey,sampleList);
@@ -1072,7 +1086,7 @@ async function execute(row){
     if(!Number.isFinite(volume)||volume<minVolume||volume>maxVolume)throw new Error("RISK_SIZED_VOLUME_OUT_OF_RANGE");
     if(positions.filter(p=>String(p.symbol||"").toUpperCase()===String(config.symbol).toUpperCase()).length>=s.maxPositions)throw new Error("MAX_SYMBOL_POSITIONS");
     const clientId="kb_"+crypto.randomUUID();
-    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,decision_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,decisionId,s.executionMode,config.symbol,side,volume]);
+    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,decision_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,adaptiveExecutionDecision?.decisionId||null,s.executionMode,config.symbol,side,volume]);
     if(!journal.rowCount)throw new Error("DUPLICATE_EXECUTION_REQUEST");
     try{
       order=await broker.placeOrder({side,symbol:config.symbol,volume,stopLoss,takeProfit,comment:"KINGBOT",clientId,userId,multiplier:String(status.broker||"").toLowerCase()==="deriv"?100:undefined});
