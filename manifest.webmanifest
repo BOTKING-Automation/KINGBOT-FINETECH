@@ -1,0 +1,14 @@
+{
+  "name":"KINGBOT FINTECH",
+  "short_name":"KINGBOT",
+  "description":"Intelligent trading technology, market intelligence, automation and execution infrastructure.",
+  "start_url":"./index.html",
+  "display":"standalone",
+  "background_color":"#02040a",
+  "theme_color":"#02040a",
+  "orientation":"portrait-primary",
+  "icons":[
+    {"src":"assets/images/kingbot-fintech-logo.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"assets/images/kingbot-fintech-logo.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}
