@@ -361,6 +361,22 @@ export function conversationSignals(question="",conversation=[]) {
 
 export function conversationFrame(question="",conversation=[]) {
   const signals=conversationSignals(question,conversation);
+  const q=WORDS(signals.resolvedQuestion || question);
+  const goals=[];
+  if(/\b(what|who|where|when|which|define|meaning)\b/i.test(q)) goals.push("UNDERSTAND");
+  if(/\b(how|how do i|how can i|steps|setup|configure|fix)\b/i.test(q)) goals.push("SOLVE");
+  if(/\b(why|what caused|reason|problem|error|failed|broken)\b/i.test(q)) goals.push("DIAGNOSE");
+  if(/\b(compare|versus|vs\.?|difference|which one)\b/i.test(q)) goals.push("COMPARE");
+  if(/\b(should|best|choose|recommend|decision)\b/i.test(q)) goals.push("DECIDE");
+  if(/\b(check|verify|confirm|real|actual|live|status)\b/i.test(q)) goals.push("VERIFY");
+  if(/\b(latest|current|today|now|news|research|search)\b/i.test(q)) goals.push("RESEARCH");
+
+  let responseMode="DIRECT";
+  if(goals.includes("SOLVE") || goals.includes("DIAGNOSE")) responseMode="ACTIONABLE";
+  else if(goals.includes("COMPARE")) responseMode="COMPARATIVE";
+  else if(goals.includes("UNDERSTAND")) responseMode="EXPLANATORY";
+  else if(goals.includes("VERIFY") || goals.includes("RESEARCH")) responseMode="EVIDENCE_FIRST";
+
   return {
     utterance:NORMALIZE(question),
     resolvedUtterance:signals.resolvedQuestion,
@@ -371,6 +387,13 @@ export function conversationFrame(question="",conversation=[]) {
     topic:signals.topic,
     confidence:signals.confidence,
     contextResolved:signals.contextResolved,
+    userGoals:[...new Set(goals)],
+    responseMode,
+    conversationContinuity:{
+      priorTurns:signals.recentUserMessages.length + signals.recentAssistantMessages.length,
+      priorTopic:signals.topic,
+      referenceResolved:signals.contextResolved
+    },
     historyDepth:signals.recentUserMessages.length + signals.recentAssistantMessages.length
   };
 }
