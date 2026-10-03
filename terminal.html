@@ -42,7 +42,7 @@ body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 @keyframes lightSweep{0%{transform:translateX(-130%) rotate(12deg)}100%{transform:translateX(430%) rotate(12deg)}}
 a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 .mono{font-family:"JetBrains Mono",monospace}.orbitron{font-family:Orbitron,sans-serif}
-.shell{width:min(1640px,calc(100% - 30px));margin:0 auto;padding:18px 0 55px}
+.shell{width:min(1640px,calc(100% - 30px));margin:0 auto;padding:18px 0 18px}
 .topbar{
   position:sticky;top:0;z-index:50;border-bottom:1px solid rgba(25,255,114,.12);
   background:rgba(1,7,4,.84);backdrop-filter:blur(20px);
@@ -355,7 +355,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     <div class="sync"><div class="sync-top"><span class="sync-label">BACKEND</span><span class="sync-state syncing" id="syncBackendState">SYNCING</span></div><div class="sync-main" id="syncBackendMain">Authoritative API</div><div class="sync-time" id="syncBackendTime">—</div></div>
     <div class="sync"><div class="sync-top"><span class="sync-label">SELECTION</span><span class="sync-state syncing" id="syncSelectionState">SYNCING</span></div><div class="sync-main" id="syncSelectionMain">Saved engine</div><div class="sync-time" id="syncSelectionTime">—</div></div>
     <div class="sync"><div class="sync-top"><span class="sync-label">RUNTIME</span><span class="sync-state syncing" id="syncRuntimeState">SYNCING</span></div><div class="sync-main" id="syncRuntimeMain">Worker engine state</div><div class="sync-time" id="syncRuntimeTime">—</div></div>
-    <div class="sync"><div class="sync-top"><span class="sync-label">BROKER</span><span class="sync-state syncing" id="syncBrokerState">SYNCING</span></div><div class="sync-main" id="syncBrokerMain">Verified account</div><div class="sync-time" id="syncBrokerTime">—</div></div>
+    <div class="sync"><div class="sync-top"><span class="sync-label">BROKER</span><span class="sync-state syncing" id="syncBrokerState">SYNCING</span></div><div class="sync-main" id="syncBrokerMain">Broker connection</div><div class="sync-time" id="syncBrokerTime">—</div></div>
     <div class="sync"><div class="sync-top"><span class="sync-label">ACCOUNT</span><span class="sync-state syncing" id="syncAccountState">SYNCING</span></div><div class="sync-main" id="syncAccountMain">Balance / equity</div><div class="sync-time" id="syncAccountTime">—</div></div>
     <div class="sync"><div class="sync-top"><span class="sync-label">MARKET</span><span class="sync-state syncing" id="syncMarketState">SYNCING</span></div><div class="sync-main" id="syncMarketMain">Broker quote</div><div class="sync-time" id="syncMarketTime">—</div></div>
   </section>
@@ -540,7 +540,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 
       <div class="side-stack">
         <div class="panel account-card">
-          <div class="panel-head" style="padding:0 0 12px;border:0"><div class="panel-head-left"><div class="section-title">VERIFIED BROKER ACCOUNT</div><div class="section-sub">Connection is managed from Broker Connect.</div></div><span class="panel-badge" id="accountBadge">SYNCING</span></div>
+          <div class="panel-head" style="padding:0 0 12px;border:0"><div class="panel-head-left"><div class="section-title">BROKER ACCOUNT STATUS</div><div class="section-sub">Connection is managed from Broker Connect.</div></div><span class="panel-badge" id="accountBadge">SYNCING</span></div>
           <div class="identity">
             <div class="identity-main"><div class="identity-state" id="accountState">SYNCING</div><div class="identity-note" id="accountNote">Reading the secured broker mapping.</div></div>
             <div class="identity-grid">
@@ -963,8 +963,8 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     try{
       await api("/positions/"+encodeURIComponent(positionId)+"/close",{method:"POST",timeoutMs:10000});
       addActivity("Position "+positionId+" closed.");
-      await loadAccount();
-      await loadOrders();
+      await loadTerminalSnapshot();
+      await loadTerminalSnapshot();
     }catch(error){
       btn.disabled=false;btn.textContent="CLOSE";
       addActivity("Position close failed: "+error.message);
@@ -989,7 +989,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     $("historySub").textContent=deals.length?deals.length+" broker records · verified source":"No verified broker history returned";$("historyBadge").textContent=deals.length?"VERIFIED":"EMPTY";$("histPnl").textContent=deals.length?fmtMoney(total,currency):"—";$("histPnl").className=Number.isFinite(total)?(total>0?"good":total<0?"bad":""):"";$("histCount").textContent=String(pnlValues.length||deals.length);$("histWinRate").textContent=wr===null?"—":wr.toFixed(1)+"%";$("histBest").textContent=best===null?"—":fmtMoney(best,currency);$("histWins").textContent=String(wins);$("histLosses").textContent=String(losses);$("historyUpdated").textContent=fmtTime(new Date().toISOString());$("histBus").textContent="LIVE";$("historyRange").value=String(state.historyRangeDays);$("histCurveRange").textContent=state.historyRangeDays+" DAYS";
     let cumulative=0;const points=[...deals].filter(d=>Number.isFinite(d.__pnl)).sort((a,b)=>new Date(a.__time||0)-new Date(b.__time||0)).map(d=>(cumulative+=Number(d.__pnl),cumulative));const svg=$("historyCurve");if(svg){if(!points.length){svg.innerHTML='<line x1="0" y1="75" x2="640" y2="75" stroke="rgba(255,255,255,.08)" stroke-width="1"/><text x="320" y="82" text-anchor="middle" fill="#566176" font-size="10" font-family="JetBrains Mono">AWAITING CLOSED TRADE DATA</text>'}else{const min=Math.min(0,...points),max=Math.max(0,...points),span=Math.max(.000001,max-min),coords=points.map((v,i)=>[points.length===1?0:i/(points.length-1)*640,140-(v-min)/span*120]),path=coords.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");svg.innerHTML='<path d="'+path+' L 640 145 L 0 145 Z" fill="rgba(34,230,255,.08)"/><path d="'+path+'" fill="none" stroke="#22e6ff" stroke-width="2" vector-effect="non-scaling-stroke"/>'}}
   }
-  async function refreshHistory(force=false){const end=Date.now(),start=end-Math.max(1,state.historyRangeDays)*86400000;try{$("histBus").textContent="SYNC";const x=await api("/trades?startTime="+encodeURIComponent(new Date(start).toISOString())+"&endTime="+encodeURIComponent(new Date(end).toISOString()),{timeoutMs:12000});const deals=Array.isArray(x?.data?.deals)?x.data.deals:(Array.isArray(x?.deals)?x.deals:[]);renderHistory(deals);state.historyLastAt=Date.now();$("historySource").textContent=String(state.account?.broker||"BROKER").toUpperCase();if(force)addActivity("Verified broker trade history synchronized.")}catch(e){$("historyBadge").textContent="UNAVAILABLE";$("histBus").textContent="ERROR";$("historySub").textContent="Broker history unavailable: "+e.message;addActivity("Trade history: "+e.message)}}
+  async function refreshHistory(force=false){const end=Date.now(),start=end-Math.max(1,state.historyRangeDays)*86400000;try{$("histBus").textContent="SYNC";const x=await api("/terminal/history?startTime="+encodeURIComponent(new Date(start).toISOString())+"&endTime="+encodeURIComponent(new Date(end).toISOString()),{timeoutMs:9000});const deals=Array.isArray(x?.data?.deals)?x.data.deals:(Array.isArray(x?.deals)?x.deals:[]);renderHistory(deals);state.historyLastAt=Date.now();$("historySource").textContent=String(state.account?.broker||"BROKER").toUpperCase();if(force)addActivity("Verified broker trade history synchronized.")}catch(e){$("historyBadge").textContent="UNAVAILABLE";$("histBus").textContent="ERROR";$("historySub").textContent="Broker history unavailable: "+e.message;addActivity("Trade history: "+e.message)}}
 
   async function loadSelection(){
     try{
@@ -1281,7 +1281,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     }
   },250);
   // Safety fallback only. Normal terminal telemetry comes from the realtime stream.
-  setInterval(()=>{if(!state.live.running)refreshAll(false)},15000);
+  setInterval(()=>{if(!state.live.running)refreshAll(false)},30000);
   window.addEventListener("resize",drawTickChart);
   $("clock").textContent=new Date().toLocaleTimeString([], {hour12:false});
   refreshAll(true);
