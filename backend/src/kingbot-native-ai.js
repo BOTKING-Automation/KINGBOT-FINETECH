@@ -4,7 +4,7 @@ import { evaluateKingbotBrain } from "./kingbot-brain.js";
 import { searchWeb, webSearchStatus } from "./kingbot-web-search.js";
 import { getPlans, BOT_NAMES } from "./subscriptions.js";
 import { searchTechnicalAnalysisBook, technicalAnalysisBookContext } from "./technical-analysis-book.js";
-import { buildCognitivePlan, capabilitySet, identitySnapshot, qualityAudit } from "./kingbot-intelligence-core.js";
+import { buildCognitivePlan, capabilitySet, identitySnapshot, qualityAudit, normalizeThinkingLevel, thinkingProfile } from "./kingbot-intelligence-core.js";
 import { orchestrateKingbotIntelligence } from "./intelligence-orchestrator.js";
 import { loadAdaptivePerformance } from "./adaptive-intelligence.js";
 import { think } from "./kingbot-cognitive-engine.js";
@@ -150,6 +150,50 @@ function conversationalReply(question){
   if(/\bwho are you\b|\bwhat are you\b/.test(t)) return {answer:"I'm KINGBOT AI — the native intelligence and communication layer of KINGBOT FINTECH. I can communicate naturally, explain the five bot engines, inspect verified account and risk data, analyze supported live market data, and search Google when configured. I never invent live data or authorize trades from chat.",facts:["Provider: KINGBOT_NATIVE","Core: KINGBOT-CORE-1","Execution authority: deterministic strategy and risk gates"],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"A specific request.",invalidation:"Not applicable."},riskFlags:["EXECUTION_REMAINS_SERVER_CONTROLLED"],nextAction:"Tell me what you need."};
   if(/\bthank you\b|\bthanks\b/.test(t)) return {answer:"You're welcome. 🤝 I'm here. Send me the next question whenever you're ready.",facts:[],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Your next request.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Continue the conversation."};
   return {answer:"I'm ready. Tell me what you need and I'll route it to the appropriate KINGBOT intelligence capability.",facts:[],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Your request.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask a question."};
+}
+
+function marketTimeframes(baseTimeframe, thinkingLevel){
+  const base=String(baseTimeframe||"15m").toLowerCase();
+  const ordered=["5m","15m","1h","4h"];
+  const level=normalizeThinkingLevel(thinkingLevel);
+  const count=thinkingProfile(level).timeframes;
+  const set=new Set([base]);
+  for(const tf of ordered){ if(set.size>=count) break; set.add(tf); }
+  return [...set].slice(0,count);
+}
+
+async function multiTimeframeMarketScan({pool,twelveData,symbol,timeframe,thinkingLevel}={}){
+  const levels=marketTimeframes(timeframe,thinkingLevel);
+  const scans=await Promise.all(levels.map(async tf=>{
+    try{
+      const scan=await runStandaloneMarketScan({pool,twelveData,symbols:[symbol],timeframe:tf});
+      const item=(scan.technical||[]).find(x=>x.symbol===symbol)||{};
+      const quote=(scan.quotes||[]).find(x=>x.symbol===symbol)||null;
+      return {
+        timeframe:tf, ok:Boolean(scan.ok), price:item.price??quote?.price??null,
+        trend:String(item.trend||"NEUTRAL").toUpperCase(), momentum:Number(item.momentum||0),
+        volatility:Number(item.volatility||0), structure:String(item.structure||item.bias||"unknown").toLowerCase(),
+        adx:Number(item.adx||item.adx14||0), rsi:Number(item.rsi||item.rsi14||0),
+        emaFast:Number(item.emaFast||item.ema20||0), emaSlow:Number(item.emaSlow||item.ema50||0),
+        breakout:Boolean(item.breakout), retest:Boolean(item.retest),
+        signal:String(item.signal||"WAIT"), score:Number(item.score||0),
+        source:scan.source||item.source||"KINGBOT market engine",
+        timestamp:quote?.timestamp||item.receivedAt||item.barTime||null,
+        technicalCount:Number(scan.technicalCount||0)
+      };
+    }catch(error){
+      return {timeframe:tf,ok:false,signal:"DATA_INSUFFICIENT",error:String(error?.message||"TIMEFRAME_SCAN_FAILED").slice(0,140)};
+    }
+  }));
+  const usable=scans.filter(x=>x.ok);
+  const bull=usable.filter(x=>x.trend==="BULLISH").length;
+  const bear=usable.filter(x=>x.trend==="BEARISH").length;
+  return {
+    level:normalizeThinkingLevel(thinkingLevel), timeframes:scans,
+    alignment:{bullish:bull,bearish:bear,total:usable.length,
+      ratio:usable.length?Number((Math.max(bull,bear)/usable.length).toFixed(2)):0,
+      direction:bull>bear?"BULLISH":bear>bull?"BEARISH":"MIXED"}
+  };
 }
 
 async function latestSnapshot(pool, symbol, timeframe="5m"){
@@ -325,7 +369,7 @@ function platformSupportReply(question){
   return {answer:"I understand the request as a KINGBOT platform question, not a market-analysis request.",facts:["No market-analysis trigger was detected.","No unsupported account or market values were fabricated."],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"A specific platform question.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask your question directly and I will route it to the appropriate intelligence capability."};
 }
 
-async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,userId,conversation=[]}={}){
+async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,userId,conversation=[],thinkingLevel="EXPERT",timeframe="15m"}={}){
   const requested=symbolFromText(question,symbol||"XAUUSD");
   const kind=intent(question);
   const utility=utilityReply(question);
@@ -413,11 +457,13 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
   }
   if(kind==="MARKET_INTELLIGENCE"){
     try{
+      const thinking=normalizeThinkingLevel(thinkingLevel);
+      const primaryTimeframe=String(timeframe||"15m").toLowerCase();
       const scan=await runStandaloneMarketScan({
         pool,
         twelveData,
         symbols:[requested],
-        timeframe:"5m"
+        timeframe:primaryTimeframe
       });
       if(scan.ok){
         const item=(scan.technical||[]).find(x=>x.symbol===requested)||{};
@@ -433,12 +479,17 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
           timestamp:quote?.timestamp ? new Date(quote.timestamp).toISOString() : (item?.dataFreshness||item?.barTime||null)
         };
         const adaptivePerformance=await loadAdaptivePerformance(pool,{userId,symbol:requested});
+        const multiTimeframe=await multiTimeframeMarketScan({
+          pool,twelveData,symbol:requested,timeframe:primaryTimeframe,thinkingLevel:thinking
+        });
+        market.multiTimeframe=multiTimeframe;
         const orchestration=await orchestrateKingbotIntelligence({
           market,
           riskContext:{},
-          options:{},
+          options:{thinkingLevel:thinking},
           memory:[],
-          adaptivePerformance
+          adaptivePerformance,
+          thinkingLevel:thinking
         });
         const signal=orchestration?.routing?.direction==="BUY"
           ?"ENTRY_CANDIDATE_BUY"
@@ -466,7 +517,9 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
               "Identity: KINGBOT INTELLIGENCE CORE",
               "Cognitive loop: IDENTIFY → OBSERVE → CORRELATE → CHALLENGE → ADAPT → VERIFY → EXPLAIN",
               "Market source: "+String(scan.source||"live market-data engine"),
-              "Timeframe: "+String(scan.timeframe||"5m"),
+              "Primary timeframe: "+String(scan.timeframe||primaryTimeframe),
+              "Thinking level: "+thinking+" · native passes: "+String(thinkingProfile(thinking).passes),
+              "Multi-timeframe alignment: "+String(multiTimeframe.alignment.direction)+" ("+String(multiTimeframe.alignment.total)+" frames)",
               ...(quote?.available?["Verified quote: "+quote.price]:[]),
               ...(selectedEngine!=="NO_ROUTE"?["Strategy route: "+selectedEngine]:["Strategy route: no candidate"]),
               ...analystFacts
@@ -494,7 +547,9 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
             liveQuote:Boolean(quote?.available),
             technicalData:Boolean(scan.technicalCount),
             multiAgentOrchestration:true,
-            adaptiveContext:true
+            adaptiveContext:true,
+            thinkingLevel:thinking,
+            multiTimeframe:true
           }
         };
       }
