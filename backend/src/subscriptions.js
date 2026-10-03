@@ -46,6 +46,16 @@ export async function requireUser(pool, req, res) {
   if (u.admin_blocked) { res.status(403).json({ok:false,error:"This account has been disabled by KINGBOT administration."}); return null; }
   return u;
 }
+export async function requireRecentAuth(pool, req, res, maxAgeSeconds=600) {
+  const u=await requireUser(pool,req,res);
+  if(!u)return null;
+  const authTime=Number(u.firebaseAuthTime||0);
+  if(!Number.isFinite(authTime)||authTime<=0||Math.floor(Date.now()/1000)-authTime>maxAgeSeconds){
+    res.status(401).json({ok:false,error:"RECENT_AUTH_REQUIRED",message:"A fresh sign-in is required before changing live-trading authorization."});
+    return null;
+  }
+  return u;
+}
 async function requireAdmin(pool, req, res) {
   const u = await requireUser(pool,req,res); if (!u) return null;
   if (!isAdminEmail(u.email)) { res.status(403).json({ok:false,error:"Administrator access required."}); return null; }
