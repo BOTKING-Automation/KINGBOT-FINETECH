@@ -9,6 +9,7 @@ import { orchestrateKingbotIntelligence } from "./intelligence-orchestrator.js";
 import { loadAdaptivePerformance } from "./adaptive-intelligence.js";
 import { think } from "./kingbot-cognitive-engine.js";
 import { conversationalReply, conversationSignals } from "./kingbot-dialogue-cortex.js";
+import { getMarketPageSnapshot } from "./market-page-feed.js";
 
 const SYMBOLS = ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 
@@ -573,18 +574,26 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
         symbols:[requested],
         timeframe:primaryTimeframe
       });
+      let sharedMarket=null;
+      try {
+        sharedMarket=await getMarketPageSnapshot({twelveData,includeSynthetics:true});
+      } catch {}
+      const sharedSymbol=requested==="BTCUSD" ? "BTCUSDT" : requested;
+      const sharedQuote=(sharedMarket?.quotes||[]).find(x=>String(x.symbol||"").toUpperCase()===sharedSymbol)||null;
       if(scan.ok){
         const item=(scan.technical||[]).find(x=>x.symbol===requested)||{};
         const parsed=safeJson(scan.analysis);
         const ranked=Array.isArray(parsed?.ranked_symbols)?parsed.ranked_symbols:[];
         const rankedItem=ranked.find(x=>x.symbol===requested)||item;
-        const quote=(scan.quotes||[]).find(x=>x.symbol===requested)||null;
+        const quote=(scan.quotes||[]).find(x=>x.symbol===requested)||sharedQuote||null;
         const market={
           ...item,
           ...quote,
           symbol:requested,
           timeframe:String(scan.timeframe||"5m").toLowerCase(),
-          timestamp:quote?.timestamp ? new Date(quote.timestamp).toISOString() : (item?.dataFreshness||item?.barTime||null)
+          timestamp:quote?.timestamp ? new Date(quote.timestamp).toISOString() : (item?.dataFreshness||item?.barTime||null),
+          crossMarketSnapshot:sharedMarket||null,
+          crossMarket:sharedMarket?.crossMarket||null
         };
         const adaptivePerformance=await loadAdaptivePerformance(pool,{userId,symbol:requested});
         const multiTimeframe=await multiTimeframeMarketScan({
@@ -674,8 +683,41 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
           riskFlags:["LIVE_MARKET_DATA_UNAVAILABLE"],
           nextAction:"Check the standalone market-data feed configuration."
         },
-        verified:{standaloneScanner:false}
-      };
+        ...(sharedQuote?.available ? {
+          provider:"KINGBOT_NATIVE",
+          model:"KINGBOT-CORTEX-1",
+          intent:kind,
+          symbol:requested,
+          reply:{
+            answer:"KINGBOT synchronized the live Market page feed for "+requested+" but the deeper technical snapshot is not currently available.",
+            facts:[
+              "Shared Market feed: LIVE",
+              "Live instruments tracked: "+String(sharedMarket?.crossMarket?.breadth?.live ?? 0),
+              "Verified live price: "+String(sharedQuote.price),
+              "Market source: "+String(sharedQuote.source||"KINGBOT shared market feed"),
+              "Technical engine: waiting for fresh OHLC/structure data."
+            ],
+            technicalAnalysis:[],
+            setup:{signal:"DATA_INSUFFICIENT",entry:sharedQuote.price,waitFor:"Fresh OHLC/technical structure for "+requested+".",invalidation:"Technical snapshot unavailable."},
+            riskFlags:["TECHNICAL_SNAPSHOT_UNAVAILABLE"],
+            nextAction:"Retry the analysis while the shared Market feed remains live."
+          },
+          verified:{sharedMarketFeed:true,liveQuote:true,technicalData:false}
+        } : {
+          provider:"KINGBOT_NATIVE",
+          model:"KINGBOT-CORTEX-1",
+          intent:kind,
+          symbol:requested,
+          reply:{
+            answer:"KINGBOT AI could not obtain fresh verified market data for "+requested+".",
+            facts:[String(scan.message||scan.reason||scan.error||"LIVE_MARKET_DATA_UNAVAILABLE").slice(0,220)],
+            technicalAnalysis:[],
+            setup:{signal:"DATA_INSUFFICIENT",entry:null,waitFor:"Fresh verified market data.",invalidation:"No valid market data."},
+            riskFlags:["LIVE_MARKET_DATA_UNAVAILABLE"],
+            nextAction:"Check the shared Market feed and technical-data configuration."
+          },
+          verified:{standaloneScanner:false,sharedMarketFeed:Boolean(sharedMarket?.ok)}
+        });
     }catch(error){
       return {
         provider:"KINGBOT_NATIVE",
