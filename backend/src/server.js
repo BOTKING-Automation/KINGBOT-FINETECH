@@ -31,7 +31,7 @@ import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { evaluateKingbotBrain } from "./kingbot-brain.js";
 import { createMt5HostingRouter, ensureMt5HostingSchema } from "./mt5-hosting.js";
 import { createFintechOpsRouter, ensureFintechOpsSchema } from "./fintech-operations.js";
-import { ensureGlobalRiskSchema, getGlobalRiskState, getWorkerHealth } from "./global-risk.js";
+import { ensureGlobalRiskSchema, getGlobalRiskState } from "./global-risk.js";
 import { registerGoldSignals, ensureGoldSignalsSchema } from "./gold-signals.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -327,8 +327,7 @@ registerTerminalLive(app, { requireUser, pool, broker, firstFinite });
 registerElevenLabsVoice(app, { requireUser, pool, rateLimit });
 registerAiIntelligence(app, { requireUser, pool, broker });
 
-app.get("/api/health", async (_req, res) => {
-  const [globalRisk,workerHealth]=await Promise.all([getGlobalRiskState(pool),getWorkerHealth(pool)]);
+app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     service: "KINGBOT Intelligence",
@@ -344,9 +343,26 @@ app.get("/api/health", async (_req, res) => {
     fintechOperations: true,
     customerWallet: false,
     internalLedger: false,
-    executionControl: globalRisk,
-    workerHealth
+    centralizedRiskControl: true,
+    workerHeartbeatMonitoring: true,
+    brokerReconciliation: true
   });
+});
+
+app.get("/api/execution-control", async (req,res)=>{
+  const user=await requireUser(pool,req,res);if(!user)return;
+  try{
+    const state=await getGlobalRiskState(pool);
+    res.json({ok:true,executionControl:{
+      newOrdersAuthorized:!state.tradingPaused&&!state.globalKillSwitch,
+      tradingPaused:state.tradingPaused,
+      globalKillSwitch:state.globalKillSwitch,
+      reason:state.reason,
+      updatedAt:state.updatedAt
+    }});
+  }catch(error){
+    res.status(503).json({ok:false,error:"EXECUTION_CONTROL_UNAVAILABLE"});
+  }
 });
 
 app.use(express.static(path.resolve(__dirname, "../../")));
