@@ -304,103 +304,6 @@ function overlayLiveQuotes(technical, quotes) {
   });
 }
 
-async function askGrok({ technical, quotes, timeframe, marketType = "TRADITIONAL" }) {
-  const apiKey = String(process.env.XAI_API_KEY || "").trim();
-  if (!apiKey) return { provider: "none", model: null, analysis: null };
-
-  const model = String(process.env.XAI_MODEL || "grok-4.7").trim();
-  const baseUrl = String(process.env.XAI_API_BASE_URL || "https://api.x.ai/v1").trim().replace(/\/$/, "");
-  const prompt = [
-    "You are KINGBOT AI, a market-intelligence reasoning layer.",
-    "Use ONLY the supplied verified market data. Do not invent prices, candles, levels, news, or signals.",
-    "The deterministic KINGBOT engine is authoritative for the calculated technical fields.",
-    "Synthesize the evidence into a disciplined market-intelligence report.",
-    "For each symbol, explain trend, momentum, structure, liquidity/FVG evidence, setup state, entry condition, invalidation and risk flags.",
-    "Do not promise profit or certainty. A score below 75 must not be described as an entry confirmation.",
-    "MARKET TYPE: " + marketType,
-    marketType === "SYNTHETIC"
-      ? "SYNTHETIC MARKET RULE: Treat Deriv Synthetic Indices as proprietary derived markets. Do not attribute movement to external news, earnings, economic events, order-book liquidity or traditional market drivers. Prioritize verified price action, regime, volatility, structure, range behaviour and instrument-specific conditions."
-      : "TRADITIONAL MARKET RULE: Use only supplied verified traditional-market context; do not invent macro/news facts.",
-    "TIMEFRAME: " + timeframe,
-    "TECHNICAL ENGINE OUTPUT: " + JSON.stringify(technical),
-    "VERIFIED LIVE QUOTES: " + JSON.stringify(quotes),
-    "KINGBOT TECHNICAL ANALYSIS BOOK METHODOLOGY:\n" + technicalAnalysisBookContext(12)
-  ].join("\n");
-
-  const response = await fetch(baseUrl + "/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + apiKey
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        { role: "system", content: "KINGBOT AI market intelligence. Return structured JSON only." },
-        { role: "user", content: prompt }
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "kingbot_market_scan",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              market_regime: { type: "string" },
-              ranked_symbols: {
-                type: "array",
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    symbol: { type: "string" },
-                    bias: { type: "string" },
-                    signal: { type: "string" },
-                    score: { type: "number" },
-                    entry: { type: ["number", "null"] },
-                    sl: { type: ["number", "null"] },
-                    tp1: { type: ["number", "null"] },
-                    tp2: { type: ["number", "null"] },
-                    waitFor: { type: "string" },
-                    reason: { type: "string" },
-                    technicalAnalysis: { type: "array", items: { type: "string" } },
-                    invalidation: { type: "string" },
-                    riskFlags: { type: "array", items: { type: "string" } }
-                  },
-                  required: ["symbol","bias","signal","score","entry","sl","tp1","tp2","waitFor","reason","technicalAnalysis","invalidation","riskFlags"]
-                }
-              },
-              risk_flags: { type: "array", items: { type: "string" } },
-              summary: { type: "string" }
-            },
-            required: ["market_regime","ranked_symbols","risk_flags","summary"]
-          }
-        }
-      },
-      max_output_tokens: 2200,
-      store: false
-    })
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data?.error?.message || data?.message || "XAI_MARKET_SCAN_FAILED");
-  }
-
-  let analysis = String(data?.output_text || "").trim();
-  if (!analysis && Array.isArray(data?.output)) {
-    for (const item of data.output) {
-      if (item?.type !== "message" || !Array.isArray(item.content)) continue;
-      const part = item.content.find(x => x?.type === "output_text" && typeof x.text === "string");
-      if (part?.text) { analysis = part.text.trim(); break; }
-    }
-  }
-  if (!analysis) throw new Error("XAI_MARKET_SCAN_EMPTY");
-  JSON.parse(analysis);
-  return { provider: "xai", model, analysis };
-}
 
 async function fetchCachedPublicDerivTechnical(symbol, timeframe) {
   const key=String(symbol).toUpperCase()+":"+String(timeframe).toLowerCase();
@@ -525,18 +428,12 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     };
   }
 
-  let ai = null;
-  try {
-    const marketType = technical.some(item => isSyntheticSymbol({symbol:item.symbol})) ? "SYNTHETIC" : "TRADITIONAL";
-    ai = await askGrok({ technical, quotes, timeframe: normalizedTimeframe, marketType });
-  } catch (error) {
-    ai = {
-      provider:"none",
-      model:null,
-      analysis:null,
-      aiError:String(error?.message || "AI_FAILED").slice(0,200)
-    };
-  }
+  const ai = {
+    provider:"KINGBOT_NATIVE",
+    model:"KINGBOT-CORTEX-1",
+    analysis:null,
+    aiError:null
+  };
 
   const fallbackAnalysis = {
     market_regime: (() => {
@@ -558,8 +455,8 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
   return {
     ok:true,
     scanner:"KINGBOT AI MARKET SCANNER",
-    provider:ai.provider,
-    model:ai.model,
+    provider:"KINGBOT_NATIVE",
+    model:"KINGBOT-CORTEX-1",
     executionAuthority:"NONE",
     source:technicalSource,
     liveQuoteSource:twelveData?.enabled ? "Twelve Data WebSocket + public fallback" : "Deriv public live feed",
@@ -680,7 +577,6 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData }) {
   app.get("/api/market-scanner/quotes",quoteLimiter,quoteHandler);
 
   app.get("/api/ai/market-scanner/status", async (_req,res) => {
-    const apiKey = String(process.env.XAI_API_KEY || "").trim();
     let tvCount=0;
     try { const q=await pool.query("SELECT COUNT(*)::int AS count FROM kingbot_tradingview_snapshots WHERE received_at > NOW() - INTERVAL '10 minutes'"); tvCount=q.rows[0]?.count || 0; } catch {}
     return res.json({
@@ -695,7 +591,7 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData }) {
       },
       scannerStandalone:true,
       brokerRequired:false,
-      model:apiKey?String(process.env.XAI_MODEL || "grok-4.7"):null,
+      model:"KINGBOT-CORTEX-1",
       tradingViewConnected:tvCount>0, tradingViewSnapshotsLast10m:tvCount, webhookConfigured:Boolean(process.env.TRADINGVIEW_WEBHOOK_SECRET),
       defaultSymbols:DEFAULT_SYMBOLS
     });
