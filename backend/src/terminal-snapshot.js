@@ -2,6 +2,8 @@
  * Terminal snapshot REST endpoint
  * Loaded by server.js
  */
+import { getGlobalRiskState } from "./global-risk.js";
+
 export function registerTerminalSnapshot(app, { requireUser, pool, broker, firstFinite }) {
   app.get("/api/terminal/snapshot", async (req, res) => {
     const user = await requireUser(pool, req, res);
@@ -22,6 +24,7 @@ export function registerTerminalSnapshot(app, { requireUser, pool, broker, first
     const startedAt = Date.now();
     const provider = String(entry.provider || mapping.provider || "").toLowerCase();
     const symbol = String(req.query?.symbol || "").trim();
+    const botId = String(req.query?.botId || "").trim().toLowerCase();
     const moneyNumber = (v) => {
       const n = Number(v);
       return Number.isFinite(n) ? n : null;
@@ -43,10 +46,13 @@ export function registerTerminalSnapshot(app, { requireUser, pool, broker, first
       status: String(p?.state || p?.status || "OPEN").toUpperCase(),
     });
     try {
-      const [accountResult, positionsResult, quoteResult] = await Promise.allSettled([
+      const [accountResult, positionsResult, ordersResult, quoteResult, riskResult, globalRiskResult] = await Promise.allSettled([
         entry.api.getAccount ? entry.api.getAccount() : Promise.resolve({ data: entry.accountInfo || {} }),
         entry.api.getPositions ? entry.api.getPositions() : Promise.resolve({ data: [] }),
+        entry.api.getOrders ? entry.api.getOrders() : Promise.resolve({ data: [] }),
         symbol && entry.api.getQuote ? entry.api.getQuote(symbol) : Promise.resolve(null),
+        botId ? pool.query("SELECT max_risk_per_trade_pct,daily_drawdown_pct,total_drawdown_pct,max_positions,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch FROM kingbot_bot_risk_settings WHERE user_id=$1 AND bot_id=$2 LIMIT 1",[user.id,botId]) : Promise.resolve({rowCount:0,rows:[]}),
+        getGlobalRiskState(pool),
       ]);
       const raw =
         accountResult.status === "fulfilled"
@@ -61,6 +67,18 @@ export function registerTerminalSnapshot(app, { requireUser, pool, broker, first
               : []
           : [];
       const positionRows = positionSource.map(mapPosition);
+      const orderSource = ordersResult.status === "fulfilled"
+        ? Array.isArray(ordersResult.value?.data) ? ordersResult.value.data : Array.isArray(ordersResult.value) ? ordersResult.value : []
+        : [];
+      const orders = orderSource.slice(0,100).map(o => ({
+        id:o?.id || o?.orderId || o?.ticket || null,
+        time:o?.time || o?.createdAt || o?.created_at || o?.timestamp || null,
+        symbol:o?.symbol || o?.instrument || "—",
+        side:String(o?.side || o?.type || o?.order_type || "—").toUpperCase(),
+        volume:firstFinite(o?.volume,o?.lots,o?.quantity,o?.stake,o?.units),
+        price:firstFinite(o?.price,o?.openPrice,o?.entryPrice,o?.currentPrice),
+        status:String(o?.status || o?.state || "OPEN").toUpperCase(),
+      }));
       const balance = moneyNumber(raw.balance);
       const equity = moneyNumber(raw.equity);
       const floating = moneyNumber(raw.floatingPnl ?? raw.floating ?? raw.profit);
@@ -98,8 +116,10 @@ export function registerTerminalSnapshot(app, { requireUser, pool, broker, first
           tradingEnabled: raw.tradeAllowed !== false && raw.tradingEnabled !== false,
           accountStatus: String(raw.account_status || raw.status || "ACTIVE").toUpperCase(),
         },
+        risk: riskResult.status === "fulfilled" && riskResult.value?.rowCount ? riskResult.value.rows[0] : botId ? null : null,
+        executionControl: globalRiskResult.status === "fulfilled" ? globalRiskResult.value : null,
         positions: positionRows,
-        orders: [],
+        orders,
         quote,
         symbol: symbol || null,
         generatedAt: new Date().toISOString(),
