@@ -69,6 +69,7 @@ function buildKingbotAgentPlan({
   const responseMode = chooseResponseMode(frame);
   const knowledge = chooseKnowledge(intent, frame);
   const hasContext = Number(frame?.historyDepth || conversation.length || 0) > 0;
+  const memoryAvailable = Array.isArray(memory) && memory.length > 0;
   const referenceResolved = Boolean(frame?.contextResolved);
 
   return {
@@ -84,7 +85,9 @@ function buildKingbotAgentPlan({
       available: hasContext,
       referenceResolved,
       topic: frame?.topic || null,
-      historyDepth: Number(frame?.historyDepth || conversation.length || 0)
+      historyDepth: Number(frame?.historyDepth || conversation.length || 0),
+      memoryAvailable,
+      memoryCount: Array.isArray(memory) ? memory.length : 0
     },
     knowledgeRoute: knowledge,
     loop: [
@@ -121,6 +124,8 @@ function buildAgentSnapshot({ plan, verified = {}, learning = null } = {}) {
     responseMode: plan?.responseMode || "DIRECT",
     knowledgeRoute: Array.isArray(plan?.knowledgeRoute) ? plan.knowledgeRoute : [],
     contextAware: Boolean(plan?.context?.available),
+    memoryAware: Boolean(plan?.context?.memoryAvailable),
+    memoryCount: Number(plan?.context?.memoryCount || 0),
     verified: Object.keys(verified || {}).length > 0,
     adaptiveLearning: Boolean(learning),
     executionAuthority: "NONE"
@@ -135,7 +140,8 @@ export function createKingbotAgent({
   frame = {},
   thinkingLevel = "EXPERT",
   verified = {},
-  learning = null
+  learning = null,
+  memory = []
 } = {}) {
   const plan = buildKingbotAgentPlan({ question, intent, symbol, conversation, frame, thinkingLevel });
   return {
@@ -143,6 +149,7 @@ export function createKingbotAgent({
     snapshot: buildAgentSnapshot({ plan, verified, learning }),
     responseStyle: {
       naturalLanguage: true,
+      memoryAware: plan.context.memoryAvailable,
       contextAware: plan.context.available,
       userGoalFirst: true,
       hiddenReasoning: false,
