@@ -99,6 +99,26 @@
     text("orchProvider",provider.toUpperCase());
   }
 
+  async function loadSyntheticOptions(){
+    const select=$("symbolSelect");
+    if(!select || select.dataset.syntheticLoaded==="1") return;
+    try{
+      const response=await fetch(API_BASE.replace(/\/api\/?$/,"")+"/api/markets/synthetics",{cache:"no-store"});
+      if(!response.ok)return;
+      const data=await response.json().catch(()=>({}));
+      const markets=Array.isArray(data.markets)?data.markets:[];
+      for(const item of markets.slice(0,40)){
+        const id=String(item.symbol||"").trim().toUpperCase();
+        if(!id || [...select.options].some(o=>o.value===id))continue;
+        const option=document.createElement("option");
+        option.value=id;
+        option.textContent=String(item.name||id);
+        select.appendChild(option);
+      }
+      select.dataset.syntheticLoaded="1";
+    }catch{}
+  }
+
   async function run(){
     if(state.busy)return;
     state.busy=true;
@@ -127,6 +147,7 @@
   }
 
   function wire(){
+    void loadSyntheticOptions();
     $("runOrchestrator")?.addEventListener("click",run);
     $("symbolSelect")?.addEventListener("change",()=>{if(state.last)run();});
     $("timeframeSelect")?.addEventListener("change",()=>{if(state.last)run();});
