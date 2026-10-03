@@ -19,6 +19,11 @@
       css.href="system/platform.css";
       document.head.appendChild(css);
     }
+    const stateScript=document.createElement("script");
+    stateScript.id="kb-client-state";
+    stateScript.src="system/kingbot-client-state.js";
+    stateScript.defer=true;
+    document.head.appendChild(stateScript);
     const script=document.createElement("script");
     script.id="kb-site-performance";
     script.src="system/site-performance.js";
@@ -45,6 +50,7 @@
     ["scanner.html","AI Scanner","◫","Live AI market scanner"],
     ["gold-signals.html","Gold Signals","◆","Live XAUUSD signal desk"],
     ["academy.html","Academy","◇","Education & research"],
+    ["platform-os.html","Company OS","▦","Full trading technology stack"],
     ["about.html","About","◎","KINGBOT FINTECH"],
     ["contact.html","Contact","✉","Support & contact"],
     ["settings.html","Settings","⚙","Account controls"],
