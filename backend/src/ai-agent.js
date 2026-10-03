@@ -57,6 +57,14 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     if(!question)return res.status(400).json({ok:false,error:"AI_AGENT_MESSAGE_REQUIRED"});
     const conversation=Array.isArray(req.body?.conversation)?req.body.conversation.slice(-6).map(item=>({role:item?.role==="assistant"?"assistant":"user",content:String(item?.content||"").slice(0,1800)})):[];
     const native=await runNativeKingbotAI({question,symbol,twelveData:feed,pool,broker,userId:user.id,conversation});
+
+    // Connection/account/runtime questions must stay on the verified native
+    // path so an external language model cannot invent or reinterpret private
+    // broker state when the account is not connected.
+    if(["CONNECTION_INTELLIGENCE","ACCOUNT_INTELLIGENCE","RUNTIME_INTELLIGENCE"].includes(String(native?.intent||""))){
+      return res.json({ok:true,agent:"KINGBOT",...native,sources:native.sources||[],generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
+    }
+
     if(EXTERNAL_PROVIDER!=="gemini" || !ai){
       return res.json({ok:true,agent:"KINGBOT",...native,sources:native.sources||[],generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
     }
