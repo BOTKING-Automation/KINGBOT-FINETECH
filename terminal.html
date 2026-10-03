@@ -1022,53 +1022,39 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 
   async function loadRuntime(){
     try{
-      const requests=[api("/runtime",{timeoutMs:7000})];
-      if(state.selection?.selectedBotId){
-        requests.push(api("/runtime/"+encodeURIComponent(state.selection.selectedBotId),{timeoutMs:7000}));
+      if(!state.selection?.selectedBotId){
+        state.runtimeBots=[];state.engine=null;renderEngine(null,state.selection);
+        setSync("runtime","IDLE","NO SAVED ENGINE",new Date().toISOString());
+        return;
       }
-      const results=await Promise.allSettled(requests);
-      const aggregate=results[0].status==="fulfilled"?results[0].value:null;
-      const detail=results[1]?.status==="fulfilled"?results[1].value:null;
-      state.runtimeBots=Array.isArray(aggregate?.bots)?aggregate.bots:[];
-      
-      // The saved-selection endpoint identifies the engine. Detail telemetry
-      // may enrich that exact bot, but aggregate runtime can never replace it
-      // with another bot.
-      if(detail&&state.engine){
-        state.engine={...state.engine,
-          state:detail.state||state.engine.state,
-          executionMode:detail.executionMode||state.engine.executionMode,
-          symbol:detail.symbol||state.engine.symbol,
-          timeframe:detail.timeframe||state.engine.timeframe,
-          lastSignal:detail.lastSignal||state.engine.lastSignal,
-          lastRunAt:detail.lastRunAt||state.engine.lastRunAt,
-          lastError:detail.lastError||state.engine.lastError,
-          updatedAt:detail.lastRunAt||state.engine.updatedAt,
-          signalThreshold:detail.signalThreshold,
-          tradePlan:detail.tradePlan,
-          strategies:detail.strategies||state.engine.strategies
-        };
-        renderEngine(state.engine,state.selection);
-      }
-      
-      const chosen=state.runtimeBots.find(b=>String(b.botId)===String(state.selection?.selectedBotId));
-      if(chosen&&state.engine){
-        state.engine={...state.engine,
-          state:chosen.runtime||state.engine.state,
-          lastSignal:chosen.lastSignal||state.engine.lastSignal,
-          lastRunAt:chosen.lastRunAt||state.engine.lastRunAt,
-          lastError:chosen.lastError||state.engine.lastError
-        };
-        renderEngine(state.engine,state.selection);
-      }
-      const running=state.runtimeBots.filter(b=>String(b.runtime||b.state||"").toUpperCase()==="RUNNING");
-      $("syncBackendMain").textContent=running.length+" RUNNING ENGINE"+(running.length===1?"":"S");
-      setSync("runtime",state.engine?"LIVE":"IDLE",state.engine?String(state.engine.state).toUpperCase():"NO SAVED ENGINE",aggregate?.syncedAt||new Date().toISOString());
-    }catch(e){setSync("runtime","ERROR","Runtime telemetry unavailable",new Date().toISOString());addActivity("Runtime telemetry: "+e.message)}
+      const botId=encodeURIComponent(state.selection.selectedBotId);
+      const detail=await api("/runtime/"+botId,{timeoutMs:5000});
+      state.runtimeBots=[{botId:state.selection.selectedBotId,runtime:detail?.state||"STOPPED",lastSignal:detail?.lastSignal,lastRunAt:detail?.lastRunAt,lastError:detail?.lastError}];
+      state.engine={
+        ...state.engine,
+        botId:detail.botId||state.selection.selectedBotId,
+        state:detail.state||state.engine?.state||"STOPPED",
+        executionMode:detail.executionMode||state.engine?.executionMode,
+        symbol:detail.symbol||state.engine?.symbol,
+        timeframe:detail.timeframe||state.engine?.timeframe,
+        lastSignal:detail.lastSignal||state.engine?.lastSignal,
+        lastRunAt:detail.lastRunAt||state.engine?.lastRunAt,
+        lastError:detail.lastError||state.engine?.lastError,
+        updatedAt:detail.lastRunAt||state.engine?.updatedAt,
+        signalThreshold:detail.signalThreshold,
+        tradePlan:detail.tradePlan,
+        strategies:detail.strategies||state.engine?.strategies
+      };
+      renderEngine(state.engine,state.selection);
+      $("syncBackendMain").textContent=String(detail.state||"STOPPED").toUpperCase()+" · "+String(detail.botId||state.selection.selectedBotId).toUpperCase();
+      setSync("runtime","LIVE",String(detail.state||"STOPPED").toUpperCase(),detail.lastRunAt||new Date().toISOString());
+    }catch(e){
+      setSync("runtime","ERROR","RUNTIME TELEMETRY UNAVAILABLE",new Date().toISOString());
+      addActivity("Runtime telemetry: "+e.message);
+    }
   }
 
-
-  function handleLiveEvent(eventName,payload){
+  function handleLiveEvent  function handleLiveEvent(eventName,payload){
     if(eventName==="quote"){
       renderLiveQuote(payload?.quote||payload);
       return;
@@ -1188,18 +1174,35 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     }
   }
 
-  async function loadAccount(){
+  async function loadTerminalSnapshot(){
+    if(!state.marketSymbol){
+      setSync("backend","IDLE","NO ENGINE MARKET",new Date().toISOString());
+      return;
+    }
     try{
-      const x=await api("/account",{timeoutMs:9500});const account=x.account||x.data||x;renderAccount(account);if(Array.isArray(account?.positions))renderPositions(account.positions);
-      setSync("backend","LIVE","API AUTHENTICATED",x.account?.syncedAt||new Date().toISOString());setSync("broker","LIVE",String(x.account?.broker||"BROKER").toUpperCase(),x.account?.syncedAt);
-      addActivity("Account telemetry synchronized.");
+      const qs=new URLSearchParams({symbol:state.marketSymbol});
+      if(state.selection?.selectedBotId)qs.set("botId",state.selection.selectedBotId);
+      const x=await api("/terminal/snapshot?"+qs.toString(),{timeoutMs:6500});
+      if(x.account)renderAccount(x.account);
+      renderPositions(Array.isArray(x.positions)?x.positions:[]);
+      renderOrders(Array.isArray(x.orders)?x.orders:[]);
+      if(x.quote)renderLiveQuote(x.quote);
+      state.risk={bots:x.risk?[x.risk]:[],executionControl:x.executionControl||null};
+      renderEngine(state.engine,state.selection);
+      setSync("backend","LIVE",String(x.provider||x.account?.broker||"BROKER").toUpperCase()+" · "+String(x.account?.accountType||"ACCOUNT").toUpperCase(),x.generatedAt);
+      setSync("broker","LIVE",String(x.account?.broker||x.provider||"BROKER").toUpperCase()+" · CONNECTED",x.generatedAt);
     }catch(e){
-      $("accountState").textContent="UNAVAILABLE";$("accountState").style.color="var(--orange)";$("accountNote").textContent="Account telemetry is unavailable. Terminal runtime continues independently.";
-      $("accountBadge").textContent="OFFLINE";setSync("account","ERROR","ACCOUNT TELEMETRY UNAVAILABLE",new Date().toISOString());setSync("broker","ERROR","ACCOUNT CONNECTION UNAVAILABLE",new Date().toISOString());addActivity("Account telemetry: "+e.message);
+      $("accountState").textContent="RECONNECTING";
+      $("accountState").style.color="var(--orange)";
+      $("accountNote").textContent="Broker snapshot unavailable. The realtime channel will continue retrying.";
+      $("accountBadge").textContent="RECONNECTING";
+      setSync("account","ERROR","BROKER SNAPSHOT UNAVAILABLE",new Date().toISOString());
+      setSync("broker","ERROR","BROKER CONNECTION UNAVAILABLE",new Date().toISOString());
+      addActivity("Terminal snapshot: "+e.message);
     }
   }
 
-  async function loadQuote(){
+  async function loadQuote(){  async function loadQuote(){
     if(!state.marketSymbol){setSync("market","IDLE","NO ENGINE MARKET",new Date().toISOString());return}
     try{const x=await api("/broker/quote?symbol="+encodeURIComponent(state.marketSymbol),{timeoutMs:7500});renderQuote(x);addActivity("Broker quote updated for "+state.marketSymbol+".")}catch(e){setSync("market","ERROR","QUOTE UNAVAILABLE",new Date().toISOString());$("marketBadge").textContent="ERROR";addActivity("Market quote: "+e.message)}
   }
@@ -1245,21 +1248,25 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     refreshRunning=true;
     const cycle=++state.cycle;
     $("topStatus").textContent=manual?"SYNC NOW":"LIVE SYNC";
-    $("footerState").textContent="Refreshing independent telemetry streams…";
+    $("footerState").textContent="Synchronizing terminal state…";
     try{
-      // Selection is fetched first and independently because it determines
-      // exactly which engine Terminal should display after every refresh.
       let selectionOk=false;
       try{await loadSelection();selectionOk=true}catch{}
-      await Promise.allSettled([loadRuntime(),loadAccount(),loadOrders(),loadRisk()]);
       if(cycle!==state.cycle)return;
-      await loadQuote();
-      state.lastSyncAt=new Date().toISOString();$("lastSystemSync").textContent=fmtTime(state.lastSyncAt);$("footerState").textContent=selectionOk?(state.engine?"Saved engine synchronized: "+String(state.engine.name).replace(/^KINGBOT\s*/,""):"No saved engine"):"Selection telemetry needs attention";
-      $("topStatus").textContent=selectionOk?(state.engine?.state==="RUNNING"?"ENGINE LIVE":"CONNECTED"):"DEGRADED";
+      await Promise.allSettled([loadRuntime(),loadTerminalSnapshot()]);
+      if(cycle!==state.cycle)return;
+      state.lastSyncAt=new Date().toISOString();
+      $("lastSystemSync").textContent=fmtTime(state.lastSyncAt);
+      $("footerState").textContent=selectionOk
+        ? (state.engine?"Terminal synchronized: "+String(state.engine.name).replace(/^KINGBOT\s*/,""):"No saved engine")
+        : "Selection telemetry needs attention";
+      $("topStatus").textContent=selectionOk
+        ? (state.engine?.state==="RUNNING"?"ENGINE LIVE":"CONNECTED")
+        : "DEGRADED";
     }finally{refreshRunning=false}
   }
 
-  $("historyRefresh").addEventListener("click",()=>refreshHistory(true));
+  $("historyRefresh").addEventListener  $("historyRefresh").addEventListener("click",()=>refreshHistory(true));
   $("historyRange").addEventListener("change",e=>{state.historyRangeDays=Math.max(1,Number(e.target.value)||7);refreshHistory(true)});
   $("goldTestBtn").addEventListener("click",testGoldDemoBuy);
   $("syncNow").addEventListener("click",()=>refreshAll(true));
