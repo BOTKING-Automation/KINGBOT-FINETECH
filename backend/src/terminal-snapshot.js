@@ -148,7 +148,7 @@ export function registerTerminalSnapshot(app, { requireUser, pool, broker, first
       if (!mapping) return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED"});
       const entry = await broker.connectionFor(user.id);
       if (!entry?.api?.getTrades) return res.status(503).json({ok:false,error:"BROKER_HISTORY_UNAVAILABLE"});
-      const result = await entry.api.getTrades({startTime,endTime});
+      const result = await entry.api.getTrades({startTime,endTime,userId:user.id});
       const data = result?.data || result || {};
       const deals = Array.isArray(data?.deals) ? data.deals : [];
       return res.json({
