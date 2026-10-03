@@ -140,10 +140,10 @@ string ResolveSymbol(string requested)
    string wanted=Upper(requested);
    if(wanted=="")return _Symbol;
    if(SymbolInfoInteger(wanted,SYMBOL_EXIST)>0)return wanted;
-   int total=SymbolsTotal(false);
+   int total=SymbolsTotal(true);
    for(int i=0;i<total;i++)
    {
-      string s=SymbolName(i,false);
+      string s=SymbolName(i,true);
       if(Upper(s)==wanted)return s;
       if(StringFind(Upper(s),wanted,0)==0)return s;
    }
@@ -158,6 +158,7 @@ int WatchSymbols(string &out[])
    {
       string s=ResolveSymbol(parts[i]);
       if(s=="")continue;
+      if(SymbolInfoInteger(s,SYMBOL_SELECT)==0)SymbolSelect(s,true);
       bool dupe=false;
       for(int j=0;j<ArraySize(out);j++)if(Upper(out[j])==Upper(s))dupe=true;
       if(dupe)continue;
