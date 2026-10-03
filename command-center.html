@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#050a18">
+<meta name="description" content="KINGBOT FINTECH unified trading command center — broker, account, bot runtime, risk and intelligence state.">
+<title>KINGBOT FINTECH — Trading Command Center</title>
+<link rel="stylesheet" href="system/platform.css">
+<style>
+:root{--bg:#02040a;--panel:rgba(7,12,27,.92);--line:rgba(25,230,255,.12);--gold:#f6b93b;--cyan:#19e6ff;--green:#23f7a3;--red:#ff5c7a;--violet:#9b5cff;--txt:#eef4ff;--muted:#7f8daa}
+body{margin:0;background:radial-gradient(circle at 10% 0%,rgba(25,230,255,.07),transparent 28%),radial-gradient(circle at 92% 8%,rgba(246,185,59,.07),transparent 26%),linear-gradient(180deg,#02040a,#050a18);color:var(--txt);font-family:Space Grotesk,system-ui}
+.wrap{width:min(1440px,calc(100% - 28px));margin:88px auto 50px}
+.hero{padding:24px;border:1px solid rgba(246,185,59,.15);border-radius:20px;background:linear-gradient(145deg,rgba(9,16,37,.96),rgba(3,7,15,.98));box-shadow:0 20px 80px rgba(0,0,0,.28)}
+.ey{font:800 8px JetBrains Mono,monospace;letter-spacing:.2em;color:var(--cyan)}
+h1{font:900 clamp(28px,4vw,46px) Orbitron,sans-serif;margin:9px 0}
+.lead{max-width:880px;color:var(--muted);line-height:1.7;font-size:13px;margin:0}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.btn{border:1px solid rgba(25,230,255,.17);background:rgba(25,230,255,.05);color:#bcefff;border-radius:9px;padding:9px 12px;cursor:pointer;font:800 8px JetBrains Mono}.btn:hover{border-color:rgba(25,230,255,.35)}.btn.gold{color:#211501;background:linear-gradient(135deg,#f6b93b,#ffd977);border-color:transparent}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+.card{border:1px solid rgba(255,255,255,.07);border-radius:14px;background:var(--panel);padding:14px;min-width:0}
+.label{font:800 7px JetBrains Mono;color:#5f6d87;letter-spacing:.12em}.value{margin-top:6px;font:900 17px Orbitron;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sub{margin-top:4px;color:#68758e;font:700 7px JetBrains Mono}
+.good{color:var(--green)}.warn{color:var(--gold)}.bad{color:var(--red)}.violet{color:#c6b0ff}
+.two{display:grid;grid-template-columns:1.1fr .9fr;gap:10px;margin-top:10px}.panel{border:1px solid rgba(255,255,255,.07);border-radius:16px;background:var(--panel);overflow:hidden}.head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06)}.head h2{margin:0;font:900 9px Orbitron;letter-spacing:.09em}.body{padding:13px}.rows{display:grid;gap:7px}.row{display:flex;justify-content:space-between;gap:12px;padding:8px 9px;border-radius:9px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.045)}.row span:first-child{color:#66738c;font:700 7px JetBrains Mono}.row span:last-child{text-align:right;font:800 7px JetBrains Mono;color:#dce5f5}
+.bot-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.bot{padding:9px;border-radius:10px;border:1px solid rgba(255,255,255,.055);background:rgba(255,255,255,.02)}.bot b{display:block;font:900 8px Orbitron}.bot small{display:block;margin-top:4px;color:#65728a;font:700 6px JetBrains Mono}.badge{display:inline-block;margin-top:7px;padding:4px 6px;border-radius:6px;font:800 6px JetBrains Mono;color:#9fb0c9;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
+.event-list{display:grid;gap:6px;max-height:360px;overflow:auto}.event{padding:8px;border-radius:9px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.045)}.event b{font:900 7px JetBrains Mono;color:#bcd0ea}.event small{display:block;margin-top:3px;color:#65728a;font:600 6px JetBrains Mono;line-height:1.45}
+.modules{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.module{padding:10px;border:1px solid rgba(255,255,255,.055);border-radius:10px;background:rgba(255,255,255,.02)}.module b{display:block;font:900 7px Orbitron}.module span{display:block;margin-top:5px;color:#68758e;font:600 6px JetBrains Mono;line-height:1.5}
+@media(max-width:1050px){.grid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}@media(max-width:620px){.grid,.bot-grid,.modules{grid-template-columns:1fr}.wrap{width:calc(100% - 14px);margin-top:72px}.hero{padding:18px}}
+</style>
+</head>
+<body>
+<div data-kingbot-navigation></div>
+<main class="wrap">
+<section class="hero">
+<div class="ey">KINGBOT FINTECH / UNIFIED TRADING COMMAND LAYER</div>
+<h1>ONE CORE. ONE VERIFIED STATE.</h1>
+<p class="lead">A single operational surface for broker connectivity, live account telemetry, bot runtime, risk authorization, subscription state, intelligence and platform events. Trading execution remains server-authoritative.</p>
+<div class="toolbar">
+<button class="btn gold" id="refresh">REFRESH CORE</button>
+<a class="btn" href="terminal.html">OPEN TERMINAL →</a>
+<a class="btn" href="bots.html">MANAGE BOTS →</a>
+<a class="btn" href="analytics.html">ANALYTICS →</a>
+</div>
+</section>
+<section class="grid">
+<div class="card"><div class="label">BROKER</div><div class="value" id="broker">—</div><div class="sub" id="brokerSub">Awaiting verified state</div></div>
+<div class="card"><div class="label">ACCOUNT EQUITY</div><div class="value" id="equity">—</div><div class="sub" id="equitySub">Terminal telemetry</div></div>
+<div class="card"><div class="label">ACTIVE ENGINE</div><div class="value" id="bot">—</div><div class="sub" id="botSub">No selected engine</div></div>
+<div class="card"><div class="label">NEW ORDERS</div><div class="value" id="risk">—</div><div class="sub" id="riskSub">Execution authorization</div></div>
+</section>
+<section class="two">
+<section class="panel"><div class="head"><h2>ACCOUNT + EXECUTION STATE</h2><span class="badge" id="fresh">CORE STANDBY</span></div><div class="body"><div class="rows">
+<div class="row"><span>ACCOUNT</span><span id="accountId">—</span></div>
+<div class="row"><span>MODE</span><span id="mode">—</span></div>
+<div class="row"><span>BALANCE</span><span id="balance">—</span></div>
+<div class="row"><span>POSITIONS</span><span id="positions">—</span></div>
+<div class="row"><span>TRADING ENABLED</span><span id="trading">—</span></div>
+<div class="row"><span>SUBSCRIPTION</span><span id="subscription">—</span></div>
+</div></div></section>
+<section class="panel"><div class="head"><h2>RISK GOVERNOR</h2><span class="badge" id="riskBadge">—</span></div><div class="body"><div class="rows">
+<div class="row"><span>TRADING PAUSED</span><span id="paused">—</span></div>
+<div class="row"><span>GLOBAL KILL SWITCH</span><span id="kill">—</span></div>
+<div class="row"><span>AUTHORIZATION</span><span id="authorization">—</span></div>
+<div class="row"><span>REASON</span><span id="reason">—</span></div>
+</div></div></section>
+</section>
+<section class="two">
+<section class="panel"><div class="head"><h2>BOT RUNTIME FABRIC</h2><span class="badge" id="runtimeCount">0 ENGINES</span></div><div class="body"><div class="bot-grid" id="bots"><div class="row"><span>LOADING</span><span>—</span></div></div></div></section>
+<section class="panel"><div class="head"><h2>LIVE EVENT STREAM</h2><span class="badge">LATEST 20</span></div><div class="body"><div class="event-list" id="events"><div class="event"><b>CORE INITIALIZING</b><small>Waiting for authenticated state.</small></div></div></div></section>
+</section>
+<section class="panel" style="margin-top:10px"><div class="head"><h2>PLATFORM CAPABILITIES</h2><span class="badge">COMPANY OS</span></div><div class="body"><div class="modules" id="modules"></div></div></section>
+</main>
+<script src="system/navigation.js"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const money=(n,c)=>Number.isFinite(Number(n))?(String(c||"")+" "+Number(n).toLocaleString(undefined,{maximumFractionDigits:2})):"—";
+function val(el,text,cls){el.textContent=text||"—";el.className=el.className.split(" ").filter(x=>!["good","warn","bad","violet"].includes(x)).join(" ")+" "+(cls||"");}
+function render(s){
+ const b=s?.broker||{}, a=s?.account?.account||{}, sel=s?.botSelection?.bot||{}, risk=s?.risk?.executionControl||{}, sub=s?.subscription?.subscription||null;
+ val($("broker"),b.connected?String(b.broker||"CONNECTED").toUpperCase():"OFFLINE",b.connected?"good":"warn");
+ $("brokerSub").textContent=b.connected?(b.executionMode||"DEMO")+" · "+(b.accountId||"account linked"):"Connect a verified broker";
+ const eq=Number(a.equity);val($("equity"),Number.isFinite(eq)?money(eq,a.currency):"—",Number.isFinite(eq)?"good":"warn");$("equitySub").textContent=a.accountStatus||"Terminal telemetry";
+ val($("bot"),sel.name||sel.botId||"NO ENGINE",sel.state==="RUNNING"?"good":"");
+ $("botSub").textContent=sel.state||"STOPPED";
+ val($("risk"),risk.globalKillSwitch?"BLOCKED":risk.tradingPaused?"PAUSED":risk.newOrdersAuthorized?"OPEN":"BLOCKED",risk.globalKillSwitch||!risk.newOrdersAuthorized?"bad":risk.tradingPaused?"warn":"good");
+ $("riskSub").textContent=risk.reason||"Risk governor clear";
+ $("accountId").textContent=a.accountId||"—";$("mode").textContent=a.executionMode||b.executionMode||"—";
+ $("balance").textContent=money(a.balance,a.currency);$("positions").textContent=String(a.positionCount??"—");
+ $("trading").textContent=a.tradingEnabled===true?"ENABLED":a.tradingEnabled===false?"DISABLED":"—";
+ $("subscription").textContent=sub?(String(sub.plan_id||"").toUpperCase()+" · "+String(sub.status||"").toUpperCase()):"NO ACTIVE PLAN";
+ $("paused").textContent=risk.tradingPaused?"YES":"NO";$("kill").textContent=risk.globalKillSwitch?"ACTIVE":"OFF";
+ $("authorization").textContent=risk.newOrdersAuthorized?"AUTHORIZED":"BLOCKED";$("reason").textContent=risk.reason||"NONE";
+ val($("riskBadge"),risk.globalKillSwitch?"GLOBAL KILL":risk.tradingPaused?"ORDERS PAUSED":"RISK OPEN",risk.globalKillSwitch?"bad":risk.tradingPaused?"warn":"good");
+ const bots=Array.isArray(s?.runtime?.bots)?s.runtime.bots:[];
+ $("runtimeCount").textContent=bots.length+" ENGINES";
+ $("bots").innerHTML=bots.length?bots.map(x=>'<div class="bot"><b>'+String(x.name||x.botId)+'</b><small>'+String(x.executionMode||"DEMO")+' · '+String(x.symbol||"MARKET UNSET")+' · '+String(x.timeframe||"—")+'</small><span class="badge '+(x.runtime==="RUNNING"?"good":"")+'">'+String(x.runtime||"STOPPED")+'</span></div>').join(""):'<div class="row"><span>NO ENGINE DATA</span><span>—</span></div>';
+ const events=Array.isArray(s?.events)?s.events.slice(0,20):[];
+ $("events").innerHTML=events.length?events.map(e=>'<div class="event"><b>'+String(e.eventType||"EVENT").replaceAll("_"," ")+'</b><small>'+new Date(e.occurredAt||e.createdAt||Date.now()).toLocaleString()+' · '+String(e.aggregateType||"CORE")+'</small></div>').join(""):'<div class="event"><b>NO RECENT EVENTS</b><small>Core is waiting for live platform events.</small></div>';
+ $("fresh").textContent="CORE UPDATED "+new Date(s?.updatedAt||Date.now()).toLocaleTimeString();
+}
+function modules(){
+ const data=window.KINGBOT_CAPABILITIES||[];
+ $("modules").innerHTML=data.filter(x=>x.status!=="planned").slice(0,18).map(x=>'<div class="module"><b>'+x.name+'</b><span>'+x.desc+'</span></div>').join("");
+}
+async function init(){
+ modules();
+ const store=window.KINGBOT_CLIENT_STATE;
+ if(!store){$("events").innerHTML='<div class="event"><b>STATE FABRIC UNAVAILABLE</b><small>Shared client state did not initialize.</small></div>';return;}
+ store.subscribe(render);
+ $("refresh").addEventListener("click",()=>store.refresh({includeMarket:true,reason:"command-center-refresh"}));
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
+})();
+</script>
+<script src="system/kingbot-platform-capabilities.js"></script>
+</body></html>
