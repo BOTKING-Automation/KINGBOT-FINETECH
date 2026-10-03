@@ -1235,12 +1235,19 @@ body.kb-terminal-page:after{opacity:.13!important}
   function renderAccount(a){
     state.account=a||null;
     if(!a){
-      $("accountState").textContent="NO ACCOUNT";$("accountState").style.color="var(--orange)";$("accountNote").textContent="No authoritative account snapshot was returned.";return;
+      for(const id of ["balance","equity","floatingPnl","dailyPnl","margin","freeMargin","positionCount","drawdown","broker","accountId","accountType","currency","executionMode","tradingStatus"]) {
+        const el=$(id); if(el) el.textContent="—";
+      }
+      $("accountState").textContent="NO VERIFIED DATA";
+      $("accountState").style.color="var(--orange)";
+      $("accountNote").textContent="The broker did not return an authoritative account snapshot.";
+      $("accountBadge").textContent="UNAVAILABLE";
+      return;
     }
     const currency=a.currency||"";
     $("balance").textContent=fmtMoney(a.balance,currency);$("equity").textContent=fmtMoney(a.equity,currency);$("floatingPnl").textContent=fmtMoney(a.floatingPnl,currency);$("dailyPnl").textContent=fmtMoney(a.dailyPnl,currency);$("margin").textContent=fmtMoney(a.margin,currency);$("freeMargin").textContent=fmtMoney(a.freeMargin,currency);$("positionCount").textContent=Number.isFinite(Number(a.positionCount))?String(a.positionCount):"—";$("drawdown").textContent=Number.isFinite(Number(a.totalDrawdownPct))?Number(a.totalDrawdownPct).toFixed(2)+"%":"—";
     $("floatingPnl").className="metric-value "+classForPnl(a.floatingPnl);$("dailyPnl").className="metric-value "+classForPnl(a.dailyPnl);
-    $("broker").textContent=String(a.broker||"—").toUpperCase();$("accountId").textContent=a.accountId||"—";$("accountType").textContent=String(a.accountType||"—").toUpperCase();$("currency").textContent=currency||"—";$("executionMode").textContent=(String(a.executionMode||"").toUpperCase()==="PAPER"?"DEMO · BROKER":(String(a.executionMode||"").toUpperCase()==="PAPER"?"DEMO":String(a.executionMode||"—").toUpperCase()));$("tradingStatus").textContent=a.tradingEnabled===false?"DISABLED":"ENABLED";
+    $("broker").textContent=String(a.broker||"—").toUpperCase();$("accountId").textContent=a.accountId||"—";$("accountType").textContent=String(a.accountType||"—").toUpperCase();$("currency").textContent=currency||"—";$("executionMode").textContent=String(a.executionMode||"—").toUpperCase();$("tradingStatus").textContent=a.tradingEnabled===true?"ENABLED":a.tradingEnabled===false?"DISABLED":"UNKNOWN";
     const demo=String(a.executionMode||"").toUpperCase()==="PAPER"||String(a.executionMode||"").toUpperCase()==="DEMO"||String(a.accountType||"").toUpperCase()==="DEMO";$("accountState").textContent=demo?"CONNECTED · DEMO":"CONNECTED · LIVE";$("accountState").style.color="var(--green)";$("accountNote").textContent="Broker-authoritative account telemetry received from the secured connection.";
     $("accountBadge").textContent=demo?"DEMO":"LIVE";$("syncAccountMain").textContent=(a.accountId||"ACCOUNT")+" · "+fmtMoney(a.equity,currency);$("itTapePositions").textContent=Number.isFinite(Number(a.positionCount))?String(a.positionCount):"—";$("itAccountId").textContent=a.accountId||"—";$("itBroker").textContent=String(a.broker||"—").toUpperCase();$("itExecMode").textContent=String(a.executionMode||"—").toUpperCase();$("syncAccountState").textContent="LIVE";$("syncAccountState").className="sync-state live";
   }
@@ -1291,7 +1298,7 @@ body.kb-terminal-page:after{opacity:.13!important}
     $("bid").textContent=Number.isFinite(bid)?fmtNumber(bid,dec):Number.isFinite(mid)?fmtNumber(mid,dec):"—";
     $("ask").textContent=Number.isFinite(ask)?fmtNumber(ask,dec):Number.isFinite(mid)?fmtNumber(mid,dec):"—";
     $("spread").textContent=Number.isFinite(spread)?fmtNumber(spread,dec):"—";
-    $("quoteTime").textContent=fmtTime(d.time||new Date().toISOString());
+    $("quoteTime").textContent=d.time?fmtTime(d.time):"—";
     $("marketBroker").textContent=(state.account?.broker||d.source||"BROKER").toString().toUpperCase()+" LIVE STREAM";
     $("marketBadge").textContent="LIVE TICK";
     $("marketBadge").className="panel-badge";
@@ -1299,7 +1306,7 @@ body.kb-terminal-page:after{opacity:.13!important}
     $("syncMarketState").className="sync-state live";
     $("syncMarketMain").textContent=symbol+" · "+(Number.isFinite(mid)?fmtNumber(mid,dec):"—");
     $("syncMarketTime").textContent=fmtTime(new Date().toISOString());
-    state.quote={data:{...d,bid:Number.isFinite(bid)?bid:mid,ask:Number.isFinite(ask)?ask:mid}};$("itTapeSymbol").textContent=symbol;$("itTapeBid").textContent=Number.isFinite(bid)?fmtNumber(bid,dec):"—";$("itTapeAsk").textContent=Number.isFinite(ask)?fmtNumber(ask,dec):"—";$("itTapeEvent").textContent="TICK #"+(++state.live.lastQuoteCount);$("itTapePositions").textContent=String(state.account?.positionCount ?? ($("positionCount").textContent || "0"));if(q?.serverReceivedAt){state.live.lastQuoteServerAt=q.serverReceivedAt;}$("itQuoteAge").textContent="0ms";
+    state.quote={data:{...d,bid:Number.isFinite(bid)?bid:null,ask:Number.isFinite(ask)?ask:null}};$("itTapeSymbol").textContent=symbol;$("itTapeBid").textContent=Number.isFinite(bid)?fmtNumber(bid,dec):"—";$("itTapeAsk").textContent=Number.isFinite(ask)?fmtNumber(ask,dec):"—";$("itTapeEvent").textContent="TICK #"+(++state.live.lastQuoteCount);$("itTapePositions").textContent=String(state.account?.positionCount ?? ($("positionCount").textContent || "0"));if(q?.serverReceivedAt){state.live.lastQuoteServerAt=q.serverReceivedAt;}$("itQuoteAge").textContent="0ms";
     state.live.lastQuoteAt=Date.now();
     const age=Number.isFinite(Number(d.ageMs))?Math.max(0,Number(d.ageMs)):0;pushTickChart(d);
     $("footerState").textContent="LIVE STREAM · TICK AGE "+Math.round(age)+"ms";
@@ -1337,8 +1344,9 @@ body.kb-terminal-page:after{opacity:.13!important}
     $("positionFeedState").style.color=state.live.running?"var(--green)":"var(--orange)";
     $("positionCount").textContent=String(rows.length);
     $("positionsBadge").textContent=rows.length+" OPEN · "+(verifiedDemo?"DEMO":"LIVE");
-    const floatingTotal=rows.reduce((sum,p)=>{const n=positionNumber(p.pnl,p.profit,p.unrealizedPnl,p.unrealizedProfit);return Number.isFinite(n)?sum+n:sum},0);
-    $("positionFloatingTotal").textContent=fmtNumber(floatingTotal,2);
+    const pnlValues=rows.map(p=>positionNumber(p.pnl,p.profit,p.unrealizedPnl,p.unrealizedProfit)).filter(Number.isFinite);
+    const floatingTotal=pnlValues.length?pnlValues.reduce((sum,n)=>sum+n,0):null;
+    $("positionFloatingTotal").textContent=floatingTotal===null?"—":fmtNumber(floatingTotal,2);
     $("positionFloatingTotal").style.color=Number.isFinite(floatingTotal)?(floatingTotal>0?"var(--green)":floatingTotal<0?"var(--red)":"#aeb9ca"):"";
     $("positionLastTick").textContent=state.live.lastQuoteAt?Math.max(0,Date.now()-state.live.lastQuoteAt)+"ms":"—";
     $("positionsTable").innerHTML=rows.length?rows.map(p=>{
@@ -1601,7 +1609,8 @@ body.kb-terminal-page:after{opacity:.13!important}
       setSync("backend","LIVE",String(x.provider||x.account?.broker||"BROKER").toUpperCase()+" · "+String(x.account?.accountType||"ACCOUNT").toUpperCase(),x.generatedAt);
       setSync("broker","LIVE",String(x.account?.broker||x.provider||"BROKER").toUpperCase()+" · CONNECTED",x.generatedAt);
     }catch(e){
-      $("accountState").textContent="RECONNECTING";
+      $("balance").textContent="—";$("equity").textContent="—";$("floatingPnl").textContent="—";$("dailyPnl").textContent="—";$("margin").textContent="—";$("freeMargin").textContent="—";$("drawdown").textContent="—";
+      $("accountState").textContent="DATA UNAVAILABLE";
       $("accountState").style.color="var(--orange)";
       $("accountNote").textContent="Broker snapshot unavailable. The realtime channel will continue retrying.";
       $("accountBadge").textContent="RECONNECTING";
