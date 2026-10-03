@@ -167,16 +167,7 @@ let brokerMarketsLoaded=false;
 function normalizeMarket(item){
  const symbol=String(item?.symbol||"").trim().toUpperCase();
  if(!symbol)return null;
- return {symbol,name:String(item?.name||symbol).trim(),category:String(item?.category||"").trim(),submarket:String(item?.submarket||"").trim(),tradeable:item?.tradeable!==false};
-}
-function preferredMarket(){
- const usable=brokerMarkets.filter(x=>x.tradeable!==false);
- return usable.find(x=>/^XAUUSD(?:[._-].*)?$/.test(x.symbol))
-   || usable.find(x=>x.symbol.includes("XAUUSD"))
-   || usable.find(x=>x.symbol.includes("PAXG"))
-   || usable[0]
-   || brokerMarkets[0]
-   || null;
+ return {symbol,name:String(item?.name||symbol).trim(),category:String(item?.category||"").trim(),submarket:String(item?.submarket||"").trim(),tradeable:item?.tradeable===true?true:item?.tradeable===false?false:null};
 }
 function renderBrokerMarkets(selectedSymbol=""){
  const select=$("symbol");
@@ -200,7 +191,10 @@ function renderBrokerMarkets(selectedSymbol=""){
      const o=document.createElement("option");
      o.value=m.symbol;
      o.textContent=m.name && m.name!==m.symbol ? m.symbol+" · "+m.name : m.symbol;
-     if(m.tradeable===false)o.disabled=true;
+     if(m.tradeable===false){
+       o.disabled=true;
+       o.textContent+=" · NOT TRADEABLE";
+     }
      og.appendChild(o);
    }
    select.appendChild(og);
@@ -376,10 +370,12 @@ async function selectBot(id){
    selected.lastSignal=r.lastSignal||null;
    putSettings(d.settings,d.executionMode||"NOT_CONNECTED",d.killSwitch);
    if(!r.symbol){
-     renderBrokerMarkets(preferredMarket()?.symbol||"");
-     selected.symbol=$("symbol").value||"";
-     $("mSymbol").textContent=selected.symbol?selected.symbol+" · BROKER MARKET":"SELECT MARKET";
-     msg(selected.symbol?"No market was saved for this bot. A broker-supported market has been selected as the starting market.":"No broker market is available yet. Connect your broker and reload the Bot Engine.","ok");
+     renderBrokerMarkets("");
+     selected.symbol="";
+     $("mSymbol").textContent="SELECT MARKET";
+     msg(brokerMarketsLoaded
+       ?"No market is saved for this bot. Select one from the connected broker catalog before saving configuration."
+       :"No broker market is available. Connect the broker and refresh the market catalog.","error");
    }else{
      renderBrokerMarkets(r.symbol);
      msg("Authoritative bot configuration loaded.","ok");
