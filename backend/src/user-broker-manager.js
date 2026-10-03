@@ -843,6 +843,18 @@ export class UserBrokerManager {
     return {connected:true,data:await entry.connection.getSymbolPrice(requested)};
   }
 
+  async closePosition({userId,positionId}={}){
+    if(!userId)throw new Error("USER_CONTEXT_REQUIRED");
+    const entry=await this.connectionFor(userId);
+    if(String(entry.ownerUserId||"")!==String(userId))throw new Error("EXECUTION_OWNER_MISMATCH");
+    const id=String(positionId||"").trim();
+    if(!id)throw new Error("BROKER_POSITION_ID_REQUIRED");
+    if(String(entry.provider).toLowerCase()==="mt5-bridge")return {connected:true,data:await entry.connection.closePosition(id)};
+    if(entry.provider==="exness"||entry.provider==="oanda"||entry.provider==="deriv")throw new Error("BROKER_POSITION_CLOSE_UNSUPPORTED");
+    if(typeof entry.connection?.closePosition!=="function")throw new Error("BROKER_POSITION_CLOSE_UNSUPPORTED");
+    return {connected:true,data:await entry.connection.closePosition(id)};
+  }
+
   async modifyPositionStops({userId,positionId,symbol,stopLoss,takeProfit}={}){
     const entry=await this.connectionFor(userId);
     const id=String(positionId||"").trim();
