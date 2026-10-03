@@ -31,6 +31,7 @@ export function registerTerminalLive(app, { requireUser, pool, broker, firstFini
     };
 
     const symbol = String(req.query?.symbol || "").trim();
+    const streamStartedAt = Date.now();
 
     const send = async () => {
       if (closed) return;
@@ -59,10 +60,21 @@ export function registerTerminalLive(app, { requireUser, pool, broker, firstFini
           symbol && entry?.api?.getQuote ? entry.api.getQuote(symbol) : Promise.resolve(null),
         ]);
 
-        const raw =
-          accountResult.status === "fulfilled"
-            ? accountResult.value?.data || accountResult.value || entry?.accountInfo || {}
-            : entry?.accountInfo || {};
+        if (accountResult.status !== "fulfilled") {
+          writeSse("error", { ok:false, error:"BROKER_ACCOUNT_DATA_UNAVAILABLE", reason:String(accountResult.reason?.message||"ACCOUNT_DATA_UNAVAILABLE").slice(0,200) });
+          return;
+        }
+        if (positionsResult.status !== "fulfilled") {
+          writeSse("error", { ok:false, error:"BROKER_POSITIONS_UNAVAILABLE", reason:String(positionsResult.reason?.message||"POSITIONS_UNAVAILABLE").slice(0,200) });
+          return;
+        }
+        if (ordersResult.status !== "fulfilled") {
+          writeSse("error", { ok:false, error:"BROKER_ORDERS_UNAVAILABLE", reason:String(ordersResult.reason?.message||"ORDERS_UNAVAILABLE").slice(0,200) });
+          return;
+        }
+
+        const raw = accountResult.value?.data || accountResult.value || {};
+
 
         const positionSource =
           positionsResult.status === "fulfilled"
@@ -77,12 +89,12 @@ export function registerTerminalLive(app, { requireUser, pool, broker, firstFini
           id: p?.id || p?.positionId || p?.ticket || null,
           ticket: p?.ticket || p?.id || p?.positionId || null,
           symbol: p?.symbol || "—",
-          side: String(p?.side || p?.type || "—").toUpperCase(),
+          side: p?.side || p?.type ? String(p?.side || p?.type).toUpperCase() : null,
           volume: firstFinite(p?.volume, p?.lots, p?.quantity),
           entry: firstFinite(p?.openPrice, p?.entryPrice, p?.entry),
           current: firstFinite(p?.currentPrice, p?.current, p?.marketPrice),
           pnl: firstFinite(p?.profit, p?.pnl, p?.unrealizedProfit),
-          status: String(p?.state || p?.status || "OPEN").toUpperCase(),
+          status: p?.state || p?.status ? String(p?.state || p?.status).toUpperCase() : null,
         }));
 
         const orderSource =
@@ -100,7 +112,7 @@ export function registerTerminalLive(app, { requireUser, pool, broker, firstFini
           side:String(o?.side || o?.type || o?.order_type || "—").toUpperCase(),
           volume:firstFinite(o?.volume,o?.lots,o?.quantity,o?.stake,o?.units),
           price:firstFinite(o?.price,o?.openPrice,o?.entryPrice,o?.currentPrice),
-          status:String(o?.status || o?.state || "OPEN").toUpperCase(),
+          status:o?.status || o?.state ? String(o?.status || o?.state).toUpperCase() : null,
         }));
 
         const balance = firstFinite(raw.balance);
@@ -115,7 +127,7 @@ export function registerTerminalLive(app, { requireUser, pool, broker, firstFini
               bid: q.bid ?? q.buy ?? null,
               ask: q.ask ?? q.sell ?? null,
               price: q.price ?? null,
-              time: q.time || q.timestamp || new Date().toISOString(),
+              time: q.time || q.timestamp || null,
             };
           }
         }
@@ -132,8 +144,8 @@ export function registerTerminalLive(app, { requireUser, pool, broker, firstFini
             broker: mapping.provider || null,
             executionMode: entry.executionMode || mapping.execution_mode || "DEMO",
             accountType: String(raw.accountType || raw.account_type || (entry.executionMode === "LIVE" ? "REAL" : "DEMO")).toUpperCase(),
-            tradingEnabled: raw.tradeAllowed !== false && raw.tradingEnabled !== false,
-            accountStatus: String(raw.account_status || raw.status || "ACTIVE").toUpperCase(),
+            tradingEnabled: typeof raw.tradeAllowed === "boolean" ? raw.tradeAllowed : (typeof raw.tradingEnabled === "boolean" ? raw.tradingEnabled : null),
+            accountStatus: raw.account_status || raw.status ? String(raw.account_status || raw.status).toUpperCase() : null,
           },
           positions,
           quote,
