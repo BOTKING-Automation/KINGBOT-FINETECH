@@ -60,6 +60,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
     <div class="hero-actions">
       <button id="scanNow" class="btn btn-primary" type="button">RUN FULL MARKET SCAN</button>
       <button id="refreshQuotes" class="btn" type="button">SYNC QUOTES</button>
+      <button id="loadSynthetics" class="btn" type="button">LOAD SYNTHETICS</button>
       <a class="btn" href="terminal.html">OPEN TERMINAL</a>
     </div>
   </article>
@@ -351,6 +352,17 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
   qs("applySymbols")?.addEventListener("click",()=>{listFromInput();syncQuotes().catch(()=>{});});
   qs("refreshQuotes")?.addEventListener("click",()=>syncQuotes().catch(()=>{}));
   qs("scanNow")?.addEventListener("click",runScan);
+  qs("loadSynthetics")?.addEventListener("click",async()=>{
+    try{
+      const data=await request("/markets/synthetics");
+      const symbols=(data.markets||[]).slice(0,12).map(x=>String(x.symbol||"").toUpperCase()).filter(Boolean);
+      const current=state.symbols.filter(s=>!s.startsWith("R_")&&!s.startsWith("1HZ")&&!/^BOOM|^CRASH|^JUMP|^STEP|^RANGE|^DEX/i.test(s));
+      state.symbols=[...new Set([...current,...symbols])].slice(0,12);
+      qs("symbols").value=state.symbols.join(",");
+      await syncQuotes();
+      toast("Deriv synthetic market universe loaded.","good");
+    }catch(error){toast(error?.message||"Synthetic market discovery failed.","bad");}
+  });
 
   (async()=>{
     listFromInput(); renderQuotes();
