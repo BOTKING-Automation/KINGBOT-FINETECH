@@ -6,7 +6,7 @@ import { webSearchStatus } from "./kingbot-web-search.js";
 import { identitySnapshot, buildCognitivePlan, capabilitySet, qualityAudit } from "./kingbot-intelligence-core.js";
 
 const DEFAULT_SYMBOLS=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
-const MODEL=String(process.env.GEMINI_AGENT_MODEL||process.env.GEMINI_MODEL||"gemini-2.5-flash-lite").trim();
+const MODEL=String(process.env.GEMINI_AGENT_MODEL||process.env.GEMINI_MODEL||"gemini-3.8-flash").trim();
 const API_KEY=String(process.env.GEMINI_API_KEY||"").trim();
 const ai=API_KEY?new GoogleGenAI({apiKey:API_KEY}):null;
 const EXTERNAL_PROVIDER=String(process.env.KINGBOT_AI_EXTERNAL_PROVIDER || (API_KEY?"gemini":"none")).trim().toLowerCase();
@@ -20,7 +20,7 @@ For trading analysis, distinguish FACTS, TECHNICAL READ, SETUP, WAIT CONDITION, 
 Do not promise profit or certainty.
 Never place, modify, close, or authorize a live trade from chat. Execution authority remains with deterministic strategy and risk engines.
 You understand the five KINGBOT engines: strategic, flipper, breakout, smc-pro, ladder-flip.
-Be concise but technically deep. Return JSON only.`;
+Be concise but technically deep. Never expose hidden chain-of-thought. Return a compact reasoning summary, evidence conflicts, uncertainty and validation steps instead. Return JSON only.`;
 
 function cleanSymbol(value){const v=String(value||"XAUUSD").trim().toUpperCase();return DEFAULT_SYMBOLS.includes(v)?v:"XAUUSD";}
 function safeJson(value){try{return JSON.parse(String(value||"").trim())}catch{return null}}
@@ -81,6 +81,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     context.kingbotIdentity=identitySnapshot();
     context.cognitivePlan=cognitivePlan;
     context.cognitiveAudit=native?.cognition?.audit || null;
+    context.deliberation={level:"HIGH",reason:"Complex KINGBOT intelligence synthesis",model:MODEL};
     let account=null,positions=[];
     try{
       const status=await broker.getStatus(user.id);
@@ -124,6 +125,12 @@ Respond with JSON:
  "setup":{"signal":"ENTRY_CONFIRMING|WAIT|NO_TRADE|DATA_INSUFFICIENT","entry":null,"waitFor":"...","invalidation":"..."},
  "riskFlags":["..."],
  "nextAction":"...",
+ "reasoningSummary":["..."],
+ "evidenceFor":["..."],
+ "evidenceAgainst":["..."],
+ "uncertainties":["..."],
+ "alternativeHypotheses":["..."],
+ "validationSteps":["..."],
  "intelligence": {"mode":"...", "epistemicStatus":"CONTROLLED", "capabilitiesUsed":[]}
 }`;
 
@@ -131,12 +138,13 @@ Respond with JSON:
       const response=await ai.models.generateContent({
         model:MODEL,
         contents:prompt,
-        config:{systemInstruction:SYSTEM,responseMimeType:"application/json",maxOutputTokens:900,temperature:0.15}
+        config:{systemInstruction:SYSTEM,responseMimeType:"application/json",maxOutputTokens:1600,thinkingConfig:{thinkingLevel:"high"}}
       });
       const parsed=safeJson(response.text)||{answer:String(response.text||"KINGBOT AI returned no structured answer.")};
       const generatedAudit=qualityAudit({reply:parsed,plan:cognitivePlan,verified:native.verified||{}});
       const intelligence={
         identity:"KINGBOT",
+        deliberation:"HIGH",
         mode:cognitivePlan.mode,
         stages:cognitivePlan.stages,
         capabilities:capabilitySet(cognitivePlan),
