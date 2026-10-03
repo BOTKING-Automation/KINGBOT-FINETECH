@@ -39,14 +39,16 @@ export async function resolveFirebaseUser(pool,req){
  const fb=await firebaseUser(req);
  if(!fb||fb.email_verified!==true)return null;
 
- const q=await pool.query("SELECT id,email,first_name,last_name,email_verified,phone_verified,admin_blocked FROM kingbot_users WHERE firebase_uid=$1 LIMIT 1",[fb.uid]);
+ const q=await pool.query("SELECT id,firebase_uid,email,first_name,last_name,email_verified,phone_verified,admin_blocked FROM kingbot_users WHERE firebase_uid=$1 LIMIT 1",[fb.uid]);
  if(q.rowCount)return q.rows[0];
 
  const email=String(fb.email||"").trim().toLowerCase();
  if(!email)return null;
 
- const byEmail=await pool.query("SELECT id,email,first_name,last_name,email_verified,phone_verified,admin_blocked FROM kingbot_users WHERE email=$1 LIMIT 1",[email]);
+ const byEmail=await pool.query("SELECT id,firebase_uid,email,first_name,last_name,email_verified,phone_verified,admin_blocked FROM kingbot_users WHERE email=$1 LIMIT 1",[email]);
  if(byEmail.rowCount){
+  const existing=byEmail.rows[0];
+  if(existing.firebase_uid && String(existing.firebase_uid)!==String(fb.uid))return null;
   await pool.query("UPDATE kingbot_users SET firebase_uid=$1,email_verified=TRUE WHERE id=$2",[fb.uid,byEmail.rows[0].id]);
   return {...byEmail.rows[0],email_verified:true};
  }
@@ -71,9 +73,10 @@ export function createAuthRouter({pool}){
    if(!email)return res.status(400).json({ok:false,error:"Firebase account email is required."});
    const names=splitName(req.body?.displayName||fb.name,email);
    const phone=String(req.body?.phone||"").trim()||null;
-   const q=await pool.query("SELECT id FROM kingbot_users WHERE firebase_uid=$1 OR email=$2 LIMIT 1",[fb.uid,email]);
+   const q=await pool.query("SELECT id,firebase_uid FROM kingbot_users WHERE firebase_uid=$1 OR email=$2 LIMIT 1",[fb.uid,email]);
    let row;
    if(q.rowCount){
+    if(q.rows[0].firebase_uid && String(q.rows[0].firebase_uid)!==String(fb.uid))return res.status(409).json({ok:false,error:"ACCOUNT_IDENTITY_MISMATCH"});
     const u=await pool.query("UPDATE kingbot_users SET firebase_uid=$1,email=$2,first_name=COALESCE(NULLIF($3,''),first_name),last_name=COALESCE(NULLIF($4,''),last_name),phone=COALESCE($5,phone),email_verified=$6 WHERE id=$7 RETURNING id,email,first_name,last_name,email_verified,phone_verified",[fb.uid,email,names.firstName,names.lastName,phone,Boolean(fb.email_verified),q.rows[0].id]);
     row=u.rows[0];
    }else{
