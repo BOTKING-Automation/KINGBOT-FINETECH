@@ -409,6 +409,45 @@
     } catch {}
   }
 
+  function localConversationReply(message, conversation = []) {
+    const t = String(message || "").trim().toLowerCase().replace(/\s+/g, " ");
+    const variants = [
+      "I'm here and ready. 🤖 What are we working on?",
+      "KINGBOT is online and listening. What should we tackle?",
+      "All good here. Give me the next thing you want me to think through."
+    ];
+    const seed = (t + "|" + conversation.map(x => x.content || "").join("|"))
+      .split("")
+      .reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % variants.length;
+
+    if (/^(hi|hello|hey|hey there|yo|hiya|howdy|greetings)([\s,!.?]+.*)?$/i.test(t)) {
+      if (/\b(sup|what'?s up|how are you|you good|are you good)\b/i.test(t)) {
+        return {
+          answer: ["Hey! 👋 I'm good and fully online. What's up?", "Hey! 🤖 All good here. What are we working on?", "I'm online and doing well. What's next?"][seed],
+          conversationOnly: true
+        };
+      }
+      return { answer: variants[seed], conversationOnly: true };
+    }
+
+    if (/^(how are you|how are u|are you good|are you okay|you good|you okay|all good|what'?s up|whats up|sup)[?! .]*$/i.test(t)) {
+      return {
+        answer: ["I'm good on the system side. 🤖 Ready for the next task.", "All good here. KINGBOT is online and ready.", "I'm online and working normally. What do you want to tackle?"][seed],
+        conversationOnly: true
+      };
+    }
+
+    if (/^(you there|are you there|you online|are you online|still there|still online)[?! .]*$/i.test(t)) {
+      return { answer: "Yes — I'm here and online. 🤖", conversationOnly: true };
+    }
+
+    if (/^(thanks|thank you|thank u|much appreciated|appreciate it)[!. ,]*$/i.test(t)) {
+      return { answer: ["You're welcome. 🤝", "Glad to help. 🤖", "Absolutely."][seed], conversationOnly: true };
+    }
+
+    return null;
+  }
+
   async function runBackendAgent(clean, conversation) {
     const symbol = byId("symbolSelect")?.value || "XAUUSD";
     const timeframe = byId("timeframeSelect")?.value || "15m";
@@ -506,7 +545,10 @@
           content: String(item.content || "").slice(0, 1800)
         }));
 
-      const result = await runBackendAgent(clean, conversation);
+      // Conversation circuit-breaker: greetings/small talk must never be
+      // misinterpreted as a market request when the backend is stale.
+      const localConversation = localConversationReply(clean, conversation);
+      const result = localConversation || await runBackendAgent(clean, conversation);
 
       hideTyping();
       addHistory("assistant", result.answer);
