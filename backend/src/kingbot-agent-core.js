@@ -63,7 +63,8 @@ function buildKingbotAgentPlan({
   symbol = null,
   conversation = [],
   frame = {},
-  thinkingLevel = "EXPERT"
+  thinkingLevel = "EXPERT",
+  memory = []
 } = {}) {
   const goals = chooseGoals(frame);
   const responseMode = chooseResponseMode(frame);
@@ -143,7 +144,7 @@ export function createKingbotAgent({
   learning = null,
   memory = []
 } = {}) {
-  const plan = buildKingbotAgentPlan({ question, intent, symbol, conversation, frame, thinkingLevel });
+  const plan = buildKingbotAgentPlan({ question, intent, symbol, conversation, frame, thinkingLevel, memory });
   return {
     plan,
     snapshot: buildAgentSnapshot({ plan, verified, learning }),
