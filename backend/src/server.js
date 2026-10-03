@@ -40,7 +40,7 @@ import { ensureCommercialLedgerSchema, registerCommercialLedgerRoutes } from "./
 import { ensureUserMemorySchema } from "./kingbot-user-memory.js";
 import { registerCommandPlane } from "./command-plane.js";
 import { requestSecurity, corsOptions, createApiLimiter, createWriteLimiter } from "./security.js";
-import { ensureAuditIntegritySchema } from "./audit-integrity.js";
+import { ensureAuditIntegritySchema, verifyAuditChain } from "./audit-integrity.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -359,6 +359,17 @@ registerIntelligenceOrchestrator(app, { requireUser, pool, twelveData });
 registerKingbotEventRoutes(app, { requireUser, pool, eventBus });
 registerCommercialLedgerRoutes(app,{pool});
 registerCommandPlane(app,{pool,broker,twelveData,eventBus});
+
+app.get("/api/admin/security/audit-integrity", async (req,res)=>{
+  const a=await requireUser(pool,req,res); if(!a)return;
+  if(!isAdminEmail(a.email))return res.status(403).json({ok:false,error:"Administrator access required."});
+  try{
+    const result=await verifyAuditChain(pool,{limit:Math.min(5000,Number(req.query?.limit)||1000)});
+    res.json({ok:result.ok,integrity:result});
+  }catch(error){
+    res.status(503).json({ok:false,error:"AUDIT_INTEGRITY_CHECK_FAILED"});
+  }
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({
