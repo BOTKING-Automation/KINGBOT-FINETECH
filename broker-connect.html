@@ -300,7 +300,7 @@ const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbo
 const cfg={
   oanda:{name:"OANDA",login:"https://fxtrade.oanda.com/",api:"https://developer.oanda.com/rest-live-v20/authentication/",native:true,mode:"oanda"},
   deriv:{name:"DERIV",login:"https://app.deriv.com/",api:"https://auth.deriv.com/oauth2/auth",native:true,mode:"oauth"},
-  derivmt5:{name:"KINGBOT MT5 BRIDGE",login:"https://deriv.com/trading-platforms/mt5/web-terminal",api:"https://deriv.com/trading-platforms/mt5/web-terminal",native:true,mode:"mt5-bridge"},
+  derivmt5:{name:"DERIV CFD / MT5",login:"https://deriv.com/trading-platforms/mt5/web-terminal",api:"https://deriv.com/trading-platforms/mt5/web-terminal",native:true,mode:"mt5-bridge"},
   exness:{name:"EXNESS",login:"https://my.exness.com/",api:"https://my.exness.com/",native:false,mode:"exness"},
   ig:{name:"IG",login:"https://my.ig.com/",api:"https://labs.ig.com/gettingstarted",native:false,mode:"metaapi"},
   fxcm:{name:"FXCM",login:"https://www.fxcm.com/",api:"https://www.fxcm.com/markets/help/api-trading-what-api-interfaces-does-fxcm-have/",native:false,mode:"metaapi"},
@@ -380,7 +380,7 @@ function textFor(){
     $("mt5VpsPanel").style.display="block";
     $("vpsExecutionMode").value=selectedExecution;
     $("vpsLiveConfirmField").style.display=selectedExecution==="LIVE"?"block":"none";
-    $("flowStatus").textContent="MT5 route selected. You can connect the local bridge or configure your own Windows VPS for remote 24/7 execution.";
+    $("flowStatus").textContent="DERIV CFD / MT5 route selected. Only MT5 CFD accounts are supported for KINGBOT execution; Options accounts are excluded.";
 
   }else if(step===2 && (!d.native || selected==='oanda')){
     $("credentials").classList.add("show");
@@ -419,7 +419,8 @@ function selectBroker(slug){
   textFor();showDrawer();
   if(selected==="derivmt5")void loadMt5VpsProfile();
   if(selected==="exness")trackExnessPartner();
-  else if(selected!=="deriv")trackBrokerPartner(selected);
+  else if(selected==="derivmt5")trackBrokerPartner("deriv");
+  else trackBrokerPartner(selected);
   else trackBrokerPartner("deriv");
 }
 
