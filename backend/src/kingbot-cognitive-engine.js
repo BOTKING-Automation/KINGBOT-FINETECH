@@ -223,7 +223,67 @@ function critique({ question, intent, profile, evidence, hypotheses, contradicti
   };
 }
 
-function synthesize({ intent, question, reply, profile, scoredEvidence, challenged, contradictions, confidence, critiqueState, conversation }) {
+
+function scenarioMatrix(intent, reply, scoredEvidence) {
+  const setup = String(reply?.setup?.signal || "").toUpperCase();
+  const base = scoredEvidence.map(x => x.text);
+  if (!/MARKET/.test(intent)) {
+    return [
+      { id:"PRIMARY", state:"DIRECT", support:base.filter(x=>/verified|backend|current|status|confirmed/i.test(x)).length },
+      { id:"ALTERNATIVE", state:"CONTEXT", support:base.filter(x=>/context|runtime|risk|history/i.test(x)).length },
+      { id:"INSUFFICIENT", state:"INSUFFICIENT_EVIDENCE", support:base.filter(x=>/unavailable|missing|unknown|insufficient|stale/i.test(x)).length }
+    ];
+  }
+  return [
+    {
+      id:"BULL",
+      state:"BUY_BIAS",
+      support:base.filter(x=>/bullish|buy|long|breakout|trend.*bull|ema.*bull/i.test(x)).length,
+      conflict:base.filter(x=>/bearish|sell|short|stale|blocked|wait/i.test(x)).length
+    },
+    {
+      id:"BEAR",
+      state:"SELL_BIAS",
+      support:base.filter(x=>/bearish|sell|short|breakdown|trend.*bear|ema.*bear/i.test(x)).length,
+      conflict:base.filter(x=>/bullish|buy|long|stale|blocked|wait/i.test(x)).length
+    },
+    {
+      id:"NO_TRADE",
+      state:"STAND_ASIDE",
+      support:base.filter(x=>/wait|neutral|insufficient|stale|blocked|no route|conflict/i.test(x)).length,
+      conflict:base.filter(x=>/entry|breakout|bullish|bearish|buy|sell/i.test(x)).length
+    }
+  ];
+}
+
+function stabilityTest(scoredEvidence, contradictions, baselineConfidence) {
+  if (!scoredEvidence.length) return { stable:false, baseline:baselineConfidence, degraded:baselineConfidence, delta:0 };
+  const trimmed = scoredEvidence.slice(1);
+  const avg = trimmed.length ? trimmed.reduce((s,e)=>s+e.score,0)/trimmed.length : 0;
+  const degraded = Math.round(Math.max(0, Math.min(100, avg*100)));
+  return {
+    stable: Math.abs(baselineConfidence-degraded) <= 15 && contradictions.length <= 1,
+    baseline: baselineConfidence,
+    degraded,
+    delta: baselineConfidence-degraded
+  };
+}
+
+function temporalConsistency(conversation, question) {
+  const history = Array.isArray(conversation) ? conversation.slice(-6).map(x=>String(x?.content||"")).join(" ") : "";
+  const current = String(question||"");
+  const currentTerms = new Set(lexicalTerms(current));
+  const historyTerms = new Set(lexicalTerms(history));
+  let overlap = 0;
+  for (const term of currentTerms) if (historyTerms.has(term)) overlap++;
+  return {
+    historyMessages: Array.isArray(conversation) ? Math.min(6, conversation.length) : 0,
+    sharedTerms: overlap,
+    consistent: !history || overlap > 0
+  };
+}
+
+function synthesize({ intent, question, reply, profile, scoredEvidence, challenged, contradictions, confidence, critiqueState, conversation, scenarios, stability, temporal }) {
   const direct = normalize(reply.answer) || "KINGBOT has no validated answer yet.";
   const dominant = challenged.find(h => h.status === "SUPPORTED") || challenged[0];
   const evidenceFor = (dominant?.supporting || scoredEvidence.slice(0, 3).map(x => x.text)).slice(0, 5);
@@ -252,11 +312,15 @@ function synthesize({ intent, question, reply, profile, scoredEvidence, challeng
   if (!validation.length) validation.push("Re-check the authoritative backend state before acting.");
 
   const reasoningSummary = [
+    "Deliberation: native KINGBOT Cortex · level " + String(reply?.intelligence?.thinkingLevel || "EXPERT") + ".",
+
     "Intent: " + intent + " · objective: " + profile.primaryGoal,
     "Relevant entities: " + (profile.entities.join(", ") || "GENERAL"),
     "Evidence set: " + scoredEvidence.length + " items scored for relevance and reliability.",
     "Leading hypothesis: " + (dominant?.label || "NONE"),
-    "Self-critique: " + critiqueState.statement
+    "Self-critique: " + critiqueState.statement,
+    "Confidence stability: " + (stability.stable ? "STABLE" : "SENSITIVE") + " · stress delta " + stability.delta + ".",
+    "Temporal consistency: " + (temporal.consistent ? "CONSISTENT" : "NEW CONTEXT OR LOW OVERLAP") + "."
   ];
 
   return {
@@ -268,6 +332,9 @@ function synthesize({ intent, question, reply, profile, scoredEvidence, challeng
     alternativeHypotheses: alternatives,
     validationSteps: validation,
     confidence,
+    scenarios,
+    stabilityTest: stability,
+    temporalConsistency: temporal,
     cognitiveState: {
       objective: profile.primaryGoal,
       entities: profile.entities,
@@ -276,6 +343,9 @@ function synthesize({ intent, question, reply, profile, scoredEvidence, challeng
       leadingHypothesis: dominant?.id || null,
       confidence,
       critique: critiqueState.issues,
+      scenarios,
+      stability,
+      temporalConsistency: temporal,
       conversationConsidered: Array.isArray(conversation) ? Math.min(6, conversation.length) : 0
     }
   };
@@ -304,7 +374,10 @@ export function think({ question="", intent="PLATFORM_SUPPORT", reply={}, conver
     confidence = Math.max(0, Math.min(100, confidence + adjustment));
   }
   const critiqueState = critique({ question, intent, profile, evidence: scoredEvidence, hypotheses, contradictions, confidence });
-  const synthesis = synthesize({ intent, question, reply, profile, scoredEvidence, challenged, contradictions, confidence, critiqueState, conversation });
+  const scenarios = scenarioMatrix(intent, reply, scoredEvidence);
+  const stability = stabilityTest(scoredEvidence, contradictions, confidence);
+  const temporal = temporalConsistency(conversation, question);
+  const synthesis = synthesize({ intent, question, reply, profile, scoredEvidence, challenged, contradictions, confidence, critiqueState, conversation, scenarios, stability, temporal });
 
   return {
     engine: "KINGBOT_CORTEX",
