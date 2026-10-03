@@ -378,7 +378,9 @@ app.get("/api/health", (_req, res) => {
     workerHeartbeatMonitoring: true,
     brokerReconciliation: true,
     adaptiveIntelligence: true,
-    adaptiveOutcomeLearning: true
+    adaptiveOutcomeLearning: true,
+    unifiedCommandPlane: true,
+    commercialRevenueLedger: true
   });
 });
 
