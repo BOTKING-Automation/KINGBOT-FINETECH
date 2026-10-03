@@ -48,7 +48,7 @@
     const market=data.market||{};
     const identity=data.identity||{};
     const cognitive=data.cognitive||{};
-    const plan=cognitive.plan||{};
+    const cognitivePlan=cognitive.plan||{};
     text("orchRegime",s.regime||"—");
     text("orchBias",s.bias||debate.direction||"NEUTRAL");
     text("orchConfidence",Number.isFinite(Number(s.confidence))?Math.round(Number(s.confidence))+" / 100":"—");
@@ -59,7 +59,7 @@
     text("orchFreshness",market.freshness?.ok?"FRESH":"STALE / UNKNOWN");
     text("orchUpdated",data.generatedAt?new Date(data.generatedAt).toLocaleTimeString():"—");
     text("identityState","COGNITIVE PASS ACTIVE");
-    text("identityMode",plan.mode||"MARKET INTELLIGENCE");
+    text("identityMode",cognitivePlan.mode||"MARKET INTELLIGENCE");
     text("identityCapabilities",Array.isArray(cognitive.capabilities)?cognitive.capabilities.join(" · "):"PERCEPTION · REASONING · VERIFICATION");
     text("identityMission",identity.mission||"Observe verified state, reason, challenge, adapt, verify and explain.");
     text("identityAuthority",identity.authority||"ANALYSIS AND COORDINATION ONLY");
