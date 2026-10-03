@@ -34,7 +34,7 @@ function buildContext({symbol,twelveData,broker,botDefinitions}){
   };
 }
 
-export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveData}={}){
+export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveData,eventBus}={}){
   const feed=twelveData||new TwelveDataFeed();
   if(!twelveData)feed.start();
   const limiter=rateLimit?rateLimit({windowMs:60000,limit:Number(process.env.AI_AGENT_MAX_REQUESTS_PER_MINUTE||12),standardHeaders:"draft-8",legacyHeaders:false}):(_req,_res,next)=>next();
@@ -58,8 +58,11 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     const timeframe=String(req.body?.timeframe||"15m").trim().toLowerCase();
     const thinkingLevel=normalizeThinkingLevel(req.body?.thinkingLevel||"EXPERT");
     if(!question)return res.status(400).json({ok:false,error:"AI_AGENT_MESSAGE_REQUIRED"});
+    const correlationId=crypto.randomUUID();
+    await eventBus?.publish({eventType:"AI_REQUEST_RECEIVED",aggregateType:"AI_AGENT",aggregateId:user.id,userId:user.id,correlationId,source:"ai-agent",payload:{symbol,timeframe,thinkingLevel,messageLength:question.length}}).catch(()=>{});
     const conversation=Array.isArray(req.body?.conversation)?req.body.conversation.slice(-6).map(item=>({role:item?.role==="assistant"?"assistant":"user",content:String(item?.content||"").slice(0,1800)})):[];
     const native=await runNativeKingbotAI({question,symbol,timeframe,thinkingLevel,twelveData:feed,pool,broker,userId:user.id,conversation});
+    await eventBus?.publish({eventType:"AI_RESPONSE_READY",aggregateType:"AI_AGENT",aggregateId:user.id,userId:user.id,correlationId,source:"ai-agent",payload:{intent:native?.intent||null,verified:native?.verified||{},memoryAware:Boolean(native?.cognition?.memory?.available)}}).catch(()=>{});
     const cognitivePlan=native?.cognition?.plan || buildCognitivePlan({intent:native?.intent || "PLATFORM_SUPPORT",symbol,conversation,thinkingLevel});
 
     // Connection/account/runtime questions must stay on the verified native
