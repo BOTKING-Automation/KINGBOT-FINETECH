@@ -43,7 +43,7 @@ export function registerTerminalSnapshot(app, { requireUser, pool, broker, first
       swap: firstFinite(p?.swap, p?.swapAmount, p?.swap_amount),
       commission: firstFinite(p?.commission, p?.commissionAmount, p?.commission_amount),
       pnl: firstFinite(p?.profit, p?.pnl, p?.unrealizedProfit, p?.unrealizedPnl),
-      status: String(p?.state || p?.status || "OPEN").toUpperCase(),
+      status: p?.state || p?.status ? String(p?.state || p?.status).toUpperCase() : null,
     });
     try {
       const [accountResult, positionsResult, ordersResult, quoteResult, riskResult, globalRiskResult] = await Promise.allSettled([
@@ -97,7 +97,7 @@ export function registerTerminalSnapshot(app, { requireUser, pool, broker, first
         side:String(o?.side || o?.type || o?.order_type || "—").toUpperCase(),
         volume:firstFinite(o?.volume,o?.lots,o?.quantity,o?.stake,o?.units),
         price:firstFinite(o?.price,o?.openPrice,o?.entryPrice,o?.currentPrice),
-        status:String(o?.status || o?.state || "OPEN").toUpperCase(),
+        status:o?.status || o?.state ? String(o?.status || o?.state).toUpperCase() : null,
       }));
       const balance = moneyNumber(raw.balance);
       const equity = moneyNumber(raw.equity);
@@ -111,7 +111,7 @@ export function registerTerminalSnapshot(app, { requireUser, pool, broker, first
             bid: q.bid ?? q.buy ?? q.bidPrice ?? null,
             ask: q.ask ?? q.sell ?? q.askPrice ?? null,
             price: q.price ?? null,
-            time: q.time || q.timestamp || new Date().toISOString(),
+            time: q.time || q.timestamp || null,
             source: "broker-snapshot-quote",
           };
       }
@@ -133,8 +133,8 @@ export function registerTerminalSnapshot(app, { requireUser, pool, broker, first
           freeMargin: moneyNumber(raw.freeMargin),
           marginLevel: moneyNumber(raw.marginLevel),
           positionCount: positionRows.length,
-          tradingEnabled: raw.tradeAllowed !== false && raw.tradingEnabled !== false,
-          accountStatus: String(raw.account_status || raw.status || "ACTIVE").toUpperCase(),
+          tradingEnabled: typeof raw.tradeAllowed === "boolean" ? raw.tradeAllowed : (typeof raw.tradingEnabled === "boolean" ? raw.tradingEnabled : null),
+          accountStatus: raw.account_status || raw.status ? String(raw.account_status || raw.status).toUpperCase() : null,
         },
         risk: riskResult.status === "fulfilled" && riskResult.value?.rowCount ? riskResult.value.rows[0] : botId ? null : null,
         executionControl: globalRiskResult.status === "fulfilled" ? globalRiskResult.value : null,
