@@ -351,7 +351,7 @@ export class UserBrokerManager {
         if(!entry){
           const connection=new Mt5BridgeConnection({registry:mt5BridgeRegistry,token:credential,userId});
           if(!await connection.waitConnected(5000))return {connected:false,mode:"NOT_CONNECTED",reason:"MT5_BRIDGE_OFFLINE"};
-          entry={api:connection,connection,accountId:mapping.account_id,executionMode:mode,provider:"mt5-bridge",connectedAt:Date.now(),accountInfo:null};
+          entry={ownerUserId:userId,api:connection,connection,accountId:mapping.account_id,executionMode:mode,provider:"mt5-bridge",connectedAt:Date.now(),accountInfo:null};
           this.connections.set(key,entry);
         }
         if(!entry.connection.connected)return {connected:false,mode:"NOT_CONNECTED",reason:"MT5_BRIDGE_OFFLINE"};
@@ -391,7 +391,7 @@ export class UserBrokerManager {
           });
           await api.ensureReady();
           const accountInfo=await api.getAccountInformation();
-          entry={api,accountInfo,accountId:mapping.account_id,executionMode:mode,provider:"exness",connectedAt:Date.now(),accountInfoAt:Date.now()};
+          entry={ownerUserId:userId,api,accountInfo,accountId:mapping.account_id,executionMode:mode,provider:"exness",connectedAt:Date.now(),accountInfoAt:Date.now()};
           this.connections.set(key,entry);
         }else{
           entry.accountInfo=await entry.api.getAccountInformation();
@@ -419,7 +419,7 @@ export class UserBrokerManager {
             accountType:parsed.accountType
           });
           const result=await api.connect();
-          entry={api,accountId:mapping.account_id,executionMode:mode,provider:"deriv",connectedAt:Date.now(),accountInfo:result.account,accountType:api.accountTypeFromBalance(result.account),accountInfoAt:Date.now()};
+          entry={ownerUserId:userId,api,accountId:mapping.account_id,executionMode:mode,provider:"deriv",connectedAt:Date.now(),accountInfo:result.account,accountType:api.accountTypeFromBalance(result.account),accountInfoAt:Date.now()};
           this.connections.set(key,entry);
         }else{
           entry.executionMode=mode;
@@ -466,7 +466,7 @@ export class UserBrokerManager {
             baseUrl:parsed.baseUrl
           });
           const accountInfo=await api.ensureReady();
-          entry={api,accountId:mapping.account_id,executionMode:mode,provider:"oanda",connectedAt:Date.now(),accountInfo,accountInfoAt:Date.now()};
+          entry={ownerUserId:userId,api,accountId:mapping.account_id,executionMode:mode,provider:"oanda",connectedAt:Date.now(),accountInfo,accountInfoAt:Date.now()};
           this.connections.set(key,entry);
         }else{
           entry.accountInfo=await entry.api.getAccountSummary();
@@ -860,6 +860,8 @@ export class UserBrokerManager {
   }
 
   async placeOrder({side,symbol,volume,stopLoss,takeProfit,comment,clientId,userId,currency,multiplier,derivContractType}){
+    if(!userId)throw new Error("EXECUTION_USER_CONTEXT_REQUIRED");
+    if(!clientId || String(clientId).trim().length<12)throw new Error("EXECUTION_CLIENT_ID_REQUIRED");
     await this.assertExecutionAuthorized(userId);
     const entry=await this.connectionFor(userId);
     if(entry.provider==="deriv"){
