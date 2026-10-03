@@ -165,6 +165,9 @@
   }
 
   function setMeta(){
+    if(!document.querySelector('link[rel="stylesheet"][href="system/platform.css"]')){
+      const css=document.createElement("link"); css.rel="stylesheet"; css.href="system/platform.css"; document.head.appendChild(css);
+    }
     if(!document.querySelector('meta[name="theme-color"]')){
       const meta=document.createElement("meta");
       meta.name="theme-color";
@@ -197,6 +200,13 @@
     performanceBudget();
     globalRuntimeErrors();
     connectEventStream();
+    window.addEventListener("kingbot:session-change",event=>{
+      if(event?.detail?.authenticated===true) void connectEventStream();
+      else { try{state.eventStream?.abort?.();}catch{} state.eventStream=null; }
+    });
+    window.addEventListener("kingbot:event-bus-error",()=>{
+      setTimeout(()=>{ if(!document.hidden) void connectEventStream(); },5000);
+    });
     registerServiceWorker();
     requestAnimationFrame(()=>mark("kingbot-shell-ready"));
   }
