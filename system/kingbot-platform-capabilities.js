@@ -11,7 +11,7 @@
     {id:"broker-connectivity",name:"Broker Connectivity",group:"Execution",status:"live",href:"broker-connect.html",desc:"Broker account linking and MT5/Deriv infrastructure."},
     {id:"mt5-cloud",name:"MT5 Cloud / VPS",group:"Execution",status:"live",href:"vps-dashboard.html",desc:"Hosted MT5 deployment and bridge operations."},
     {id:"execution-journal",name:"Execution Audit Trail",group:"Execution",status:"live",href:"reports.html",desc:"Server-side execution history and operational evidence."},
-    {id:"event-bus",name:"Central Event Bus",group:"Infrastructure",status:"live",href:"system/architecture.html",desc:"Durable events, correlation IDs, SSE distribution and central state."},
+    {id:"event-bus",name:"Central Event Bus",group:"Infrastructure",status:"live",href:"platform-os.html",desc:"Durable events, correlation IDs, SSE distribution and central state."},
     {id:"adaptive-memory",name:"Adaptive Intelligence Memory",group:"Intelligence",status:"live",href:"ai.html",desc:"Persistent non-sensitive user preferences and outcome-driven learning."},
     {id:"developer-api",name:"Developer API",group:"Platform",status:"live",href:"developer.html",desc:"Versioned read-only integration API with scoped keys."},
     {id:"subscription-engine",name:"Subscription Engine",group:"Commercial",status:"live",href:"subscription.html",desc:"Plans, entitlements, payment verification and access control."},
