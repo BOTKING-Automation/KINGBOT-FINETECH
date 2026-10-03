@@ -382,9 +382,9 @@
     const contextNote = byId("contextNote");
     if (contextNote) {
       if (connected && quote) {
-        contextNote.textContent = "AI queries can use the verified broker quote, account telemetry, positions, runtime state and risk controls shown above.";
+        contextNote.textContent = "AI queries can use the shared live Market page feed plus verified broker quote, account telemetry, positions, runtime state and risk controls."
       } else if (connected) {
-        contextNote.textContent = "Broker is connected. Select a symbol configured by the broker to load a verified quote.";
+        contextNote.textContent = "KINGBOT can read the shared live Market page feed without a broker connection; broker connection adds account and execution telemetry."
       } else {
         contextNote.textContent = "AI remains available for product, strategy and risk education. Live account-specific analysis requires a verified broker connection.";
       }
