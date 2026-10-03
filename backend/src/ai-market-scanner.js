@@ -584,7 +584,7 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData }) {
     let tvCount=0;
     try { const q=await pool.query("SELECT COUNT(*)::int AS count FROM kingbot_tradingview_snapshots WHERE received_at > NOW() - INTERVAL '10 minutes'"); tvCount=q.rows[0]?.count || 0; } catch {}
     return res.json({
-      ok:true, scanner:"KINGBOT AI MARKET SCANNER", aiReady:Boolean(apiKey), provider:apiKey?"xai":"none",
+      ok:true, scanner:"KINGBOT AI MARKET SCANNER", aiReady:true, provider:"KINGBOT_NATIVE",
       marketData:{
         twelveData:twelveData.status(),
         derivPublic:{
