@@ -38,6 +38,7 @@ import { registerIntelligenceOrchestrator, ensureIntelligenceOrchestratorSchema 
 import { KingbotEventBus, registerKingbotEventRoutes } from "./kingbot-event-bus.js";
 import { ensureCommercialLedgerSchema, registerCommercialLedgerRoutes } from "./commercial-ledger.js";
 import { ensureUserMemorySchema } from "./kingbot-user-memory.js";
+import { registerCommandPlane } from "./command-plane.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -350,6 +351,7 @@ registerAiIntelligence(app, { requireUser, pool, broker });
 registerIntelligenceOrchestrator(app, { requireUser, pool, twelveData });
 registerKingbotEventRoutes(app, { requireUser, pool, eventBus });
 registerCommercialLedgerRoutes(app,{pool});
+registerCommandPlane(app,{pool,broker,twelveData,eventBus});
 
 app.get("/api/health", (_req, res) => {
   res.json({
