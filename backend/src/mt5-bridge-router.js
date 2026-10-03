@@ -77,14 +77,31 @@ export function createMt5BridgeRouter({pool,broker}={}){
       const result=await mt5BridgeRegistry.poll({token:req.body?.token,login:req.body?.login,server:req.body?.server,accountType:req.body?.accountType,state:req.body?.state});
       if(!result.ok&&result.error==="MT5_BRIDGE_ACCOUNT_MISMATCH")return res.status(409).json(result);
       if(!result.ok)return res.status(result.status||409).json(result);
-      const active=await broker.getMapping(result.userId);
+      let active=await broker.getMapping(result.userId);
+      const activeProvider=String(active?.provider||"").toLowerCase();
+      if(active && activeProvider!=="mt5-bridge"){
+        const canMigrate=activeProvider==="deriv" && String(result.migrateFrom||"").toLowerCase()==="deriv";
+        if(!canMigrate)return res.status(409).json({ok:false,error:"BROKER_ALREADY_CONNECTED"});
+        // A verified MT5 bridge heartbeat is explicit user intent to move the
+        // account from the retired Deriv Options adapter to native MT5 lots.
+        const stopped=await pool.query(
+          "UPDATE kingbot_bot_runtime SET state='STOPPED',last_error=$2,updated_at=NOW() WHERE user_id=$1 AND state='RUNNING'",
+          [result.userId,"BROKER_MIGRATED_TO_MT5"]
+        );
+        await broker.disconnect(result.userId,{disableMapping:true});
+        await pool.query(
+          "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'BROKER_DISCONNECTED',$2::jsonb)",
+          [result.userId,JSON.stringify({reason:"MT5_BRIDGE_MIGRATION",previousProvider:activeProvider,stoppedRunningBots:Number(stopped.rowCount||0)})]
+        );
+        active=null;
+      }
       if(!active){
         const saved=await broker.saveMapping({userId:result.userId,provider:"mt5-bridge",accountId:result.login,accountToken:String(req.body?.token||""),executionMode:result.mode});
         if(!saved?.ok)return res.status(saved.error==="BROKER_ALREADY_CONNECTED"?409:400).json(saved);
         const connected=await broker.connect(result.userId,result.mode);
         if(!connected.connected)return res.status(503).json({ok:false,error:"MT5_BRIDGE_REGISTER_FAILED",reason:connected.reason});
         const retried=await mt5BridgeRegistry.poll({token:req.body?.token,login:req.body?.login,server:req.body?.server,accountType:req.body?.accountType,state:req.body?.state});
-        return res.status(retried.ok?200:(retried.status||409)).json(retried);
+        return res.status(retried.ok?200:(retried.status||409)).json({...retried,migratedFrom:activeProvider==="deriv"?"deriv":undefined});
       }
       if(String(active.provider).toLowerCase()!=="mt5-bridge")return res.status(409).json({ok:false,error:"BROKER_ALREADY_CONNECTED"});
       return res.json(result);
