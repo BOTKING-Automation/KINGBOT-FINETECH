@@ -77,6 +77,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
       cognitivePlan,
       cognitionAudit:native?.cognition?.audit||null,
       cognition:native?.cognition||null,
+      conversationState:native?.conversationState||null,
       reply:native?.reply||{},
       sources:native.sources||[],
       generatedAt:new Date().toISOString(),
