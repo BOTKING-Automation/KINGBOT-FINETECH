@@ -180,6 +180,24 @@
       meta.content="KINGBOT FINTECH — intelligent trading technology, market intelligence, automation and controlled execution infrastructure.";
       document.head.appendChild(meta);
     }
+    const title=document.title||"KINGBOT FINTECH";
+    const description=document.querySelector('meta[name="description"]')?.content||
+      "KINGBOT FINTECH — intelligent trading technology, market intelligence, automation and controlled execution infrastructure.";
+    const social=[
+      ["og:title",title],
+      ["og:description",description],
+      ["og:type","website"],
+      ["twitter:card","summary_large_image"],
+      ["twitter:title",title],
+      ["twitter:description",description]
+    ];
+    social.forEach(([name,content])=>{
+      if(document.querySelector('meta[property="'+name+'"],meta[name="'+name+'"]'))return;
+      const meta=document.createElement("meta");
+      meta.setAttribute(name.startsWith("og:")?"property":"name",name);
+      meta.content=content;
+      document.head.appendChild(meta);
+    });
     if(!document.querySelector('meta[name="color-scheme"]')){
       const meta=document.createElement("meta");
       meta.name="color-scheme";
@@ -206,6 +224,10 @@
     });
     window.addEventListener("kingbot:event-bus-error",()=>{
       setTimeout(()=>{ if(!document.hidden) void connectEventStream(); },5000);
+    });
+    document.addEventListener("visibilitychange",()=>{
+      if(document.hidden){ try{state.eventStream?.abort?.();}catch{} state.eventStream=null; }
+      else if(window.KINGBOT_SESSION?.isAuthenticated?.()) void connectEventStream();
     });
     registerServiceWorker();
     requestAnimationFrame(()=>mark("kingbot-shell-ready"));
