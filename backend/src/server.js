@@ -33,6 +33,7 @@ import { createMt5HostingRouter, ensureMt5HostingSchema } from "./mt5-hosting.js
 import { createFintechOpsRouter, ensureFintechOpsSchema } from "./fintech-operations.js";
 import { ensureGlobalRiskSchema, getGlobalRiskState } from "./global-risk.js";
 import { registerGoldSignals, ensureGoldSignalsSchema } from "./gold-signals.js";
+import { registerIntelligenceOrchestrator } from "./intelligence-orchestrator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -326,6 +327,7 @@ registerAiAgent(app, { requireUser, pool, broker, rateLimit, twelveData });
 registerTerminalLive(app, { requireUser, pool, broker, firstFinite });
 registerElevenLabsVoice(app, { requireUser, pool, rateLimit });
 registerAiIntelligence(app, { requireUser, pool, broker });
+registerIntelligenceOrchestrator(app, { requireUser, pool, twelveData });
 
 app.get("/api/health", (_req, res) => {
   res.json({
