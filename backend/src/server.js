@@ -36,6 +36,7 @@ import { registerGoldSignals, ensureGoldSignalsSchema } from "./gold-signals.js"
 import { syntheticCatalog, CORE_SYNTHETIC_FAMILIES } from "./synthetic-markets.js";
 import { registerIntelligenceOrchestrator, ensureIntelligenceOrchestratorSchema } from "./intelligence-orchestrator.js";
 import { KingbotEventBus, registerKingbotEventRoutes } from "./kingbot-event-bus.js";
+import { ensureUserMemorySchema } from "./kingbot-user-memory.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
