@@ -53,10 +53,12 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     const user=await requireUser(pool,req,res);if(!user)return;
     const question=String(req.body?.message||"").trim().slice(0,3000);
     const symbol=cleanSymbol(req.body?.symbol);
+    const timeframe=String(req.body?.timeframe||"15m").trim().toLowerCase();
+    const thinkingLevel=normalizeThinkingLevel(req.body?.thinkingLevel||"EXPERT");
     if(!question)return res.status(400).json({ok:false,error:"AI_AGENT_MESSAGE_REQUIRED"});
     const conversation=Array.isArray(req.body?.conversation)?req.body.conversation.slice(-6).map(item=>({role:item?.role==="assistant"?"assistant":"user",content:String(item?.content||"").slice(0,1800)})):[];
-    const native=await runNativeKingbotAI({question,symbol,twelveData:feed,pool,broker,userId:user.id,conversation});
-    const cognitivePlan=native?.cognition?.plan || buildCognitivePlan({intent:native?.intent || "PLATFORM_SUPPORT",symbol,conversation});
+    const native=await runNativeKingbotAI({question,symbol,timeframe,thinkingLevel,twelveData:feed,pool,broker,userId:user.id,conversation});
+    const cognitivePlan=native?.cognition?.plan || buildCognitivePlan({intent:native?.intent || "PLATFORM_SUPPORT",symbol,conversation,thinkingLevel});
 
     // Connection/account/runtime questions must stay on the verified native
     // path so an external language model cannot invent or reinterpret private
