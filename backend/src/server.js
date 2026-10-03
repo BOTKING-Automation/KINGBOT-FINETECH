@@ -33,6 +33,7 @@ import { createMt5HostingRouter, ensureMt5HostingSchema } from "./mt5-hosting.js
 import { createFintechOpsRouter, ensureFintechOpsSchema } from "./fintech-operations.js";
 import { ensureGlobalRiskSchema, getGlobalRiskState } from "./global-risk.js";
 import { registerGoldSignals, ensureGoldSignalsSchema } from "./gold-signals.js";
+import { syntheticCatalog, CORE_SYNTHETIC_FAMILIES } from "./synthetic-markets.js";
 import { registerIntelligenceOrchestrator, ensureIntelligenceOrchestratorSchema } from "./intelligence-orchestrator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -143,6 +144,21 @@ app.get("/api/broker/identity", async (req,res)=>{
   }catch(error){
     console.error("[KINGBOT BROKER] stored identity lookup failed:",error?.message||error);
     res.status(503).json({ok:false,error:"BROKER_IDENTITY_UNAVAILABLE",reason:String(error?.message||"BROKER_IDENTITY_UNAVAILABLE").slice(0,220)});
+  }
+});
+
+let syntheticCatalogCache={at:0,items:[]};
+app.get("/api/markets/synthetics", async (_req,res)=>{
+  try{
+    if(syntheticCatalogCache.items.length && Date.now()-syntheticCatalogCache.at<30000){
+      return res.json({ok:true,marketType:"SYNTHETIC",families:CORE_SYNTHETIC_FAMILIES,markets:syntheticCatalogCache.items,cached:true});
+    }
+    const rows=await getDerivMarketFeed().getActiveSymbols({timeoutMs:7000});
+    const markets=syntheticCatalog(rows);
+    syntheticCatalogCache={at:Date.now(),items:markets};
+    res.json({ok:true,marketType:"SYNTHETIC",families:CORE_SYNTHETIC_FAMILIES,markets,generatedAt:new Date().toISOString()});
+  }catch(error){
+    res.status(503).json({ok:false,error:"SYNTHETIC_MARKETS_UNAVAILABLE",reason:String(error?.message||"SYNTHETIC_MARKETS_UNAVAILABLE").slice(0,180)});
   }
 });
 
