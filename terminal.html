@@ -1202,11 +1202,6 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     }
   }
 
-  async function loadQuote(){
-    if(!state.marketSymbol){setSync("market","IDLE","NO ENGINE MARKET",new Date().toISOString());return}
-    try{const x=await api("/broker/quote?symbol="+encodeURIComponent(state.marketSymbol),{timeoutMs:7500});renderQuote(x);addActivity("Broker quote updated for "+state.marketSymbol+".")}catch(e){setSync("market","ERROR","QUOTE UNAVAILABLE",new Date().toISOString());$("marketBadge").textContent="ERROR";addActivity("Market quote: "+e.message)}
-  }
-
   async function testGoldDemoBuy(){
     const button=$("goldTestBtn");
     if(button.disabled)return;
