@@ -742,12 +742,19 @@ export class UserBrokerManager {
   async getMarkets(userId){
     let entry=await this.connectionFor(userId);
     if(String(entry.provider).toLowerCase()==="mt5-bridge"){
-      const list=await entry.connection.getSymbols();
+      const list=typeof entry.connection.getMarketCatalog==="function"
+        ? await entry.connection.getMarketCatalog()
+        : await entry.connection.getSymbols();
       return {connected:true,data:(Array.isArray(list)?list:[]).map(item=>typeof item==="string"
-        ? {symbol:item.toUpperCase(),name:item,category:"CFD",submarket:"",tradeable:true,source:"mt5-ea-bridge"}
-        : {symbol:String(item?.symbol||"").toUpperCase(),name:String(item?.name||item?.description||item?.symbol||"").trim(),category:String(item?.category||"CFD"),submarket:String(item?.path||"").trim(),tradeable:item?.tradeable!==false,source:"mt5-ea-bridge",minVolume:Number(item?.minVolume)||null,maxVolume:Number(item?.maxVolume)||null,volumeStep:Number(item?.volumeStep)||null,digits:Number(item?.digits)||null,point:Number(item?.point)||null,tickSize:Number(item?.tickSize)||null,tickValue:Number(item?.tickValue)||null,stopsLevel:Number(item?.stopsLevel)||0,contractSize:Number(item?.contractSize)||null}).filter(x=>x.symbol)};
+        ? {symbol:item.toUpperCase(),name:item,category:"CFD",submarket:"",tradeable:null,source:"mt5-ea-bridge"}
+        : {symbol:String(item?.symbol||"").toUpperCase(),name:String(item?.name||item?.description||item?.symbol||"").trim(),
+          category:String(item?.category||"CFD"),submarket:String(item?.path||item?.submarket||"").trim(),
+          tradeable:typeof item?.tradeable==="boolean"?item.tradeable:null,source:item?.source||"mt5-ea-bridge",
+          minVolume:Number(item?.minVolume)||null,maxVolume:Number(item?.maxVolume)||null,volumeStep:Number(item?.volumeStep)||null,
+          digits:Number(item?.digits)||null,point:Number(item?.point)||null,tickSize:Number(item?.tickSize)||null,
+          tickValue:Number(item?.tickValue)||null,stopsLevel:Number(item?.stopsLevel)||0,contractSize:Number(item?.contractSize)||null}).filter(x=>x.symbol)};
     }
-    if(entry.provider==="exness")return {connected:true,data:await entry.api.getMarkets()};
+        if(entry.provider==="exness")return {connected:true,data:await entry.api.getMarkets()};
     if(entry.provider==="deriv"){
       try{
         return {connected:true,data:await entry.api.getMarkets()};
