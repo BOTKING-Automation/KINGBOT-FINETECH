@@ -11,7 +11,7 @@ test("sameTenant rejects missing or different ownership", () => {
 
 test("redactLogValue removes control characters and caps length", () => {
   const value = redactLogValue("abc\nsecret\tdata\r", 8);
-  assert.equal(value, "abc secret");
+  assert.equal(value, "abc secr");
 });
 
 test("allowedOrigins never falls back to wildcard origin", () => {
