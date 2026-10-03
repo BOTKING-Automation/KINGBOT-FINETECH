@@ -17,14 +17,15 @@ function ipHash(req){ const salt=String(process.env.SECURITY_EVENT_SALT||process
 function userAgent(req){ return clean(req.headers["user-agent"]||"unknown",400); }
 async function audit(pool,userId,eventType,metadata={}){ if(!pool)return; await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,$2,$3::jsonb)",[userId||null,eventType,JSON.stringify(metadata)]).catch(error=>console.warn("[KINGBOT FINOPS] audit failed:",error?.message||error)); }
 async function notify(pool,userId,type,title,body,metadata={}){ if(!pool||!userId)return; await pool.query("INSERT INTO kingbot_notifications(user_id,type,title,body,metadata) VALUES($1,$2,$3,$4,$5::jsonb)",[userId,type,clean(title,140),clean(body,1000),JSON.stringify(metadata)]).catch(error=>console.warn("[KINGBOT FINOPS] notification failed:",error?.message||error)); }
-function createApiKey(){ const secret="kb_live_"+crypto.randomBytes(30).toString("base64url"); return {secret,prefix:secret.slice(0,15),hash:crypto.createHash("sha256").update(secret).digest("hex")}; }
+function createApiKey(){ const secret="kb_read_"+crypto.randomBytes(30).toString("base64url"); return {secret,prefix:secret.slice(0,15),hash:crypto.createHash("sha256").update(secret).digest("hex")}; }
 async function authenticateApiKey(pool,req,res,next){
   const raw=clean(req.headers["x-api-key"]||"",160);
   if(!raw)return res.status(401).json({ok:false,error:"API key required in X-API-Key."});
   const hash=crypto.createHash("sha256").update(raw).digest("hex");
   try{
-    const q=await pool.query("SELECT id,user_id,scopes,revoked_at FROM kingbot_api_keys WHERE key_hash=$1 LIMIT 1",[hash]);
+    const q=await pool.query("SELECT id,user_id,scopes,revoked_at,expires_at FROM kingbot_api_keys WHERE key_hash=$1 LIMIT 1",[hash]);
     if(!q.rowCount||q.rows[0].revoked_at)return res.status(401).json({ok:false,error:"API key is invalid or revoked."});
+    if(q.rows[0].expires_at && new Date(q.rows[0].expires_at).getTime()<=Date.now())return res.status(401).json({ok:false,error:"API key has expired."});
     await pool.query("UPDATE kingbot_api_keys SET last_used_at=NOW() WHERE id=$1",[q.rows[0].id]);
     req.kingbotApiKey=q.rows[0]; next();
   }catch(error){ console.error("[KINGBOT API KEY]",error?.message||error); res.status(503).json({ok:false,error:"Developer API unavailable."}); }
@@ -47,7 +48,7 @@ export async function ensureFintechOpsSchema(pool){
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,
     kyc_profile_id UUID REFERENCES kingbot_kyc_profiles(id) ON DELETE CASCADE, document_type TEXT NOT NULL,
     document_reference TEXT, provider TEXT, provider_reference TEXT, status TEXT NOT NULL DEFAULT 'pending',
-    metadata JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), expires_at TIMESTAMPTZ
   )`);
   await pool.query(`CREATE TABLE IF NOT EXISTS kingbot_compliance_alerts(
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID REFERENCES kingbot_users(id) ON DELETE SET NULL,
@@ -102,6 +103,8 @@ export async function ensureFintechOpsSchema(pool){
     scopes JSONB NOT NULL DEFAULT '[]'::jsonb, last_used_at TIMESTAMPTZ, revoked_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+  await pool.query("ALTER TABLE kingbot_api_keys ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ");
+  await pool.query("CREATE INDEX IF NOT EXISTS kingbot_api_keys_expiry_idx ON kingbot_api_keys(user_id,revoked_at,expires_at)");
   await pool.query(`CREATE TABLE IF NOT EXISTS kingbot_invoices(
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,
     subscription_id UUID, number TEXT NOT NULL UNIQUE, status TEXT NOT NULL DEFAULT 'issued',
@@ -376,7 +379,7 @@ export function createFintechOpsRouter({pool}){
   router.get("/api-keys",userLimit,async(req,res)=>{const u=await requireUser(pool,req,res);if(!u)return;const q=await pool.query("SELECT id,name,key_prefix,scopes,last_used_at,revoked_at,created_at FROM kingbot_api_keys WHERE user_id=$1 ORDER BY created_at DESC",[u.id]);res.json({ok:true,keys:q.rows});});
   router.post("/api-keys",userLimit,async(req,res)=>{
     const u=await requireUser(pool,req,res);if(!u)return;const name=clean(req.body?.name,80)||"KINGBOT API key",requested=Array.isArray(req.body?.scopes)?req.body.scopes.map(x=>clean(x,50)).filter(x=>SCOPES.includes(x)):[],scopes=requested.length?Array.from(new Set(requested)):["profile:read","account:read"];const key=createApiKey();
-    try{const q=await pool.query("INSERT INTO kingbot_api_keys(user_id,name,key_hash,key_prefix,scopes) VALUES($1,$2,$3,$4,$5::jsonb) RETURNING id,name,key_prefix,scopes,created_at",[u.id,name,key.hash,key.prefix,JSON.stringify(scopes)]);await audit(pool,u.id,"API_KEY_CREATED",{keyId:q.rows[0].id,scopes});res.status(201).json({ok:true,key:q.rows[0],secret:key.secret,warning:"Store this secret now. KINGBOT does not display the full API key again."});}catch(error){res.status(500).json({ok:false,error:"API key creation failed."});}
+    try{const q=await pool.query("INSERT INTO kingbot_api_keys(user_id,name,key_hash,key_prefix,scopes,expires_at) VALUES($1,$2,$3,$4,$5::jsonb,NOW()+INTERVAL '90 days') RETURNING id,name,key_prefix,scopes,expires_at,created_at",[u.id,name,key.hash,key.prefix,JSON.stringify(scopes)]);await audit(pool,u.id,"API_KEY_CREATED",{keyId:q.rows[0].id,scopes});res.status(201).json({ok:true,key:q.rows[0],secret:key.secret,warning:"Store this secret now. KINGBOT does not display the full API key again."});}catch(error){res.status(500).json({ok:false,error:"API key creation failed."});}
   });
   router.post("/api-keys/:id/revoke",userLimit,async(req,res)=>{const u=await requireUser(pool,req,res);if(!u)return;const q=await pool.query("UPDATE kingbot_api_keys SET revoked_at=COALESCE(revoked_at,NOW()) WHERE id=$1 AND user_id=$2 RETURNING id,revoked_at",[req.params.id,u.id]);if(!q.rowCount)return res.status(404).json({ok:false,error:"API key not found."});await audit(pool,u.id,"API_KEY_REVOKED",{keyId:req.params.id});res.json({ok:true,key:q.rows[0]});});
 
