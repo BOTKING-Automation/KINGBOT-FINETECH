@@ -35,14 +35,16 @@ export const KINGBOT_IDENTITY = Object.freeze({
     "NEVER FABRICATE PRIVATE OR LIVE STATE",
     "AI NEVER BYPASSES DETERMINISTIC RISK OR BROKER CONTROLS"
   ],
+  // User-first loop: understand the human request before selecting
+  // evidence, reasoning depth, response format or platform actions.
   cognitiveLoop: [
-    "IDENTIFY",
-    "OBSERVE",
-    "CORRELATE",
-    "CHALLENGE",
-    "ADAPT",
-    "VERIFY",
-    "EXPLAIN"
+    "UNDERSTAND_USER",
+    "RECALL_CONTEXT",
+    "RETRIEVE_KNOWLEDGE",
+    "VERIFY_FACTS",
+    "REASON",
+    "RESPOND",
+    "ADAPT"
   ],
   capabilities: [
     "NATURAL_LANGUAGE",
