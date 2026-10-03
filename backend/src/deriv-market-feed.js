@@ -342,6 +342,38 @@ export class DerivMarketFeed {
     });
   }
 
+  async getActiveSymbols({timeoutMs=7000}={}) {
+    await this.connect();
+    const reqId=this.nextReqId();
+    return new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{
+        this.requestWaiters.delete(reqId);
+        reject(new Error("DERIV_ACTIVE_SYMBOLS_TIMEOUT"));
+      },Math.max(2000,Number(timeoutMs)||7000));
+      this.requestWaiters.set(reqId,{
+        resolve:(data)=>{
+          clearTimeout(timer);
+          this.requestWaiters.delete(reqId);
+          if(data?.error){reject(new Error(data.error.message||"DERIV_ACTIVE_SYMBOLS_FAILED"));return;}
+          const rows=Array.isArray(data?.active_symbols)?data.active_symbols:[];
+          resolve(rows);
+        },
+        reject:(error)=>{
+          clearTimeout(timer);
+          this.requestWaiters.delete(reqId);
+          reject(error);
+        }
+      });
+      try{
+        this.send({active_symbols:"full",req_id:reqId});
+      }catch(error){
+        clearTimeout(timer);
+        this.requestWaiters.delete(reqId);
+        reject(error);
+      }
+    });
+  }
+
   async getHistoricalCandles(symbol,{timeframe="5m",limit=120,timeoutMs=5000}={}) {
     const s=this.normalize(symbol);
     const granularityMap={"1m":60,"2m":120,"3m":180,"4m":240,"5m":300,"6m":360,"10m":600,"12m":720,"15m":900,"20m":1200,"30m":1800,"1h":3600,"2h":7200,"3h":10800,"4h":14400,"6h":21600,"8h":28800,"12h":43200,"1d":86400,"1w":604800,"1mn":2592000};
