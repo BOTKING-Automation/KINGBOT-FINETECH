@@ -40,6 +40,13 @@
     return (window.location.pathname.split("/").filter(Boolean).pop() || "index.html").toLowerCase();
   }
 
+  function resolveHref(href){
+    const value=String(href||"");
+    if(!value||value==="#"||value.startsWith("http")||value.startsWith("mailto:")) return value;
+    const nestedAdmin=/\/admin\//i.test(window.location.pathname);
+    return nestedAdmin ? "../"+value.replace(/^\.\//,"") : value;
+  }
+
   function injectStyle(){
     if(document.getElementById("kb-compact-nav-style")) return;
 
@@ -404,7 +411,7 @@
 
     const pageLinks=links.map(([href,name,icon,desc])=>{
       const active=href.toLowerCase()===page;
-      return '<a href="'+href+'"'+(active?' class="kb-active" aria-current="page"':'')+'>'+
+      return '<a href="'+resolveHref(href)+'"'+(active?' class="kb-active" aria-current="page"':'')+'>'+
         '<span class="kb-menu-icon">'+icon+'</span>'+
         '<span><span class="kb-menu-name">'+name+'</span><span class="kb-menu-sub">'+desc+'</span></span>'+
       '</a>';
@@ -418,14 +425,14 @@
       if(action==="logout"){
         return '<a href="#" data-kb-logout>'+name+'</a>';
       }
-      return '<a href="'+href+'">'+name+'</a>';
+      return '<a href="'+resolveHref(href)+'">'+name+'</a>';
     }).join("");
 
     const root=document.createElement("div");
     root.id="kb-compact-nav";
     root.innerHTML=
-      '<a href="index.html" aria-label="KINGBOT FINTECH home" style="display:block">'+
-        '<img class="kb-fintech-logo" src="assets/images/kingbot-fintech-logo.png" alt="KINGBOT FINTECH logo" title="KINGBOT FINTECH">'+
+      '<a href="'+resolveHref("index.html")+'" aria-label="KINGBOT FINTECH home" style="display:block">'+
+        '<img class="kb-fintech-logo" src="'+resolveHref("assets/images/kingbot-fintech-logo.png")+'" alt="KINGBOT FINTECH logo" title="KINGBOT FINTECH">'+
       '</a>'+
       '<button class="kb-nav-trigger" type="button" aria-label="Open KINGBOT navigation" aria-expanded="false">'+
         '<span class="kb-bars" aria-hidden="true"><i></i><i></i><i></i></span>'+
