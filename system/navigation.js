@@ -6,6 +6,19 @@
   /* Shared runtime is loaded by every product surface through the global shell. */
   (function loadKingbotRuntime(){
     if(document.getElementById("kb-site-performance")) return;
+    if(!document.querySelector('link[rel="icon"]')){
+      const icon=document.createElement("link");
+      icon.rel="icon";
+      icon.type="image/png";
+      icon.href="assets/images/kingbot-fintech-logo.png";
+      document.head.appendChild(icon);
+    }
+    if(!document.querySelector('link[rel="stylesheet"][href="system/platform.css"]')){
+      const css=document.createElement("link");
+      css.rel="stylesheet";
+      css.href="system/platform.css";
+      document.head.appendChild(css);
+    }
     const script=document.createElement("script");
     script.id="kb-site-performance";
     script.src="system/site-performance.js";
