@@ -25,6 +25,7 @@ import {
   touchExecutionCycle,
   governanceWorkerId
 } from "./execution-governance.js";
+import { getValidationState } from "./strategy-validation.js";
 
 const { Pool } = pg;
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined }) : null;
@@ -762,6 +763,15 @@ async function execute(row){
   if(s.executionMode==="LIVE"&&accountType!=="REAL")throw new Error("LIVE_REQUIRES_REAL_ACCOUNT");
   if(account.tradeAllowed===false)throw new Error("BROKER_TRADING_NOT_ALLOWED");
 
+  const validation=await getValidationState(pool,{botId,version:"1.0.0"});
+  if(s.executionMode==="LIVE"&&validation.enforcement&&!validation.ready){
+    const missing=Object.entries(validation.stages||{}).filter(([,ready])=>!ready).map(([stage])=>stage);
+    const reason="VALIDATION_GATE_BLOCKED:"+missing.join("|");
+    await heartbeatExecution(pool,{userId,botId,provider:status.broker,accountId:status.accountId,error:reason,brokerOk:true,dataOk:true,riskOk:false,reconciliationState:"VALIDATION_BLOCKED"});
+    await pool.query("UPDATE kingbot_bot_runtime SET state='PAUSED',last_error=$3,last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,reason.slice(0,500)]);
+    await audit(userId,"BOT_VALIDATION_BLOCKED",{botId,missingStages:missing});
+    return;
+  }
   const governance=await validateExecutionGovernance(pool,{
     userId,
     userEmail:(await pool.query("SELECT email FROM kingbot_users WHERE id=$1 LIMIT 1",[userId])).rows[0]?.email||"",
