@@ -645,10 +645,12 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
 
 export async function runNativeKingbotAI(input = {}) {
   const result = await runNativeKingbotAIBase(input);
+  const thinkingLevel = normalizeThinkingLevel(input?.thinkingLevel || "EXPERT");
   const plan = buildCognitivePlan({
     intent: result?.intent || "PLATFORM_SUPPORT",
     symbol: result?.symbol || input?.symbol || "XAUUSD",
-    conversation: input?.conversation || []
+    conversation: input?.conversation || [],
+    thinkingLevel
   });
   const identity = identitySnapshot();
   const capabilities = capabilitySet(plan);
@@ -661,7 +663,8 @@ export async function runNativeKingbotAI(input = {}) {
     question: input?.question || "",
     intent: result?.intent || "PLATFORM_SUPPORT",
     reply: result?.reply || {},
-    conversation: input?.conversation || []
+    conversation: input?.conversation || [],
+    thinkingLevel
   });
 
   const reply = {
