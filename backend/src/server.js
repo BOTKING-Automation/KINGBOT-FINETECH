@@ -353,6 +353,7 @@ app.get("/api/health", (_req, res) => {
     ok: true,
     service: "KINGBOT Intelligence",
     aiReady: true,
+    eventBus: eventBus.status(),
     nativeReady: true,
     aiProvider: AI_PROVIDER,
     aiModel: "KINGBOT-CORTEX-1",
@@ -401,7 +402,7 @@ ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ens
   eventBus.start().catch(error => console.warn("[KINGBOT EVENT BUS] startup deferred:",error?.message||error));
   app.listen(PORT, () => {
     console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
-    void startWorker().then(() => {}).catch((error) => console.error("[KINGBOT WORKER]", error?.message || error));
+    void startWorker({eventBus}).then(() => {}).catch((error) => console.error("[KINGBOT WORKER]", error?.message || error));
   });
 }).catch((error) => {
   console.error("[KINGBOT] Startup initialization failed:", error?.message || error);
