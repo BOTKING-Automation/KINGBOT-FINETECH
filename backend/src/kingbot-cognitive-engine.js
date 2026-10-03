@@ -281,15 +281,28 @@ function synthesize({ intent, question, reply, profile, scoredEvidence, challeng
   };
 }
 
-export function think({ question="", intent="PLATFORM_SUPPORT", reply={}, conversation=[] } = {}) {
+export function think({ question="", intent="PLATFORM_SUPPORT", reply={}, conversation=[], thinkingLevel="EXPERT" } = {}) {
+  const level = String(thinkingLevel || "EXPERT").toUpperCase();
+  const profiles = {
+    FAST:{passes:2,evidenceLimit:8,hypothesisLimit:2},
+    STANDARD:{passes:4,evidenceLimit:14,hypothesisLimit:3},
+    DEEP:{passes:6,evidenceLimit:20,hypothesisLimit:4},
+    EXPERT:{passes:8,evidenceLimit:30,hypothesisLimit:6}
+  };
+  const cfg=profiles[level]||profiles.EXPERT;
+
   const profile = intentProfile(intent, question);
   const flat = flattenEvidence(reply);
   const evidence = [...flat.facts, ...flat.technical, ...flat.risks].filter(Boolean);
-  const scoredEvidence = scoreEvidence(question, evidence);
-  const hypotheses = buildHypotheses({ intent, question, reply, profile });
+  const scoredEvidence = scoreEvidence(question, evidence).slice(0,cfg.evidenceLimit);
+  const hypotheses = buildHypotheses({ intent, question, reply, profile }).slice(0,cfg.hypothesisLimit);
   const contradictions = contradictionPairs(scoredEvidence.slice(0, 14));
   const challenged = challengeHypotheses(hypotheses, scoredEvidence, contradictions);
-  const confidence = confidenceScore({ evidence: scoredEvidence, contradictions, hypotheses, reply });
+  let confidence = confidenceScore({ evidence: scoredEvidence, contradictions, hypotheses, reply });
+  for(let pass=1; pass<cfg.passes; pass++){
+    const adjustment = (scoredEvidence.length>8?1:0) - Math.min(2, contradictions.length);
+    confidence = Math.max(0, Math.min(100, confidence + adjustment));
+  }
   const critiqueState = critique({ question, intent, profile, evidence: scoredEvidence, hypotheses, contradictions, confidence });
   const synthesis = synthesize({ intent, question, reply, profile, scoredEvidence, challenged, contradictions, confidence, critiqueState, conversation });
 
@@ -297,6 +310,10 @@ export function think({ question="", intent="PLATFORM_SUPPORT", reply={}, conver
     engine: "KINGBOT_CORTEX",
     version: "1.0.0",
     mode: "PROPRIETARY_REASONING",
+    thinkingLevel: level,
+    passes: cfg.passes,
+    evidenceLimit: cfg.evidenceLimit,
+    hypothesisLimit: cfg.hypothesisLimit,
     stages: ["DECOMPOSE","RETRIEVE","HYPOTHESIZE","WEIGH","CHALLENGE","CALIBRATE","SELF_CRITIQUE","SYNTHESIZE"],
     ...synthesis
   };
