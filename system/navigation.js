@@ -3,6 +3,21 @@
    Only a small top-right command button remains.
    Clicking it opens a lightweight compact menu. */
 (function(window, document){
+  /* Shared runtime is loaded by every product surface through the global shell. */
+  (function loadKingbotRuntime(){
+    if(document.getElementById("kb-site-performance")) return;
+    const script=document.createElement("script");
+    script.id="kb-site-performance";
+    script.src="system/site-performance.js";
+    script.defer=true;
+    document.head.appendChild(script);
+    if(!document.querySelector('link[rel="manifest"]')){
+      const manifest=document.createElement("link");
+      manifest.rel="manifest";
+      manifest.href="manifest.webmanifest";
+      document.head.appendChild(manifest);
+    }
+  })();
   "use strict";
 
   const links = [
@@ -195,6 +210,37 @@
 
       @keyframes kbCompactSpin{
         to{transform:rotate(360deg)}
+      }
+
+      #kb-compact-nav .kb-system-pulse{
+        position:fixed;
+        top:15px;
+        right:72px;
+        min-width:118px;
+        height:42px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:7px;
+        padding:0 11px;
+        border-radius:12px;
+        border:1px solid rgba(35,247,163,.12);
+        background:rgba(4,9,22,.78);
+        backdrop-filter:blur(14px);
+        -webkit-backdrop-filter:blur(14px);
+        box-shadow:0 12px 32px rgba(0,0,0,.28);
+        color:#8fa8a3;
+        font:800 7px JetBrains Mono,monospace;
+        letter-spacing:.08em;
+      }
+      #kb-compact-nav .kb-system-dot{
+        width:6px;height:6px;border-radius:50%;background:#23f7a3;box-shadow:0 0 11px rgba(35,247,163,.8);
+      }
+      #kb-compact-nav .kb-system-pulse[data-state="offline"]{color:#ffb2c0;border-color:rgba(255,77,109,.16)}
+      #kb-compact-nav .kb-system-pulse[data-state="offline"] .kb-system-dot{background:#ff4d6d;box-shadow:0 0 11px rgba(255,77,109,.65)}
+
+      @media(prefers-reduced-motion:reduce){
+        #kb-compact-nav .kb-fintech-logo{animation:none}
       }
 
       #kb-compact-nav .kb-menu{
@@ -430,7 +476,7 @@
       '<button class="kb-nav-trigger" type="button" aria-label="Open KINGBOT navigation" aria-expanded="false">'+
         '<span class="kb-bars" aria-hidden="true"><i></i><i></i><i></i></span>'+
       '</button>'+
-      '<div class="kb-menu" role="navigation" aria-label="KINGBOT navigation">'+
+      '<div class="kb-system-pulse" data-kb-network-state data-state="online" aria-live="polite"><span class="kb-system-dot"></span><span>NETWORK <b>ONLINE</b></span></div><div class="kb-menu" role="navigation" aria-label="KINGBOT navigation">'+
         '<div class="kb-menu-head">'+
           '<div class="kb-menu-title">KINGBOT NAVIGATION</div>'+
           '<div class="kb-menu-state"><span class="kb-menu-dot"></span>SYSTEM ONLINE</div>'+
@@ -525,6 +571,22 @@
 
     syncAuthUI();
     window.addEventListener("kingbot:session-change",event=>syncAuthUI(event.detail||{}));
+    window.addEventListener("kingbot:event-bus-ready",()=>{
+      const state=root.querySelector(".kb-menu-state");
+      if(state && (window.KINGBOT_SESSION?.isAuthenticated?.()===true)){
+        state.innerHTML='<span class="kb-menu-dot"></span>LIVE CORE';
+      }
+    });
+    window.addEventListener("kingbot:event",event=>{
+      const type=String(event?.detail?.eventType||"").toUpperCase();
+      if(!type)return;
+      const state=root.querySelector(".kb-menu-state");
+      if(state && /ERROR|REJECT|FAIL|DISCONNECT|BLOCK/.test(type)){
+        state.innerHTML='<span class="kb-menu-dot" style="background:#ff4d6d;box-shadow:0 0 10px #ff4d6d"></span>'+type.replaceAll("_"," ");
+        clearTimeout(window.__kbNavStatusTimer);
+        window.__kbNavStatusTimer=setTimeout(()=>syncAuthUI(),4500);
+      }
+    });
   }
 
   if(document.readyState==="loading"){
