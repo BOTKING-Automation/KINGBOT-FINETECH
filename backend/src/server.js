@@ -38,9 +38,6 @@ import { registerIntelligenceOrchestrator, ensureIntelligenceOrchestratorSchema 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT || 10000);
-const XAI_MODEL = process.env.XAI_MODEL || "grok-4.7";
-const XAI_API_KEY = process.env.XAI_API_KEY || "";
-const XAI_BASE_URL = (process.env.XAI_API_BASE_URL || "https://api.x.ai/v1").replace(/\/$/, "");
 const AI_PROVIDER = "kingbot-native";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const pool = DATABASE_URL ? new pg.Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false } }) : null;
