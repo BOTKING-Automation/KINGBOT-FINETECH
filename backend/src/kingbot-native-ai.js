@@ -754,7 +754,26 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
 
 
 export async function runNativeKingbotAI(input = {}) {
-  const result = await runNativeKingbotAIBase(input);
+  const conversationSignalsResult = conversationSignals(input?.question || "", input?.conversation || []) || {};
+  const conversationMode = String(conversationSignalsResult.intent || "");
+  const socialModes = new Set([
+    "GREETING","WELLBEING","WHAT_IS_UP","PRESENCE","THANKS","APPRECIATION",
+    "GOODBYE","IDENTITY","INTELLIGENCE","CAPABILITY","EMOTION_PROBE","HELP",
+    "META_FEEDBACK","CASUAL"
+  ]);
+
+  // Final guard: ordinary conversation must never fall through into market
+  // analysis just because an earlier routing branch changed or failed.
+  const result = socialModes.has(conversationMode)
+    ? {
+        provider:"KINGBOT_NATIVE",
+        model:"KINGBOT-CORTEX-1",
+        intent:"CONVERSATION",
+        symbol:symbolFromText(input?.question || input?.symbol || "XAUUSD","XAUUSD"),
+        reply:conversationalReply(input?.question || "", input?.conversation || []),
+        verified:{native:true,dialogueCortex:true,conversationFirst:true}
+      }
+    : await runNativeKingbotAIBase(input);
   const thinkingLevel = normalizeThinkingLevel(input?.thinkingLevel || "EXPERT");
   const plan = buildCognitivePlan({
     intent: result?.intent || "PLATFORM_SUPPORT",
