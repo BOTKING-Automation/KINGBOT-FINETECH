@@ -10,7 +10,7 @@
 
   const $=id=>document.getElementById(id);
   const text=(id,value)=>{const el=$(id);if(el)el.textContent=String(value??"—");};
-  const esc=value=>String(value??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
+  const esc=value=>String(value??"").replace(/[&<>"]/g,m=>m==="&"?"&amp;":m==="<"?"&lt;":m===">"?"&gt;":"&quot;");
   const tone=value=>String(value||"").toUpperCase();
   const fmt=n=>Number.isFinite(Number(n))?Number(n).toFixed(0):"—";
 
