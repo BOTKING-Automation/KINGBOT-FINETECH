@@ -988,8 +988,17 @@ async function execute(row){
     const clientId="kb_"+crypto.randomUUID();
     const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,s.executionMode,config.symbol,side,volume]);
     if(!journal.rowCount)throw new Error("DUPLICATE_EXECUTION_REQUEST");
+    const submittedAt=new Date();
+    const intendedPrice=entry;
     try{
       order=await broker.placeOrder({side,symbol:config.symbol,volume,stopLoss,takeProfit,comment:"KINGBOT",clientId,userId,multiplier:String(status.broker||"").toLowerCase()==="deriv"?100:undefined});
+      const outcome=await recordExecutionOutcome(pool,{journalId:journal.rows[0].id,order,intendedPrice,submittedAt});
+      const maxSlip=Number(process.env.KINGBOT_MAX_SLIPPAGE_BPS||0);
+      const maxLatency=Number(process.env.KINGBOT_MAX_ORDER_LATENCY_MS||0);
+      if((maxSlip>0&&Number.isFinite(Number(outcome?.slippageBps))&&Number(outcome.slippageBps)>maxSlip)||(maxLatency>0&&Number.isFinite(Number(outcome?.latencyMs))&&Number(outcome.latencyMs)>maxLatency)){
+        await haltExecution(pool,{userId,provider:String(status.broker||"").toLowerCase(),accountId:String(status.accountId||""),reason:"EXECUTION_QUALITY_LIMIT_BREACHED",source:"EXECUTION_QUALITY"});
+        await audit(userId,"BOT_EXECUTION_QUALITY_HALT",{botId,slippageBps:outcome?.slippageBps||null,latencyMs:outcome?.latencyMs||null,maxSlip,maxLatency});
+      }
       await pool.query("UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,JSON.stringify(order)]);
       action="ORDER_SUBMITTED";
     }catch(error){
