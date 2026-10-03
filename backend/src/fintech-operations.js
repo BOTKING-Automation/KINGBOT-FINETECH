@@ -4,6 +4,7 @@ import rateLimit from "express-rate-limit";
 import { resolveFirebaseUser } from "./auth.js";
 import { requireUser } from "./subscriptions.js";
 import { isAdminEmail } from "./admin-access.js";
+import { getGlobalRiskState, setGlobalRiskState, getWorkerHealth } from "./global-risk.js";
 
 const SCOPES = ["profile:read","account:read","bots:read","trades:read"];
 const STATUS_VALUES = ["pending","approved","rejected","under_review","blocked"];
@@ -201,6 +202,43 @@ export function createFintechOpsRouter({pool}){
     if(!["open","investigating","resolved","dismissed"].includes(status))return res.status(400).json({ok:false,error:"Invalid compliance status."});
     try{const q=await pool.query("UPDATE kingbot_compliance_alerts SET status=$2,assigned_to=COALESCE($3,assigned_to),resolved_at=CASE WHEN $2 IN ('resolved','dismissed') THEN NOW() ELSE NULL END WHERE id=$1 RETURNING *",[req.params.id,status,a.id]);if(!q.rowCount)return res.status(404).json({ok:false,error:"Compliance alert not found."});if(q.rows[0].user_id)await notify(pool,q.rows[0].user_id,"compliance","Compliance case "+status,"Your KINGBOT compliance case is now "+status+".",{alertId:req.params.id,status});res.json({ok:true,alert:q.rows[0]});}catch(error){res.status(500).json({ok:false,error:"Compliance alert update failed."});}
   });
+  router.get("/system-risk",adminLimit,async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    try{
+      const [executionControl,workerHealth,reconciliation]=await Promise.all([
+        getGlobalRiskState(pool),
+        getWorkerHealth(pool),
+        pool.query("SELECT provider,account_id,status,broker_positions,journal_open,known_position_matches,unresolved_references,checked_at,details FROM kingbot_broker_reconciliation ORDER BY checked_at DESC LIMIT 100")
+      ]);
+      res.json({ok:true,executionControl,workerHealth,reconciliation:reconciliation.rows,generatedAt:now()});
+    }catch(error){
+      console.error("[KINGBOT SYSTEM RISK]",error?.message||error);
+      res.status(500).json({ok:false,error:"System risk state unavailable."});
+    }
+  });
+
+  router.post("/system-risk",adminLimit,async(req,res)=>{
+    const a=await requireAdmin(pool,req,res);if(!a)return;
+    const tradingPaused=Boolean(req.body?.tradingPaused);
+    const globalKillSwitch=Boolean(req.body?.globalKillSwitch);
+    if(tradingPaused&&globalKillSwitch!==true && String(req.body?.action||"").toLowerCase()==="resume"){
+      return res.status(400).json({ok:false,error:"Resume requests must explicitly clear both global controls."});
+    }
+    const reason=clean(req.body?.reason,500)||(globalKillSwitch?"ADMIN_GLOBAL_KILL_SWITCH":tradingPaused?"ADMIN_NEW_ORDERS_PAUSED":"ADMIN_EXECUTION_RESUMED");
+    try{
+      const state=await setGlobalRiskState(pool,{tradingPaused,globalKillSwitch,reason,changedBy:a.id});
+      await audit(pool,a.id,"GLOBAL_EXECUTION_CONTROL_CHANGED",{tradingPaused,globalKillSwitch,reason});
+      res.json({
+        ok:true,
+        executionControl:state,
+        policy:"Global controls block new order authorization. Existing position-management logic remains responsible for protective exits and broker state handling."
+      });
+    }catch(error){
+      console.error("[KINGBOT SYSTEM RISK]",error?.message||error);
+      res.status(500).json({ok:false,error:"Global execution control update failed."});
+    }
+  });
+
   router.get("/risk/overview",adminLimit,async(req,res)=>{
     const a=await requireAdmin(pool,req,res);if(!a)return;
     try{
@@ -210,11 +248,16 @@ export function createFintechOpsRouter({pool}){
         pool.query("SELECT COUNT(*)::int AS n FROM kingbot_payment_intents WHERE status IN ('failed','rejected') AND created_at>NOW()-INTERVAL '24 hours'"),
         pool.query("SELECT COUNT(*)::int AS n FROM kingbot_users WHERE admin_blocked=TRUE")
       ]);
+      const executionControl=await getGlobalRiskState(pool);
+      const reconciliation=await pool.query("SELECT COUNT(*)::int AS n FROM kingbot_broker_reconciliation WHERE status='MISMATCH' AND checked_at>NOW()-INTERVAL '24 hours'");
       res.json({ok:true,overview:{
         accountsWithKillSwitch:Number(risk.rows[0]?.n||0),
         rejectedExecutions24h:Number(losses.rows[0]?.n||0),
         failedPayments24h:Number(failed.rows[0]?.n||0),
-        disabledAccounts:Number(disabled.rows[0]?.n||0)
+        disabledAccounts:Number(disabled.rows[0]?.n||0),
+        brokerReconciliationMismatches24h:Number(reconciliation.rows[0]?.n||0),
+        globalTradingPaused:Boolean(executionControl.tradingPaused),
+        globalKillSwitch:Boolean(executionControl.globalKillSwitch)
       },generatedAt:now()});
     }catch(error){res.status(500).json({ok:false,error:"Risk overview unavailable."});}
   });
