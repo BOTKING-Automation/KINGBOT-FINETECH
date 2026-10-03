@@ -404,8 +404,8 @@ function selectBroker(slug){
   $("vpsPort").value="3389";$("vpsProtocol").value="RDP";$("vpsOs").value="WINDOWS";
   $("terminalPath").value="C:\\Program Files\\MetaTrader 5\\terminal64.exe";$("vpsSymbol").value="XAUUSD";$("vpsTimeframe").value="M1";$("vpsBot").value="strategic";$("vpsExecutionMode").value=selectedExecution;$("vpsLiveConfirm").value="";
   $("mt5VpsStatus").textContent="VPS profile not configured.";$("mt5VpsCommand").classList.remove("show");$("vpsAgentCommand").value="";
-  $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=(selected==="exness"||selected==="oanda")?"block":"none";$("bridgeTokenField").style.display=(selected==="exness"||selected==="oanda"||selected==="deriv")?"none":"block";$("oandaTokenField").style.display=selected==="oanda"?"block":"none";if(selected==="derivmt5")$("accountId").placeholder="MetaApi account ID (UUID)";
-  $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION"; $("verifyBtn").style.display=(selected==="deriv"||selected==="derivmt5")?"none":"inline-flex"; $("executionMode").value=selectedExecution;
+  $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=(selected==="exness"||selected==="oanda")?"block":"none";$("bridgeTokenField").style.display="block";$("oandaTokenField").style.display=selected==="oanda"?"block":"none";if(selected==="derivmt5")$("accountId").placeholder="MetaApi account ID (UUID)";
+  $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION"; $("verifyBtn").style.display=selected==="derivmt5"?"none":"inline-flex"; $("executionMode").value=selectedExecution;
   if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
   textFor();showDrawer();
   if(selected==="derivmt5"){void loadVpsSyntheticSymbols();void loadMt5VpsProfile();}
