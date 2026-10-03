@@ -56,6 +56,7 @@ const SPEECH_ACTS = Object.freeze({
   INTELLIGENCE: /\b(are you smart|are you intelligent|how intelligent are you|how smart are you|are you an ai|are you artificial intelligence)\b/i,
   CAPABILITY: /\b(what can you do|what do you do|what are you capable of|your capabilities|what can you help with|how can you help me|what can you help me with)\b/i,
   EMOTION_PROBE: /\b(do you feel|do you have feelings|are you happy|are you sad|do you get tired|do you get bored|do you love|do you care)\b/i,
+  TONE_FEEDBACK: /\b(you are|you're|youre|that was|this is|you sound|you seem)\s+(so )?(rude|cold|harsh|dismissive|unfriendly|impolite|dry|robotic|formal|blunt|mean|short)\b|\b(too rude|too cold|too formal|too robotic|not friendly|not helpful|unhelpful|bad attitude|terrible attitude)\b/i,
   HELP: /\b(i need help|help me|can you help me|i need your help|i don't understand|i dont understand|i'm confused|im confused|can you explain|show me how)\b/i,
   META_FEEDBACK: /^(that makes sense|i understand|i understood|got it|makes sense|i see|exactly|right|okay|ok|alright|sure|yes|yep|yeah|no|nah|hmm|hm)[!.? ]*$/i
 });
@@ -246,7 +247,7 @@ function routeIntent(text,conversation=[]) {
   const info=classify(text,conversation);
   const t=WORDS(info.effectiveQuestion || text);
 
-  if(["GREETING","WELLBEING","WHAT_IS_UP","PRESENCE","THANKS","GOODBYE","IDENTITY","INTELLIGENCE","CAPABILITY","EMOTION_PROBE","HELP","META_FEEDBACK","CASUAL"].includes(info.act)) return info.act;
+  if(["GREETING","WELLBEING","WHAT_IS_UP","PRESENCE","THANKS","GOODBYE","IDENTITY","INTELLIGENCE","CAPABILITY","EMOTION_PROBE","TONE_FEEDBACK","HELP","META_FEEDBACK","CASUAL"].includes(info.act)) return info.act;
   if(info.act==="RESEARCH" || info.domain==="RESEARCH" || /\b(search|google|online research|latest news)\b/i.test(t)) return "RESEARCH";
   if(info.domain==="ACCOUNT") return /\b(broker|connection|connected|mt5|deriv|exness|oanda)\b/i.test(t) ? "CONNECTION" : "ACCOUNT";
   if(info.domain==="RISK") return "RISK";
@@ -322,6 +323,15 @@ export function conversationalReply(question="",conversation=[]) {
   if(mode==="HELP") return responseBase(
     "Yes. Explain the problem in your own words. I’ll identify the subject, inspect the recent context, determine what kind of help you need, and route it to the relevant KINGBOT capability.",
     "Describe the problem naturally — you don't need a technical command."
+  );
+
+  if(mode==="TONE_FEEDBACK") return responseBase(
+    [
+      "You're right — that came across too blunt. Sorry about that. I'll keep the conversation more natural and respectful.",
+      "I hear you. That response was too cold. Sorry. I'll be more conversational and helpful.",
+      "Fair point. I sounded more like a system message than a real assistant. Sorry about that — I'll adjust my tone."
+    ][i],
+    "Tell me what you want to work on, and I'll meet you there."
   );
 
   if(mode==="CASUAL" || mode==="META_FEEDBACK") return responseBase(
