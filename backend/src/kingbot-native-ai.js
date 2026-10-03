@@ -858,9 +858,7 @@ export async function runNativeKingbotAI(input = {}) {
     identity,
     cognition: {
       plan,
-      capabilities: [...capabilities, "PROPRIETARY_REASONING_KERNEL", "HYPOTHESIS_ENGINE", "CONTRADICTION_ENGINE", "SELF_CRITIQUE"],
-      audit,
-      thought
+      capabilities: [...capabilities, "PROPRIETARY_REASONING_KERNEL"]
     },
     reply
   };
