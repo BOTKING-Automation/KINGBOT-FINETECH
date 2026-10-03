@@ -32,6 +32,7 @@ import { evaluateKingbotBrain } from "./kingbot-brain.js";
 import { createMt5HostingRouter, ensureMt5HostingSchema } from "./mt5-hosting.js";
 import { createFintechOpsRouter, ensureFintechOpsSchema } from "./fintech-operations.js";
 import { registerGoldSignals, ensureGoldSignalsSchema } from "./gold-signals.js";
+import { createExecutionGovernanceRouter, ensureExecutionGovernanceSchema, seedExecutionGovernance } from "./execution-governance.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -71,6 +72,7 @@ app.use("/api/runtime", createBotRuntimeRouter({ pool, broker }));
 app.use("/api/mt5/bridge", createMt5BridgeRouter({ pool, broker }));
 app.use("/api/mt5/hosting", createMt5HostingRouter({ pool, requireUser }));
 app.use("/api/finops", createFintechOpsRouter({ pool }));
+app.use("/api/governance", createExecutionGovernanceRouter({ pool, requireUser }));
 registerGoldSignals(app,{pool,rateLimit,twelveData});
 
 // Generic broker connection API used by Broker Connect, Terminal and account-aware pages.
@@ -350,7 +352,7 @@ app.use((_req, res) => {
   res.status(404).json({ ok: false, error: "Route not found." });
 });
 
-ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => ensureFintechOpsSchema(pool)).then(() => ensureGoldSignalsSchema(pool)).then(() => ensureAiMarketScannerSchema(pool)).then(() => partners.ensureSchema()).then(() => {
+ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => ensureFintechOpsSchema(pool)).then(() => ensureGoldSignalsSchema(pool)).then(() => ensureExecutionGovernanceSchema(pool)).then(() => seedExecutionGovernance(pool)).then(() => ensureAiMarketScannerSchema(pool)).then(() => partners.ensureSchema()).then(() => {
   app.listen(PORT, () => {
     console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
     void startWorker().then(() => {}).catch((error) => console.error("[KINGBOT WORKER]", error?.message || error));
