@@ -278,7 +278,7 @@ async function reconcileBrokerState(userId,status,positions){
   }catch(error){
     console.warn("[KINGBOT RECON] trade history unavailable",JSON.stringify({userId,provider,error:String(error?.message||"TRADE_HISTORY_UNAVAILABLE").slice(0,180)}));
   }
-  const brokerHistoryRefs=new Set(recentDeals.flatMap(orderExecutionIds).map(String));
+  const brokerHistoryRefs=new Set(recentDeals.flatMap(function(deal){ return orderExecutionIds(deal); }).map(String));
   for(const row of journal.rows){
     const refs=orderExecutionIds(row.broker_result);
     if(refs.some(ref=>brokerPositionIds.has(String(ref)))){knownMatches++;continue;}
