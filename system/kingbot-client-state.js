@@ -64,8 +64,13 @@
         return {...state};
       }
 
-      const keyAfter= sessionKey();
-      if(keyAfter!==activeSessionKey){resetPrivateState();activeSessionKey=keyAfter;return {...state};}
+      const keyAfter=sessionKey();
+      if(keyAtStart && keyAfter!==keyAtStart){
+        resetPrivateState();
+        activeSessionKey=keyAfter;
+        return await refresh({includeMarket,reason:reason+":session-shift"});
+      }
+      if(keyAfter) activeSessionKey=keyAfter;
       state.auth={ok:true,authenticated:true,user:core.user||null};
       state.broker=core.broker||null;
       state.account=core.account?{ok:true,account:core.account}:null;
