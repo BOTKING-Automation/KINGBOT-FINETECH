@@ -6,7 +6,7 @@ import { loadAdaptivePerformance, applyAdaptivePerformance, classifySetup, recor
 import { identitySnapshot, buildCognitivePlan, capabilitySet } from "./kingbot-intelligence-core.js";
 
 const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
-const MODEL = String(process.env.GEMINI_ORCHESTRATOR_MODEL || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite");
+const MODEL = String(process.env.GEMINI_ORCHESTRATOR_MODEL || process.env.GEMINI_MODEL || "gemini-3.8-flash");
 const API_KEY = String(process.env.GEMINI_API_KEY || "").trim();
 const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
 const CACHE_MS = Math.max(2500, Number(process.env.KINGBOT_INTELLIGENCE_CACHE_MS || 7000));
@@ -496,6 +496,7 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
       engines: BOT_IDS,
       aiSynthesis: Boolean(ai),
       model: ai ? MODEL : null,
+      deliberation: ai ? "HIGH" : "DETERMINISTIC",
       memoryPersistence: Boolean(pool),
       executionAuthority: "NONE",
       cacheMs: CACHE_MS,
