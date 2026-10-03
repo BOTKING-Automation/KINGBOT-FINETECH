@@ -1249,7 +1249,7 @@ body.kb-terminal-page:after{opacity:.13!important}
     $("floatingPnl").className="metric-value "+classForPnl(a.floatingPnl);$("dailyPnl").className="metric-value "+classForPnl(a.dailyPnl);
     $("broker").textContent=String(a.broker||"—").toUpperCase();$("accountId").textContent=a.accountId||"—";$("accountType").textContent=String(a.accountType||"—").toUpperCase();$("currency").textContent=currency||"—";$("executionMode").textContent=String(a.executionMode||"—").toUpperCase();$("tradingStatus").textContent=a.tradingEnabled===true?"ENABLED":a.tradingEnabled===false?"DISABLED":"UNKNOWN";
     const demo=String(a.executionMode||"").toUpperCase()==="PAPER"||String(a.executionMode||"").toUpperCase()==="DEMO"||String(a.accountType||"").toUpperCase()==="DEMO";$("accountState").textContent=demo?"CONNECTED · DEMO":"CONNECTED · LIVE";$("accountState").style.color="var(--green)";$("accountNote").textContent="Broker-authoritative account telemetry received from the secured connection.";
-    $("accountBadge").textContent=demo?"DEMO":"LIVE";$("syncAccountMain").textContent=(a.accountId||"ACCOUNT")+" · "+fmtMoney(a.equity,currency);$("itTapePositions").textContent=Number.isFinite(Number(a.positionCount))?String(a.positionCount):"—";$("itAccountId").textContent=a.accountId||"—";$("itBroker").textContent=String(a.broker||"—").toUpperCase();$("itExecMode").textContent=String(a.executionMode||"—").toUpperCase();$("syncAccountState").textContent="LIVE";$("syncAccountState").className="sync-state live";
+    $("accountBadge").textContent=demo?"DEMO":"LIVE";$("syncAccountMain").textContent=(a.accountId||"ACCOUNT")+" · "+(Number.isFinite(Number(a.balance))?("BAL "+fmtMoney(a.balance,currency)):"ACCOUNT DATA");$("itTapePositions").textContent=Number.isFinite(Number(a.positionCount))?String(a.positionCount):"—";$("itAccountId").textContent=a.accountId||"—";$("itBroker").textContent=String(a.broker||"—").toUpperCase();$("itExecMode").textContent=String(a.executionMode||"—").toUpperCase();$("syncAccountState").textContent="LIVE";$("syncAccountState").className="sync-state live";
   }
 
 
@@ -1306,7 +1306,7 @@ body.kb-terminal-page:after{opacity:.13!important}
     $("syncMarketState").className="sync-state live";
     $("syncMarketMain").textContent=symbol+" · "+(Number.isFinite(mid)?fmtNumber(mid,dec):"—");
     $("syncMarketTime").textContent=fmtTime(new Date().toISOString());
-    state.quote={data:{...d,bid:Number.isFinite(bid)?bid:null,ask:Number.isFinite(ask)?ask:null}};$("itTapeSymbol").textContent=symbol;$("itTapeBid").textContent=Number.isFinite(bid)?fmtNumber(bid,dec):"—";$("itTapeAsk").textContent=Number.isFinite(ask)?fmtNumber(ask,dec):"—";$("itTapeEvent").textContent="TICK #"+(++state.live.lastQuoteCount);$("itTapePositions").textContent=String(state.account?.positionCount ?? ($("positionCount").textContent || "0"));if(q?.serverReceivedAt){state.live.lastQuoteServerAt=q.serverReceivedAt;}$("itQuoteAge").textContent="0ms";
+    state.quote={data:{...d,bid:Number.isFinite(bid)?bid:null,ask:Number.isFinite(ask)?ask:null}};$("itTapeSymbol").textContent=symbol;$("itTapeBid").textContent=Number.isFinite(bid)?fmtNumber(bid,dec):"—";$("itTapeAsk").textContent=Number.isFinite(ask)?fmtNumber(ask,dec):"—";$("itTapeEvent").textContent="TICK #"+(++state.live.lastQuoteCount);$("itTapePositions").textContent=state.account && Number.isFinite(Number(state.account.positionCount)) ? String(state.account.positionCount) : "—";if(q?.serverReceivedAt){state.live.lastQuoteServerAt=q.serverReceivedAt;}$("itQuoteAge").textContent="0ms";
     state.live.lastQuoteAt=Date.now();
     const age=Number.isFinite(Number(d.ageMs))?Math.max(0,Number(d.ageMs)):0;pushTickChart(d);
     $("footerState").textContent="LIVE STREAM · TICK AGE "+Math.round(age)+"ms";
@@ -1351,7 +1351,8 @@ body.kb-terminal-page:after{opacity:.13!important}
     $("positionLastTick").textContent=state.live.lastQuoteAt?Math.max(0,Date.now()-state.live.lastQuoteAt)+"ms":"—";
     $("positionsTable").innerHTML=rows.length?rows.map(p=>{
       const id=String(p.id||p.contractId||p.ticket||"");
-      const canClose=Boolean(id)&&String(p.status||p.state||"OPEN").toUpperCase()==="OPEN";
+      const status=String(p.status||p.state||"").toUpperCase();
+      const canClose=Boolean(id)&&status==="OPEN";
       const side=String(p.side||p.type||p.positionSide||"—").toUpperCase();
       const entry=positionNumber(p.entry,p.openPrice,p.entryPrice,p.open_price);
       const current=positionNumber(p.current,p.currentPrice,p.marketPrice,p.current_spot,p.current_tick,p.bidPrice,p.bid_price);
@@ -1366,8 +1367,8 @@ body.kb-terminal-page:after{opacity:.13!important}
       const pnlClass=Number.isFinite(pnl)?(pnl>0?"pnl-positive":pnl<0?"pnl-negative":"muted"):"muted";
       const sizeLabel=broker==="deriv"?"STAKE":"LOTS";
       const time=positionTime(p);
-      const status=String(p.status||p.state||"OPEN").toUpperCase();
-      return "<tr><td class=\"ticket\">"+esc(id||"—")+"</td><td>"+esc(fmtMt5Time(time))+"</td><td class=\""+typeClass+"\">"+esc(side)+"</td><td class=\"num\">"+esc(volume===null?"—":fmtNumber(volume,2))+"<span class=\"position-size-sub\">"+sizeLabel+"</span></td><td class=\"symbol\">"+esc(p.symbol||"—")+"</td><td class=\"num\">"+esc(entry===null?"—":fmtNumber(entry,dec))+"</td><td class=\"num muted\">"+esc(sl===null?"—":fmtNumber(sl,dec))+"</td><td class=\"num muted\">"+esc(tp===null?"—":fmtNumber(tp,dec))+"</td><td class=\"num\">"+esc(current===null?"—":fmtNumber(current,dec))+"</td><td class=\"num muted\">"+esc(commission===null?"—":fmtNumber(commission,2))+"</td><td class=\"num muted\">"+esc(swap===null?"—":fmtNumber(swap,2))+"</td><td class=\"num "+pnlClass+"\">"+esc(pnl===null?"—":fmtNumber(pnl,2))+"</td><td><span class=\"position-row-status\"><i></i>"+esc(status)+"</span></td><td class=\"position-action\">"+(canClose?"<button class=\"close-position-btn\" data-position-id=\""+esc(id)+"\" type=\"button\">CLOSE</button>":"—")+"</td></tr>";
+      const displayStatus=status||"UNKNOWN";
+      return "<tr><td class=\"ticket\">"+esc(id||"—")+"</td><td>"+esc(fmtMt5Time(time))+"</td><td class=\""+typeClass+"\">"+esc(side)+"</td><td class=\"num\">"+esc(volume===null?"—":fmtNumber(volume,2))+"<span class=\"position-size-sub\">"+sizeLabel+"</span></td><td class=\"symbol\">"+esc(p.symbol||"—")+"</td><td class=\"num\">"+esc(entry===null?"—":fmtNumber(entry,dec))+"</td><td class=\"num muted\">"+esc(sl===null?"—":fmtNumber(sl,dec))+"</td><td class=\"num muted\">"+esc(tp===null?"—":fmtNumber(tp,dec))+"</td><td class=\"num\">"+esc(current===null?"—":fmtNumber(current,dec))+"</td><td class=\"num muted\">"+esc(commission===null?"—":fmtNumber(commission,2))+"</td><td class=\"num muted\">"+esc(swap===null?"—":fmtNumber(swap,2))+"</td><td class=\"num "+pnlClass+"\">"+esc(pnl===null?"—":fmtNumber(pnl,2))+"</td><td><span class=\"position-row-status\"><i></i>"+esc(displayStatus)+"</span></td><td class=\"position-action\">"+(canClose?"<button class=\"close-position-btn\" data-position-id=\""+esc(id)+"\" type=\"button\">CLOSE</button>":"—")+"</td></tr>";
     }).join(""):"<tr><td colspan=\"14\"><div class=\"position-empty\"><strong>NO OPEN POSITIONS</strong><span>Waiting for broker-authoritative open position data.</span></div></td></tr>";
   }
   document.addEventListener("click",async e=>{
@@ -1380,7 +1381,6 @@ body.kb-terminal-page:after{opacity:.13!important}
     try{
       await api("/terminal/positions/"+encodeURIComponent(positionId)+"/close",{method:"POST",timeoutMs:10000});
       addActivity("Position "+positionId+" closed.");
-      await loadTerminalSnapshot();
       await loadTerminalSnapshot();
     }catch(error){
       btn.disabled=false;btn.textContent="CLOSE";
