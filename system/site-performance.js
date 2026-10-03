@@ -105,27 +105,56 @@
     });
   }
 
-  function connectEventStream(){
+  async function connectEventStream(){
     const base=apiBase();
-    if(!base||!window.EventSource||!window.KINGBOT_SESSION?.isAuthenticated?.())return;
-    if(state.eventStream)return;
+    const session=window.KINGBOT_SESSION;
+    if(!base||!session?.isAuthenticated?.()||state.eventStream)return;
     try{
-      const stream=new EventSource(base+"/api/events/live");
-      stream.addEventListener("ready",event=>{
-        let detail={};
-        try{detail=JSON.parse(event.data||"{}");}catch{}
-        window.dispatchEvent(new CustomEvent("kingbot:event-bus-ready",{detail}));
+      const token=await (window.KINGBOT_FIREBASE?.getToken?.(true) || Promise.resolve(null));
+      if(!token)return;
+      const controller=new AbortController();
+      state.eventStream=controller;
+      const response=await fetch(base+"/api/events/live",{
+        method:"GET",
+        headers:{Authorization:"Bearer "+token,Accept:"text/event-stream"},
+        cache:"no-store",
+        signal:controller.signal
       });
-      stream.addEventListener("kingbot",event=>{
-        let detail=null;
-        try{detail=JSON.parse(event.data||"null");}catch{}
-        if(detail) window.dispatchEvent(new CustomEvent("kingbot:event",{detail}));
-      });
-      stream.onerror=()=>{
-        window.dispatchEvent(new CustomEvent("kingbot:event-bus-error"));
+      if(!response.ok||!response.body)throw new Error("EVENT_STREAM_UNAVAILABLE");
+      window.dispatchEvent(new CustomEvent("kingbot:event-bus-connected"));
+      const reader=response.body.getReader();
+      const decoder=new TextDecoder();
+      let buffer="";
+      let eventName="message";
+      let data="";
+      const emit=()=>{
+        if(!data)return;
+        let parsed=data;
+        try{parsed=JSON.parse(data);}catch{}
+        if(eventName==="ready")window.dispatchEvent(new CustomEvent("kingbot:event-bus-ready",{detail:parsed}));
+        else if(eventName==="kingbot")window.dispatchEvent(new CustomEvent("kingbot:event",{detail:parsed}));
+        eventName="message";
+        data="";
       };
-      state.eventStream=stream;
-    }catch{}
+      while(true){
+        const chunk=await reader.read();
+        if(chunk.done)break;
+        buffer+=decoder.decode(chunk.value,{stream:true});
+        const lines=buffer.split("\n");
+        buffer=lines.pop()||"";
+        for(const raw of lines){
+          const line=raw.endsWith("\r")?raw.slice(0,-1):raw;
+          if(!line){emit();continue;}
+          if(line.startsWith("event:"))eventName=line.slice(6).trim()||"message";
+          else if(line.startsWith("data:"))data+=(data?"\n":"")+line.slice(5).trim();
+        }
+      }
+      emit();
+    }catch(error){
+      if(error?.name!=="AbortError")window.dispatchEvent(new CustomEvent("kingbot:event-bus-error",{detail:{message:String(error?.message||"EVENT_STREAM_UNAVAILABLE")}}));
+    }finally{
+      state.eventStream=null;
+    }
   }
 
   function registerServiceWorker(){
@@ -176,9 +205,9 @@
     state,
     init,
     reconnectEvents:()=>{
-      try{state.eventStream?.close();}catch{}
+      try{state.eventStream?.abort?.();}catch{}
       state.eventStream=null;
-      connectEventStream();
+      void connectEventStream();
     },
     prefetch
   };
