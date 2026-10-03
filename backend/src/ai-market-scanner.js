@@ -1,3 +1,4 @@
+import { isSyntheticSymbol } from "./synthetic-markets.js";
 import "dotenv/config";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getDerivMarketFeed } from "./deriv-market-feed.js";
@@ -303,7 +304,7 @@ function overlayLiveQuotes(technical, quotes) {
   });
 }
 
-async function askGrok({ technical, quotes, timeframe }) {
+async function askGrok({ technical, quotes, timeframe, marketType = "TRADITIONAL" }) {
   const apiKey = String(process.env.XAI_API_KEY || "").trim();
   if (!apiKey) return { provider: "none", model: null, analysis: null };
 
@@ -316,6 +317,10 @@ async function askGrok({ technical, quotes, timeframe }) {
     "Synthesize the evidence into a disciplined market-intelligence report.",
     "For each symbol, explain trend, momentum, structure, liquidity/FVG evidence, setup state, entry condition, invalidation and risk flags.",
     "Do not promise profit or certainty. A score below 75 must not be described as an entry confirmation.",
+    "MARKET TYPE: " + marketType,
+    marketType === "SYNTHETIC"
+      ? "SYNTHETIC MARKET RULE: Treat Deriv Synthetic Indices as proprietary derived markets. Do not attribute movement to external news, earnings, economic events, order-book liquidity or traditional market drivers. Prioritize verified price action, regime, volatility, structure, range behaviour and instrument-specific conditions."
+      : "TRADITIONAL MARKET RULE: Use only supplied verified traditional-market context; do not invent macro/news facts.",
     "TIMEFRAME: " + timeframe,
     "TECHNICAL ENGINE OUTPUT: " + JSON.stringify(technical),
     "VERIFIED LIVE QUOTES: " + JSON.stringify(quotes),
@@ -522,7 +527,8 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
 
   let ai = null;
   try {
-    ai = await askGrok({ technical, quotes, timeframe: normalizedTimeframe });
+    const marketType = technical.some(item => isSyntheticSymbol({symbol:item.symbol})) ? "SYNTHETIC" : "TRADITIONAL";
+    ai = await askGrok({ technical, quotes, timeframe: normalizedTimeframe, marketType });
   } catch (error) {
     ai = {
       provider:"none",
@@ -577,7 +583,11 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     tradingViewCount:tv.length,
     technicalCount:technical.filter(x=>x.source!=="none").length,
     technicalSource,
-    brokerRequired:false
+    brokerRequired:false,
+    marketTypes: {
+      synthetic: technical.filter(item => isSyntheticSymbol({symbol:item.symbol})).map(item => item.symbol),
+      traditional: technical.filter(item => !isSyntheticSymbol({symbol:item.symbol})).map(item => item.symbol)
+    }
   };
 }
 
