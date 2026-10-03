@@ -56,9 +56,12 @@
       const tasks=[
         ["broker",request("/api/connection")],
         ["subscription",request("/api/subscription/status")],
-        ["risk",request("/api/execution-control")]
+        ["risk",request("/api/execution-control")],
+        ["runtime",request("/api/runtime")],
+        ["botSelection",request("/api/runtime/selection/current")],
+        ["account",request("/api/terminal/snapshot")]
       ];
-      if(includeMarket)tasks.push(["market",request("/api/intelligence/context")]);
+      if(includeMarket)tasks.push(["market",request("/api/markets/live?synthetics=true")]);
       for(const [key,p] of tasks){
         try{state[key]=await p}catch(e){state[key]={ok:false,unavailable:true,error:String(e?.message||e)}}
       }
