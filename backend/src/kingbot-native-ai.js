@@ -627,6 +627,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
           intent:kind,
           symbol:requested,
           scanner:scan,
+          marketPageFeed:sharedMarket,
           orchestration,
           reply:{
             answer:"KINGBOT CORE completed a multi-stage intelligence pass on live "+requested+" data: "+summary,
@@ -634,6 +635,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
               "Identity: KINGBOT INTELLIGENCE CORE",
               "Cognitive loop: IDENTIFY → OBSERVE → CORRELATE → CHALLENGE → ADAPT → VERIFY → EXPLAIN",
               "Market source: "+String(scan.source||"live market-data engine"),
+              "Shared Market page feed: "+String(sharedMarket?.crossMarket?.breadth?.live ?? 0)+"/"+String(sharedMarket?.crossMarket?.breadth?.tracked ?? 0)+" live instruments",
               "Primary timeframe: "+String(scan.timeframe||primaryTimeframe),
               "Thinking level: "+thinking+" · native passes: "+String(thinkingProfile(thinking).passes),
               "Multi-timeframe alignment: "+String(multiTimeframe.alignment.direction)+" ("+String(multiTimeframe.alignment.total)+" frames)",
@@ -702,6 +704,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
             riskFlags:["TECHNICAL_SNAPSHOT_UNAVAILABLE"],
             nextAction:"Retry the analysis while the shared Market feed remains live."
           },
+          marketPageFeed:sharedMarket,
           verified:{sharedMarketFeed:true,liveQuote:true,technicalData:false}
         } : {
           provider:"KINGBOT_NATIVE",
