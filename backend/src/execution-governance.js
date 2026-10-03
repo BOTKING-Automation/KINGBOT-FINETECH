@@ -1,3 +1,4 @@
+import { Router } from "express";
 import crypto from "node:crypto";
 import { getBotDefinitions } from "./bot-engines.js";
 import { isAdminEmail } from "./admin-access.js";
@@ -303,7 +304,7 @@ export async function recordExecutionOutcome(pool,{journalId,order,intendedPrice
 }
 
 export function createExecutionGovernanceRouter({pool,requireUser}={}){
-  const router=awaitImportRouter();
+  const router=Router();
   async function admin(req,res){
     const u=await requireUser(pool,req,res);if(!u)return null;
     if(!isAdminEmail(u.email)){res.status(403).json({ok:false,error:"Administrator access required."});return null;}
@@ -321,7 +322,7 @@ export function createExecutionGovernanceRouter({pool,requireUser}={}){
         pool.query("SELECT * FROM kingbot_broker_registry ORDER BY provider,bot_id"),
         pool.query("SELECT l.*,u.email FROM kingbot_bot_licenses l JOIN kingbot_users u ON u.id=l.user_id ORDER BY l.issued_at DESC LIMIT 500")
       ]);
-      res.json({ok:true,workerId:WORKER_ID,generatedAt:new Date().toISOString(),health:health.rows,reconciliation:recon.rows,halts:controls.rows,blackouts:blackouts.rows,catalog:catalog.rows,brokers:brokers.rows,licenses});
+      res.json({ok:true,workerId:WORKER_ID,generatedAt:new Date().toISOString(),health:health.rows,reconciliation:recon.rows,halts:controls.rows,blackouts:blackouts.rows,catalog:catalog.rows,brokers:brokers.rows,licenses:licenses.rows});
     }catch(error){res.status(500).json({ok:false,error:"Governance overview unavailable."});}
   });
   router.get("/catalog",async(req,res)=>{const a=await admin(req,res);if(!a)return;const q=await pool.query("SELECT * FROM kingbot_bot_catalog ORDER BY bot_id");res.json({ok:true,catalog:q.rows});});
@@ -334,12 +335,7 @@ export function createExecutionGovernanceRouter({pool,requireUser}={}){
   router.post("/blackouts",async(req,res)=>{const a=await admin(req,res);if(!a)return;const symbol=clean(req.body?.symbol,40).toUpperCase()||"*";const starts=new Date(req.body?.startsAt),ends=new Date(req.body?.endsAt),reason=clean(req.body?.reason,240);const severity=clean(req.body?.severity,20).toUpperCase()||"HIGH";if(!Number.isFinite(starts.getTime())||!Number.isFinite(ends.getTime())||ends<=starts||reason.length<4)return res.status(400).json({ok:false,error:"Valid blackout window and reason are required."});if(!["LOW","HIGH","CRITICAL"].includes(severity))return res.status(400).json({ok:false,error:"Invalid blackout severity."});const q=await pool.query("INSERT INTO kingbot_market_blackouts(symbol,starts_at,ends_at,reason,severity,created_by) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",[symbol,starts.toISOString(),ends.toISOString(),reason,severity,a.id]);res.status(201).json({ok:true,blackout:q.rows[0]});});
   router.patch("/blackouts/:id",async(req,res)=>{const a=await admin(req,res);if(!a)return;const enabled=req.body?.enabled;const q=await pool.query("UPDATE kingbot_market_blackouts SET enabled=COALESCE($2,enabled) WHERE id=$1 RETURNING *",[req.params.id,enabled==null?null:Boolean(enabled)]);if(!q.rowCount)return res.status(404).json({ok:false,error:"Blackout not found."});res.json({ok:true,blackout:q.rows[0]});});
   router.get("/license",async(req,res)=>{const u=await requireUser(pool,req,res);if(!u)return;const q=await pool.query("SELECT l.*,b.name FROM kingbot_bot_licenses l LEFT JOIN kingbot_bot_catalog b ON b.bot_id=l.bot_id WHERE l.user_id=$1 ORDER BY l.issued_at DESC",[u.id]);res.json({ok:true,licenses:q.rows});});
-  router.post("/license/:botId",async(req,res)=>{const a=await admin(req,res);if(!a)return;const userId=clean(req.body?.userId,80),version=clean(req.body?.version,30)||"1.0.0",accountId=clean(req.body?.brokerAccountId,120)||null,expiresAt=req.body?.expiresAt?new Date(req.body.expiresAt):null;if(!userId)return res.status(400).json({ok:false,error:"userId is required."});if(expiresAt&&!Number.isFinite(expiresAt.getTime()))return res.status(400).json({ok:false,error:"Invalid expiresAt."});const q=await pool.query("INSERT INTO kingbot_bot_licenses(user_id,bot_id,version,broker_account_id,expires_at,issued_by) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",[userId,req.params.botId,version,accountId,expiresAt?aISOString(expiresAt):null,a.id]);res.status(201).json({ok:true,license:q.rows[0]});});
+  router.post("/license/:botId",async(req,res)=>{const a=await admin(req,res);if(!a)return;const userId=clean(req.body?.userId,80),version=clean(req.body?.version,30)||"1.0.0",accountId=clean(req.body?.brokerAccountId,120)||null,expiresAt=req.body?.expiresAt?new Date(req.body.expiresAt):null;if(!userId)return res.status(400).json({ok:false,error:"userId is required."});if(expiresAt&&!Number.isFinite(expiresAt.getTime()))return res.status(400).json({ok:false,error:"Invalid expiresAt."});const q=await pool.query("INSERT INTO kingbot_bot_licenses(user_id,bot_id,version,broker_account_id,expires_at,issued_by) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",[userId,req.params.botId,version,accountId,expiresAt?expiresAt.toISOString():null,a.id]);res.status(201).json({ok:true,license:q.rows[0]});});
   router.post("/license/:id/revoke",async(req,res)=>{const a=await admin(req,res);if(!a)return;const q=await pool.query("UPDATE kingbot_bot_licenses SET status='REVOKED',revoked_at=NOW() WHERE id=$1 RETURNING *",[req.params.id]);if(!q.rowCount)return res.status(404).json({ok:false,error:"License not found."});res.json({ok:true,license:q.rows[0]});});
   return router;
-}
-function awaitImportRouter(){
-  // Router is imported lazily to keep this governance module side-effect free during schema discovery.
-  // The server passes express.Router-compatible factory through createExecutionGovernanceRouter.
-  throw new Error("ROUTER_FACTORY_REQUIRED");
-}
+}\n
