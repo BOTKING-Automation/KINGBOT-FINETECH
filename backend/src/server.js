@@ -342,7 +342,7 @@ function firstFinite(...values){
 
 registerTerminalSnapshot(app, { requireUser, pool, broker, firstFinite });
 registerAiMarketScanner(app, { pool, rateLimit, twelveData });
-registerAiAgent(app, { requireUser, pool, broker, rateLimit, twelveData });
+registerAiAgent(app, { requireUser, pool, broker, rateLimit, twelveData, eventBus });
 registerTerminalLive(app, { requireUser, pool, broker, firstFinite });
 registerElevenLabsVoice(app, { requireUser, pool, rateLimit });
 registerAiIntelligence(app, { requireUser, pool, broker });
