@@ -67,7 +67,7 @@ export function createBotRuntimeRouter({pool,broker}){
       ok:true,
       selectedBotId,
       updatedAt:q.rows[0].updated_at,
-      bot:{botId:bot.id,name:bot.name,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||b.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null}
+      bot:{botId:bot.id,name:bot.name,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||bot.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null}
     });
   });
 
@@ -80,7 +80,7 @@ export function createBotRuntimeRouter({pool,broker}){
     await claimActiveBot(pool,user.id,botId);
     await audit(pool,user.id,"BOT_SELECTION_SAVED",{botId});
     const r=await runtime(pool,user.id,botId),s=await settings(pool,user.id,botId);
-    res.json({ok:true,selectedBotId:botId,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||b.timeframeProfile?.execution||"5m"});
+    res.json({ok:true,selectedBotId:botId,state:r?.state||"STOPPED",executionMode:s.executionMode,symbol:r?.symbol||null,timeframe:r?.timeframe||bot.timeframeProfile?.execution||"5m"});
   });
   router.get("/:botId",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
