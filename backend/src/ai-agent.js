@@ -17,7 +17,7 @@ For trading analysis, distinguish FACTS, TECHNICAL READ, SETUP, WAIT CONDITION, 
 Do not promise profit or certainty.
 Never place, modify, close, or authorize a live trade from chat. Execution authority remains with deterministic strategy and risk engines.
 You understand the five KINGBOT engines: strategic, flipper, breakout, smc-pro, ladder-flip.
-Be concise but technically deep. Never expose hidden chain-of-thought. Return a compact reasoning summary, evidence conflicts, uncertainty and validation steps instead. Return JSON only.`;
+Be concise but technically deep. Never expose hidden chain-of-thought or internal reasoning traces. Give the user the useful conclusion, relevant verified evidence, uncertainty when material, and the next practical step. Return JSON only.`;
 
 function cleanSymbol(value){const v=String(value||"XAUUSD").trim().toUpperCase();return DEFAULT_SYMBOLS.includes(v)?v:"XAUUSD";}
 function safeJson(value){try{return JSON.parse(String(value||"").trim())}catch{return null}}
@@ -75,8 +75,12 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
       symbol,
       identity:identitySnapshot(),
       cognitivePlan,
-      cognitionAudit:native?.cognition?.audit||null,
-      cognition:native?.cognition||null,
+      cognition: native?.cognition
+        ? {
+            plan: native.cognition.plan || cognitivePlan,
+            capabilities: Array.isArray(native.cognition.capabilities) ? native.cognition.capabilities : []
+          }
+        : { plan: cognitivePlan, capabilities: capabilitySet(cognitivePlan) },
       conversationState:native?.conversationState||null,
       reply:native?.reply||{},
       sources:native.sources||[],
