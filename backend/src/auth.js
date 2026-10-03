@@ -40,7 +40,7 @@ export async function resolveFirebaseUser(pool,req){
  if(!fb||fb.email_verified!==true)return null;
 
  const q=await pool.query("SELECT id,firebase_uid,email,first_name,last_name,email_verified,phone_verified,admin_blocked FROM kingbot_users WHERE firebase_uid=$1 LIMIT 1",[fb.uid]);
- if(q.rowCount)return q.rows[0];
+ if(q.rowCount)return {...q.rows[0],firebaseAuthTime:Number(fb.auth_time||0)};
 
  const email=String(fb.email||"").trim().toLowerCase();
  if(!email)return null;
@@ -50,7 +50,7 @@ export async function resolveFirebaseUser(pool,req){
   const existing=byEmail.rows[0];
   if(existing.firebase_uid && String(existing.firebase_uid)!==String(fb.uid))return null;
   await pool.query("UPDATE kingbot_users SET firebase_uid=$1,email_verified=TRUE WHERE id=$2",[fb.uid,byEmail.rows[0].id]);
-  return {...byEmail.rows[0],email_verified:true};
+  return {...byEmail.rows[0],email_verified:true,firebaseAuthTime:Number(fb.auth_time||0)};
  }
 
  // Recover the KINGBOT profile automatically when Firebase authentication
@@ -60,7 +60,7 @@ export async function resolveFirebaseUser(pool,req){
   "INSERT INTO kingbot_users(firebase_uid,first_name,last_name,email,email_verified,phone_verified) VALUES($1,$2,$3,$4,TRUE,FALSE) ON CONFLICT(email) DO UPDATE SET email_verified=TRUE WHERE kingbot_users.firebase_uid IS NULL OR kingbot_users.firebase_uid=EXCLUDED.firebase_uid RETURNING id,email,first_name,last_name,email_verified,phone_verified,admin_blocked",
   [fb.uid,names.firstName,names.lastName,email]
  );
- return created.rows[0]||null;
+ return created.rows[0]?{...created.rows[0],firebaseAuthTime:Number(fb.auth_time||0)}:null;
 }
 export function createAuthRouter({pool}){
  const router=Router();
