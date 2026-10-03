@@ -1,3 +1,5 @@
+import { agentToolPlan } from "./kingbot-agent-tools.js";
+
 /*
  * KINGBOT AGENT CORE v1
  * Native agent controller for KINGBOT FINTECH.
@@ -91,6 +93,7 @@ function buildKingbotAgentPlan({
       memoryCount: Array.isArray(memory) ? memory.length : 0
     },
     knowledgeRoute: knowledge,
+    toolPlan: agentToolPlan({ intent, goal: goals[0] }),
     loop: [
       "UNDERSTAND_USER",
       "RECALL_CONTEXT",
