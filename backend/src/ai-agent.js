@@ -43,7 +43,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     let brokerStatus={connected:false};
     try{brokerStatus=await broker.getStatus(user.id)}catch{}
     res.json({
-      ok:true,agentReady:true,nativeReady:true,externalProvider:EXTERNAL_PROVIDER,model:EXTERNAL_PROVIDER==="gemini"&&ai?MODEL:"KINGBOT-CORE-1",mode:"KINGBOT_NATIVE_INTELLIGENCE_AGENT",
+      ok:true,agentReady:true,nativeReady:true,externalProvider:EXTERNAL_PROVIDER,model:MODEL,mode:"KINGBOT_NATIVE_INTELLIGENCE_AGENT",
       authority:"ANALYSIS_ONLY",marketData:feed.status(),brokerConnected:Boolean(brokerStatus?.connected),
       engines:Object.keys(getBotDefinitions()),webResearch:webSearchStatus(),identity:identitySnapshot(),cognitiveLoop:identitySnapshot().cognitiveLoop
     });
