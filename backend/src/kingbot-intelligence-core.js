@@ -162,7 +162,7 @@ export function capabilitySet(plan = {}) {
   if (stages.has("VERIFY")) active.push("VERIFICATION_GATE");
   if (stages.has("EXPLAIN")) active.push("EXPLANATION");
   if (evidence.has("web_sources")) active.push("WEB_RESEARCH");
-  if (evidence.includes?.("risk_context") || evidence.has("risk_context")) active.push("RISK_AWARENESS");
+  if (evidence.has("risk_context")) active.push("RISK_AWARENESS");
   return [...new Set(active)];
 }
 
