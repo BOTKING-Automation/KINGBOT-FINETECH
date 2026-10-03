@@ -571,6 +571,7 @@ export class UserBrokerManager {
 
   async getAccount(userId){
     const entry=await this.connectionFor(userId);
+    if(String(entry.ownerUserId||"")!==String(userId))throw new Error("EXECUTION_OWNER_MISMATCH");
     if(entry.provider==="deriv"){
       // Prefer the adapter's live balance stream snapshot. Deriv pushes a
       // balance message whenever the authorized account balance changes.
