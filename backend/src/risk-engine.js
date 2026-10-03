@@ -34,7 +34,10 @@ export function evaluateRisk(input={}){
 }
 export function authorizeOrder(input={}){
  if(input.killSwitch===true)return {allowed:false,reason:"KILL_SWITCH_ACTIVE"};
+ if(input.globalKillSwitch===true)return {allowed:false,reason:"GLOBAL_KILL_SWITCH_ACTIVE"};
+ if(input.globalTradingPaused===true)return {allowed:false,reason:"GLOBAL_TRADING_PAUSED"};
  if(input.executionMode!=="DEMO"&&input.executionMode!=="LIVE")return {allowed:false,reason:"EXECUTION_MODE_NOT_AUTHORIZED"};
- const risk=evaluateRisk(input); return risk.allowed?{allowed:true,risk}:{allowed:false,risk};
+ const risk=evaluateRisk(input);
+ return risk.allowed ? {allowed:true,risk} : {allowed:false,risk};
 }
 export { DEFAULTS };
