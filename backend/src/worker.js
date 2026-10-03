@@ -294,7 +294,10 @@ async function reconcileBrokerState(userId,status,positions){
         if(Number.isFinite(profit)){
           const outcome=profit>0?"WIN":profit<0?"LOSS":"BREAKEVEN";
           try{
-            await settleAdaptiveDecision(pool,userId,{decisionId:String(row.decision_id),outcome,pnl:profit});
+            const settled=await settleAdaptiveDecision(pool,userId,{decisionId:String(row.decision_id),outcome,pnl:profit});
+            if(settled){
+              await pool.query("UPDATE kingbot_execution_journal SET status='SETTLED',updated_at=NOW() WHERE user_id=$1 AND client_id=$2",[userId,row.client_id]);
+            }
           }catch(error){
             console.warn("[KINGBOT ADAPTIVE] settlement skipped",JSON.stringify({decisionId:row.decision_id,error:String(error?.message||"SETTLEMENT_FAILED").slice(0,160)}));
           }
