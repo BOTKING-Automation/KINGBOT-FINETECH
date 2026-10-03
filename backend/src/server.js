@@ -143,6 +143,32 @@ app.post("/api/broker/account", async (req,res)=>{
   }
 });
 
+app.get("/api/broker/markets", async (req,res)=>{
+  const user=await requireUser(pool,req,res);
+  if(!user)return;
+  try{
+    const result=await broker.getMarkets(user.id);
+    const markets=Array.isArray(result?.data)?result.data:[];
+    return res.json({
+      ok:true,
+      connected:Boolean(result?.connected!==false),
+      broker:String(result?.broker||"").toLowerCase()||undefined,
+      markets,
+      count:markets.length,
+      generatedAt:new Date().toISOString(),
+      source:"connected-broker-catalog"
+    });
+  }catch(error){
+    const message=String(error?.message||"BROKER_MARKETS_UNAVAILABLE");
+    return res.status(503).json({
+      ok:false,
+      error:"BROKER_MARKETS_UNAVAILABLE",
+      reason:message.slice(0,240),
+      message:"The connected broker did not return an authoritative market catalog. No market was selected."
+    });
+  }
+});
+
 app.get("/api/broker/identity", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   try{
