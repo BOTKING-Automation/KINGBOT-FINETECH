@@ -1266,7 +1266,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
     }finally{refreshRunning=false}
   }
 
-  $("historyRefresh").addEventListener  $("historyRefresh").addEventListener("click",()=>refreshHistory(true));
+  $("historyRefresh").addEventListener("click",()=>refreshHistory(true));
   $("historyRange").addEventListener("change",e=>{state.historyRangeDays=Math.max(1,Number(e.target.value)||7);refreshHistory(true)});
   $("goldTestBtn").addEventListener("click",testGoldDemoBuy);
   $("syncNow").addEventListener("click",()=>refreshAll(true));
