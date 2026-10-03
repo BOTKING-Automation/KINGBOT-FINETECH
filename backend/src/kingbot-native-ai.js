@@ -7,6 +7,7 @@ import { searchTechnicalAnalysisBook, technicalAnalysisBookContext } from "./tec
 import { buildCognitivePlan, capabilitySet, identitySnapshot, qualityAudit } from "./kingbot-intelligence-core.js";
 import { orchestrateKingbotIntelligence } from "./intelligence-orchestrator.js";
 import { loadAdaptivePerformance } from "./adaptive-intelligence.js";
+import { think } from "./kingbot-cognitive-engine.js";
 
 const SYMBOLS = ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 
@@ -601,15 +602,30 @@ export async function runNativeKingbotAI(input = {}) {
     plan,
     verified: result?.verified || {}
   });
+  const thought = think({
+    question: input?.question || "",
+    intent: result?.intent || "PLATFORM_SUPPORT",
+    reply: result?.reply || {},
+    conversation: input?.conversation || []
+  });
 
   const reply = {
     ...(result?.reply || {}),
+    reasoningSummary: thought.reasoningSummary,
+    evidenceFor: thought.evidenceFor,
+    evidenceAgainst: thought.evidenceAgainst,
+    uncertainties: thought.uncertainties,
+    alternativeHypotheses: thought.alternativeHypotheses,
+    validationSteps: thought.validationSteps,
+    confidence: thought.confidence,
+    cognitiveState: thought.cognitiveState,
     intelligence: {
       identity: identity.id,
       mode: plan.mode,
       stages: plan.stages,
-      capabilities,
+      capabilities: [...capabilities, "PROPRIETARY_REASONING_KERNEL", "HYPOTHESIS_ENGINE", "CONTRADICTION_ENGINE", "SELF_CRITIQUE"],
       epistemicStatus: audit.epistemicStatus,
+      deliberation: "PROPRIETARY_MULTI_PASS",
       authority: "NONE"
     }
   };
@@ -619,8 +635,9 @@ export async function runNativeKingbotAI(input = {}) {
     identity,
     cognition: {
       plan,
-      capabilities,
-      audit
+      capabilities: [...capabilities, "PROPRIETARY_REASONING_KERNEL", "HYPOTHESIS_ENGINE", "CONTRADICTION_ENGINE", "SELF_CRITIQUE"],
+      audit,
+      thought
     },
     reply
   };
