@@ -3,7 +3,7 @@ import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getBotDefinitions } from "./bot-engines.js";
 import { runNativeKingbotAI } from "./kingbot-native-ai.js";
 import { webSearchStatus } from "./kingbot-web-search.js";
-import { identitySnapshot, buildCognitivePlan } from "./kingbot-intelligence-core.js";
+import { identitySnapshot, buildCognitivePlan, capabilitySet, qualityAudit } from "./kingbot-intelligence-core.js";
 
 const DEFAULT_SYMBOLS=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 const MODEL=String(process.env.GEMINI_AGENT_MODEL||process.env.GEMINI_MODEL||"gemini-2.5-flash-lite").trim();
@@ -134,7 +134,17 @@ Respond with JSON:
         config:{systemInstruction:SYSTEM,responseMimeType:"application/json",maxOutputTokens:900,temperature:0.15}
       });
       const parsed=safeJson(response.text)||{answer:String(response.text||"KINGBOT AI returned no structured answer.")};
-      return res.json({ok:true,agent:"KINGBOT",model:MODEL,symbol,context,reply:parsed,sources:native.sources||[],generatedAt:new Date().toISOString()});
+      const generatedAudit=qualityAudit({reply:parsed,plan:cognitivePlan,verified:native.verified||{}});
+      const intelligence={
+        identity:"KINGBOT",
+        mode:cognitivePlan.mode,
+        stages:cognitivePlan.stages,
+        capabilities:capabilitySet(cognitivePlan),
+        epistemicStatus:generatedAudit.epistemicStatus,
+        authority:"NONE"
+      };
+      const finalReply={...parsed,intelligence};
+      return res.json({ok:true,agent:"KINGBOT",model:MODEL,symbol,context,identity:identitySnapshot(),cognitivePlan,cognitionAudit:generatedAudit,reply:finalReply,sources:native.sources||[],generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
     }catch(error){
       console.error("[KINGBOT AI AGENT]",error?.message||error);
       return res.status(502).json({ok:false,error:"KINGBOT_AI_AGENT_FAILED",message:String(error?.message||"AI agent failed").slice(0,220)});
