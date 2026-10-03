@@ -64,6 +64,55 @@ export const KINGBOT_IDENTITY = Object.freeze({
   executionBoundary: "DETERMINISTIC_STRATEGY + RISK_ENGINE + BROKER_VALIDATION"
 });
 
+const THINKING_LEVELS = Object.freeze({
+  FAST: {
+    rank: 1,
+    label: "FAST",
+    passes: 2,
+    evidenceLimit: 8,
+    hypothesisLimit: 2,
+    timeframes: 1,
+    description: "Fast situational reasoning with minimal evidence expansion."
+  },
+  STANDARD: {
+    rank: 2,
+    label: "STANDARD",
+    passes: 4,
+    evidenceLimit: 14,
+    hypothesisLimit: 3,
+    timeframes: 2,
+    description: "Balanced reasoning for normal platform and market questions."
+  },
+  DEEP: {
+    rank: 3,
+    label: "DEEP",
+    passes: 6,
+    evidenceLimit: 20,
+    hypothesisLimit: 4,
+    timeframes: 3,
+    description: "Expanded evidence correlation, contradiction testing and validation."
+  },
+  EXPERT: {
+    rank: 4,
+    label: "EXPERT",
+    passes: 8,
+    evidenceLimit: 30,
+    hypothesisLimit: 6,
+    timeframes: 4,
+    description: "Maximum native deliberation with multi-timeframe market verification."
+  }
+});
+
+export function normalizeThinkingLevel(value = "EXPERT") {
+  const level = String(value || "").trim().toUpperCase();
+  return THINKING_LEVELS[level] ? level : "EXPERT";
+}
+
+export function thinkingProfile(value = "EXPERT") {
+  const level = normalizeThinkingLevel(value);
+  return { level, ...THINKING_LEVELS[level] };
+}
+
 const MODE_DEFS = {
   CONVERSATION: {
     goal: "Understand and respond naturally without inventing platform state.",
@@ -134,9 +183,10 @@ const MODE_DEFS = {
 
 const normalizeText = value => String(value || "").trim();
 
-export function buildCognitivePlan({ intent = "PLATFORM_SUPPORT", symbol = null, conversation = [] } = {}) {
+export function buildCognitivePlan({ intent = "PLATFORM_SUPPORT", symbol = null, conversation = [], thinkingLevel = "EXPERT" } = {}) {
   const mode = MODE_DEFS[intent] || MODE_DEFS.PLATFORM_SUPPORT;
   const requestedSymbol = normalizeText(symbol).toUpperCase() || null;
+  const thinking = thinkingProfile(thinkingLevel);
   return {
     identity: KINGBOT_IDENTITY.id,
     mode: intent,
@@ -146,6 +196,7 @@ export function buildCognitivePlan({ intent = "PLATFORM_SUPPORT", symbol = null,
     requestedSymbol,
     conversationDepth: Array.isArray(conversation) ? Math.min(conversation.length, 6) : 0,
     executionAuthority: "NONE",
+    thinking,
     createdAt: new Date().toISOString()
   };
 }
