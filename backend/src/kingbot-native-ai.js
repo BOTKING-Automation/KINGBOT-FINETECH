@@ -146,14 +146,6 @@ function kingbotKnowledgeReply(question){
   };
 }
 
-function conversationalReply(question){
-  const t=String(question||"").toLowerCase().trim();
-  if(/^(hi|hello|hey|yo|good morning|good afternoon|good evening|howdy|greetings)\b/.test(t)) return {answer:"Hey! 👋 KINGBOT AI is online. I can chat with you, explain the platform, research information online, or use verified live market intelligence. What would you like to do?",facts:["Native KINGBOT conversational layer is active."],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Ask a question or choose an intelligence function.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask KINGBOT anything about the platform, bots, markets, risk, or online research."};
-  if(/\bhow are you\b/.test(t)) return {answer:"I'm online and ready to work. 🤖 Give me a question and I'll choose the right KINGBOT intelligence capability.",facts:["Native KINGBOT communication layer is active."],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Your next request.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Try: What can you do? or Analyze gold."};
-  if(/\bwho are you\b|\bwhat are you\b/.test(t)) return {answer:"I'm KINGBOT AI — the native intelligence and communication layer of KINGBOT FINTECH. I can communicate naturally, explain the five bot engines, inspect verified account and risk data, analyze supported live market data, and search Google when configured. I never invent live data or authorize trades from chat.",facts:["Provider: KINGBOT_NATIVE","Core: KINGBOT-CORE-1","Execution authority: deterministic strategy and risk gates"],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"A specific request.",invalidation:"Not applicable."},riskFlags:["EXECUTION_REMAINS_SERVER_CONTROLLED"],nextAction:"Tell me what you need."};
-  if(/\bthank you\b|\bthanks\b/.test(t)) return {answer:"You're welcome. 🤝 I'm here. Send me the next question whenever you're ready.",facts:[],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Your next request.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Continue the conversation."};
-  return {answer:"I'm ready. Tell me what you need and I'll route it to the appropriate KINGBOT intelligence capability.",facts:[],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Your request.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask a question."};
-}
 
 function marketTimeframes(baseTimeframe, thinkingLevel){
   const base=String(baseTimeframe||"15m").toLowerCase();
