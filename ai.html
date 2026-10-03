@@ -936,6 +936,33 @@
             </div>
           </section>
         </div>
+
+        <section class="orch-panel" style="margin-top:12px">
+          <div class="orch-panel-title"><span>BIAS CARD · ADAPTIVE ROUTER</span><span id="biasCardState">STANDBY</span></div>
+          <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:10px">
+            <div class="orch-plan-cell"><span>BIAS</span><strong id="biasCardBias">—</strong></div>
+            <div class="orch-plan-cell"><span>REGIME</span><strong id="biasCardRegime">—</strong></div>
+            <div class="orch-plan-cell"><span>CONFIDENCE</span><strong id="biasCardConfidence">—</strong></div>
+            <div class="orch-plan-cell"><span>SETUP</span><strong id="biasCardSetup">—</strong></div>
+            <div class="orch-plan-cell"><span>INVALIDATION</span><strong id="biasCardInvalidation">—</strong></div>
+            <div class="orch-plan-cell"><span>DECISION</span><strong id="biasCardDecision">—</strong></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+            <div class="orch-case bull" style="min-height:72px">
+              <div class="orch-panel-title">EVIDENCE FABRIC</div>
+              <div id="biasCardEvidence" style="margin-top:7px;line-height:1.6">Awaiting intelligence pass.</div>
+            </div>
+            <div class="orch-case bear" style="min-height:72px">
+              <div class="orch-panel-title">ADAPTIVE MEMORY</div>
+              <div id="biasCardMemory" style="margin-top:7px;line-height:1.6">No historical settlement data loaded.</div>
+            </div>
+          </div>
+          <div class="orch-panel-title" style="margin-top:12px"><span>ENGINE PERFORMANCE CONTEXT</span><span>ROLLING · OUTCOME-DRIVEN</span></div>
+          <div id="adaptiveEngineTable" style="margin-top:8px;display:grid;gap:6px">
+            <div class="orch-muted">Run intelligence to load adaptive routing context.</div>
+          </div>
+          <div class="orch-warning" style="margin-top:10px">Adaptive scores only influence research/routing context. The orchestrator still has ZERO execution authority; the deterministic risk engine and broker controls remain the final gate.</div>
+        </section>
       </article>
     </section>
 
