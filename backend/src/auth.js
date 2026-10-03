@@ -57,7 +57,7 @@ export async function resolveFirebaseUser(pool,req){
  // succeeded but the frontend/backend synchronization did not complete.
  const names=splitName(fb.name,email);
  const created=await pool.query(
-  "INSERT INTO kingbot_users(firebase_uid,first_name,last_name,email,email_verified,phone_verified) VALUES($1,$2,$3,$4,TRUE,FALSE) ON CONFLICT(email) DO UPDATE SET firebase_uid=EXCLUDED.firebase_uid,email_verified=TRUE RETURNING id,email,first_name,last_name,email_verified,phone_verified,admin_blocked",
+  "INSERT INTO kingbot_users(firebase_uid,first_name,last_name,email,email_verified,phone_verified) VALUES($1,$2,$3,$4,TRUE,FALSE) ON CONFLICT(email) DO UPDATE SET email_verified=TRUE WHERE kingbot_users.firebase_uid IS NULL OR kingbot_users.firebase_uid=EXCLUDED.firebase_uid RETURNING id,email,first_name,last_name,email_verified,phone_verified,admin_blocked",
   [fb.uid,names.firstName,names.lastName,email]
  );
  return created.rows[0]||null;
