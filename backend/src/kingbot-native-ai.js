@@ -672,24 +672,13 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
           }
         };
       }
-      return {
-        provider:"KINGBOT_NATIVE",
-        model:"KINGBOT-CORTEX-1",
-        intent:kind,
-        symbol:requested,
-        reply:{
-          answer:"KINGBOT AI could not obtain fresh verified market data for "+requested+".",
-          facts:[String(scan.message||scan.reason||scan.error||"LIVE_MARKET_DATA_UNAVAILABLE").slice(0,220)],
-          technicalAnalysis:[],
-          setup:{signal:"DATA_INSUFFICIENT",entry:null,waitFor:"Fresh verified market data.",invalidation:"No valid market data."},
-          riskFlags:["LIVE_MARKET_DATA_UNAVAILABLE"],
-          nextAction:"Check the standalone market-data feed configuration."
-        },
-        ...(sharedQuote?.available ? {
+      if(sharedQuote?.available){
+        return {
           provider:"KINGBOT_NATIVE",
           model:"KINGBOT-CORTEX-1",
           intent:kind,
           symbol:requested,
+          marketPageFeed:sharedMarket,
           reply:{
             answer:"KINGBOT synchronized the live Market page feed for "+requested+" but the deeper technical snapshot is not currently available.",
             facts:[
@@ -704,23 +693,26 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
             riskFlags:["TECHNICAL_SNAPSHOT_UNAVAILABLE"],
             nextAction:"Retry the analysis while the shared Market feed remains live."
           },
-          marketPageFeed:sharedMarket,
           verified:{sharedMarketFeed:true,liveQuote:true,technicalData:false}
-        } : {
-          provider:"KINGBOT_NATIVE",
-          model:"KINGBOT-CORTEX-1",
-          intent:kind,
-          symbol:requested,
-          reply:{
-            answer:"KINGBOT AI could not obtain fresh verified market data for "+requested+".",
-            facts:[String(scan.message||scan.reason||scan.error||"LIVE_MARKET_DATA_UNAVAILABLE").slice(0,220)],
-            technicalAnalysis:[],
-            setup:{signal:"DATA_INSUFFICIENT",entry:null,waitFor:"Fresh verified market data.",invalidation:"No valid market data."},
-            riskFlags:["LIVE_MARKET_DATA_UNAVAILABLE"],
-            nextAction:"Check the shared Market feed and technical-data configuration."
-          },
-          verified:{standaloneScanner:false,sharedMarketFeed:Boolean(sharedMarket?.ok)}
-        });
+        };
+      }
+
+      return {
+        provider:"KINGBOT_NATIVE",
+        model:"KINGBOT-CORTEX-1",
+        intent:kind,
+        symbol:requested,
+        marketPageFeed:sharedMarket,
+        reply:{
+          answer:"KINGBOT AI could not obtain fresh verified market data for "+requested+".",
+          facts:[String(scan.message||scan.reason||scan.error||"LIVE_MARKET_DATA_UNAVAILABLE").slice(0,220)],
+          technicalAnalysis:[],
+          setup:{signal:"DATA_INSUFFICIENT",entry:null,waitFor:"Fresh verified market data.",invalidation:"No valid market data."},
+          riskFlags:["LIVE_MARKET_DATA_UNAVAILABLE"],
+          nextAction:"Check the shared Market feed and technical-data configuration."
+        },
+        verified:{standaloneScanner:false,sharedMarketFeed:Boolean(sharedMarket?.ok)}
+      };
     }catch(error){
       return {
         provider:"KINGBOT_NATIVE",
