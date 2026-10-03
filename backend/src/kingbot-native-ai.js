@@ -8,7 +8,7 @@ import { buildCognitivePlan, capabilitySet, identitySnapshot, qualityAudit, norm
 import { orchestrateKingbotIntelligence } from "./intelligence-orchestrator.js";
 import { loadAdaptivePerformance } from "./adaptive-intelligence.js";
 import { think } from "./kingbot-cognitive-engine.js";
-import { conversationalReply, conversationSignals } from "./kingbot-dialogue-cortex.js";
+import { conversationalReply, conversationSignals, conversationFrame } from "./kingbot-dialogue-cortex.js";
 import { getMarketPageSnapshot } from "./market-page-feed.js";
 
 const SYMBOLS = ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
@@ -438,6 +438,7 @@ function generalKnowledgeReply(question,search){
 async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,userId,conversation=[],thinkingLevel="EXPERT",timeframe="15m"}={}){
   const signals=conversationSignals(question,conversation)||{};
   const effectiveQuestion=String(signals.resolvedQuestion||question).trim();
+  const userFrame=conversationFrame(question,conversation);
   const requested=symbolFromText(effectiveQuestion,symbol||"XAUUSD");
   const kind=intent(effectiveQuestion,conversation);
   const utility=utilityReply(effectiveQuestion);
@@ -457,7 +458,16 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
     };
   }
   if(kind==="KINGBOT_KNOWLEDGE"){
-    return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,reply:kingbotKnowledgeReply(question),verified:{platformKnowledge:true,engineDefinitions:true}};
+    const reply=kingbotKnowledgeReply(effectiveQuestion);
+    return {
+      provider:"KINGBOT_NATIVE",
+      model:"KINGBOT-CORTEX-1",
+      intent:kind,
+      symbol:requested,
+      reply,
+      userFrame,
+      verified:{platformKnowledge:true,engineDefinitions:true}
+    };
   }
   if(utility) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:"TIME",symbol:requested,reply:utility,verified:{native:true,timeSource:"server"}};
   if(["GREETING","WELLBEING","FOLLOW_UP","PRESENCE","APPRECIATION","GOODBYE","IDENTITY","INTELLIGENCE","CAPABILITY","EMOTION_PROBE","CASUAL"].includes(kind)) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:"CONVERSATION",symbol:requested,reply:conversationalReply(question,conversation),verified:{native:true,dialogueCortex:true}};
@@ -853,12 +863,14 @@ export async function runNativeKingbotAI(input = {}) {
     ...result,
     conversationState: {
       ...(conversationSignals(input?.question || "", input?.conversation || []) || {}),
+      frame: conversationFrame(input?.question || "", input?.conversation || []),
       effectiveQuestion: String(conversationSignals(input?.question || "", input?.conversation || [])?.resolvedQuestion || input?.question || "")
     },
     identity,
     cognition: {
       plan,
-      capabilities: [...capabilities, "PROPRIETARY_REASONING_KERNEL"]
+      capabilities: [...capabilities, "PROPRIETARY_REASONING_KERNEL"],
+      userFrame: conversationFrame(input?.question || "", input?.conversation || [])
     },
     reply
   };
