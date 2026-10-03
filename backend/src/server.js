@@ -27,6 +27,7 @@ import { registerAiIntelligence } from "./ai-intelligence.js";
 import { webSearchStatus } from "./kingbot-web-search.js";
 import { registerAiAgent } from "./ai-agent.js";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
+import { getMarketPageSnapshot, marketPageSymbols } from "./market-page-feed.js";
 import { evaluateKingbotBrain } from "./kingbot-brain.js";
 import { createMt5HostingRouter, ensureMt5HostingSchema } from "./mt5-hosting.js";
 import { createFintechOpsRouter, ensureFintechOpsSchema } from "./fintech-operations.js";
@@ -138,6 +139,26 @@ app.get("/api/broker/identity", async (req,res)=>{
   }catch(error){
     console.error("[KINGBOT BROKER] stored identity lookup failed:",error?.message||error);
     res.status(503).json({ok:false,error:"BROKER_IDENTITY_UNAVAILABLE",reason:String(error?.message||"BROKER_IDENTITY_UNAVAILABLE").slice(0,220)});
+  }
+});
+
+app.get("/api/markets/live", async (req,res)=>{
+  try{
+    const includeSynthetics=String(req.query?.synthetics ?? "true").toLowerCase() !== "false";
+    const snapshot=await getMarketPageSnapshot({twelveData,includeSynthetics});
+    res.json({
+      ...snapshot,
+      endpoint:"/api/markets/live",
+      trackedSymbols:marketPageSymbols({includeSynthetics})
+    });
+  }catch(error){
+    console.error("[KINGBOT SHARED MARKET FEED]",error?.message||error);
+    res.status(503).json({
+      ok:false,
+      provider:"KINGBOT_SHARED_MARKET_FEED",
+      error:"SHARED_MARKET_FEED_UNAVAILABLE",
+      reason:String(error?.message||"SHARED_MARKET_FEED_UNAVAILABLE").slice(0,220)
+    });
   }
 });
 
