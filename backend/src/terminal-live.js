@@ -52,9 +52,10 @@ export function registerTerminalLive(app, { requireUser, pool, broker, firstFini
           return;
         }
 
-        const [accountResult, positionsResult, quoteResult] = await Promise.allSettled([
+        const [accountResult, positionsResult, ordersResult, quoteResult] = await Promise.allSettled([
           entry?.api?.getAccount ? entry.api.getAccount() : Promise.resolve({ data: entry?.accountInfo || {} }),
           entry?.api?.getPositions ? entry.api.getPositions() : Promise.resolve({ data: [] }),
+          entry?.api?.getOrders ? entry.api.getOrders() : Promise.resolve({ data: [] }),
           symbol && entry?.api?.getQuote ? entry.api.getQuote(symbol) : Promise.resolve(null),
         ]);
 
@@ -82,6 +83,24 @@ export function registerTerminalLive(app, { requireUser, pool, broker, firstFini
           current: firstFinite(p?.currentPrice, p?.current, p?.marketPrice),
           pnl: firstFinite(p?.profit, p?.pnl, p?.unrealizedProfit),
           status: String(p?.state || p?.status || "OPEN").toUpperCase(),
+        }));
+
+        const orderSource =
+          ordersResult.status === "fulfilled"
+            ? Array.isArray(ordersResult.value?.data)
+              ? ordersResult.value.data
+              : Array.isArray(ordersResult.value)
+                ? ordersResult.value
+                : []
+            : [];
+        const orders = orderSource.slice(0,100).map((o) => ({
+          id:o?.id || o?.orderId || o?.ticket || null,
+          time:o?.time || o?.createdAt || o?.created_at || o?.timestamp || null,
+          symbol:o?.symbol || o?.instrument || "—",
+          side:String(o?.side || o?.type || o?.order_type || "—").toUpperCase(),
+          volume:firstFinite(o?.volume,o?.lots,o?.quantity,o?.stake,o?.units),
+          price:firstFinite(o?.price,o?.openPrice,o?.entryPrice,o?.currentPrice),
+          status:String(o?.status || o?.state || "OPEN").toUpperCase(),
         }));
 
         const balance = firstFinite(raw.balance);
@@ -115,6 +134,8 @@ export function registerTerminalLive(app, { requireUser, pool, broker, firstFini
           positions,
           quote,
           at: new Date().toISOString(),
+          generatedAt: new Date().toISOString(),
+          latencyMs: Math.max(0, Date.now() - streamStartedAt),
         });
       } catch (error) {
         writeSse("error", {
