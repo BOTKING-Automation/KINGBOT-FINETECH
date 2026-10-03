@@ -3326,6 +3326,52 @@ overscroll-behavior:none;}
 
 
     /* =========================================================
+       KINGBOT SHARED LIVE MARKET DATA
+    ========================================================== */
+
+    async function fetchSharedMarketData() {
+      try {
+        const response = await fetch(
+          "https://kingbot-fintech-api-etfv.onrender.com/api/markets/live?synthetics=true",
+          { cache: "no-store" }
+        );
+        if (!response.ok) throw new Error("SHARED_MARKET_FEED_HTTP_" + response.status);
+        const payload = await response.json().catch(() => ({}));
+        const quotes = Array.isArray(payload.quotes) ? payload.quotes : [];
+
+        for (const quote of quotes) {
+          if (!quote?.symbol) continue;
+          state.data[quote.symbol] = {
+            ...(state.data[quote.symbol] || {}),
+            price: Number.isFinite(Number(quote.price)) ? Number(quote.price) : state.data[quote.symbol]?.price ?? null,
+            change: Number.isFinite(Number(quote.change)) ? Number(quote.change) : state.data[quote.symbol]?.change ?? null,
+            volume: Number.isFinite(Number(quote.volume)) ? Number(quote.volume) : state.data[quote.symbol]?.volume ?? null,
+            high: Number.isFinite(Number(quote.high)) ? Number(quote.high) : state.data[quote.symbol]?.high ?? null,
+            low: Number.isFinite(Number(quote.low)) ? Number(quote.low) : state.data[quote.symbol]?.low ?? null,
+            updated: Date.now(),
+            source: quote.source || "KINGBOT shared live market feed",
+            feedAgeMs: Number(quote.ageMs || 0),
+            available: Boolean(quote.available)
+          };
+        }
+
+        const liveCount = Number(payload?.crossMarket?.breadth?.live || quotes.filter(q => q.available).length);
+        const trackedCount = Number(payload?.crossMarket?.breadth?.tracked || quotes.length);
+        state.lastUpdate = Date.now();
+        state.feedMessages++;
+        setConnection(liveCount > 0);
+        const feedStatus = document.querySelector(".market-feed-status");
+        if (feedStatus) {
+          feedStatus.textContent = liveCount + "/" + trackedCount + " LIVE";
+        }
+        renderAll();
+      } catch (error) {
+        console.warn("KINGBOT shared market feed failed", error);
+        setConnection(false);
+      }
+    }
+
+    /* =========================================================
        KINGBOT DERIV LIVE DATA
     ========================================================== */
 
