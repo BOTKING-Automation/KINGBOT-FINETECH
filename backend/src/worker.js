@@ -14,6 +14,17 @@ import { ensureSubscriptionSchema, expireStaleSubscriptions } from "./subscripti
 import { isAdminUser } from "./admin-access.js";
 import { ensureBotEngineSchema } from "./bot-engines.js";
 import { ensureBotRuntimeSchema } from "./bot-runtime.js";
+import {
+  ensureExecutionGovernanceSchema,
+  seedExecutionGovernance,
+  acquireExecutionLease,
+  validateExecutionGovernance,
+  heartbeatExecution,
+  reconcileBrokerPositions,
+  recordExecutionOutcome,
+  touchExecutionCycle,
+  governanceWorkerId
+} from "./execution-governance.js";
 
 const { Pool } = pg;
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined }) : null;
@@ -37,6 +48,8 @@ async function ensureWorkerSchema(){
   await ensureBotEngineSchema(pool);
   await ensureBotRuntimeSchema(pool);
   await broker.ensureSchema();
+  await ensureExecutionGovernanceSchema(pool);
+  await seedExecutionGovernance(pool);
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_account_risk_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,baseline_date DATE NOT NULL,day_start_equity NUMERIC NOT NULL,peak_equity NUMERIC NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,provider,account_id))");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_execution_journal (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,execution_mode TEXT NOT NULL,symbol TEXT NOT NULL,side TEXT NOT NULL,volume NUMERIC NOT NULL,status TEXT NOT NULL,broker_result JSONB,error_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
 }
@@ -749,11 +762,38 @@ async function execute(row){
   if(s.executionMode==="LIVE"&&accountType!=="REAL")throw new Error("LIVE_REQUIRES_REAL_ACCOUNT");
   if(account.tradeAllowed===false)throw new Error("BROKER_TRADING_NOT_ALLOWED");
 
+  const governance=await validateExecutionGovernance(pool,{
+    userId,
+    userEmail:(await pool.query("SELECT email FROM kingbot_users WHERE id=$1 LIMIT 1",[userId])).rows[0]?.email||"",
+    botId,
+    provider:String(status.broker||"").toLowerCase(),
+    accountId:String(status.accountId||""),
+    accountType,
+    symbol:config.symbol,
+    executionMode:s.executionMode
+  });
+  if(!governance.allowed){
+    const reason="GOVERNANCE_BLOCKED:"+governance.blockedReasons.join("|");
+    await heartbeatExecution(pool,{userId,botId,provider:status.broker,accountId:status.accountId,error:reason,brokerOk:true,dataOk:false,riskOk:false,reconciliationState:"BLOCKED"});
+    await pool.query("UPDATE kingbot_bot_runtime SET state='PAUSED',last_error=$3,last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,reason.slice(0,500)]);
+    await audit(userId,"BOT_GOVERNANCE_BLOCKED",{botId,provider:status.broker,accountId:status.accountId,blockedReasons:governance.blockedReasons});
+    return;
+  }
+  const lease=await acquireExecutionLease(pool,{userId,provider:String(status.broker||"").toLowerCase(),accountId:String(status.accountId||""),botId});
+  if(!lease.ok){
+    const reason=lease.error||"EXECUTION_LEASE_HELD";
+    await heartbeatExecution(pool,{userId,botId,provider:status.broker,accountId:status.accountId,error:reason,brokerOk:true,dataOk:false,riskOk:false,reconciliationState:"LEASE_BLOCKED"});
+    await pool.query("UPDATE kingbot_bot_runtime SET state='PAUSED',last_error=$3,last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,reason]);
+    await audit(userId,"BOT_EXECUTION_LEASE_BLOCKED",{botId,provider:status.broker,accountId:status.accountId,workerId:governanceWorkerId()});
+    return;
+  }
+
   const quote=(await broker.getQuote(config.symbol,userId)).data||{};
   trace("QUOTE_READY",{symbol:config.symbol,quoteFresh:Boolean(quote.fresh),ageMs:Number(quote.ageMs||0)});
   const bid=Number(quote.bid),ask=Number(quote.ask),quoteTime=new Date(quote.time||0).getTime();
   if(!Number.isFinite(bid)||!Number.isFinite(ask)||ask<bid)throw new Error("INVALID_BROKER_QUOTE");
   if(!Number.isFinite(quoteTime)||Date.now()-quoteTime>s.staleDataMs)throw new Error("STALE_BROKER_QUOTE");
+  await heartbeatExecution(pool,{userId,botId,provider:status.broker,accountId:status.accountId,brokerOk:true,dataOk:true,riskOk:false,reconciliationState:"PENDING",latencyMs:Date.now()-quoteTime});
 
   const executionTimeframe=String(config.timeframe||getBotDefinitions()[botId]?.timeframeProfile?.execution||"5m");
   const multiTimeframe=await getMultiTimeframeContext(userId,config.symbol,botId,executionTimeframe);
@@ -788,6 +828,15 @@ async function execute(row){
   });
   const positions=await getWorkerPositions(userId);
   trace("POSITIONS_READY",{count:positions.length});
+  const reconciliation=await reconcileBrokerPositions(pool,{userId,provider:String(status.broker||"").toLowerCase(),accountId:String(status.accountId||""),botId,positions});
+  trace("RECONCILIATION",{status:reconciliation.status,reason:reconciliation.reason});
+  if(reconciliation.status==="MISMATCH"){
+    const reason="RECONCILIATION_MISMATCH:"+String(reconciliation.reason||"POSITION_STATE_MISMATCH");
+    await heartbeatExecution(pool,{userId,botId,provider:status.broker,accountId:status.accountId,error:reason,brokerOk:true,dataOk:true,riskOk:false,reconciliationState:"MISMATCH",latencyMs:Date.now()-quoteTime});
+    await pool.query("UPDATE kingbot_bot_runtime SET state='PAUSED',last_error=$3,last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,reason]);
+    await audit(userId,"BOT_EXECUTION_HALTED_RECONCILIATION",{botId,reconciliationId:reconciliation.reconciliationId,reason});
+    return;
+  }
 
   const riskStateQ=await pool.query("SELECT baseline_date,day_start_equity,peak_equity FROM kingbot_account_risk_state WHERE user_id=$1 AND provider=$2 AND account_id=$3",[userId,status.broker,status.accountId]);
   const today=new Date().toISOString().slice(0,10);
@@ -800,6 +849,7 @@ async function execute(row){
     ? {...authorization.risk,allowed:Boolean(authorization.allowed),reason:authorization.reason||null}
     : authorization;
   trace("RISK_EVALUATED",{signal:analysis.signal,score:analysis.score,riskAllowed:Boolean(risk?.allowed),blocked:risk?.blockedReasons||[],reason:risk?.reason||null});
+  await heartbeatExecution(pool,{userId,botId,provider:status.broker,accountId:status.accountId,brokerOk:true,dataOk:true,riskOk:Boolean(risk?.allowed),reconciliationState:reconciliation.status,latencyMs:Date.now()-quoteTime});
 
   const aiMarket={
     symbol:config.symbol,timeframe:executionTimeframe,price:(bid+ask)/2,bid,ask,
@@ -994,7 +1044,7 @@ export async function startWorker(){
     throw new Error("DATABASE_URL_REQUIRED");
   }
   await ensureWorkerSchema();
-  console.log("[KINGBOT WORKER] real broker execution loop started");
+  console.log("[KINGBOT WORKER] real broker execution loop started",JSON.stringify({workerId:governanceWorkerId(),pollMs:WORKER_POLL_MS}));
   const loop=async()=>{try{await cycle();}catch(error){console.error("[KINGBOT WORKER]",error?.message||error);}if(!stopping)timer=setTimeout(loop,WORKER_POLL_MS);};
   await loop();
 }
