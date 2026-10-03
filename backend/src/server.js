@@ -35,6 +35,7 @@ import { ensureGlobalRiskSchema, getGlobalRiskState } from "./global-risk.js";
 import { registerGoldSignals, ensureGoldSignalsSchema } from "./gold-signals.js";
 import { syntheticCatalog, CORE_SYNTHETIC_FAMILIES } from "./synthetic-markets.js";
 import { registerIntelligenceOrchestrator, ensureIntelligenceOrchestratorSchema } from "./intelligence-orchestrator.js";
+import { KingbotEventBus, registerKingbotEventRoutes } from "./kingbot-event-bus.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -46,6 +47,7 @@ const broker = new UserBrokerManager({pool});
 const twelveData = new TwelveDataFeed();
 twelveData.start();
 const partners = new PartnerManager({pool});
+const eventBus = new KingbotEventBus({pool,name:"kingbot-api"});
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
@@ -222,6 +224,7 @@ app.post("/api/broker/connect", async (req,res)=>{
       brokerSlug:partnerSlug,
       metadata:{accountId:result?.accountId||null,executionMode:result?.mode||mode,bridge:provider==="mt5-bridge"}
     }).catch(error=>console.warn("[KINGBOT PARTNER] active attribution failed:",error?.message||error));
+    await eventBus.publish({eventType:"BROKER_CONNECTED",aggregateType:"BROKER",aggregateId:result?.accountId||null,userId:user.id,source:"server.broker.connect",payload:{provider:result?.broker||provider,executionMode:result?.mode||mode,accountId:result?.accountId||null}}).catch(error=>console.warn("[KINGBOT EVENT BUS] broker connect event failed:",error?.message||error));
     res.json({ok:true,...result});
   }catch(error){
     console.error("[KINGBOT BROKER] connect failed:",error?.message||error);
@@ -238,6 +241,7 @@ app.post("/api/broker/disconnect", async (req,res)=>{
       await pool.query("UPDATE kingbot_bot_runtime SET state='STOPPED',last_error=$2,updated_at=NOW() WHERE user_id=$1 AND state='RUNNING'",[user.id,"BROKER_DISCONNECTED"]);
       await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'BROKER_DISCONNECTED',$2::jsonb)",[user.id,JSON.stringify({stoppedRunningBots:true})]);
     }
+    await eventBus.publish({eventType:"BROKER_DISCONNECTED",aggregateType:"BROKER",aggregateId:null,userId:user.id,source:"server.broker.disconnect",severity:"WARN",payload:{stoppedRunningBots:true}}).catch(error=>console.warn("[KINGBOT EVENT BUS] broker disconnect event failed:",error?.message||error));
     res.json({ok:true,...result,stoppedRunningBots:true});
   }catch(error){
     console.error("[KINGBOT BROKER] disconnect failed:",error?.message||error);
@@ -342,6 +346,7 @@ registerTerminalLive(app, { requireUser, pool, broker, firstFinite });
 registerElevenLabsVoice(app, { requireUser, pool, rateLimit });
 registerAiIntelligence(app, { requireUser, pool, broker });
 registerIntelligenceOrchestrator(app, { requireUser, pool, twelveData });
+registerKingbotEventRoutes(app, { requireUser, pool, eventBus });
 
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -393,6 +398,7 @@ app.use((_req, res) => {
 });
 
 ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => ensureFintechOpsSchema(pool)).then(() => ensureGlobalRiskSchema(pool)).then(() => ensureGoldSignalsSchema(pool)).then(() => ensureAiMarketScannerSchema(pool)).then(() => ensureIntelligenceOrchestratorSchema(pool)).then(() => partners.ensureSchema()).then(() => {
+  eventBus.start().catch(error => console.warn("[KINGBOT EVENT BUS] startup deferred:",error?.message||error));
   app.listen(PORT, () => {
     console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
     void startWorker().then(() => {}).catch((error) => console.error("[KINGBOT WORKER]", error?.message || error));
