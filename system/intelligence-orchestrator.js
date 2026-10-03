@@ -86,11 +86,56 @@
     const plan=data.tradePlan||null;
     text("orchPlanEngine",plan?.botId||routing.selectedEngine||"—");
     text("orchPlanSide",plan?.side||routing.direction||"HOLD");
-    text("orchPlanEntry",plan?.stopLoss!=null?fmt(plan.stopLoss):"—");
+    text("orchPlanEntry",plan?.entryPrice!=null?fmt(plan.entryPrice):(market.price!=null?fmt(market.price):"—"));
     text("orchPlanSL",plan?.stopLoss!=null?fmt(plan.stopLoss):"—");
     text("orchPlanTP",plan?.takeProfit!=null?fmt(plan.takeProfit):"—");
-    text("orchPlanRR",plan?.riskReward!=null:String(plan.riskReward)+"R":"—");
+    text("orchPlanRR",plan?.riskReward!=null?String(plan.riskReward)+"R":"—");
     text("orchPlanState",data.execution?.authorized?"AUTHORIZED":"ANALYSIS ONLY");
+
+    const adaptive=data.adaptive||{};
+    text("biasCardState",adaptive.decisionState||"STANDBY");
+    text("biasCardBias",s.bias||debate.direction||"NEUTRAL");
+    text("biasCardRegime",s.regime||"—");
+    text("biasCardConfidence",Number.isFinite(Number(s.confidence))?Math.round(Number(s.confidence))+" / 100":"—");
+    text("biasCardSetup",adaptive.setupType||"—");
+    text("biasCardInvalidation",plan?.stopLoss!=null?fmt(plan.stopLoss):"WAIT FOR VALID SETUP");
+    text("biasCardDecision",adaptive.decisionId||"—");
+
+    const evidence=$("biasCardEvidence");
+    if(evidence){
+      const facts=[];
+      for(const a of (data.analysts||[]).slice(0,4)){
+        const signal=a.bias&&String(a.bias).toUpperCase()!=="NEUTRAL" ? (" · "+a.bias) : "";
+        facts.push(String(a.name||"ANALYST")+signal);
+      }
+      if(routing.candidate)facts.push("ROUTED: "+String(routing.candidate.name||routing.selectedEngine));
+      if(risk.blocks?.length)facts.push("BLOCKERS: "+risk.blocks.join(", "));
+      evidence.innerHTML=facts.slice(0,5).map(x=>"<div>• "+esc(x)+"</div>").join("")||"No structured evidence.";
+    }
+
+    const adaptiveMemory=$("biasCardMemory");
+    if(adaptiveMemory){
+      const adaptiveRows=Array.isArray(data.engines)?data.engines.filter(e=>Number(e.historicalSampleSize||0)>0):[];
+      const bestSample=adaptiveRows.reduce((max,e)=>Math.max(max,Number(e.historicalSampleSize||0)),0);
+      const adaptiveCount=adaptiveRows.filter(e=>e.adaptationState==="ADAPTIVE").length;
+      adaptiveMemory.innerHTML=adaptiveCount
+        ? esc(adaptiveCount)+" engine(s) have enough settled outcomes to influence fit · max sample "+esc(bestSample)
+        : "Baseline routing active · historical sample thresholds not yet met.";
+    }
+
+    const adaptiveTable=$("adaptiveEngineTable");
+    if(adaptiveTable){
+      const rows=[...(data.engines||[])].sort((a,b)=>Number(b.fit||0)-Number(a.fit||0));
+      adaptiveTable.innerHTML=rows.map(e=>{
+        const selected=e.botId===routing.selectedEngine;
+        const current=fmt(e.currentFit);
+        const historical=e.historicalReliable?fmt(e.historicalFit):"BASE";
+        const adjusted=fmt(e.fit);
+        const samples=Number(e.historicalSampleSize||0);
+        const delta=Number(e.adaptiveAdjustment||0);
+        return '<div style="display:grid;grid-template-columns:1.6fr .8fr .8fr .9fr .7fr .7fr;gap:7px;align-items:center;padding:8px;border:1px solid '+(selected?"rgba(25,230,255,.28)":"rgba(255,255,255,.05)")+';border-radius:9px;background:'+(selected?"rgba(25,230,255,.05)":"rgba(255,255,255,.015)")+'"><div><strong style="font:900 8px JetBrains Mono">'+esc(e.name||e.botId)+'</strong><small style="display:block;color:var(--muted);font:700 7px JetBrains Mono">'+esc(e.adaptationState||"BASELINE")+'</small></div><span style="font:800 8px JetBrains Mono">NOW "+esc(current)+"</span><span style="font:800 8px JetBrains Mono">HIST "+esc(historical)+"</span><span style="font:900 8px JetBrains Mono">FIT "+esc(adjusted)+"</span><span style="font:800 8px JetBrains Mono">N="+esc(samples)+"</span><span style="font:800 8px JetBrains Mono">Δ "+esc(delta>=0?"+":"")+esc(delta)+"</span></div>';
+      }).join("")||'<div class="orch-muted">No adaptive engine context.</div>';
+    }
 
     const note=$("orchSummary");
     if(note)note.textContent=String(s.summary||"KINGBOT completed the intelligence pass without execution authority.");
