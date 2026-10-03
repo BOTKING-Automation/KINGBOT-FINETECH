@@ -49,6 +49,18 @@ async function ensureWorkerSchema(){
 
 async function audit(userId,event,metadata){
   await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,$2,$3::jsonb)",[userId,event,JSON.stringify(metadata)]);
+  if(activeEventBus){
+    void activeEventBus.publish({
+      eventType:String(event||"AUDIT_EVENT").toUpperCase(),
+      aggregateType:String(metadata?.botId||metadata?.symbol?"TRADING":"BOT_RUNTIME").toUpperCase(),
+      aggregateId:metadata?.botId||metadata?.decisionId||metadata?.clientId||null,
+      userId,
+      source:"worker.audit",
+      severity:/ERROR|REJECT|FAIL|BLOCK|KILL/i.test(String(event||""))?"WARN":"INFO",
+      correlationId:metadata?.decisionId||metadata?.cycleId||null,
+      payload:metadata||{}
+    }).catch(error=>console.warn("[KINGBOT EVENT BUS] audit event failed:",error?.message||error));
+  }
 }
 
 async function getGlobalRisk(){
@@ -68,6 +80,21 @@ async function heartbeat(details={}){
     activeExecutions:activeExecutionKeys.size,
     ...details
   }}).catch(error=>console.warn("[KINGBOT HEARTBEAT] failed:",error?.message||error));
+  if(activeEventBus){
+    void activeEventBus.upsertState({
+      scopeType:"WORKER",
+      scopeId:WORKER_ID,
+      stateType:"HEALTH",
+      state:{
+        status:stopping?"STOPPING":"RUNNING",
+        workerRole:"execution",
+        activeExecutions:activeExecutionKeys.size,
+        pollMs:WORKER_POLL_MS,
+        lastHeartbeatAt:new Date().toISOString(),
+        ...details
+      }
+    }).catch(error=>console.warn("[KINGBOT EVENT BUS] worker state failed:",error?.message||error));
+  }
 }
 
 
@@ -238,6 +265,7 @@ let globalRiskCache={tradingPaused:false,globalKillSwitch:false,reason:null};
 let globalRiskCacheAt=0;
 let lastHeartbeatWrite=0;
 const reconciliationCache=new Map();
+let activeEventBus = null;
 
 function ladderKey(userId,botId){return String(userId)+":"+String(botId);}
 function accountCacheKey(userId){return String(userId);}
@@ -1160,7 +1188,8 @@ async function cycle(){
   }
 }
 
-export async function startWorker(){
+export async function startWorker(options={}){
+  activeEventBus = options?.eventBus || null;
   if(!pool){
     if(String(process.env.WORKER_STANDBY||"").trim()==="1"){
       console.log("[KINGBOT WORKER] standby mode: database is owned by the primary API service");
@@ -1170,6 +1199,12 @@ export async function startWorker(){
   }
   await ensureWorkerSchema();
   await heartbeat({startup:true});
+  await activeEventBus?.upsertState({
+    scopeType:"WORKER",
+    scopeId:WORKER_ID,
+    stateType:"HEALTH",
+    state:{status:"RUNNING",startedAt:new Date().toISOString(),workerRole:"execution"}
+  }).catch(()=>{});
   console.log("[KINGBOT WORKER] real broker execution loop started with centralized risk control");
   const loop=async()=>{try{await cycle();}catch(error){console.error("[KINGBOT WORKER]",error?.message||error);}if(!stopping)timer=setTimeout(loop,WORKER_POLL_MS);};
   await loop();
