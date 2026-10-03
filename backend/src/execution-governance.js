@@ -255,6 +255,16 @@ export async function clearExecutionHalt(pool,{userId,provider,accountId,source=
 export async function validateExecutionGovernance(pool,{userId,userEmail,botId,provider,accountId,accountType="*",symbol,executionMode}={}){
   const blocked=[];
   if(!pool)return {allowed:false,blockedReasons:["DATABASE_REQUIRED"]};
+  const maxSlip=Number(process.env.KINGBOT_MAX_OBSERVED_SLIPPAGE_BPS||0);
+  const maxLatency=Number(process.env.KINGBOT_MAX_OBSERVED_LATENCY_MS||0);
+  if(maxSlip>0||maxLatency>0){
+    const health=await pool.query("SELECT slippage_bps,latency_ms FROM kingbot_execution_health WHERE user_id=$1 AND bot_id=$2 LIMIT 1",[userId,botId]);
+    if(health.rowCount){
+      const slip=finite(health.rows[0].slippage_bps),lat=finite(health.rows[0].latency_ms);
+      if(maxSlip>0&&slip!==null&&slip>maxSlip)blocked.push("OBSERVED_SLIPPAGE_LIMIT");
+      if(maxLatency>0&&lat!==null&&lat>maxLatency)blocked.push("OBSERVED_LATENCY_LIMIT");
+    }
+  }
   const control=await pool.query(`SELECT halted,reason FROM kingbot_execution_controls WHERE user_id=$1 AND provider=$2 AND account_id=$3`,[userId,provider,accountId]);
   if(control.rowCount&&control.rows[0].halted)blocked.push("ACCOUNT_EXECUTION_HALTED");
   const reg=await pool.query(`SELECT status FROM kingbot_broker_registry WHERE provider=$1 AND (account_type='*' OR account_type=$2) AND bot_id=$3
