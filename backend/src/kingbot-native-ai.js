@@ -12,6 +12,7 @@ import { conversationalReply, conversationSignals, conversationFrame } from "./k
 import { createKingbotAgent, agentAnswer } from "./kingbot-agent-core.js";
 import { getMarketPageSnapshot } from "./market-page-feed.js";
 import { loadUserMemory, learnExplicitUserMemory, summarizeUserMemory } from "./kingbot-user-memory.js";
+import { executeKingbotAgentTools, summarizeToolContext, verifiedToolFacts } from "./kingbot-agent-tools.js";
 
 const SYMBOLS = ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 
@@ -850,6 +851,17 @@ export async function runNativeKingbotAI(input = {}) {
   });
   const identity = identitySnapshot();
   const capabilities = capabilitySet(plan);
+  const agentTools = await executeKingbotAgentTools({
+    intent: result?.intent || "PLATFORM_SUPPORT",
+    goal: conversationSignals(input?.question || "", input?.conversation || [])?.userGoals?.[0] || "UNDERSTAND",
+    pool: input?.pool,
+    broker: input?.broker,
+    twelveData: input?.twelveData,
+    userId: input?.userId,
+    symbol: result?.symbol || input?.symbol || "XAUUSD",
+    timeframe: input?.timeframe || "15m",
+    eventBus: input?.eventBus
+  }).catch(error => ({ plan:{selected:[],count:0,executionPolicy:"READ_ONLY_VERIFIED_TOOLS"}, results:{}, error:String(error?.message||"AGENT_TOOL_ORCHESTRATION_FAILED").slice(0,180) }));
   const audit = qualityAudit({
     reply: result?.reply || {},
     plan,
@@ -898,10 +910,13 @@ export async function runNativeKingbotAI(input = {}) {
       memory: { available: persistentMemory.length > 0, count: persistentMemory.length, learned: learnedMemory.length },
       capabilities: [...capabilities, "PROPRIETARY_REASONING_KERNEL"],
       userFrame: conversationFrame(input?.question || "", input?.conversation || []),
-      agentPlan: agent.plan
+      agentTools,
+      agentPlan: agent.plan,
+      tools: summarizeToolContext(agentTools)
     },
     reply: {
       ...publicReply,
+      toolFacts: verifiedToolFacts(agentTools),
       intelligence: {
         identity: identity.id,
         mode: plan.mode,
