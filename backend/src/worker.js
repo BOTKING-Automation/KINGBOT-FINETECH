@@ -374,32 +374,40 @@ function positionIdentities(position){
   if(Array.isArray(position?.tradeIds))for(const id of position.tradeIds)add(id);
   return [...new Set(ids)];
 }
-async function recordExecutionAdaptiveDecision({userId,botId,config,analysis,risk,account,aiTradeGate,aiStrategySignal}={}) {
+async function recordExecutionAdaptiveDecision({userId,botId,config,analysis,marketSnapshot={},risk,riskPercent,account,aiTradeGate,aiStrategySignal}={}) {
   if(!analysis?.ok || analysis.signal==="NO_SIGNAL") return null;
   const direction=analysis.signal==="LONG_CANDIDATE"?"BUY":analysis.signal==="SHORT_CANDIDATE"?"SELL":"HOLD";
   if(direction==="HOLD") return null;
   const fit=Math.min(100,Math.abs(Number(analysis.score||0)));
   const equity=Number(account?.equity||0);
-  const riskPct=Number(risk?.requestedRiskPct||0);
+  const riskPct=Number(riskPercent||0);
+  const market=marketSnapshot||{};
   const result={
     market:{
-      symbol:String(config?.symbol||"").toUpperCase(),
-      timeframe:String(config?.timeframe||"5m"),
-      price:Number(analysis?.price ?? analysis?.market?.price ?? 0),
-      atr:Number(analysis?.atr||0),
-      volatility:Number(analysis?.volatility||0),
-      trend:Number(analysis?.trend||0),
-      momentum:Number(analysis?.momentum||0),
-      structure:String(analysis?.structure||"unknown"),
-      liquiditySweep:Boolean(analysis?.liquiditySweep),
-      orderBlock:Boolean(analysis?.orderBlock),
-      fairValueGap:Boolean(analysis?.fairValueGap),
-      displacement:Boolean(analysis?.displacement),
-      breakout:Boolean(analysis?.breakout),
-      retest:Boolean(analysis?.retest),
+      ...market,
+      symbol:String(market?.symbol||config?.symbol||analysis?.market?.symbol||"").toUpperCase(),
+      timeframe:String(market?.timeframe||config?.timeframe||analysis?.market?.timeframe||"5m"),
+      price:Number(market?.price ?? analysis?.market?.price ?? 0),
+      atr:Number(market?.atr||analysis?.market?.atr||0),
+      volatility:Number(market?.volatility||0),
+      trend:Number(market?.trend||0),
+      momentum:Number(market?.momentum||0),
+      structure:String(market?.structure||"unknown"),
+      liquiditySweep:Boolean(market?.liquiditySweep),
+      orderBlock:Boolean(market?.orderBlock),
+      fairValueGap:Boolean(market?.fairValueGap),
+      displacement:Boolean(market?.displacement),
+      breakout:Boolean(market?.breakout),
+      retest:Boolean(market?.retest),
       timestamp:new Date().toISOString()
     },
-    summary:{confidence:fit,bias:direction==="BUY"?"BULLISH":"BEARISH",regime:"EXECUTION_OBSERVED"},
+    summary:{
+      confidence:fit,
+      bias:direction==="BUY"?"BULLISH":"BEARISH",
+      regime:(Math.abs(Number(market?.trend||0))>=0.55
+        ? (Number(market?.volatility||0)>=0.65?"TRENDING_VOLATILE":"TRENDING")
+        : (Number(market?.volatility||0)>=0.65?"EXPANSION":Number(market?.volatility||0)<=0.12?"LOW_VOLATILITY":"RANGE"))
+    },
     debate:{direction:direction==="BUY"?"BULLISH":"BEARISH"},
     routing:{selectedEngine:botId,direction,candidate:{botId,score:Number(analysis.score||0),fit,currentFit:fit}},
     riskCouncil:{status:risk?.allowed?"NORMAL":"BLOCKED",blocks:risk?.blockedReasons||[],flags:[]},
@@ -920,7 +928,7 @@ async function execute(row){
   );
   if(adaptiveExecutionEligible){
     try{
-      adaptiveExecutionDecision=await recordExecutionAdaptiveDecision({userId,botId,config,analysis,risk,account,aiTradeGate,aiStrategySignal});
+      adaptiveExecutionDecision=await recordExecutionAdaptiveDecision({userId,botId,config,analysis,marketSnapshot:aiMarket,risk,riskPercent:s.maxRiskPerTradePct,account,aiTradeGate,aiStrategySignal});
     }catch(error){
       console.warn("[KINGBOT ADAPTIVE] decision record failed:",error?.message||error);
     }
