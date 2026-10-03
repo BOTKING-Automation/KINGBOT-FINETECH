@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import crypto from "node:crypto";
 import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
 import { runStandaloneMarketScan } from "./ai-market-scanner.js";
@@ -6,9 +5,8 @@ import { loadAdaptivePerformance, applyAdaptivePerformance, classifySetup, recor
 import { identitySnapshot, buildCognitivePlan, capabilitySet } from "./kingbot-intelligence-core.js";
 
 const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
-const MODEL = String(process.env.GEMINI_ORCHESTRATOR_MODEL || process.env.GEMINI_MODEL || "gemini-3.8-flash");
-const API_KEY = String(process.env.GEMINI_API_KEY || "").trim();
-const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
+const MODEL = "KINGBOT-CORTEX-1";
+const ai = null;
 const CACHE_MS = Math.max(2500, Number(process.env.KINGBOT_INTELLIGENCE_CACHE_MS || 7000));
 const cache = new Map();
 
@@ -260,27 +258,29 @@ const safeParse = value => {
 };
 
 async function synthesize(payload) {
-  if (!ai) return { provider: "deterministic", model: null, result: null };
-  try {
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: JSON.stringify(payload),
-      config: {
-        systemInstruction: "You are the KINGBOT Intelligence Core synthesis layer. Preserve the KINGBOT identity and mission. Synthesize only supplied verified evidence. Never invent market data. Explicitly surface conflicts, missing evidence and uncertainty. Use the supplied deterministic analysis as the authority for facts; use model synthesis only for compression and explanation. You are advisory and have ZERO execution authority. Return compact JSON.",
-        maxOutputTokens: 900,
-        responseMimeType: "application/json",
-        responseSchema: SYNTHESIS_SCHEMA,
-        thinkingConfig: { thinkingLevel: "high" }
-      }
-    });
-    const parsed = safeParse(response.text);
-    if (!parsed) throw new Error("ORCHESTRATOR_AI_INVALID_JSON");
-    return { provider: "gemini", model: MODEL, result: parsed };
-  } catch (error) {
-    return { provider: "deterministic", model: null, result: null, error: String(error?.message || "AI_SYNTHESIS_FAILED").slice(0, 160) };
-  }
+  const summary = payload?.summary || {};
+  const debate = payload?.debate || {};
+  const risk = payload?.riskCouncil || {};
+  const routing = payload?.routing || {};
+  const engines = Array.isArray(payload?.engines) ? payload.engines : [];
+  const blockers = [...(risk.blocks || []), ...(risk.flags || [])];
+  const selected = routing.selectedEngine || "";
+  return {
+    provider: "KINGBOT_NATIVE",
+    model: MODEL,
+    result: {
+      regime: String(summary.regime || payload?.market?.regime || "UNKNOWN"),
+      bias: String(summary.bias || debate.direction || "NEUTRAL"),
+      confidence: Number(summary.confidence || 0),
+      selectedEngine: selected,
+      summary: selected
+        ? "KINGBOT CORTEX synthesized verified specialist evidence and routed the current state toward " + selected + "."
+        : "KINGBOT CORTEX found no sufficiently aligned engine candidate.",
+      risks: blockers.slice(0, 8),
+      watch: engines.filter(e => !e.strategyMatch).slice(0, 4).map(e => e.botId + ": strategy threshold not met")
+    }
+  };
 }
-
 function cacheKey(market, options = {}) {
   return JSON.stringify({
     symbol: market.symbol,
@@ -494,9 +494,9 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
       cognitiveLoop: identitySnapshot().cognitiveLoop,
       agents: ["TECHNICAL ANALYST", "REGIME ANALYST", "MACRO + SENTIMENT ANALYST", "EXECUTION CONDITIONS ANALYST", "BULL RESEARCHER", "BEAR RESEARCHER", "RISK COUNCIL", "STRATEGY ROUTER"],
       engines: BOT_IDS,
-      aiSynthesis: Boolean(ai),
-      model: ai ? MODEL : null,
-      deliberation: ai ? "HIGH" : "DETERMINISTIC",
+      aiSynthesis: false,
+      model: MODEL,
+      deliberation: "PROPRIETARY_NATIVE",
       memoryPersistence: Boolean(pool),
       executionAuthority: "NONE",
       cacheMs: CACHE_MS,
