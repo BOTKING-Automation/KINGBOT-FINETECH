@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
 import { runStandaloneMarketScan } from "./ai-market-scanner.js";
 import { loadAdaptivePerformance, applyAdaptivePerformance, classifySetup, recordAdaptiveDecision, settleAdaptiveDecision, ensureAdaptiveIntelligenceSchema, adaptiveDecisionState } from "./adaptive-intelligence.js";
+import { identitySnapshot, buildCognitivePlan, capabilitySet } from "./kingbot-intelligence-core.js";
 
 const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
 const MODEL = String(process.env.GEMINI_ORCHESTRATOR_MODEL || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite");
@@ -265,7 +266,7 @@ async function synthesize(payload) {
       model: MODEL,
       contents: JSON.stringify(payload),
       config: {
-        systemInstruction: "You are the KINGBOT Intelligence Orchestrator. Synthesize only supplied verified evidence. Never invent market data. You are advisory and have ZERO execution authority. Explain disagreement. Return compact JSON.",
+        systemInstruction: "You are the KINGBOT Intelligence Core synthesis layer. Preserve the KINGBOT identity and mission. Synthesize only supplied verified evidence. Never invent market data. Explicitly surface conflicts, missing evidence and uncertainty. Use the supplied deterministic analysis as the authority for facts; use model synthesis only for compression and explanation. You are advisory and have ZERO execution authority. Return compact JSON.",
         maxOutputTokens: 500,
         responseMimeType: "application/json",
         responseSchema: SYNTHESIS_SCHEMA,
@@ -300,6 +301,7 @@ function cacheKey(market, options = {}) {
 
 export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {}, memory = [], adaptivePerformance = {} } = {}) {
   const market = normalizeMarket(inputMarket);
+  const cognitivePlan = buildCognitivePlan({ intent: "MARKET_INTELLIGENCE", symbol: market.symbol, conversation: [] });
   const key = cacheKey(market, options);
   const cached = cache.get(key);
   if (cached && Date.now() - cached.at <= CACHE_MS) return { ...cached.result, cached: true };
@@ -336,7 +338,13 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
       createdAt: row.created_at || null
     })),
     orchestrator: "KINGBOT INTELLIGENCE ORCHESTRATOR",
-    version: "2.0.0",
+    version: "3.0.0",
+    identity: identitySnapshot(),
+    cognitive: {
+      plan: cognitivePlan,
+      capabilities: capabilitySet(cognitivePlan),
+      executionAuthority: "NONE"
+    },
     adaptive: {
       enabled: true,
       decisionId,
@@ -481,7 +489,9 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
     res.json({
       ok: true,
       orchestrator: "KINGBOT INTELLIGENCE ORCHESTRATOR",
-      version: "2.0.0",
+      version: "3.0.0",
+      identity: identitySnapshot(),
+      cognitiveLoop: identitySnapshot().cognitiveLoop,
       agents: ["TECHNICAL ANALYST", "REGIME ANALYST", "MACRO + SENTIMENT ANALYST", "EXECUTION CONDITIONS ANALYST", "BULL RESEARCHER", "BEAR RESEARCHER", "RISK COUNCIL", "STRATEGY ROUTER"],
       engines: BOT_IDS,
       aiSynthesis: Boolean(ai),
