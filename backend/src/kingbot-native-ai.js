@@ -25,8 +25,33 @@ function symbolFromText(text, fallback="XAUUSD"){
 
 function intent(text, conversation=[]){
   const t=String(text||"").toLowerCase().trim();
-  const dialogueIntent=conversationSignals(text,conversation)?.intent;
-  if(dialogueIntent) return dialogueIntent;
+  const signals=conversationSignals(text,conversation)||{};
+  const dialogueIntent=String(signals.intent||"");
+  const mapped={
+    GREETING:"CONVERSATION",
+    WELLBEING:"CONVERSATION",
+    FOLLOW_UP:"CONVERSATION",
+    PRESENCE:"CONVERSATION",
+    THANKS:"CONVERSATION",
+    APPRECIATION:"CONVERSATION",
+    GOODBYE:"CONVERSATION",
+    IDENTITY:"CONVERSATION",
+    INTELLIGENCE:"CONVERSATION",
+    CAPABILITY:"CONVERSATION",
+    EMOTION_PROBE:"CONVERSATION",
+    HELP:"CONVERSATION",
+    META_FEEDBACK:"CONVERSATION",
+    CASUAL:"CONVERSATION",
+    RESEARCH:"WEB_RESEARCH",
+    CONNECTION:"CONNECTION_INTELLIGENCE",
+    ACCOUNT:"ACCOUNT_INTELLIGENCE",
+    RISK:"RISK_REVIEW",
+    BOT:"BOT_INTELLIGENCE",
+    MARKET:"MARKET_INTELLIGENCE",
+    PLATFORM:"PLATFORM_SUPPORT",
+    GENERAL:"PLATFORM_SUPPORT"
+  };
+  if(mapped[dialogueIntent]) return mapped[dialogueIntent];
   if(/^(hi|hello|hey|yo|good morning|good afternoon|good evening|howdy|greetings)\b/.test(t)||/\bhow are you\b|\bwho are you\b|\bwhat are you\b|\bthank you\b|\bthanks\b|\bbye\b|\bgood night\b/.test(t)) return "CONVERSATION";
   if(/^(what is|what's|tell me about|explain)\s+(kingbot|kingbot fintech|this platform|the platform)\b/.test(t)
     ||/\bwhat does kingbot do\b|\bwhat is kingbot fintech\b|\bwhat can kingbot do\b/.test(t)) return "KINGBOT_KNOWLEDGE";
@@ -44,7 +69,7 @@ function intent(text, conversation=[]){
   return "PLATFORM_SUPPORT";
 }
 function utilityReply(question){
-  const t=String(question||"").toLowerCase().trim();
+  const t=String(effectiveQuestion||").toLowerCase().trim();
   if(/\bwhat time is it\b|\bcurrent time\b|\bwhat is the time\b|\bwhat's the time\b|\btime now\b|\bwhat day is it\b|\bwhat date is it\b|\btoday'?s date\b|\bcurrent date\b/.test(t)){
     const now=new Date();
     const eat=new Intl.DateTimeFormat("en-KE",{timeZone:"Africa/Nairobi",dateStyle:"full",timeStyle:"medium"}).format(now);
@@ -75,7 +100,7 @@ function technicalAnalysisBookReply(question){
 }
 
 function kingbotKnowledgeReply(question){
-  const t=String(question||"").toLowerCase().trim();
+  const t=String(effectiveQuestion||").toLowerCase().trim();
 
   if(/\bdoes kingbot hold my money\b|\bis kingbot a broker\b|\bkingbot a broker\b|\bwho is the broker\b/.test(t)){
     return {
@@ -260,7 +285,7 @@ function storeCatalog(){
 }
 
 async function storeSupport(pool,userId,question){
-  const t=String(question||"").toLowerCase();
+  const t=String(effectiveQuestion||").toLowerCase();
   const catalog=storeCatalog();
   const requestedPlan=Object.values(getPlans()).find(p =>
     t.includes(p.id) || t.includes(p.name.toLowerCase()) ||
@@ -317,7 +342,7 @@ async function storeSupport(pool,userId,question){
 
 async function databaseSupport(pool,userId,question){
   if(!pool||!userId)return null;
-  const t=String(question||"").toLowerCase();
+  const t=String(effectiveQuestion||").toLowerCase();
   try{
     if(/subscription|plan|billing|access|expire/.test(t)){
       const q=await pool.query("SELECT plan_id,status,expires_at,created_at FROM kingbot_subscriptions WHERE user_id=$1 ORDER BY created_at DESC LIMIT 5",[userId]);
@@ -358,16 +383,18 @@ async function runtimeSupport(pool,userId){
 }
 
 function platformSupportReply(question){
-  const t=String(question||"").toLowerCase();
+  const t=String(effectiveQuestion||").toLowerCase();
   if(/\bwhat can you do\b|\bwhat do you do\b|\bcapabilities\b/.test(t)) return {answer:"I route each request to the right KINGBOT capability instead of forcing everything through market analysis.",facts:["Conversation: natural-language platform help","Account/connection: verified broker state","Market: verified quotes and technical snapshots","Bots/runtime: engine definitions and backend state","Risk: saved risk controls","Research: Google-backed web research when configured"],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Choose a capability or ask naturally.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask a normal question such as “what time is it?”, “what is my connection?”, or “analyze XAUUSD”."};
   if(/\bhow does (kingbot|this platform) work\b|\bhow does it work\b/.test(t)) return {answer:"KINGBOT separates verified data from reasoning and execution: broker/runtime data is read from the backend, intelligence explains that data, and server-side risk and execution controls remain authoritative.",facts:["AI is not the execution authority.","Broker/account values must come from verified backend state.","Market analysis requires fresh market data."],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Ask for a specific subsystem.",invalidation:"Not applicable."},riskFlags:["EXECUTION_REMAINS_SERVER_CONTROLLED"],nextAction:"Ask about the broker connection, a bot engine, risk controls, or a supported market."};
   return {answer:"I understand the request as a KINGBOT platform question, not a market-analysis request.",facts:["No market-analysis trigger was detected.","No unsupported account or market values were fabricated."],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"A specific platform question.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask your question directly and I will route it to the appropriate intelligence capability."};
 }
 
 async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,userId,conversation=[],thinkingLevel="EXPERT",timeframe="15m"}={}){
-  const requested=symbolFromText(question,symbol||"XAUUSD");
-  const kind=intent(question,conversation);
-  const utility=utilityReply(question);
+  const signals=conversationSignals(question,conversation)||{};
+  const effectiveQuestion=String(signals.resolvedQuestion||question).trim();
+  const requested=symbolFromText(effectiveQuestion,symbol||"XAUUSD");
+  const kind=intent(effectiveQuestion,conversation);
+  const utility=utilityReply(effectiveQuestion);
   if(kind==="TECHNICAL_ANALYSIS_BOOK"){
     return {
       provider:"KINGBOT_NATIVE",
@@ -405,7 +432,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
   }
 
   if(kind==="WEB_RESEARCH" || kind==="MARKET_RESEARCH"){
-    const rawQuery=String(question||"").replace(/\b(google|search the web|search online|look up|find online|research online|on the internet)\b/gi,"").trim()||question;
+    const rawQuery=String(effectiveQuestion||").replace(/\b(google|search the web|search online|look up|find online|research online|on the internet)\b/gi,"").trim()||question;
     const fresh=/\b(today|latest|current|now|breaking|headline|headlines|this week)\b/i.test(rawQuery)
       ? (/\b(today|now)\b/i.test(rawQuery)?1:7)
       : 0;
@@ -587,7 +614,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
 
   if(kind==="BOT_INTELLIGENCE"){
     const defs=getBotDefinitions();
-    const requestedBot=Object.entries(defs).find(([id,d])=>new RegExp(id.replace("-","|"),"i").test(String(question||"")))||null;
+    const requestedBot=Object.entries(defs).find(([id,d])=>new RegExp(id.replace("-","|"),"i").test(String(effectiveQuestion||")))||null;
     const list=requestedBot?[requestedBot]:Object.entries(defs);
     return {
       provider:"KINGBOT_NATIVE",
@@ -687,6 +714,10 @@ export async function runNativeKingbotAI(input = {}) {
 
   return {
     ...result,
+    conversationState: {
+      ...(conversationSignals(input?.question || "", input?.conversation || []) || {}),
+      effectiveQuestion: String(conversationSignals(input?.question || "", input?.conversation || [])?.resolvedQuestion || input?.question || "")
+    },
     identity,
     cognition: {
       plan,
