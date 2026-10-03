@@ -237,6 +237,8 @@
     setText("identityAuthority", identity.authority || "ANALYSIS AND COORDINATION ONLY");
     setText("identityVersion", identity.version || "3.0.0");
     setText("identityMode", mode.replaceAll("_", " "));
+    setText("identityDeliberation", data?.deliberation || identity?.deliberation || "HIGH");
+    setText("identityReasoning", "MULTI-PASS");
     setText("identityCapabilities", capabilities.length ? capabilities.join(" · ") : "PERCEPTION · REASONING · VERIFICATION");
     const loopEl = byId("identityLoop");
     if (loopEl && loop.length) {
