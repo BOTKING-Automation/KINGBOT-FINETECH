@@ -267,10 +267,10 @@ async function synthesize(payload) {
       contents: JSON.stringify(payload),
       config: {
         systemInstruction: "You are the KINGBOT Intelligence Core synthesis layer. Preserve the KINGBOT identity and mission. Synthesize only supplied verified evidence. Never invent market data. Explicitly surface conflicts, missing evidence and uncertainty. Use the supplied deterministic analysis as the authority for facts; use model synthesis only for compression and explanation. You are advisory and have ZERO execution authority. Return compact JSON.",
-        maxOutputTokens: 500,
+        maxOutputTokens: 900,
         responseMimeType: "application/json",
         responseSchema: SYNTHESIS_SCHEMA,
-        thinkingConfig: { thinkingLevel: "low" }
+        thinkingConfig: { thinkingLevel: "high" }
       }
     });
     const parsed = safeParse(response.text);
