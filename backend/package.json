@@ -6,10 +6,11 @@
   "scripts": {
     "start": "node src/server.js",
     "worker": "node src/worker.js",
-    "test": "node --test"
+    "test": "node --test",
+    "security:audit": "npm audit --audit-level=high --omit=dev"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "cors": "^2.8.5",
