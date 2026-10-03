@@ -147,12 +147,13 @@ app.get("/api/broker/markets", async (req,res)=>{
   const user=await requireUser(pool,req,res);
   if(!user)return;
   try{
+    const mapping=await broker.getMapping(user.id);
     const result=await broker.getMarkets(user.id);
     const markets=Array.isArray(result?.data)?result.data:[];
     return res.json({
       ok:true,
       connected:Boolean(result?.connected!==false),
-      broker:String(result?.broker||"").toLowerCase()||undefined,
+      broker:String(mapping?.provider||result?.broker||"").toLowerCase()||undefined,
       markets,
       count:markets.length,
       generatedAt:new Date().toISOString(),
