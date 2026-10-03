@@ -206,6 +206,44 @@ export class Mt5BridgeConnection{
     throw new Error("MT5_QUOTE_UNAVAILABLE:"+wanted);
   }
   async getSymbols(){return Array.isArray(this.registry.getState(this.userId)?.state?.symbols)?this.registry.getState(this.userId).state.symbols:[];}
+  async getMarketCatalog(){
+    const session=this.registry.getState(this.userId);
+    if(!session)throw new Error("MT5_BRIDGE_OFFLINE");
+    const state=session.state||{},out=[],seen=new Set();
+    const add=(rawSymbol,meta={})=>{
+      const symbol=String(rawSymbol||"").trim().toUpperCase();
+      if(!symbol||seen.has(symbol))return;
+      seen.add(symbol);
+      const spec=state.specs&&typeof state.specs==="object"
+        ? Object.entries(state.specs).find(([key])=>String(key).toUpperCase()===symbol)?.[1]
+        : null;
+      const quote=state.quotes&&typeof state.quotes==="object"
+        ? Object.entries(state.quotes).find(([key])=>String(key).toUpperCase()===symbol)?.[1]
+        : null;
+      const m=meta&&typeof meta==="object"?meta:{};
+      const tradeMode=m.tradeMode!==undefined?Number(m.tradeMode):spec?.tradeMode;
+      const tradeable=typeof m.tradeable==="boolean"
+        ? m.tradeable
+        : typeof spec?.tradeable==="boolean"
+          ? spec.tradeable
+          : tradeMode!==undefined&&Number.isFinite(tradeMode)
+            ? tradeMode!==0
+            : null;
+      out.push({...m,symbol,name:String(m.name||spec?.name||spec?.description||quote?.symbol||symbol).trim(),
+        description:String(m.description||spec?.description||"").trim(),
+        category:String(m.category||"CFD"),submarket:String(m.submarket||m.path||"").trim(),
+        tradeable,minVolume:Number(m.minVolume??spec?.minVolume)||null,maxVolume:Number(m.maxVolume??spec?.maxVolume)||null,
+        volumeStep:Number(m.volumeStep??spec?.volumeStep)||null,digits:Number(m.digits??spec?.digits)||null,
+        point:Number(m.point??spec?.point)||null,tickSize:Number(m.tickSize??spec?.tickSize)||null,
+        tickValue:Number(m.tickValue??spec?.tickValue)||null,stopsLevel:Number(m.stopsLevel??spec?.stopsLevel)||0,
+        contractSize:Number(m.contractSize??spec?.contractSize)||null,source:String(m.source||"mt5-ea-bridge")});
+    };
+    const symbols=Array.isArray(state.symbols)?state.symbols:[];
+    for(const item of symbols){if(typeof item==="string")add(item);else add(item?.symbol,item||{});}
+    if(state.specs&&typeof state.specs==="object")for(const [symbol,spec] of Object.entries(state.specs))add(symbol,spec&&typeof spec==="object"?spec:{});
+    if(state.quotes&&typeof state.quotes==="object")for(const [symbol,quote] of Object.entries(state.quotes))add(symbol,{...(quote&&typeof quote==="object"?quote:{}),name:String(quote?.symbol||symbol),source:"mt5-ea-bridge-quote"});
+    return out;
+  }
   async getSymbolSpecification(symbol){
     const s=this.registry.getState(this.userId);if(!s)throw new Error("MT5_BRIDGE_OFFLINE");
     const wanted=String(symbol||"").toUpperCase(),specs=s.state.specs||{};
