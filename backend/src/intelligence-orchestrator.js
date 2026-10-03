@@ -1,6 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
+import crypto from "node:crypto";
 import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
 import { runStandaloneMarketScan } from "./ai-market-scanner.js";
+import { loadAdaptivePerformance, applyAdaptivePerformance, classifySetup, recordAdaptiveDecision, settleAdaptiveDecision, ensureAdaptiveIntelligenceSchema, adaptiveDecisionState } from "./adaptive-intelligence.js";
 
 const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
 const MODEL = String(process.env.GEMINI_ORCHESTRATOR_MODEL || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite");
@@ -155,7 +157,7 @@ function analyzeMacroAndSentiment(input) {
   };
 }
 
-function engineFit(botId, market, regime) {
+function engineFit(botId, market, regime, performance = {}) {
   const result = evaluateBot(botId, market);
   let fit = clamp(Math.abs(Number(result.score || 0)), 0, 100);
   if (botId === "smc-pro") {
@@ -176,7 +178,7 @@ function engineFit(botId, market, regime) {
     if (Number.isFinite(market.rsi) && ((result.score > 0 && market.rsi >= 50) || (result.score < 0 && market.rsi <= 50))) fit += 6;
   }
   if (botId === "strategic" && String(regime.regime).startsWith("TRENDING")) fit += 6;
-  return {
+  const baseEngine = {
     botId,
     name: getBotDefinitions()[botId]?.name || botId,
     signal: result.signal || "NO_SIGNAL",
@@ -186,6 +188,10 @@ function engineFit(botId, market, regime) {
     reason: result.reason || "No reason supplied",
     timeframeProfile: getBotDefinitions()[botId]?.timeframeProfile || {}
   };
+  return applyAdaptivePerformance(baseEngine, performance[botId], {
+    regime: regime?.regime || "UNKNOWN",
+    setupType: classifySetup(market)
+  });
 }
 
 function buildDebate(analysts, engines, market) {
@@ -292,7 +298,7 @@ function cacheKey(market, options = {}) {
   });
 }
 
-export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {}, memory = [] } = {}) {
+export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {}, memory = [], adaptivePerformance = {} } = {}) {
   const market = normalizeMarket(inputMarket);
   const key = cacheKey(market, options);
   const cached = cache.get(key);
@@ -303,7 +309,7 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
   const execution = analyzeExecution(market);
   const context = analyzeMacroAndSentiment(inputMarket);
   const analysts = [technical, regime, context, execution];
-  const engines = BOT_IDS.map(id => engineFit(id, market, regime));
+  const engines = BOT_IDS.map(id => engineFit(id, market, regime, adaptivePerformance));
   const debate = buildDebate(analysts, engines, market);
   const routing = chooseEngine(engines, debate);
   const risk = riskCouncil(market, engines, riskContext);
@@ -314,6 +320,12 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
     if (side !== "HOLD") tradePlan = getTradePlan(routing.selectedEngine, market, side);
   }
 
+  const decisionId = crypto.randomUUID();
+  const decisionState = adaptiveDecisionState({
+    riskBlocks: risk.blocks,
+    selectedEngine: routing.selectedEngine,
+    directionalBias: debate.direction
+  });
   const result = {
     ok: true,
     memoryContext: memory.slice(0, 5).map(row => ({
@@ -324,7 +336,15 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
       createdAt: row.created_at || null
     })),
     orchestrator: "KINGBOT INTELLIGENCE ORCHESTRATOR",
-    version: "1.0.0",
+    version: "2.0.0",
+    adaptive: {
+      enabled: true,
+      decisionId,
+      decisionState,
+      setupType: classifySetup(market),
+      performanceWindowDays: Number(process.env.KINGBOT_ADAPTIVE_WINDOW_DAYS || 90),
+      minSamples: Number(process.env.KINGBOT_ADAPTIVE_MIN_SAMPLES || 8)
+    },
     generatedAt: new Date().toISOString(),
     market: { ...market, freshness: freshness(market.timestamp, Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)) },
     analysts,
@@ -365,6 +385,7 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
 
 export async function ensureIntelligenceOrchestratorSchema(pool) {
   if (!pool) return;
+  await ensureAdaptiveIntelligenceSchema(pool);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS kingbot_ai_intelligence_memory (
       id BIGSERIAL PRIMARY KEY,
@@ -433,13 +454,16 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
         market.aiScanner = { provider: scan?.provider || "none", model: scan?.model || null, source: scan?.source || null, aiError: scan?.aiError || null };
       }
       const memory = await loadIntelligenceMemory(pool, user.id, symbol);
+      const adaptivePerformance = await loadAdaptivePerformance(pool, {userId:user.id, symbol});
       const result = await orchestrateKingbotIntelligence({
         market,
         riskContext: req.body?.riskContext || {},
         options: { botId: req.body?.botId || null },
-        memory
+        memory,
+        adaptivePerformance
       });
       await recordIntelligenceMemory(pool, user.id, result);
+      await recordAdaptiveDecision(pool, user.id, result);
       res.json({
         ...result,
         brokerExecution: "NOT_AUTHORIZED_BY_ORCHESTRATOR",
@@ -466,5 +490,35 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
       executionAuthority: "NONE",
       cacheMs: CACHE_MS
     });
+  app.get("/api/ai/intelligence/adaptive", async (req, res) => {
+    try {
+      const user = await requireUser(pool, req, res);
+      if (!user) return;
+      const symbol = upper(req.query?.symbol || "XAUUSD");
+      const performance = await loadAdaptivePerformance(pool, {userId:user.id, symbol});
+      res.json({
+        ok:true,
+        symbol,
+        windowDays:Number(process.env.KINGBOT_ADAPTIVE_WINDOW_DAYS || 90),
+        minSamples:Number(process.env.KINGBOT_ADAPTIVE_MIN_SAMPLES || 8),
+        performance
+      });
+    } catch (error) {
+      res.status(503).json({ok:false,error:"ADAPTIVE_INTELLIGENCE_UNAVAILABLE",reason:String(error?.message||"ADAPTIVE_INTELLIGENCE_UNAVAILABLE").slice(0,180)});
+    }
+  });
+
+  app.post("/api/ai/intelligence/outcome", async (req, res) => {
+    try {
+      const user = await requireUser(pool, req, res);
+      if (!user) return;
+      const settled = await settleAdaptiveDecision(pool, user.id, req.body || {});
+      res.json({ok:true, outcome:settled});
+    } catch (error) {
+      const message=String(error?.message||"ADAPTIVE_OUTCOME_FAILED");
+      const status=/NOT_FOUND|REQUIRED|INVALID/.test(message)?400:503;
+      res.status(status).json({ok:false,error:message});
+    }
+  });
   });
 }
