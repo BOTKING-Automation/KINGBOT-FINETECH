@@ -350,7 +350,7 @@ function orderExecutionIds(value,out=new Set(),depth=0){
   if(typeof value!=="object")return [...out];
   for(const [key,val] of Object.entries(value)){
     const k=key.toLowerCase();
-    if((k.includes("positionid")||k.includes("position_id")||k==="tradeid"||k==="trade_id")&&(typeof val==="string"||typeof val==="number"))out.add(String(val));
+    if((k.includes("positionid")||k.includes("position_id")||k==="tradeid"||k==="trade_id"||k==="orderid"||k==="order_id"||k==="dealid"||k==="deal_id"||k==="contractid"||k==="contract_id"||k==="ticket")&&(typeof val==="string"||typeof val==="number"))out.add(String(val));
     if(typeof val==="object")orderExecutionIds(val,out,depth+1);
   }
   return [...out];
