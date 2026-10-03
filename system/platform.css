@@ -2955,3 +2955,135 @@ body.kb-ui-surface-ai .hero{
     animation:none !important;
   }
 }
+
+
+/* =========================================================
+   KINGBOT FINTECH — PERFORMANCE / ACCESSIBILITY SYSTEM
+========================================================= */
+html{
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+  scroll-behavior:smooth;
+}
+body{
+  min-height:100vh;
+  overscroll-behavior-x:none;
+}
+img,video,canvas,svg{
+  max-width:100%;
+}
+img{
+  content-visibility:auto;
+}
+a,button,input,select,textarea{
+  -webkit-tap-highlight-color:transparent;
+}
+:where(a,button,input,select,textarea):focus-visible{
+  outline:2px solid var(--kb-cyan,#19e6ff);
+  outline-offset:3px;
+  box-shadow:0 0 0 4px rgba(25,230,255,.08);
+}
+.kb-skip-link{
+  position:fixed;
+  left:12px;
+  top:12px;
+  z-index:2147483647;
+  transform:translateY(-160%);
+  padding:9px 12px;
+  border-radius:9px;
+  background:#071020;
+  color:#eef4ff;
+  border:1px solid rgba(25,230,255,.22);
+  font:800 11px/1 system-ui,sans-serif;
+  text-decoration:none;
+  transition:transform .15s ease;
+}
+.kb-skip-link:focus{
+  transform:none;
+}
+.kb-live-region{
+  position:fixed;
+  left:-10000px;
+  width:1px;
+  height:1px;
+  overflow:hidden;
+}
+.kb-page-enter{
+  animation:kbPageEnter .24s ease both;
+}
+@keyframes kbPageEnter{
+  from{opacity:.001;transform:translateY(3px)}
+  to{opacity:1;transform:none}
+}
+.kb-skeleton{
+  position:relative;
+  overflow:hidden;
+  background:rgba(255,255,255,.035);
+  border-radius:9px;
+}
+.kb-skeleton::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);
+  animation:kbSkeleton 1.35s infinite;
+}
+@keyframes kbSkeleton{
+  to{transform:translateX(100%)}
+}
+.kb-low-bandwidth .kb-scanline::after,
+.kb-low-bandwidth .kb-neon-frame::before,
+.kb-low-bandwidth .panel::after{
+  animation:none!important;
+}
+.kb-low-bandwidth *,
+.kb-low-bandwidth *::before,
+.kb-low-bandwidth *::after{
+  scroll-behavior:auto;
+}
+.kb-status-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:28px;
+  padding:5px 9px;
+  border-radius:999px;
+  border:1px solid rgba(25,230,255,.12);
+  background:rgba(25,230,255,.035);
+  color:#8ea4bf;
+  font:800 7px/1 JetBrains Mono,monospace;
+  letter-spacing:.06em;
+}
+.kb-status-chip::before{
+  content:"";
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:#23f7a3;
+  box-shadow:0 0 9px rgba(35,247,163,.8);
+}
+.kb-status-chip[data-state="offline"]{
+  color:#ffadb9;
+  border-color:rgba(255,77,109,.16);
+}
+.kb-status-chip[data-state="offline"]::before{
+  background:#ff4d6d;
+  box-shadow:0 0 9px rgba(255,77,109,.65);
+}
+@media(max-width:700px){
+  html{font-size:15px}
+  button,.kb-button,.btn{
+    min-height:42px;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,
+  *::before,
+  *::after{
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+  }
+}
