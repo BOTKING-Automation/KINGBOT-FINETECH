@@ -920,20 +920,6 @@ async function execute(row){
   const spread=ask-bid;
   const velocityKey=ladderKey(userId,botId);
   const ladderCfg=getBotDefinitions()[botId]?.v8||LADDER_V8_DEFAULTS;
-  let adaptiveExecutionDecision=null;
-  const adaptiveExecutionEligible=Boolean(
-    analysis.ok &&
-    analysis.signal!=="NO_SIGNAL" &&
-    risk?.allowed &&
-    (!aiExecutionGateEnabled() || aiTradeGate?.confirm)
-  );
-  if(adaptiveExecutionEligible){
-    try{
-      adaptiveExecutionDecision=await recordExecutionAdaptiveDecision({userId,botId,config,analysis,marketSnapshot:aiMarket,risk,riskPercent:s.maxRiskPerTradePct,account,aiTradeGate,aiStrategySignal});
-    }catch(error){
-      console.warn("[KINGBOT ADAPTIVE] decision record failed:",error?.message||error);
-    }
-  }
   if(botId==="ladder-flip"){
     const sampleList=updateVelocitySamples(ladderVelocityBuffers.get(velocityKey)||[],(bid+ask)/2,Date.now(),ladderCfg);
     ladderVelocityBuffers.set(velocityKey,sampleList);
@@ -990,6 +976,21 @@ async function execute(row){
   if(analysis.ok){
     void warmAiStrategySignal({userId,botId,market:aiMarket,analysis,risk,tradePlan:null})
       .catch(error=>console.error("[KINGBOT AI SIGNAL] warm failed:",error?.message||error));
+  }
+
+  let adaptiveExecutionDecision=null;
+  const adaptiveExecutionEligible=Boolean(
+    analysis.ok &&
+    analysis.signal!=="NO_SIGNAL" &&
+    risk?.allowed &&
+    (!aiExecutionGateEnabled() || aiTradeGate?.confirm)
+  );
+  if(adaptiveExecutionEligible){
+    try{
+      adaptiveExecutionDecision=await recordExecutionAdaptiveDecision({userId,botId,config,analysis,marketSnapshot:aiMarket,risk,riskPercent:s.maxRiskPerTradePct,account,aiTradeGate,aiStrategySignal});
+    }catch(error){
+      console.warn("[KINGBOT ADAPTIVE] decision record failed:",error?.message||error);
+    }
   }
 
   if(botId==="ladder-flip"){
