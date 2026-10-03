@@ -66,7 +66,8 @@ function normalizeMarket(input = {}) {
     emaSlow: num(input.emaSlow ?? input.ema50),
     velocityPoints: num(input.velocityPoints, 0),
     timestamp: input.timestamp || input.time || input.receivedAt || null,
-    multiTimeframe: input.multiTimeframe || null
+    multiTimeframe: input.multiTimeframe || null,
+    crossMarket: input.crossMarket || null
   };
 }
 
@@ -133,6 +134,48 @@ function analyzeExecution(m) {
     dataAgeMs: stale.ageMs,
     flags,
     status: flags.length ? "CAUTION" : "EXECUTION_CONTEXT_READY"
+  };
+}
+
+function analyzeCrossMarket(input) {
+  const context = input?.crossMarket || input?.crossMarketSnapshot?.crossMarket || {};
+  const breadth = context?.breadth || {};
+  const live = Number(breadth.live || 0);
+  const tracked = Number(breadth.tracked || 0);
+  const up = Number(breadth.up || 0);
+  const down = Number(breadth.down || 0);
+  const avgChange = num(breadth.avgChange);
+  if (!live) {
+    return {
+      id: "cross-market",
+      name: "CROSS-MARKET ANALYST",
+      score: 0,
+      bias: "NEUTRAL",
+      evidence: ["No shared Market page breadth snapshot available."],
+      status: "WAITING_FOR_SHARED_MARKET_FEED"
+    };
+  }
+  const bias = up === down ? "NEUTRAL" : up > down ? "BULLISH" : "BEARISH";
+  const evidence = [
+    "Shared Market page live instruments=" + live + "/" + Math.max(tracked, live),
+    "Breadth up=" + up + " down=" + down + " flat=" + Number(breadth.flat || 0),
+    ...(avgChange !== null ? ["Average 24h change-aware move=" + avgChange.toFixed(2) + "%"] : [])
+  ];
+  if (Array.isArray(context.strongest) && context.strongest.length) {
+    evidence.push("Strongest live movers=" + context.strongest.slice(0, 3).map(x => x.symbol + " " + Number(x.change).toFixed(2) + "%").join(", "));
+  }
+  if (Array.isArray(context.weakest) && context.weakest.length) {
+    evidence.push("Weakest live movers=" + context.weakest.slice(0, 3).map(x => x.symbol + " " + Number(x.change).toFixed(2) + "%").join(", "));
+  }
+  const score = up + down ? clamp(((up - down) / (up + down)) * 100, -100, 100) : 0;
+  return {
+    id: "cross-market",
+    name: "CROSS-MARKET ANALYST",
+    score: Math.round(score),
+    bias,
+    breadth: { live, tracked, up, down, flat: Number(breadth.flat || 0), avgChange },
+    evidence,
+    status: "SHARED_MARKET_FEED_VERIFIED"
   };
 }
 
@@ -291,6 +334,12 @@ function cacheKey(market, options = {}) {
     trend: market.trend,
     momentum: market.momentum,
     structure: market.structure,
+    crossMarket: market.crossMarket?.breadth ? {
+      live: market.crossMarket.breadth.live,
+      up: market.crossMarket.breadth.up,
+      down: market.crossMarket.breadth.down,
+      avgChange: market.crossMarket.breadth.avgChange
+    } : null,
     liquiditySweep: market.liquiditySweep,
     displacement: market.displacement,
     breakout: market.breakout,
@@ -311,7 +360,8 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
   const regime = analyzeRegime(market);
   const execution = analyzeExecution(market);
   const context = analyzeMacroAndSentiment(inputMarket);
-  const analysts = [technical, regime, context, execution];
+  const crossMarket = analyzeCrossMarket(inputMarket);
+  const analysts = [technical, regime, context, execution, crossMarket];
   const engines = BOT_IDS.map(id => engineFit(id, market, regime, adaptivePerformance));
   const debate = buildDebate(analysts, engines, market);
   const routing = chooseEngine(engines, debate);
