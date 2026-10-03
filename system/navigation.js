@@ -426,6 +426,25 @@
         border-color:rgba(246,185,59,.20);
       }
 
+      .kb-command-snapshot{
+        position:relative;
+        z-index:1;
+        margin-top:9px;
+        padding:9px;
+        border:1px solid rgba(25,230,255,.10);
+        border-radius:11px;
+        background:linear-gradient(135deg,rgba(25,230,255,.035),rgba(155,92,255,.035),rgba(246,185,59,.025));
+      }
+      .kb-command-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+      .kb-command-title{font:900 7px Orbitron,sans-serif;letter-spacing:.12em;color:#dbe6fb}
+      .kb-command-refresh{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);color:#8ea0bd;border-radius:7px;padding:5px 7px;font:800 6px JetBrains Mono,monospace;cursor:pointer}
+      .kb-command-refresh:hover{color:#fff;border-color:rgba(25,230,255,.18)}
+      .kb-command-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+      .kb-command-cell{min-width:0;padding:6px 7px;border-radius:8px;background:rgba(255,255,255,.018);border:1px solid rgba(255,255,255,.045)}
+      .kb-command-label{display:block;color:#56657f;font:700 5.5px JetBrains Mono,monospace;letter-spacing:.08em}
+      .kb-command-value{display:block;margin-top:2px;color:#dfe8f8;font:900 7px JetBrains Mono,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .kb-command-value.good{color:#86ffd0}.kb-command-value.warn{color:#ffd977}.kb-command-value.bad{color:#ff9bad}
+      .kb-command-foot{margin-top:6px;color:#4d5b74;font:600 5.5px JetBrains Mono,monospace}
       .kb-menu-footer{
         position:relative;
         z-index:1;
@@ -513,6 +532,16 @@
           '<div class="kb-menu-state"><span class="kb-menu-dot"></span>SYSTEM ONLINE</div>'+
         '</div>'+
         '<div class="kb-menu-grid">'+pageLinks+'</div>'+
+        '<div class="kb-command-snapshot" data-kb-command-snapshot>'+
+          '<div class="kb-command-top"><span class="kb-command-title">LIVE CORE SNAPSHOT</span><button class="kb-command-refresh" type="button" data-kb-command-refresh>REFRESH</button></div>'+
+          '<div class="kb-command-grid">'+
+            '<div class="kb-command-cell"><span class="kb-command-label">BROKER</span><span class="kb-command-value" data-kb-core-broker>—</span></div>'+
+            '<div class="kb-command-cell"><span class="kb-command-label">ACCOUNT</span><span class="kb-command-value" data-kb-core-account>—</span></div>'+
+            '<div class="kb-command-cell"><span class="kb-command-label">BOT</span><span class="kb-command-value" data-kb-core-bot>—</span></div>'+
+            '<div class="kb-command-cell"><span class="kb-command-label">RISK</span><span class="kb-command-value" data-kb-core-risk>—</span></div>'+
+          '</div>'+
+          '<div class="kb-command-foot" data-kb-core-time>CORE STATE STANDBY</div>'+
+        '</div>'+
         '<div class="kb-menu-account">'+account+'</div>'+
         '<div class="kb-menu-footer"><span>COMPACT CONTROL</span><span>GIBSONFX TECH</span></div>'+
       '</div>';
@@ -604,7 +633,33 @@
     };
 
     syncAuthUI();
-    window.addEventListener("kingbot:session-change",event=>syncAuthUI(event.detail||{}));
+
+    function renderCoreSnapshot(snapshot){
+      const snap=root.querySelector("[data-kb-command-snapshot]"); if(!snap)return;
+      const broker=snapshot?.broker||{};
+      const account=snapshot?.account?.account||snapshot?.account?.accountSnapshot||snapshot?.account||{};
+      const selection=snapshot?.botSelection?.bot||{};
+      const risk=snapshot?.risk?.executionControl||snapshot?.risk||{};
+      const b=snap.querySelector("[data-kb-core-broker]");
+      const a=snap.querySelector("[data-kb-core-account]");
+      const bot=snap.querySelector("[data-kb-core-bot]");
+      const rr=snap.querySelector("[data-kb-core-risk]");
+      if(b){b.textContent=broker.connected?String(broker.broker||"CONNECTED").toUpperCase():"OFFLINE";b.className="kb-command-value "+(broker.connected?"good":"warn");}
+      if(a){const balance=Number(account?.balance);a.textContent=Number.isFinite(balance)?(String(account?.currency||"")+" "+balance.toLocaleString()):"CONNECTED";a.className="kb-command-value "+(snapshot?.account?.ok===false?"warn":"good");}
+      if(bot){bot.textContent=selection.name||selection.botId||"NO SELECTION";bot.className="kb-command-value "+(selection.state==="RUNNING"?"good":"");}
+      if(rr){rr.textContent=risk.globalKillSwitch?"GLOBAL KILL":risk.tradingPaused?"PAUSED":"OPEN";rr.className="kb-command-value "+(risk.globalKillSwitch?"bad":risk.tradingPaused?"warn":"good");}
+      const tm=snap.querySelector("[data-kb-core-time]"); if(tm)tm.textContent="CORE UPDATED "+new Date(snapshot?.updatedAt||Date.now()).toLocaleTimeString();
+    }
+
+    function bindCoreState(){
+      const store=window.KINGBOT_CLIENT_STATE;
+      if(!store?.subscribe)return;
+      store.subscribe(renderCoreSnapshot);
+      root.querySelector("[data-kb-command-refresh]")?.addEventListener("click",()=>store.refresh({reason:"nav-manual-refresh"}));
+    }
+
+    bindCoreState();
+    window.addEventListener("kingbot:session-change",event=>{syncAuthUI(event.detail||{});void window.KINGBOT_CLIENT_STATE?.refresh?.({reason:"session-change"});});
     window.addEventListener("kingbot:event-bus-ready",()=>{
       const state=root.querySelector(".kb-menu-state");
       if(state && (window.KINGBOT_SESSION?.isAuthenticated?.()===true)){
