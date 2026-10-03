@@ -205,8 +205,16 @@ function renderBrokerMarkets(selectedSymbol=""){
    }
    select.appendChild(og);
  }
- if(wanted && brokerMarkets.some(x=>x.symbol===wanted)){select.value=wanted;}
- else {const fallback=preferredMarket(); if(fallback)select.value=fallback.symbol;}
+ if(wanted && brokerMarkets.some(x=>x.symbol===wanted)){
+   select.value=wanted;
+ }else{
+   const placeholder=document.createElement("option");
+   placeholder.value="";
+   placeholder.textContent="SELECT A BROKER MARKET";
+   placeholder.disabled=true;
+   placeholder.selected=true;
+   select.insertBefore(placeholder,select.firstChild);
+ }
  $("brokerExecutionNote").dataset.marketCount=String(brokerMarkets.length);
 }
 async function refreshBrokerMarkets(){
@@ -216,10 +224,17 @@ async function refreshBrokerMarkets(){
    brokerMarketsLoaded=brokerMarkets.length>0;
    renderBrokerMarkets($("symbol")?.value||selected?.symbol||"");
    const title=$("brokerExecutionTitle");
+   const note=$("brokerExecutionNote");
    if(title && brokerMarketsLoaded) title.textContent=String(d.broker||"BROKER").toUpperCase()+" · "+brokerMarkets.length+" MARKETS AVAILABLE";
+   if(note && brokerMarketsLoaded) {
+     note.textContent="Live market catalog loaded from your connected broker. Select a symbol before saving or starting the bot.";
+     note.style.color="#69e6bf";
+   }
    return true;
  }catch(error){
    brokerMarkets=[]; brokerMarketsLoaded=false; renderBrokerMarkets("");
+   $("brokerExecutionTitle").textContent="BROKER MARKET · UNAVAILABLE";
+   $("brokerExecutionNote").textContent="No authoritative market catalog was returned by the connected broker. Connect or refresh the broker connection.";
    return false;
  }
 }
