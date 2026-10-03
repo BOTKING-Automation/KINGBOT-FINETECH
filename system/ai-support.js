@@ -239,6 +239,8 @@
     setText("identityMode", mode.replaceAll("_", " "));
     setText("identityDeliberation", data?.deliberation || identity?.deliberation || "HIGH");
     setText("identityReasoning", "MULTI-PASS");
+    setText("identityDeliberation", plan?.thinking?.label || "EXPERT");
+    setText("identityReasoning", "NATIVE MULTI-PASS");
     setText("identityCapabilities", capabilities.length ? capabilities.join(" · ") : "PERCEPTION · REASONING · VERIFICATION");
     const loopEl = byId("identityLoop");
     if (loopEl && loop.length) {
