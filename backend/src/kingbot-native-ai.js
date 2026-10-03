@@ -833,23 +833,14 @@ export async function runNativeKingbotAI(input = {}) {
     thinkingLevel
   });
 
+  // Internal thinking is used for quality control only. It is never returned
+  // as chat content or exposed as a reasoning trace to the browser.
   const reply = {
     ...(result?.reply || {}),
-    reasoningSummary: thought.reasoningSummary,
-    evidenceFor: thought.evidenceFor,
-    evidenceAgainst: thought.evidenceAgainst,
-    uncertainties: thought.uncertainties,
-    alternativeHypotheses: thought.alternativeHypotheses,
-    validationSteps: thought.validationSteps,
-    confidence: thought.confidence,
-    cognitiveState: thought.cognitiveState,
     intelligence: {
       identity: identity.id,
       mode: plan.mode,
-      stages: plan.stages,
-      capabilities: [...capabilities, "PROPRIETARY_REASONING_KERNEL", "HYPOTHESIS_ENGINE", "CONTRADICTION_ENGINE", "SELF_CRITIQUE"],
-      epistemicStatus: audit.epistemicStatus,
-      deliberation: "PROPRIETARY_MULTI_PASS",
+      capabilities: [...capabilities, "PROPRIETARY_REASONING_KERNEL"],
       authority: "NONE"
     }
   };
