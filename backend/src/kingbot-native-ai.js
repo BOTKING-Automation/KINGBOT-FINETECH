@@ -49,7 +49,9 @@ function intent(text, conversation=[]){
     BOT:"BOT_INTELLIGENCE",
     MARKET:"MARKET_INTELLIGENCE",
     PLATFORM:"PLATFORM_SUPPORT",
-    GENERAL:"PLATFORM_SUPPORT"
+    GENERAL:"PLATFORM_SUPPORT",
+    GENERAL_KNOWLEDGE:"GENERAL_KNOWLEDGE",
+    PROGRAMMING:"PROGRAMMING"
   };
   if(mapped[dialogueIntent]) return mapped[dialogueIntent];
   if(/^(hi|hello|hey|yo|good morning|good afternoon|good evening|howdy|greetings)\b/.test(t)||/\bhow are you\b|\bwho are you\b|\bwhat are you\b|\bthank you\b|\bthanks\b|\bbye\b|\bgood night\b/.test(t)) return "CONVERSATION";
@@ -389,6 +391,45 @@ function platformSupportReply(question){
   return {answer:"I understand the request as a KINGBOT platform question, not a market-analysis request.",facts:["No market-analysis trigger was detected.","No unsupported account or market values were fabricated."],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"A specific platform question.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask your question directly and I will route it to the appropriate intelligence capability."};
 }
 
+
+function generalKnowledgeReply(question,search){
+  if(!search?.ok){
+    return {
+      answer:"I understand the question, but KINGBOT does not currently have a verified knowledge source for it. The native brain will not invent an answer.",
+      facts:[String(search?.error||"VERIFIED_KNOWLEDGE_SOURCE_UNAVAILABLE").slice(0,220)],
+      technicalAnalysis:[],
+      setup:{signal:"DATA_INSUFFICIENT",entry:null,waitFor:"A verified knowledge source.",invalidation:"No verified source available."},
+      riskFlags:["KNOWLEDGE_SOURCE_UNAVAILABLE"],
+      nextAction:"Configure the research service or ask a KINGBOT-specific question."
+    };
+  }
+  const results=Array.isArray(search.results)?search.results.slice(0,6):[];
+  const facts=results.map(r=>{
+    const title=String(r.title||"Source");
+    const snippet=String(r.snippet||"").replace(/\s+/g," ").trim();
+    const published=r.publishedAt?(" · "+String(r.publishedAt)):"";
+    const url=r.url?(" · "+String(r.url)):"";
+    return title+published+" — "+snippet+url;
+  });
+  const lead=results[0];
+  const answer=lead
+    ? "KINGBOT researched “"+String(search.query||question).trim()+"” and found "+results.length+" relevant source(s). The answer below is source-grounded rather than invented by the system."
+    : "KINGBOT searched for the requested information but found no useful verified result.";
+  return {
+    answer,
+    facts,
+    technicalAnalysis:[],
+    setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No market setup requested.",invalidation:"Research is informational and not execution authorization."},
+    riskFlags:["EXTERNAL_SOURCE_RESEARCH","NO_EXECUTION_AUTHORIZATION"],
+    nextAction:"Ask KINGBOT to compare the sources, explain the subject, or connect the answer to a KINGBOT task.",
+    knowledge:{
+      query:String(search.query||question),
+      sourceCount:results.length,
+      synthesisMode:"EXTRACTIVE_VERIFIED_SOURCE_SYNTHESIS"
+    }
+  };
+}
+
 async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,userId,conversation=[],thinkingLevel="EXPERT",timeframe="15m"}={}){
   const signals=conversationSignals(question,conversation)||{};
   const effectiveQuestion=String(signals.resolvedQuestion||question).trim();
@@ -429,6 +470,51 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
       technicalAnalysis:[],
       setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Not a market setup request.",invalidation:"Not applicable."}
     },verified:{store:true,userSpecific:Boolean(userId)}};
+  }
+
+  if(kind==="GENERAL_KNOWLEDGE"){
+    try{
+      const query=String(effectiveQuestion||question).trim();
+      const search=await searchWeb(query,{limit:8,freshnessDays:0});
+      const reply=generalKnowledgeReply(query,search);
+      return {
+        provider:"KINGBOT_NATIVE",
+        model:"KINGBOT-CORTEX-1",
+        intent:kind,
+        symbol:requested,
+        reply,
+        sources:Array.isArray(search?.results)?search.results:[],
+        research:{generalKnowledge:true},
+        verified:{knowledgeSource:Boolean(search?.ok)}
+      };
+    }catch(error){
+      return {
+        provider:"KINGBOT_NATIVE",
+        model:"KINGBOT-CORTEX-1",
+        intent:kind,
+        symbol:requested,
+        reply:generalKnowledgeReply(effectiveQuestion||question,{ok:false,error:String(error?.message||"KNOWLEDGE_LOOKUP_FAILED")}),
+        verified:{knowledgeSource:false}
+      };
+    }
+  }
+
+  if(kind==="PROGRAMMING"){
+    const query=String(effectiveQuestion||question).trim();
+    const search=await searchWeb(query+" programming documentation",{limit:6,freshnessDays:0});
+    const reply=generalKnowledgeReply(query,search);
+    reply.nextAction="Ask KINGBOT to explain the code, identify the bug, or design the implementation from the verified sources.";
+    reply.knowledge={...(reply.knowledge||{}),domain:"PROGRAMMING"};
+    return {
+      provider:"KINGBOT_NATIVE",
+      model:"KINGBOT-CORTEX-1",
+      intent:kind,
+      symbol:requested,
+      reply,
+      sources:Array.isArray(search?.results)?search.results:[],
+      research:{programmingKnowledge:true},
+      verified:{knowledgeSource:Boolean(search?.ok)}
+    };
   }
 
   if(kind==="WEB_RESEARCH" || kind==="MARKET_RESEARCH"){
