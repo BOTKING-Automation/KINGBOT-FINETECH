@@ -220,6 +220,40 @@
     el.className = "telemetry-value" + (tone ? " " + tone : "");
   }
 
+  function renderIdentity(data = {}) {
+    const identity = data?.identity || {};
+    const cognition = data?.cognition || {};
+    const plan = data?.cognitivePlan || cognition?.plan || {};
+    const intelligence = data?.reply?.intelligence || {};
+    const mode = intelligence.mode || plan.mode || "STANDBY";
+    const capabilities = Array.isArray(intelligence.capabilities) ? intelligence.capabilities : (Array.isArray(cognition?.capabilities) ? cognition.capabilities : []);
+    const loop = Array.isArray(identity.cognitiveLoop) ? identity.cognitiveLoop : [];
+    const mission = String(identity.mission || "Observe verified state, reason, challenge, adapt, verify and explain.");
+    const identityState = byId("identityState");
+    if (identityState) identityState.textContent = data?.ok === false ? "CORE DEGRADED" : "CORE ACTIVE";
+    setText("identityName", identity.name || "KINGBOT");
+    setText("identityRole", identity.role || "Persistent intelligence operating layer.");
+    setText("identityMission", mission);
+    setText("identityAuthority", identity.authority || "ANALYSIS AND COORDINATION ONLY");
+    setText("identityVersion", identity.version || "3.0.0");
+    setText("identityMode", mode.replaceAll("_", " "));
+    setText("identityCapabilities", capabilities.length ? capabilities.join(" · ") : "PERCEPTION · REASONING · VERIFICATION");
+    const loopEl = byId("identityLoop");
+    if (loopEl && loop.length) {
+      loopEl.innerHTML = "";
+      loop.forEach((step, index) => {
+        const cell = document.createElement("div");
+        cell.className = "orch-plan-cell";
+        const n = document.createElement("span");
+        n.textContent = String(index + 1).padStart(2, "0");
+        const strong = document.createElement("strong");
+        strong.textContent = String(step).replaceAll("_", " ");
+        cell.append(n, strong);
+        loopEl.appendChild(cell);
+      });
+    }
+  }
+
   function renderHealth() {
     const h = state.health;
     if (!h) return;
@@ -357,10 +391,18 @@
     try {
       state.health = await requestJson(API_BASE + "/health", {}, false);
       renderHealth();
+      loadAgentStatus();
     } catch (error) {
       state.health = { ok: false, aiReady: false, accountServiceReady: false };
       renderHealth();
     }
+  }
+
+  async function loadAgentStatus() {
+    try {
+      const data = await requestJson(API_BASE + "/ai/agent/status");
+      renderIdentity(data);
+    } catch {}
   }
 
   async function runBackendAgent(clean, conversation) {
@@ -370,6 +412,7 @@
       body: JSON.stringify({ message: clean, symbol, conversation: conversation.slice(-4) })
     });
     const reply = data?.reply || {};
+    renderIdentity(data);
     let answer = String(reply.answer || data?.message || "KINGBOT AI returned no answer.");
     const sources = Array.isArray(data?.sources) ? data.sources.slice(0,6) : [];
     if(sources.length){
@@ -540,8 +583,14 @@
     setTelemetry("aiCoreStatus", "KINGBOT NATIVE", "good");
     setText("coreStateLabel", "KINGBOT NATIVE AI ONLINE");
     setText("coreStateSub", "Native KINGBOT intelligence is active. External browser AI providers are not required.");
-    window.setTimeout(loadContext, 700);
-    window.addEventListener("kingbot:session-change", () => loadContext());
+    window.setTimeout(() => {
+      loadAgentStatus();
+      loadContext();
+    }, 700);
+    window.addEventListener("kingbot:session-change", () => {
+      loadAgentStatus();
+      loadContext();
+    });
     window.addEventListener("kingbot:access-ready", () => loadContext(), { once: true });
   }
 
