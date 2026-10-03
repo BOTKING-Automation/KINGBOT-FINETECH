@@ -629,9 +629,9 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
     }catch{}
   }
 
-  if(kind==="PLATFORM_SUPPORT") const dialogue=conversationalReply(question,conversation);
+  if(kind==="PLATFORM_SUPPORT"){ const dialogue=conversationalReply(question,conversation);
   if(dialogue) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:"CONVERSATION",symbol:requested,reply:dialogue,verified:{native:true,dialogueCortex:true}};
-  return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,reply:platformSupportReply(question),verified:{native:true}};
+  return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,reply:platformSupportReply(question),verified:{native:true}}; }
 
   const snapshot=await latestSnapshot(pool,requested,"5m");
   const brain=snapshot?evaluateKingbotBrain(snapshot,{maxAgeMs:Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS||5000)}):null;
