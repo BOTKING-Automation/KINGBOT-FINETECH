@@ -134,4 +134,34 @@ export function registerTerminalSnapshot(app, { requireUser, pool, broker, first
       });
     }
   });
+
+  app.get("/api/terminal/history", async (req, res) => {
+    const user = await requireUser(pool, req, res);
+    if (!user) return;
+    const startTime = req.query?.startTime ? new Date(String(req.query.startTime)) : new Date(Date.now()-7*86400000);
+    const endTime = req.query?.endTime ? new Date(String(req.query.endTime)) : new Date();
+    if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime()) || endTime <= startTime) {
+      return res.status(400).json({ok:false,error:"INVALID_HISTORY_RANGE"});
+    }
+    try {
+      const mapping = await broker.getMapping(user.id);
+      if (!mapping) return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED"});
+      const entry = await broker.connectionFor(user.id);
+      if (!entry?.api?.getTrades) return res.status(503).json({ok:false,error:"BROKER_HISTORY_UNAVAILABLE"});
+      const result = await entry.api.getTrades({startTime,endTime});
+      const data = result?.data || result || {};
+      const deals = Array.isArray(data?.deals) ? data.deals : [];
+      return res.json({
+        ok:true,
+        broker:String(mapping.provider||entry.provider||"BROKER").toUpperCase(),
+        startTime:startTime.toISOString(),
+        endTime:endTime.toISOString(),
+        deals:deals.slice(-500),
+        generatedAt:new Date().toISOString()
+      });
+    } catch (error) {
+      return res.status(503).json({ok:false,error:"TERMINAL_HISTORY_UNAVAILABLE",reason:String(error?.message||"TERMINAL_HISTORY_UNAVAILABLE").slice(0,300)});
+    }
+  });
+
 }
