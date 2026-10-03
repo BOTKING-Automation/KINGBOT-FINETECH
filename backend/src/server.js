@@ -39,6 +39,7 @@ import { KingbotEventBus, registerKingbotEventRoutes } from "./kingbot-event-bus
 import { ensureCommercialLedgerSchema, registerCommercialLedgerRoutes } from "./commercial-ledger.js";
 import { ensureUserMemorySchema } from "./kingbot-user-memory.js";
 import { registerCommandPlane } from "./command-plane.js";
+import { requestSecurity, corsOptions, createApiLimiter, createWriteLimiter } from "./security.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -54,9 +55,14 @@ const eventBus = new KingbotEventBus({pool,name:"kingbot-api"});
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
-app.use(express.json({ limit: "2mb" }));
-const allowedOrigin = process.env.FRONTEND_ORIGIN?.trim();
-app.use(cors({ origin: allowedOrigin || true, credentials: true, methods: ["GET","POST","OPTIONS"], allowedHeaders: ["Content-Type","Authorization"] }));
+app.use(requestSecurity);
+app.use(express.json({ limit: "512kb", strict: true }));
+app.use(cors(corsOptions()));
+app.use("/api", createApiLimiter());
+app.use("/api/broker", createWriteLimiter());
+app.use("/api/runtime", createWriteLimiter());
+app.use("/api/mt5", createWriteLimiter());
+app.use("/api/subscription", createWriteLimiter());
 
 const authLimiter = rateLimit({ windowMs: 15*60*1000, limit: 12, standardHeaders: "draft-8", legacyHeaders: false });
 app.use("/api/auth", createAuthRouter({ pool, sessionTtlHours: Number(process.env.SESSION_TTL_HOURS || 24), limiter: authLimiter }));
