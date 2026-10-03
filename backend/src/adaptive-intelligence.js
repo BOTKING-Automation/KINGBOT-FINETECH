@@ -69,6 +69,7 @@ export async function ensureAdaptiveIntelligenceSchema(pool) {
       regime TEXT NOT NULL,
       direction TEXT NOT NULL,
       selected_engine TEXT,
+      risk_amount NUMERIC,
       confidence NUMERIC(6,2),
       current_fit NUMERIC(6,2),
       historical_fit NUMERIC(6,2),
@@ -86,6 +87,7 @@ export async function ensureAdaptiveIntelligenceSchema(pool) {
       settled_at TIMESTAMPTZ
     )
   `);
+  await pool.query("ALTER TABLE kingbot_ai_adaptive_decisions ADD COLUMN IF NOT EXISTS risk_amount NUMERIC");
   await pool.query("CREATE INDEX IF NOT EXISTS idx_kb_adaptive_perf ON kingbot_ai_adaptive_decisions(user_id,symbol,selected_engine,regime,setup_type,outcome_status,created_at DESC)");
   await pool.query("CREATE INDEX IF NOT EXISTS idx_kb_adaptive_decision_user ON kingbot_ai_adaptive_decisions(user_id,decision_id)");
 }
@@ -197,9 +199,9 @@ export async function recordAdaptiveDecision(pool, userId, result) {
     `
       INSERT INTO kingbot_ai_adaptive_decisions(
         decision_id,user_id,symbol,timeframe,setup_type,regime,direction,
-        selected_engine,confidence,current_fit,historical_fit,adjusted_fit,state,decision_json
+        selected_engine,risk_amount,confidence,current_fit,historical_fit,adjusted_fit,state,decision_json
       )
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)
       ON CONFLICT(decision_id) DO NOTHING
     `,
     [
@@ -211,6 +213,7 @@ export async function recordAdaptiveDecision(pool, userId, result) {
       regimeBucket(result.summary?.regime || result.debate?.regime || result.market.regime || "UNKNOWN"),
       upper(result.routing?.direction || result.summary?.bias || "HOLD"),
       engine?.botId || result.routing?.selectedEngine || null,
+      result.execution?.riskAmount == null ? null : num(result.execution.riskAmount, null),
       num(result.summary?.confidence),
       num(engine?.currentFit ?? engine?.fit),
       num(engine?.historicalFit, 50),
@@ -228,7 +231,7 @@ export async function settleAdaptiveDecision(pool, userId, payload = {}) {
   if (!decisionId) throw new Error("DECISION_ID_REQUIRED");
 
   const existing = await pool.query(
-    "SELECT decision_id FROM kingbot_ai_adaptive_decisions WHERE decision_id=$1 AND user_id=$2",
+    "SELECT decision_id,risk_amount FROM kingbot_ai_adaptive_decisions WHERE decision_id=$1 AND user_id=$2",
     [decisionId, userId]
   );
   if (!existing.rowCount) throw new Error("ADAPTIVE_DECISION_NOT_FOUND");
@@ -238,8 +241,11 @@ export async function settleAdaptiveDecision(pool, userId, payload = {}) {
     throw new Error("INVALID_OUTCOME_STATUS");
   }
 
-  const rMultiple = payload.rMultiple == null ? null : num(payload.rMultiple, null);
   const pnl = payload.pnl == null ? null : num(payload.pnl, null);
+  let rMultiple = payload.rMultiple == null ? null : num(payload.rMultiple, null);
+  if (rMultiple == null && pnl != null && Number(existing.rows[0]?.risk_amount) > 0) {
+    rMultiple = pnl / Number(existing.rows[0].risk_amount);
+  }
   if (outcome !== "UNREALIZED" && rMultiple == null) throw new Error("R_MULTIPLE_REQUIRED");
 
   const result = await pool.query(
@@ -254,6 +260,7 @@ export async function settleAdaptiveDecision(pool, userId, payload = {}) {
           latency_ms=$9,
           settled_at=NOW()
       WHERE decision_id=$1 AND user_id=$2
+        AND outcome_status='UNSETTLED'
       RETURNING decision_id, symbol, selected_engine, regime, setup_type, outcome_status, pnl, r_multiple, mfe_r, mae_r, slippage, latency_ms, settled_at
     `,
     [
