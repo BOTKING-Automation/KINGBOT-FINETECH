@@ -15,7 +15,7 @@ import { isAdminUser } from "./admin-access.js";
 import { ensureBotEngineSchema } from "./bot-engines.js";
 import { ensureBotRuntimeSchema } from "./bot-runtime.js";
 import { ensureGlobalRiskSchema, getGlobalRiskState, globalExecutionGate, recordWorkerHeartbeat } from "./global-risk.js";
-import { recordAdaptiveDecision, settleAdaptiveDecision } from "./adaptive-intelligence.js";
+import { ensureAdaptiveIntelligenceSchema, recordAdaptiveDecision, settleAdaptiveDecision } from "./adaptive-intelligence.js";
 
 const { Pool } = pg;
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined }) : null;
@@ -40,6 +40,7 @@ async function ensureWorkerSchema(){
   await ensureBotRuntimeSchema(pool);
   await broker.ensureSchema();
   await ensureGlobalRiskSchema(pool);
+  await ensureAdaptiveIntelligenceSchema(pool);
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_account_risk_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,baseline_date DATE NOT NULL,day_start_equity NUMERIC NOT NULL,peak_equity NUMERIC NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,provider,account_id))");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_execution_journal (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,decision_id UUID,execution_mode TEXT NOT NULL,symbol TEXT NOT NULL,side TEXT NOT NULL,volume NUMERIC NOT NULL,status TEXT NOT NULL,broker_result JSONB,error_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
   await pool.query("ALTER TABLE kingbot_execution_journal ADD COLUMN IF NOT EXISTS decision_id UUID");
