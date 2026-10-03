@@ -162,6 +162,25 @@ app.get("/api/markets/synthetics", async (_req,res)=>{
   }
 });
 
+app.get("/api/markets/synthetics/quotes", async (req,res)=>{
+  try{
+    const raw=String(req.query?.symbols||"").split(",").map(x=>x.trim().toUpperCase()).filter(Boolean).slice(0,30);
+    if(!raw.length)return res.status(400).json({ok:false,error:"SYNTHETIC_SYMBOLS_REQUIRED"});
+    const feed=getDerivMarketFeed();
+    const quotes=await Promise.all(raw.map(async symbol=>{
+      try{
+        const quote=await feed.getQuote(symbol,{maxAgeMs:3000,timeoutMs:5000});
+        return {symbol,brokerSymbol:quote.brokerSymbol||symbol,price:quote.price,bid:quote.bid,ask:quote.ask,time:quote.time,epoch:quote.epoch,ageMs:quote.ageMs||0,available:true,source:"deriv-public-live"};
+      }catch(error){
+        return {symbol,available:false,error:String(error?.message||"SYNTHETIC_QUOTE_UNAVAILABLE").slice(0,120)};
+      }
+    }));
+    res.json({ok:true,marketType:"SYNTHETIC",quotes,generatedAt:new Date().toISOString()});
+  }catch(error){
+    res.status(503).json({ok:false,error:"SYNTHETIC_QUOTES_UNAVAILABLE",reason:String(error?.message||"SYNTHETIC_QUOTES_UNAVAILABLE").slice(0,180)});
+  }
+});
+
 app.get("/api/connection", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   try{
