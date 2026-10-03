@@ -54,6 +54,10 @@ function intent(text, conversation=[]){
     GENERAL_KNOWLEDGE:"GENERAL_KNOWLEDGE",
     PROGRAMMING:"PROGRAMMING"
   };
+  // Specific KINGBOT identity questions must beat the generic PLATFORM route.
+  if(/^(what is|what's|tell me about|explain)\s+(kingbot|kingbot fintech|this platform|the platform)\b/.test(t)
+    ||/\bwhat does kingbot do\b|\bwhat is kingbot fintech\b|\bwhat can kingbot do\b/.test(t)) return "KINGBOT_KNOWLEDGE";
+
   if(mapped[dialogueIntent]) return mapped[dialogueIntent];
   if(/^(hi|hello|hey|yo|good morning|good afternoon|good evening|howdy|greetings)\b/.test(t)||/\bhow are you\b|\bwho are you\b|\bwhat are you\b|\bthank you\b|\bthanks\b|\bbye\b|\bgood night\b/.test(t)) return "CONVERSATION";
   if(/^(what is|what's|tell me about|explain)\s+(kingbot|kingbot fintech|this platform|the platform)\b/.test(t)
@@ -151,7 +155,7 @@ function kingbotKnowledgeReply(question){
   }
 
   return {
-    answer:"KINGBOT FINTECH is the trading-technology operating layer behind the KINGBOT ecosystem. It combines broker connectivity, verified market/account telemetry, specialized strategy engines, risk controls, runtime automation, analytics and an AI intelligence interface.",
+    answer:"KINGBOT FINTECH is a trading-technology and automation platform that brings together market data, AI intelligence, strategy engines, risk controls, broker connectivity, execution infrastructure and analytics in one system.",
     facts:[
       "MARKET DATA: broker quotes and supported external market feeds provide verified inputs when connected.",
       "INTELLIGENCE: KINGBOT AI explains platform state, account context, strategy logic and market information.",
