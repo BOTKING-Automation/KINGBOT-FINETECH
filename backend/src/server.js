@@ -13,7 +13,7 @@ import { UserBrokerManager } from "./user-broker-manager.js";
 import { DerivTraderClient } from "./deriv-trader-client.js";
 import { getDerivMarketFeed } from "./deriv-market-feed.js";
 import { PartnerManager } from "./partner-manager.js";
-import { requireUser } from "./subscriptions.js";
+import { requireUser, requireRecentAuth } from "./subscriptions.js";
 import { isAdminEmail } from "./admin-access.js";
 import { createBotRuntimeRouter, ensureBotRuntimeSchema } from "./bot-runtime.js";
 import { startWorker } from "./worker.js";
