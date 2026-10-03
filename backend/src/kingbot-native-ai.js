@@ -809,7 +809,7 @@ export async function runNativeKingbotAI(input = {}) {
   const conversationMode = String(conversationSignalsResult.intent || "");
   const socialModes = new Set([
     "GREETING","WELLBEING","WHAT_IS_UP","PRESENCE","THANKS","APPRECIATION",
-    "GOODBYE","IDENTITY","INTELLIGENCE","CAPABILITY","EMOTION_PROBE","HELP",
+    "GOODBYE","IDENTITY","INTELLIGENCE","CAPABILITY","EMOTION_PROBE","TONE_FEEDBACK","HELP",
     "META_FEEDBACK","CASUAL"
   ]);
 
