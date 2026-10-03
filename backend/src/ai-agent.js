@@ -3,6 +3,7 @@ import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getBotDefinitions } from "./bot-engines.js";
 import { runNativeKingbotAI } from "./kingbot-native-ai.js";
 import { webSearchStatus } from "./kingbot-web-search.js";
+import { identitySnapshot, buildCognitivePlan } from "./kingbot-intelligence-core.js";
 
 const DEFAULT_SYMBOLS=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 const MODEL=String(process.env.GEMINI_AGENT_MODEL||process.env.GEMINI_MODEL||"gemini-2.5-flash-lite").trim();
@@ -11,6 +12,7 @@ const ai=API_KEY?new GoogleGenAI({apiKey:API_KEY}):null;
 const EXTERNAL_PROVIDER=String(process.env.KINGBOT_AI_EXTERNAL_PROVIDER || (API_KEY?"gemini":"none")).trim().toLowerCase();
 
 const SYSTEM=`You are KINGBOT AI, the proprietary intelligence agent for KINGBOT FINTECH.
+You operate as a persistent intelligence core, not a chatbot. Maintain the KINGBOT identity, mission and cognitive discipline supplied in context.
 You are a market-intelligence and platform-operations agent, not a profit predictor.
 Use ONLY supplied verified context. Never invent prices, trades, broker state, account values, performance, news, or technical indicators.
 When live market context is unavailable, say so clearly.
@@ -46,7 +48,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     res.json({
       ok:true,agentReady:true,nativeReady:true,externalProvider:EXTERNAL_PROVIDER,model:EXTERNAL_PROVIDER==="gemini"&&ai?MODEL:"KINGBOT-CORE-1",mode:"KINGBOT_NATIVE_INTELLIGENCE_AGENT",
       authority:"ANALYSIS_ONLY",marketData:feed.status(),brokerConnected:Boolean(brokerStatus?.connected),
-      engines:Object.keys(getBotDefinitions()),webResearch:webSearchStatus()
+      engines:Object.keys(getBotDefinitions()),webResearch:webSearchStatus(),identity:identitySnapshot(),cognitiveLoop:identitySnapshot().cognitiveLoop
     });
   });
 
@@ -57,16 +59,17 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     if(!question)return res.status(400).json({ok:false,error:"AI_AGENT_MESSAGE_REQUIRED"});
     const conversation=Array.isArray(req.body?.conversation)?req.body.conversation.slice(-6).map(item=>({role:item?.role==="assistant"?"assistant":"user",content:String(item?.content||"").slice(0,1800)})):[];
     const native=await runNativeKingbotAI({question,symbol,twelveData:feed,pool,broker,userId:user.id,conversation});
+    const cognitivePlan=native?.cognition?.plan || buildCognitivePlan({intent:native?.intent || "PLATFORM_SUPPORT",symbol,conversation});
 
     // Connection/account/runtime questions must stay on the verified native
     // path so an external language model cannot invent or reinterpret private
     // broker state when the account is not connected.
     if(["CONNECTION_INTELLIGENCE","ACCOUNT_INTELLIGENCE","RUNTIME_INTELLIGENCE"].includes(String(native?.intent||""))){
-      return res.json({ok:true,agent:"KINGBOT",...native,sources:native.sources||[],generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
+      return res.json({ok:true,agent:"KINGBOT",...native,cognitivePlan,sources:native.sources||[],generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
     }
 
     if(EXTERNAL_PROVIDER!=="gemini" || !ai){
-      return res.json({ok:true,agent:"KINGBOT",...native,sources:native.sources||[],generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
+      return res.json({ok:true,agent:"KINGBOT",...native,cognitivePlan,sources:native.sources||[],generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
     }
 
     const context=buildContext({symbol,twelveData:feed,broker,botDefinitions:getBotDefinitions()});
@@ -75,6 +78,9 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     context.nativeProvider=native.provider;
     context.webResearch=native.sources||[];
     context.conversation=conversation;
+    context.kingbotIdentity=identitySnapshot();
+    context.cognitivePlan=cognitivePlan;
+    context.cognitiveAudit=native?.cognition?.audit || null;
     let account=null,positions=[];
     try{
       const status=await broker.getStatus(user.id);
@@ -93,6 +99,15 @@ VERIFIED KINGBOT CONTEXT:
 ${JSON.stringify(context)}
 
 
+COGNITIVE OPERATING CONTRACT:
+- Treat KINGBOT identity as persistent system state, not a chat persona.
+- Execute the supplied cognitive plan in order: identify -> observe -> correlate -> challenge -> adapt -> verify -> explain, using only the stages required for this request.
+- Distinguish observed facts, derived analysis, uncertainty and decisions.
+- When evidence conflicts, surface the conflict instead of averaging it away.
+- When evidence is missing or stale, downgrade confidence and say what is missing.
+- Do not manufacture reasoning steps, live values, broker state, sources or outcomes.
+- The response is advisory; execution remains outside the conversational model.
+
 RESEARCH RULES:
 - If webResearch contains results, treat them as source material, not guaranteed truth.
 - Do not invent facts that are absent from the supplied sources.
@@ -108,7 +123,8 @@ Respond with JSON:
  "technicalAnalysis":["..."],
  "setup":{"signal":"ENTRY_CONFIRMING|WAIT|NO_TRADE|DATA_INSUFFICIENT","entry":null,"waitFor":"...","invalidation":"..."},
  "riskFlags":["..."],
- "nextAction":"..."
+ "nextAction":"...",
+ "intelligence": {"mode":"...", "epistemicStatus":"CONTROLLED", "capabilitiesUsed":[]}
 }`;
 
     try{
