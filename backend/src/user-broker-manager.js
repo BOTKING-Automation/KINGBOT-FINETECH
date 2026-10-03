@@ -587,10 +587,10 @@ export class UserBrokerManager {
       return {connected:true,data:{
         ...raw,
         balance:Number.isFinite(Number(raw.balance))?Number(raw.balance):null,
-        equity:Number.isFinite(Number(raw.equity))?Number(raw.equity):Number(raw.balance),
+        equity:Number.isFinite(Number(raw.equity))?Number(raw.equity):null,
         currency:raw.currency||null,
         loginid:raw.loginid||entry.accountId,
-        tradeAllowed:raw.tradeAllowed!==false,
+        tradeAllowed:typeof raw.tradeAllowed==="boolean"?raw.tradeAllowed:null,
         provider:"deriv",
         accountType,
         balanceUpdatedAt:entry.api?.accountBalanceAt?new Date(entry.api.accountBalanceAt).toISOString():null,
