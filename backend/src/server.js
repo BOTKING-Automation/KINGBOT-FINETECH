@@ -208,6 +208,24 @@ app.get("/api/markets/synthetics/quotes", async (req,res)=>{
   }
 });
 
+app.post("/api/terminal/positions/:positionId/close", async (req,res)=>{
+  const user=await requireUser(pool,req,res); if(!user)return;
+  const positionId=String(req.params.positionId||"").trim();
+  if(!positionId)return res.status(400).json({ok:false,error:"POSITION_ID_REQUIRED"});
+  try{
+    const result=await broker.closePosition({userId:user.id,positionId});
+    await pool.query(
+      "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'TERMINAL_POSITION_CLOSED',$2::jsonb)",
+      [user.id,JSON.stringify({positionId})]
+    );
+    res.json({ok:true,positionId,...result});
+  }catch(error){
+    const message=String(error?.message||"BROKER_POSITION_CLOSE_FAILED").slice(0,220);
+    const status=/UNSUPPORTED|NOT_CONNECTED|OWNER_MISMATCH|USER_CONTEXT/.test(message)?409:500;
+    res.status(status).json({ok:false,error:message});
+  }
+});
+
 app.get("/api/connection", async (req,res)=>{
   const user=await requireUser(pool,req,res); if(!user)return;
   try{
