@@ -57,26 +57,32 @@ export async function verifyAuditChain(pool,{limit=1000}={}){
   if(!pool)return {ok:false,error:"POOL_UNAVAILABLE"};
   const count=Math.max(1,Math.min(10000,Number(limit)||1000));
   const q=await pool.query(
-    "SELECT id,user_id,event_type,metadata,created_at,previous_entry_hash,entry_hash FROM kingbot_audit_log ORDER BY created_at DESC,id DESC LIMIT $1",
+    `SELECT id,user_id,event_type,metadata,created_at,previous_entry_hash,entry_hash,
+      encode(digest(
+        coalesce(id::text,'') || '|' ||
+        coalesce(user_id::text,'') || '|' ||
+        coalesce(event_type,'') || '|' ||
+        coalesce(metadata::text,'{}') || '|' ||
+        coalesce(created_at::text,'') || '|' ||
+        coalesce(previous_entry_hash,''),
+        'sha256'
+      ),'hex') AS expected_hash
+     FROM kingbot_audit_log
+     ORDER BY created_at DESC,id DESC
+     LIMIT $1`,
     [count]
   );
-  let nextExpected=null;
-  for(const row of q.rows.reverse()){
-    const expected=crypto.createHash("sha256").update(
-      [
-        row.id ?? "",
-        row.user_id ?? "",
-        row.event_type ?? "",
-        JSON.stringify(row.metadata ?? {}),
-        row.created_at ?? "",
-        row.previous_entry_hash ?? ""
-      ].join("|"),
-      "utf8"
-    ).digest("hex");
-    if(row.entry_hash && row.entry_hash!==expected){
-      return {ok:false,verifiedEntries:q.rowCount,corruptEntryId:row.id};
+  const rows=q.rows.slice().reverse();
+  for(const row of rows){
+    if(row.entry_hash && row.entry_hash!==row.expected_hash){
+      return {ok:false,verifiedEntries:rows.length,corruptEntryId:row.id};
     }
-    nextExpected=row.entry_hash||nextExpected;
   }
-  return {ok:true,verifiedEntries:q.rowCount};
+  for(let i=1;i<rows.length;i++){
+    const expectedPrevious=rows[i-1].entry_hash||null;
+    if(rows[i].previous_entry_hash!==expectedPrevious){
+      return {ok:false,verifiedEntries:i,brokenLinkEntryId:rows[i].id};
+    }
+  }
+  return {ok:true,verifiedEntries:rows.length};
 }
