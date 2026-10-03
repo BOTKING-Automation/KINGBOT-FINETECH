@@ -4,6 +4,7 @@ import { ExnessTraderClient } from "./exness-trader-client.js";
 import { OandaTraderClient } from "./oanda-trader-client.js";
 import { DerivTraderClient } from "./deriv-trader-client.js";
 import { Mt5BridgeConnection, mt5BridgeRegistry } from "./mt5-bridge.js";
+import { getGlobalRiskState } from "./global-risk.js";
 
 const ALGORITHM="aes-256-gcm";
 
@@ -308,6 +309,10 @@ export class UserBrokerManager {
   }
 
   async assertExecutionAuthorized(userId){
+    const globalRisk=await getGlobalRiskState(this.pool);
+    if(globalRisk.globalKillSwitch)throw new Error("GLOBAL_KILL_SWITCH_ACTIVE");
+    if(globalRisk.tradingPaused)throw new Error("GLOBAL_TRADING_PAUSED");
+
     const mapping=await this.getMapping(userId);
     if(!mapping)throw new Error("BROKER_ACCOUNT_NOT_CONFIGURED");
     const mode=String(mapping.execution_mode||"DEMO").toUpperCase();
