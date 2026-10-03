@@ -148,6 +148,7 @@ export class UserBrokerManager {
     // account mapping is persistent. Rehydrate the connection after a
     // Render restart, idle wake-up, broker socket close, or worker/page transition.
     const mapping=await this.getMapping(userId);
+    if(mapping?.provider==="deriv")return {connected:false,mode:"NOT_CONNECTED",reason:"DERIV_OPTIONS_DISABLED_USE_DERIV_MT5_CFD"};
     if(!mapping)return false;
 
     try{
@@ -223,6 +224,7 @@ export class UserBrokerManager {
     const mode=requestedMode;
     const id=String(accountId||"").trim();
     const providerName=String(provider).toLowerCase();
+    if(providerName==="deriv")return {ok:false,error:"DERIV_OPTIONS_DISABLED_USE_DERIV_MT5_CFD",message:"KINGBOT CFD execution does not accept Deriv Options accounts. Connect the user Deriv MT5 CFD account through the KINGBOT MT5 Bridge."};
     const isExness=providerName==="exness";
     let secretValue=String(accountToken||"").trim();
     if(isExness){
