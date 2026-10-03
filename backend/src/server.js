@@ -33,7 +33,7 @@ import { createMt5HostingRouter, ensureMt5HostingSchema } from "./mt5-hosting.js
 import { createFintechOpsRouter, ensureFintechOpsSchema } from "./fintech-operations.js";
 import { ensureGlobalRiskSchema, getGlobalRiskState } from "./global-risk.js";
 import { registerGoldSignals, ensureGoldSignalsSchema } from "./gold-signals.js";
-import { registerIntelligenceOrchestrator } from "./intelligence-orchestrator.js";
+import { registerIntelligenceOrchestrator, ensureIntelligenceOrchestratorSchema } from "./intelligence-orchestrator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -372,7 +372,7 @@ app.use((_req, res) => {
   res.status(404).json({ ok: false, error: "Route not found." });
 });
 
-ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => ensureFintechOpsSchema(pool)).then(() => ensureGlobalRiskSchema(pool)).then(() => ensureGoldSignalsSchema(pool)).then(() => ensureAiMarketScannerSchema(pool)).then(() => partners.ensureSchema()).then(() => {
+ensureAuthSchema(pool).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => ensureFintechOpsSchema(pool)).then(() => ensureGlobalRiskSchema(pool)).then(() => ensureGoldSignalsSchema(pool)).then(() => ensureAiMarketScannerSchema(pool)).then(() => ensureIntelligenceOrchestratorSchema(pool)).then(() => partners.ensureSchema()).then(() => {
   app.listen(PORT, () => {
     console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
     void startWorker().then(() => {}).catch((error) => console.error("[KINGBOT WORKER]", error?.message || error));
