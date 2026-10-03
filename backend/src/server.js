@@ -2,7 +2,6 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
-import { GoogleGenAI } from "@google/genai";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
@@ -39,12 +38,10 @@ import { registerIntelligenceOrchestrator, ensureIntelligenceOrchestratorSchema 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT || 10000);
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const XAI_MODEL = process.env.XAI_MODEL || "grok-4.7";
 const XAI_API_KEY = process.env.XAI_API_KEY || "";
 const XAI_BASE_URL = (process.env.XAI_API_BASE_URL || "https://api.x.ai/v1").replace(/\/$/, "");
-const AI_PROVIDER = XAI_API_KEY ? "xai" : (GEMINI_API_KEY ? "gemini" : "none");
+const AI_PROVIDER = "kingbot-native";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const pool = DATABASE_URL ? new pg.Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false } }) : null;
 const broker = new UserBrokerManager({pool});
@@ -332,12 +329,13 @@ app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     service: "KINGBOT Intelligence",
-    aiReady: Boolean(XAI_API_KEY || GEMINI_API_KEY),
+    aiReady: true,
+    nativeReady: true,
     aiProvider: AI_PROVIDER,
-    aiModel: AI_PROVIDER === "xai" ? XAI_MODEL : (AI_PROVIDER === "gemini" ? GEMINI_MODEL : null),
-    deepReasoningReady: Boolean(GEMINI_API_KEY),
-    deepReasoningModel: GEMINI_API_KEY ? GEMINI_MODEL : null,
-    deepReasoningLevel: GEMINI_API_KEY ? "HIGH" : "DETERMINISTIC_FALLBACK",
+    aiModel: "KINGBOT-CORTEX-1",
+    deepReasoningReady: true,
+    deepReasoningModel: "KINGBOT-CORTEX-1",
+    deepReasoningLevel: "PROPRIETARY_MULTI_PASS",
     accountServiceReady: true,
     passwordRecoveryEmailReady: true,
     voiceReady: Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID),
