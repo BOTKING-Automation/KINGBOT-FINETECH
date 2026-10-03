@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#050a18">
+<meta name="description" content="KINGBOT FINTECH platform operating system and product capability map.">
+<title>KINGBOT FINTECH — Platform OS</title>
+<link rel="stylesheet" href="system/platform.css">
+<style>
+body{margin:0;background:#02040a;color:#eef2ff;font-family:Space Grotesk,system-ui}
+.wrap{width:min(1220px,calc(100% - 28px));margin:92px auto 60px}
+.hero,.panel,.cap{border:1px solid rgba(246,185,59,.15);border-radius:18px;background:linear-gradient(145deg,rgba(8,15,34,.96),rgba(3,7,15,.98));box-shadow:0 20px 70px rgba(0,0,0,.25)}
+.hero{padding:26px}.ey{font:800 9px ui-monospace;color:#19e6ff;letter-spacing:.2em}.hero h1{margin:8px 0 10px;font:900 34px Orbitron}.hero p{margin:0;color:#93a0c9;line-height:1.7;max-width:820px}
+.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.pill{padding:7px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.08);font:800 8px ui-monospace;color:#c8d2e8}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}.cap{padding:17px}.cap h2{margin:0 0 6px;font:900 11px Orbitron}.cap p{margin:0;color:#8f9db8;font-size:10px;line-height:1.65}.cap .top{display:flex;justify-content:space-between;gap:10px;align-items:center}.status{font:800 7px ui-monospace;letter-spacing:.08em;padding:5px 7px;border-radius:7px;background:rgba(25,230,255,.06);border:1px solid rgba(25,230,255,.15);color:#6ceeff}.status.planned{color:#ffd977;border-color:rgba(246,185,59,.18);background:rgba(246,185,59,.06)}.status.foundation{color:#c6b0ff;border-color:rgba(155,92,255,.18);background:rgba(155,92,255,.06)}.cap small{display:block;margin-top:11px;color:#63718b;font:700 7px ui-monospace}.cap a{display:inline-block;margin-top:9px;color:#19e6ff;font:800 8px ui-monospace}
+h3{margin:25px 0 8px;font:900 13px Orbitron;color:#ffd977}
+@media(max-width:900px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:620px){.grid{grid-template-columns:1fr}.wrap{margin-top:78px}.hero h1{font-size:27px}}
+</style></head><body>
+<div data-kingbot-navigation></div>
+<main class="wrap">
+<section class="hero"><div class="ey">KINGBOT FINTECH / COMPANY OPERATING SYSTEM</div>
+<h1>ONE TRADING TECHNOLOGY PLATFORM.</h1>
+<p>The platform is being built as a multi-product trading technology company: market intelligence, automated strategies, broker connectivity, execution infrastructure, analytics, developer APIs, subscriptions, partner revenue, institutional tooling and compliance-ready operations.</p>
+<div class="meta"><span class="pill">TRADING CORE</span><span class="pill">EXECUTION</span><span class="pill">INTELLIGENCE</span><span class="pill">COMMERCIAL</span><span class="pill">TRUST</span><span class="pill">SCALE</span></div></section>
+<div id="caps"></div>
+</main>
+<script src="system/navigation.js"></script><script src="system/kingbot-platform-capabilities.js"></script>
+<script>
+(function(){
+const root=document.getElementById("caps"), data=window.KINGBOT_CAPABILITIES||[];
+const groups=[...new Set(data.map(x=>x.group))];
+root.innerHTML=groups.map(g=>'<h3>'+g+'</h3><section class="grid">'+data.filter(x=>x.group===g).map(x=>'<article class="cap"><div class="top"><h2>'+x.name+'</h2><span class="status '+x.status+'">'+x.status.toUpperCase()+'</span></div><p>'+x.desc+'</p>'+(x.href?'<a href="'+x.href+'">OPEN MODULE →</a>': '')+'<small>ID: '+x.id+'</small></article>').join("")+'</section>').join("");
+})();
+</script>
+</body></html>
