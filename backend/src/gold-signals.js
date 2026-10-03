@@ -1,14 +1,10 @@
 import "dotenv/config";
 import { Router } from "express";
-import { GoogleGenAI } from "@google/genai";
 import { requireUser } from "./subscriptions.js";
 import { isAdminEmail } from "./admin-access.js";
 import { getDerivMarketFeed } from "./deriv-market-feed.js";
 
 const publicDerivFeed = getDerivMarketFeed();
-const GEMINI_API_KEY = String(process.env.GEMINI_API_KEY || "").trim();
-const GEMINI_MODEL = String(process.env.GEMINI_MODEL || "gemini-3.5-flash-lite").trim();
-const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
 const SIGNAL_STATES = ["DRAFT","PUBLISHED","CLOSED","CANCELLED"];
 const DIRECTIONS = ["BUY","SELL","WAIT"];
@@ -186,71 +182,54 @@ function sanitizeEvidence(items){
   }
   return total;
 }
-function evidenceForAI(items){
+function legacyEvidenceForAI(items){
   return (Array.isArray(items)?items:[]).slice(0,4).map(item=>{
     const match=String(item?.dataUrl||"").match(/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i);
     return match?{mimeType:match[1],data:match[2].replace(/\s+/g,"")}:null;
   }).filter(Boolean);
 }
 async function runAiReview(signal,quote){
-  if(!ai){
-    return {
-      status:"PENDING",
-      message:"KINGBOT AI review is not configured on the backend yet. The published setup remains a human-authored market signal.",
-      checks:["AI_PROVIDER_UNAVAILABLE"],
-      model:null
-    };
+  const checks=[];
+  const price=finite(quote?.price);
+  const entryMin=finite(signal?.entryMin);
+  const entryMax=finite(signal?.entryMax);
+  const sl=finite(signal?.sl);
+  const tp1=finite(signal?.tp1);
+  const tp2=finite(signal?.tp2);
+  const tp3=finite(signal?.tp3);
+  const entry=finite(signal?.entry);
+  const direction=clean(signal?.direction,12).toUpperCase();
+
+  const valid=validateSignal({
+    direction,timeframe:clean(signal?.timeframe,12).toLowerCase(),
+    entry,entryMin,entryMax,sl,tp1,tp2,tp3,
+    reason:clean(signal?.reason,1800),
+    waitFor:clean(signal?.waitFor,1000),
+    state:"PUBLISHED",
+    evidence:Array.isArray(signal?.evidence)?signal.evidence:[]
+  });
+  if(valid){checks.push("SIGNAL_STRUCTURE_INVALID");return {status:"CONFLICT",message:"KINGBOT Cortex rejected the signal structure: "+valid,checks,model:"KINGBOT-CORTEX-1"};}
+
+  if(price===null){
+    checks.push("LIVE_QUOTE_UNAVAILABLE");
+    return {status:"WAIT",message:"KINGBOT Cortex verified the signal structure but has no fresh live gold quote for external-price validation.",checks,model:"KINGBOT-CORTEX-1"};
   }
-  const evidence=evidenceForAI(signal.evidence);
-  const prompt=[
-    "You are KINGBOT AI reviewing a human-authored XAUUSD market signal.",
-    "Do not invent prices, candles, news, fills or performance.",
-    "Treat the supplied signal levels as the only intended order plan.",
-    "Return a disciplined review, not a profit promise and not execution authority.",
-    "Classify the setup as CONFIRMED, WAIT, or CONFLICT.",
-    "CONFIRMED means the supplied direction and level structure is internally coherent and the live quote is not contradicting the setup.",
-    "WAIT means the plan is coherent but the wait-for condition is still required.",
-    "CONFLICT means the plan has an obvious structural contradiction or the live quote clearly invalidates it.",
-    "Keep the public message under 280 characters.",
-    "Return JSON only.",
-    "SIGNAL:"+JSON.stringify({
-      direction:signal.direction,entry:signal.entry,entryMin:signal.entryMin,entryMax:signal.entryMax,
-      tp1:signal.tp1,tp2:signal.tp2,tp3:signal.tp3,sl:signal.sl,
-      timeframe:signal.timeframe,reason:signal.reason,waitFor:signal.waitFor
-    }),
-    "LIVE_QUOTE:"+JSON.stringify(quote||{})
-  ].join("\n");
-  try{
-    const parts=[{text:prompt}];
-    for(const img of evidence)parts.push({inlineData:{mimeType:img.mimeType,data:img.data}});
-    const response=await ai.models.generateContent({
-      model:GEMINI_MODEL,
-      contents:[{role:"user",parts}],
-      config:{
-        systemInstruction:"KINGBOT AI market review. Verify only supplied evidence and market facts. Never promise profit.",
-        responseMimeType:"application/json",
-        temperature:0.1,
-        maxOutputTokens:240
-      }
-    });
-    const raw=String(response.text||"").trim();
-    const parsed=JSON.parse(raw);
-    const status=["CONFIRMED","WAIT","CONFLICT"].includes(parsed.status)?parsed.status:"WAIT";
-    return {
-      status,
-      message:clean(parsed.message,280)||"KINGBOT AI review completed.",
-      checks:Array.isArray(parsed.checks)?parsed.checks.slice(0,5).map(x=>clean(x,120)):[],
-      model:GEMINI_MODEL
-    };
-  }catch(error){
-    console.error("[KINGBOT GOLD AI]",error?.message||error);
-    return {
-      status:"WAIT",
-      message:"KINGBOT AI review is temporarily unavailable; use the published levels and wait-for condition until a fresh review arrives.",
-      checks:["AI_REVIEW_ERROR"],
-      model:GEMINI_MODEL
-    };
+
+  const inside=price>=entryMin&&price<=entryMax;
+  const beyondStop=direction==="BUY"?price<=sl:direction==="SELL"?price>=sl:false;
+  const beyondTp3=direction==="BUY"?price>=tp3:direction==="SELL"?price<=tp3:false;
+
+  if(beyondStop){checks.push("PRICE_AT_OR_BEYOND_SL");return {status:"CONFLICT",message:"KINGBOT Cortex detected live price at or beyond the published stop boundary.",checks,model:"KINGBOT-CORTEX-1"};}
+  if(beyondTp3){checks.push("PRICE_AT_OR_BEYOND_TP3");return {status:"WAIT",message:"KINGBOT Cortex sees the published target area already reached; the original entry thesis is no longer a fresh setup.",checks,model:"KINGBOT-CORTEX-1"};}
+  if(inside){
+    checks.push("ENTRY_ZONE_REACHED");
+    checks.push("LEVEL_ORDER_VALID");
+    return {status:"CONFIRMED",message:"KINGBOT Cortex verified the published level structure and live price is inside the intended entry zone. This is not execution authorization.",checks,model:"KINGBOT-CORTEX-1"};
   }
+
+  checks.push("ENTRY_ZONE_NOT_REACHED");
+  checks.push("WAIT_CONDITION_ACTIVE");
+  return {status:"WAIT",message:"KINGBOT Cortex verified the signal structure, but the live price is outside the entry zone. Preserve the wait-for condition.",checks,model:"KINGBOT-CORTEX-1"};
 }
 function entryReached(direction,price,min,max){
   if(price===null||min===null||max===null||direction==="WAIT")return false;
