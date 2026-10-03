@@ -212,20 +212,24 @@ function deriveTechnicalFromBars(bars) {
   if(!Array.isArray(bars)||bars.length<60)return null;
   const closes=bars.map(b=>b.close), highs=bars.map(b=>b.high), lows=bars.map(b=>b.low);
   const e20=emaSeries(closes,20), e50=emaSeries(closes,50);
-  const ema20=e20.at(-1), ema50=e50.at(-1), rsi=rsiValue(closes,14), atr=atrValue(bars,14);
+  const ema20=e20.at(-1), ema50=e50.at(-1), rsi=rsiValue(closes,14), atr=atrValue(bars,14), atr60=atrValue(bars,60);
   const fast=emaSeries(closes,12), slow=emaSeries(closes,26);
   const macdSeries=closes.map((_,i)=>fast[i]!=null&&slow[i]!=null?fast[i]-slow[i]:null).filter(v=>v!=null);
   const macd=sma(macdSeries.slice(-9),9), macdLine=macdSeries.at(-1);
   const last=bars.at(-1), prev=bars.at(-2), recentHigh=Math.max(...highs.slice(-20,-1)), recentLow=Math.min(...lows.slice(-20,-1));
   const priorHigh=Math.max(...highs.slice(-40,-20)), priorLow=Math.min(...lows.slice(-40,-20));
   const trend=ema20>ema50&&last.close>ema20?"BULLISH":ema20<ema50&&last.close<ema20?"BEARISH":"NEUTRAL";
+  const roc5=closes.length>=6 ? (last.close-closes.at(-6))/Math.max(Math.abs(closes.at(-6)),1e-12) : 0;
+  const momentum=Math.max(-1,Math.min(1,(rsi==null?0:(rsi-50)/20)*0.65 + Math.max(-1,Math.min(1,roc5/0.003))*0.35));
+  const volatility=atr!=null&&atr60!=null&&atr60>0 ? Math.max(0,Math.min(1,(atr/atr60)/1.8)) : 0;
+  const structure=trend==="BULLISH"?"bullish":trend==="BEARISH"?"bearish":"unknown";
   const bos=last.close>recentHigh?"BULLISH":last.close<recentLow?"BEARISH":"NONE";
   const choch=(prev.close<=priorHigh&&last.close>priorHigh)?"BULLISH":(prev.close>=priorLow&&last.close<priorLow)?"BEARISH":"NONE";
   const liquiditySweep=(last.low<recentLow&&last.close>recentLow)?"BULLISH":(last.high>recentHigh&&last.close<recentHigh)?"BEARISH":"NONE";
   const fvg=bars.length>=4 && (bars.at(-1).low>bars.at(-3).high || bars.at(-1).high<bars.at(-3).low);
   return {
     close:last.close, price:last.close, ema20, ema50, rsi14:rsi, macd:macdLine, macdSignal:macd,
-    atr14:atr, support:recentLow, resistance:recentHigh, trend, bos, choch,
+    atr14:atr, support:recentLow, resistance:recentHigh, trend, structure, momentum, volatility, roc5, bos, choch,
     liquiditySweep, fvg, source:"Twelve Data OHLC + KINGBOT technical engine",
     barTime:last.datetime||last.timestamp||null, receivedAt:new Date().toISOString()
   };
