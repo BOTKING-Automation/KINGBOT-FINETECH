@@ -46,25 +46,32 @@
     if(state.loading)return;
     state.loading=true;emit("refresh:start");
     try{
-      try{state.auth=await request("/api/auth/session",{forceToken:false});}
+      let core=null;
+      try{core=await request("/api/command/snapshot",{forceToken:false});}
       catch(error){
         state.auth={ok:false,authenticated:false,error:String(error?.message||error)};
-        state.broker=null;state.account=null;state.subscription=null;state.risk=null;state.market=null;
+        state.broker=null;state.account=null;state.subscription=null;state.risk=null;state.runtime=null;state.botSelection=null;
         emit(reason+":guest");
         return {...state};
       }
-      const tasks=[
-        ["broker",request("/api/connection")],
-        ["subscription",request("/api/subscription/status")],
-        ["risk",request("/api/execution-control")],
-        ["runtime",request("/api/runtime")],
-        ["botSelection",request("/api/runtime/selection/current")],
-        ["account",request("/api/terminal/snapshot")]
-      ];
-      if(includeMarket)tasks.push(["market",request("/api/markets/live?synthetics=true")]);
-      for(const [key,p] of tasks){
-        try{state[key]=await p}catch(e){state[key]={ok:false,unavailable:true,error:String(e?.message||e)}}
+
+      state.auth={ok:true,authenticated:true,user:core.user||null};
+      state.broker=core.broker||null;
+      state.account=core.account?{ok:true,account:core.account}:null;
+      state.subscription=core.subscription?{ok:true,subscription:core.subscription}:null;
+      state.risk={ok:true,executionControl:core.risk||{}};
+      state.runtime={ok:true,bots:core.bots?.bots||[]};
+      const selectedId=core.bots?.selectedBotId||null;
+      const selectedBot=(core.bots?.bots||[]).find(x=>x.botId===selectedId)||null;
+      state.botSelection={ok:true,selectedBotId:selectedId,updatedAt:core.bots?.selectedAt||null,bot:selectedBot};
+      state.market={ok:true,quotes:core.marketQuotes||[],generatedAt:core.generatedAt,latencyMs:core.latencyMs};
+      if(includeMarket){
+        try{
+          const live=await request("/api/markets/live?synthetics=true");
+          state.market={...state.market,live};
+        }catch{}
       }
+      if(core.eventBus)state.eventBus=core.eventBus;
       emit(reason);
       return {...state};
     }finally{state.loading=false;}
