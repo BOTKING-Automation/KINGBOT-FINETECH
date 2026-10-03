@@ -296,6 +296,414 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 @media(max-width:1180px){.history-console{grid-template-columns:1fr}}
 @media(max-width:760px){.shell,.topbar-inner{width:min(100% - 18px,1640px)}.brand{min-width:auto}.brand-text span,.clock{display:none}.hero-main{padding:20px}.sync-grid{grid-template-columns:repeat(2,1fr)}.engine-status-hero{grid-template-columns:1fr}.telemetry-grid{grid-template-columns:repeat(2,1fr)}.plan-grid{grid-template-columns:repeat(3,1fr)}.identity{grid-template-columns:1fr}.grid-4{grid-template-columns:1fr 1fr}.top-actions .btn{display:none}}
 @media(max-width:480px){.grid-4{grid-template-columns:1fr}.sync-grid{grid-template-columns:1fr}.hero h1{font-size:28px}.plan-grid{grid-template-columns:repeat(2,1fr)}.quote-grid{grid-template-columns:1fr 1fr}.hero-actions .btn{width:100%}}
+/* =========================================================
+   FRIENDLY TERMINAL UI — clarity-first redesign
+========================================================= */
+:root{
+  --bg:#05080d;
+  --panel:#0b1119;
+  --panel2:#0e1621;
+  --panel3:#131d29;
+  --line:rgba(148,163,184,.12);
+  --text:#f4f7fb;
+  --muted:#94a3b8;
+  --dim:#5f6f83;
+  --cyan:#33d6ff;
+  --gold:#f4c95d;
+  --green:#38e78b;
+  --red:#ff647d;
+  --orange:#ffab57;
+  --violet:#a879ff;
+  --blue:#71a2ff;
+  --pink:#ff6de1;
+  --matrix:#38e78b;
+  --shadow:0 18px 55px rgba(0,0,0,.30);
+  --radius:16px;
+}
+html{background:var(--bg)!important;overflow-x:hidden!important;overflow-y:auto!important}
+body.kb-terminal-page{
+  min-height:0!important;
+  height:auto!important;
+  padding:0!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  background:
+    radial-gradient(circle at 7% 0%,rgba(56,231,139,.075),transparent 26%),
+    radial-gradient(circle at 93% 4%,rgba(51,214,255,.08),transparent 24%),
+    radial-gradient(circle at 78% 55%,rgba(168,121,255,.055),transparent 28%),
+    #05080d!important;
+}
+body.kb-terminal-page:before,
+body.kb-terminal-page:after{
+  position:fixed!important;
+  inset:0!important;
+  clip-path:inset(0)!important;
+}
+body.kb-terminal-page:before{
+  opacity:.28!important;
+  background-image:
+    linear-gradient(rgba(120,150,180,.05) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(120,150,180,.05) 1px,transparent 1px)!important;
+}
+body.kb-terminal-page:after{opacity:.13!important}
+
+.kb-terminal-page main.shell{
+  width:min(1520px,calc(100% - 32px))!important;
+  padding:18px 0 12px!important;
+}
+.topbar{
+  background:rgba(5,8,13,.88)!important;
+  border-bottom:1px solid rgba(148,163,184,.10)!important;
+  box-shadow:0 8px 28px rgba(0,0,0,.24)!important;
+}
+.topbar-inner{
+  width:min(1520px,calc(100% - 32px))!important;
+  min-height:64px!important;
+}
+.brand{gap:12px}
+.brand-mark{
+  width:38px!important;height:38px!important;border-radius:12px!important;
+  background:linear-gradient(135deg,var(--gold),var(--cyan))!important;
+  box-shadow:0 0 22px rgba(51,214,255,.16)!important;
+}
+.brand-text strong{font-size:12px!important}
+.brand-text span{font-size:8px!important;color:#64748b!important}
+.nav{gap:4px!important}
+.nav a{
+  padding:9px 11px!important;
+  border-radius:9px!important;
+  color:#8b98ab!important;
+  font-size:10px!important;
+}
+.nav a.active{
+  color:#f7fbff!important;
+  background:rgba(255,255,255,.055)!important;
+}
+.live-status{
+  padding:8px 10px!important;
+  background:rgba(56,231,139,.05)!important;
+  border-color:rgba(56,231,139,.16)!important;
+}
+.clock{font-size:8px!important;color:#68778b!important}
+
+.hero{
+  grid-template-columns:minmax(0,1.38fr) minmax(330px,.72fr)!important;
+  gap:12px!important;
+  margin-top:12px!important;
+}
+.hero-main,.hero-engine{
+  border-radius:20px!important;
+  border-color:rgba(148,163,184,.11)!important;
+  background:linear-gradient(145deg,rgba(10,16,24,.97),rgba(6,10,16,.99))!important;
+  box-shadow:var(--shadow),inset 0 0 26px rgba(51,214,255,.02)!important;
+  animation:none!important;
+}
+.hero-main{padding:24px!important}
+.eyebrow{
+  color:var(--cyan)!important;
+  font-size:9px!important;
+  letter-spacing:.14em!important;
+}
+.hero h1{
+  max-width:720px!important;
+  margin-top:12px!important;
+  font-size:clamp(28px,3.35vw,46px)!important;
+  line-height:1.08!important;
+  letter-spacing:-.025em!important;
+}
+.hero-copy{
+  max-width:700px!important;
+  margin-top:12px!important;
+  color:#91a0b4!important;
+  font-size:12px!important;
+  line-height:1.7!important;
+}
+.hero-actions{margin-top:17px!important;gap:8px!important}
+.btn{
+  min-height:40px!important;
+  padding:10px 13px!important;
+  border-radius:10px!important;
+  font-size:9px!important;
+}
+.btn.primary{
+  background:linear-gradient(135deg,#f4c95d,#ffac4d)!important;
+  color:#101214!important;
+  box-shadow:0 10px 25px rgba(244,201,93,.10)!important;
+}
+.btn.secondary{
+  background:rgba(255,255,255,.035)!important;
+  border-color:rgba(148,163,184,.13)!important;
+}
+.hero-tags{margin-top:15px!important}
+.hero-tag{
+  padding:6px 8px!important;
+  border-color:rgba(148,163,184,.10)!important;
+  color:#8492a5!important;
+  background:rgba(255,255,255,.018)!important;
+  box-shadow:none!important;
+  font-size:7px!important;
+}
+.hero-engine{
+  padding:20px!important;
+  background:
+    radial-gradient(circle at 95% 6%,rgba(51,214,255,.08),transparent 29%),
+    radial-gradient(circle at 10% 95%,rgba(56,231,139,.06),transparent 32%),
+    linear-gradient(145deg,rgba(12,18,27,.98),rgba(7,11,18,.99))!important;
+}
+.kicker{font-size:7.5px!important;color:#718198!important}
+.engine-lock{font-size:8px!important;color:#80dff3!important}
+.engine-name{font-size:20px!important}
+.engine-grid{gap:7px!important;margin-top:15px!important}
+.engine-cell{
+  padding:10px!important;
+  background:rgba(255,255,255,.018)!important;
+  border-color:rgba(148,163,184,.08)!important;
+}
+.engine-cell span{font-size:7px!important;color:#6d7b8f!important}
+.engine-cell strong{font-size:9px!important;color:#dce5f0!important}
+.engine-foot{font-size:7px!important;color:#69788c!important}
+
+.sync-grid{
+  grid-template-columns:repeat(6,1fr)!important;
+  gap:7px!important;
+  margin-top:10px!important;
+}
+.sync{
+  min-height:70px!important;
+  padding:10px 11px!important;
+  border-color:rgba(148,163,184,.095)!important;
+  border-radius:12px!important;
+  background:rgba(9,15,22,.88)!important;
+  box-shadow:none!important;
+}
+.sync-label{font-size:7px!important;color:#708096!important}
+.sync-state{font-size:7px!important}
+.sync-main{font-size:9px!important;color:#d4deeb!important}
+.sync-time{font-size:6.5px!important;color:#58697f!important}
+
+.section{margin-top:14px!important}
+.section-head{margin:0 2px 8px!important}
+.section-title{font-size:11px!important;letter-spacing:.06em!important}
+.section-sub{font-size:9px!important;line-height:1.55!important;color:#77869a!important}
+.section-code{font-size:7px!important;color:#5f6d80!important}
+
+.grid-4{
+  grid-template-columns:repeat(4,1fr)!important;
+  gap:8px!important;
+}
+.metric{
+  padding:14px!important;
+  min-height:110px!important;
+  border-radius:14px!important;
+  border-color:rgba(148,163,184,.10)!important;
+  background:linear-gradient(145deg,rgba(11,18,26,.96),rgba(7,12,18,.98))!important;
+  box-shadow:0 10px 28px rgba(0,0,0,.18)!important;
+}
+.metric-label{font-size:7px!important;color:#7b899c!important}
+.metric-icon{font-size:9px!important;color:#6c7a8f!important}
+.metric-value{margin-top:10px!important;font-size:20px!important}
+.metric-note{font-size:6.5px!important;color:#596a80!important}
+
+.main-grid{
+  grid-template-columns:minmax(0,1.28fr) minmax(315px,.72fr)!important;
+  gap:9px!important;
+}
+.panel{
+  border-radius:15px!important;
+  border-color:rgba(148,163,184,.10)!important;
+  background:linear-gradient(145deg,rgba(10,16,24,.97),rgba(6,10,16,.99))!important;
+  box-shadow:0 12px 34px rgba(0,0,0,.19)!important;
+}
+.panel:before,.metric:before,.sync:before,.big-status:before,.signal-box:before,.account-card:before,.market:before,.risk-card:before,.activity-card:before,.hero-main:before,.hero-engine:before{
+  opacity:.18!important;
+}
+.panel-head{padding:13px 14px!important;border-bottom-color:rgba(148,163,184,.08)!important}
+.panel-badge{
+  padding:5px 7px!important;
+  font-size:6.5px!important;
+  border-color:rgba(148,163,184,.10)!important;
+  background:rgba(255,255,255,.025)!important;
+}
+.engine-dashboard{padding:13px!important}
+.big-status,.signal-box{
+  padding:15px!important;
+  border-radius:12px!important;
+  border-color:rgba(148,163,184,.09)!important;
+}
+.status-word{font-size:10px!important}
+.status-note{font-size:8px!important;color:#78869a!important}
+.signal-name{font-size:19px!important}
+.telemetry-grid{gap:7px!important}
+.telemetry-cell{padding:9px!important}
+.telemetry-cell span{font-size:6.5px!important;color:#6d7b8e!important}
+.telemetry-cell strong{font-size:9px!important}
+.plan{padding:11px!important}
+.plan-title{font-size:7px!important}
+.plan-grid{gap:6px!important}
+.plan-item span{font-size:6px!important;color:#66758a!important}
+.plan-item strong{font-size:8.5px!important}
+.tag{
+  padding:5px 7px!important;
+  background:rgba(168,121,255,.035)!important;
+  border-color:rgba(168,121,255,.10)!important;
+  font-size:6.5px!important;
+}
+
+.identity-main{
+  padding:13px!important;
+  background:rgba(56,231,139,.026)!important;
+  border-color:rgba(56,231,139,.11)!important;
+}
+.identity-state{font-size:16px!important}
+.identity-note{font-size:7px!important;color:#77869a!important}
+.id-cell{padding:9px!important}
+.id-cell span{font-size:6px!important;color:#66758a!important}
+.id-cell strong{font-size:8px!important}
+.market-symbol{font-size:19px!important}
+.market-price{font-size:17px!important}
+.quote{padding:9px!important}
+.quote span{font-size:6px!important;color:#66758a!important}
+.quote strong{font-size:9px!important}
+.market-foot{font-size:6.5px!important}
+
+.live-chart-wrap{
+  height:310px!important;
+  background:
+    radial-gradient(circle at 72% 10%,rgba(51,214,255,.055),transparent 34%),
+    linear-gradient(180deg,#09111a,#050a10)!important;
+}
+.live-chart-overlay{
+  left:13px!important;top:12px!important;
+  padding:8px 10px!important;
+  border-color:rgba(148,163,184,.10)!important;
+  background:rgba(7,12,18,.84)!important;
+}
+.live-chart-overlay strong{font-size:15px!important}
+
+.tables{gap:9px!important}
+.table th,.history-table th,.position-table th{
+  font-size:6.5px!important;
+  color:#68778b!important;
+}
+.table td,.history-table td,.position-table td{
+  font-size:7.5px!important;
+}
+.position-toolbar{
+  padding:8px 11px!important;
+  background:rgba(255,255,255,.01)!important;
+}
+.position-led{font-size:6.5px!important}
+.position-meta{font-size:6.5px!important}
+.position-action{min-width:62px!important}
+.close-position-btn{
+  padding:7px 9px!important;
+  border-radius:8px!important;
+  font-size:7px!important;
+}
+.empty{padding:26px!important}
+
+.it-console{
+  grid-template-columns:minmax(0,1.45fr) minmax(290px,.65fr)!important;
+  gap:9px!important;
+  margin-top:0!important;
+}
+.it-panel{
+  border-radius:15px!important;
+  border-color:rgba(148,163,184,.09)!important;
+  background:linear-gradient(145deg,rgba(9,15,22,.97),rgba(6,10,16,.99))!important;
+}
+.it-head{padding:11px 13px!important}
+.it-title{font-size:9px!important}
+.it-sub{font-size:6.5px!important;color:#69788c!important}
+.it-chip{font-size:6px!important}
+.it-grid{gap:6px!important;padding:9px 11px 10px!important}
+.it-cell{min-height:60px!important;padding:9px!important}
+.it-cell .k{font-size:6px!important}
+.it-cell .v{font-size:10px!important}
+.it-cell .micro{font-size:5.8px!important;color:#53647a!important}
+.it-tape{margin:0 11px 10px!important}
+.it-tape-item{padding:8px 9px!important}
+.it-tape-item span{font-size:6px!important}
+.it-tape-item strong{font-size:8.5px!important}
+.it-log{padding:0 11px 10px!important}
+
+.history-console{grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr)!important;gap:9px!important}
+.history-panel{border-radius:15px!important;border-color:rgba(148,163,184,.09)!important}
+.history-head{padding:12px 13px!important}
+.history-select,.history-refresh{
+  min-height:34px!important;
+  font-size:7px!important;
+}
+.performance-wrap{padding:12px!important}
+.performance-stat{padding:10px!important}
+.performance-stat span{font-size:6px!important}
+.performance-stat strong{font-size:13px!important}
+.curve-svg{height:135px!important}
+
+.risk-grid{grid-template-columns:1fr 1fr!important;gap:9px!important}
+.risk-card,.activity-card{padding:13px!important}
+.risk-row{padding:10px 0!important}
+.risk-name{font-size:8px!important}
+.risk-detail{font-size:7px!important}
+.risk-value{font-size:9px!important}
+.activity-list{max-height:236px!important}
+.activity time{font-size:6.5px!important}
+.activity span{font-size:7px!important}
+
+.footer-sync{
+  margin-top:9px!important;
+  padding:10px 12px!important;
+  border-radius:11px!important;
+  background:rgba(255,255,255,.018)!important;
+  font-size:6.5px!important;
+}
+
+.btn:focus-visible,.sync-button:focus-visible,.history-refresh:focus-visible,.history-select:focus-visible,.close-position-btn:focus-visible,a:focus-visible{
+  outline:2px solid rgba(51,214,255,.8)!important;
+  outline-offset:2px!important;
+}
+
+@media(max-width:1180px){
+  .nav{display:flex!important;max-width:42vw;overflow-x:auto;scrollbar-width:none}
+  .nav::-webkit-scrollbar{display:none}
+  .hero{grid-template-columns:1fr!important}
+  .sync-grid{grid-template-columns:repeat(3,1fr)!important}
+  .grid-4{grid-template-columns:repeat(2,1fr)!important}
+  .main-grid,.risk-grid,.tables,.history-console,.it-console{grid-template-columns:1fr!important}
+}
+@media(max-width:760px){
+  .kb-terminal-page main.shell,.topbar-inner{width:min(100% - 18px,1520px)!important}
+  .topbar-inner{min-height:58px!important}
+  .brand-mark{width:34px!important;height:34px!important}
+  .brand-text strong{font-size:10px!important}
+  .brand-text span{display:none}
+  .nav{display:flex!important;max-width:44vw}
+  .nav a{font-size:8px!important;padding:8px 8px!important}
+  .live-status{font-size:7px!important;padding:7px 8px!important}
+  .clock{display:none!important}
+  .hero-main{padding:19px!important}
+  .hero h1{font-size:27px!important}
+  .hero-copy{font-size:11px!important}
+  .hero-actions .btn{min-height:42px!important}
+  .sync-grid{grid-template-columns:repeat(2,1fr)!important}
+  .grid-4{grid-template-columns:1fr 1fr!important}
+  .engine-status-hero{grid-template-columns:1fr!important}
+  .telemetry-grid{grid-template-columns:1fr 1fr!important}
+  .plan-grid{grid-template-columns:repeat(2,1fr)!important}
+  .identity{grid-template-columns:1fr!important}
+  .it-grid{grid-template-columns:repeat(2,1fr)!important}
+  .it-tape{grid-template-columns:1fr 1fr!important}
+  .it-tape-item:nth-child(n+3){display:none!important}
+}
+@media(max-width:480px){
+  .sync-grid,.grid-4{grid-template-columns:1fr!important}
+  .hero h1{font-size:25px!important}
+  .hero-actions .btn{width:100%!important}
+  .hero-tag{font-size:6.5px!important}
+  .quote-grid{grid-template-columns:1fr 1fr!important}
+  .footer-sync{align-items:flex-start!important;flex-direction:column!important}
+}
+
 </style>
 </head>
 <body class="kb-terminal-page">
@@ -322,22 +730,22 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 <main class="shell">
   <section class="hero">
     <div class="hero-main">
-      <div class="eyebrow"><i></i>AUTHORIZED EXECUTION TELEMETRY</div>
-      <h1>One account.<br><span class="gradient">One active engine.</span><br>One live terminal.</h1>
-      <p class="hero-copy">Terminal is a read-only command view of the backend. The saved Bot Control selection is authoritative: refreshes, navigation and page reloads do not choose a different bot.</p>
+      <div class="eyebrow"><i></i>LIVE ACCOUNT OVERVIEW</div>
+      <h1>Everything you need.<br><span class="gradient">One clear trading view.</span><br>Live and connected.</h1>
+      <p class="hero-copy">See your connected broker, active bot, balance, market price, open positions and risk in one place. Live values always come from the connected broker.</p>
       <div class="hero-actions">
-        <a class="btn primary" href="bots.html">OPEN BOT CONTROL →</a>
-        <a class="btn secondary" href="broker-connect.html">BROKER CONNECTION</a>
-        <button class="btn secondary" id="goldTestBtn" type="button">TEST BUY GOLD DEMO</button>
+        <a class="btn primary" href="bots.html">MANAGE BOTS →</a>
+        <a class="btn secondary" href="broker-connect.html">MANAGE BROKER</a>
+        <button class="btn secondary" id="goldTestBtn" type="button">TEST DEMO TRADE</button>
       </div>
       <div class="hero-tags">
-        <span class="hero-tag">SERVER STATE FIRST</span><span class="hero-tag">NO SYNTHETIC ACCOUNT DATA</span><span class="hero-tag">BROKER-AUTHORITATIVE QUOTES</span><span class="hero-tag">AUTO SYNC</span>
+        <span class="hero-tag">LIVE DATA FIRST</span><span class="hero-tag">NO FAKE BALANCES</span><span class="hero-tag">BROKER PRICES</span><span class="hero-tag">AUTO REFRESH</span>
       </div>
     </div>
 
     <div class="hero-engine" id="engineHero">
       <div class="engine-head">
-        <div><div class="kicker">PERSISTENT ACTIVE ENGINE</div><div class="engine-lock">LOCKED TO SAVED ACCOUNT SELECTION</div></div>
+        <div><div class="kicker">ACTIVE BOT</div><div class="engine-lock">SAVED TO YOUR ACCOUNT</div></div>
         <div class="state-pill" id="heroStatePill"><span class="mini-dot"></span><span id="heroState">SYNCING</span></div>
       </div>
       <div class="engine-name" id="heroEngineName">READING SAVED ENGINE…</div>
@@ -347,7 +755,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
         <div class="engine-cell"><span>Execution</span><strong id="heroMode">—</strong></div>
         <div class="engine-cell"><span>Last run</span><strong id="heroLastRun">—</strong></div>
       </div>
-      <div class="engine-foot"><span>Saved selection</span><strong id="heroSavedAt">—</strong></div>
+      <div class="engine-foot"><span>Saved bot</span><strong id="heroSavedAt">—</strong></div>
     </div>
   </section>
 
@@ -366,8 +774,8 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       <div class="it-panel">
         <div class="it-head">
           <div>
-            <div class="it-title">REALTIME OPERATIONS BUS</div>
-            <div class="it-sub">LIVE ACCOUNT + MARKET TELEMETRY · EVENT-DRIVEN DATA PATH</div>
+            <div class="it-title">LIVE CONNECTION</div>
+            <div class="it-sub">ACCOUNT AND MARKET UPDATES</div>
           </div>
           <span class="it-chip"><i></i><span id="itBusState">BOOTING</span></span>
         </div>
@@ -433,8 +841,8 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       <div class="it-panel">
         <div class="it-head">
           <div>
-            <div class="it-title">SYSTEM DIAGNOSTICS</div>
-            <div class="it-sub">TERMINAL HEALTH · DATA FRESHNESS · CONNECTION INTEGRITY</div>
+            <div class="it-title">SYSTEM HEALTH</div>
+            <div class="it-sub">CONNECTION, DATA AND SESSION HEALTH</div>
           </div>
           <span class="it-chip"><i></i><span id="itDiagState">MONITORING</span></span>
         </div>
@@ -475,7 +883,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
   </section>
 
   <section class="section">
-    <div class="section-head"><div><div class="section-title">ACCOUNT COMMAND METRICS</div><div class="section-sub">Fresh values from the connected broker account. No cached balance is used as the live truth.</div></div><div class="section-code">ACCOUNT / TELEMETRY</div></div>
+    <div class="section-head"><div><div class="section-title">ACCOUNT OVERVIEW</div><div class="section-sub">Your latest broker balance, equity, P&amp;L and margin. These values are refreshed from the connected account.</div></div><div class="section-code">ACCOUNT</div></div>
     <div class="grid-4">
       <div class="metric"><div class="metric-top"><span class="metric-label">Balance</span><span class="metric-icon">$</span></div><div class="metric-value gold" id="balance">—</div><div class="metric-note">BROKER AUTHORITATIVE</div></div>
       <div class="metric"><div class="metric-top"><span class="metric-label">Equity</span><span class="metric-icon">EQ</span></div><div class="metric-value cyan" id="equity">—</div><div class="metric-note">CURRENT ACCOUNT EQUITY</div></div>
@@ -483,7 +891,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       <div class="metric"><div class="metric-top"><span class="metric-label">Daily P&amp;L</span><span class="metric-icon">DAY</span></div><div class="metric-value" id="dailyPnl">—</div><div class="metric-note">CURRENT KINGBOT DAY</div></div>
       <div class="metric"><div class="metric-top"><span class="metric-label">Margin Used</span><span class="metric-icon">MG</span></div><div class="metric-value" id="margin">—</div><div class="metric-note">BROKER SUPPLIED</div></div>
       <div class="metric"><div class="metric-top"><span class="metric-label">Free Margin</span><span class="metric-icon">FM</span></div><div class="metric-value" id="freeMargin">—</div><div class="metric-note">BROKER SUPPLIED</div></div>
-      <div class="metric"><div class="metric-top"><span class="metric-label">Positions</span><span class="metric-icon">POS</span></div><div class="metric-value cyan" id="positionCount">—</div><div class="metric-note">OPEN BROKER POSITIONS</div></div>
+      <div class="metric"><div class="metric-top"><span class="metric-label">Positions</span><span class="metric-icon">POS</span></div><div class="metric-value cyan" id="positionCount">—</div><div class="metric-note">OPEN OPEN POSITIONS</div></div>
       <div class="metric"><div class="metric-top"><span class="metric-label">Drawdown</span><span class="metric-icon">DD</span></div><div class="metric-value" id="drawdown">—</div><div class="metric-note">ACCOUNT TELEMETRY</div></div>
     </div>
   </section>
@@ -491,7 +899,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
   <section class="section">
     <div class="panel live-chart-panel">
       <div class="panel-head">
-        <div class="panel-head-left"><div class="section-title">LIVE MARKET CHART</div><div class="section-sub">Broker tick stream rendered directly in the terminal. No synthetic candles or delayed market values.</div></div>
+        <div class="panel-head-left"><div class="section-title">LIVE MARKET</div><div class="section-sub">Watch the selected market move from the live broker feed.</div></div>
         <div class="history-tools"><span class="panel-badge" id="chartBadge">WAITING FOR TICKS</span><span class="panel-badge" id="chartLatency">—</span></div>
       </div>
       <div class="live-chart-wrap">
@@ -504,7 +912,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
   <section class="section">
     <div class="main-grid">
       <div class="panel">
-        <div class="panel-head"><div class="panel-head-left"><div class="section-title">ENGINE TELEMETRY</div><div class="section-sub">The exact engine saved on this account, its worker state, signal and execution plan.</div></div><span class="panel-badge" id="engineBadge">READING SERVER</span></div>
+        <div class="panel-head"><div class="panel-head-left"><div class="section-title">ACTIVE BOT</div><div class="section-sub">Your selected bot, current state, latest signal and trade settings.</div></div><span class="panel-badge" id="engineBadge">READING SERVER</span></div>
         <div class="engine-dashboard">
           <div class="engine-status-hero">
             <div class="big-status stopped" id="bigStatus">
@@ -534,13 +942,13 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
             </div>
             <div class="strategy-tags" id="strategyTags"></div>
           </div>
-          <div class="footer-sync"><span>Terminal never selects a different bot on refresh. <strong id="selectionTruth">Awaiting saved selection.</strong></span><a class="sync-button" href="bots.html">MANAGE ENGINE</a></div>
+          <div class="footer-sync"><span>Your selected bot stays the same after refresh. <strong id="selectionTruth">Awaiting saved selection.</strong></span><a class="sync-button" href="bots.html">CHANGE BOT</a></div>
         </div>
       </div>
 
       <div class="side-stack">
         <div class="panel account-card">
-          <div class="panel-head" style="padding:0 0 12px;border:0"><div class="panel-head-left"><div class="section-title">BROKER ACCOUNT STATUS</div><div class="section-sub">Connection is managed from Broker Connect.</div></div><span class="panel-badge" id="accountBadge">SYNCING</span></div>
+          <div class="panel-head" style="padding:0 0 12px;border:0"><div class="panel-head-left"><div class="section-title">BROKER ACCOUNT</div><div class="section-sub">Your broker connection and trading mode.</div></div><span class="panel-badge" id="accountBadge">SYNCING</span></div>
           <div class="identity">
             <div class="identity-main"><div class="identity-state" id="accountState">SYNCING</div><div class="identity-note" id="accountNote">Reading the secured broker mapping.</div></div>
             <div class="identity-grid">
@@ -555,7 +963,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
         </div>
 
         <div class="panel market">
-          <div class="panel-head" style="padding:0 0 12px;border:0"><div class="panel-head-left"><div class="section-title">BROKER MARKET RADAR</div><div class="section-sub">Only the selected engine market is queried here.</div></div><span class="panel-badge" id="marketBadge">WAITING</span></div>
+          <div class="panel-head" style="padding:0 0 12px;border:0"><div class="panel-head-left"><div class="section-title">MARKET SNAPSHOT</div><div class="section-sub">Live price information for the selected bot market.</div></div><span class="panel-badge" id="marketBadge">WAITING</span></div>
           <div class="market-top"><div><div class="market-symbol" id="marketSymbol">—</div><div class="market-price" id="marketPrice">—</div></div><div class="kicker" id="marketBroker">—</div></div>
           <div class="quote-grid">
             <div class="quote"><span>BID</span><strong id="bid">—</strong></div><div class="quote"><span>ASK</span><strong id="ask">—</strong></div><div class="quote"><span>SPREAD</span><strong id="spread">—</strong></div>
@@ -571,8 +979,8 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       <div class="panel position-terminal">
         <div class="panel-head">
           <div class="panel-head-left">
-            <div class="section-title" id="positionsTitle">BROKER POSITIONS</div>
-            <div class="section-sub">MT5-style position ledger · broker-authoritative open trade data.</div>
+            <div class="section-title" id="positionsTitle">OPEN POSITIONS</div>
+            <div class="section-sub">Open trades currently confirmed by your broker.</div>
           </div>
           <span class="panel-badge" id="positionsBadge">0 OPEN</span>
         </div>
@@ -592,21 +1000,21 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
         </div>
       </div>
       <div class="panel">
-        <div class="panel-head"><div class="panel-head-left"><div class="section-title">BROKER ORDERS</div><div class="section-sub">Confirmed order records only.</div></div><span class="panel-badge" id="ordersBadge">0 ORDERS</span></div>
+        <div class="panel-head"><div class="panel-head-left"><div class="section-title">RECENT ORDERS</div><div class="section-sub">Recent orders confirmed by your broker.</div></div><span class="panel-badge" id="ordersBadge">0 ORDERS</span></div>
         <div class="table-wrap"><table class="table"><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Volume</th><th>Price</th><th>Status</th></tr></thead><tbody id="ordersTable"></tbody></table></div>
       </div>
     </div>
   </section>
 
   <section class="section">
-    <div class="section-head"><div><div class="section-title">BROKER TRADE HISTORY</div><div class="section-sub">Closed broker records only. Realized P&amp;L is derived from verified broker history.</div></div><div class="section-code">HISTORY / PERFORMANCE</div></div>
+    <div class="section-head"><div><div class="section-title">TRADE HISTORY</div><div class="section-sub">Closed trades and realized performance from confirmed broker history.</div></div><div class="section-code">HISTORY / PERFORMANCE</div></div>
     <div class="history-console">
       <div class="history-panel">
-        <div class="history-head"><div class="history-head-left"><div class="section-title">EXECUTION HISTORY</div><div class="section-sub" id="historySub">Waiting for verified broker history.</div></div><div class="history-tools"><select id="historyRange" class="history-select" aria-label="History range"><option value="1">TODAY</option><option value="3">3 DAYS</option><option value="7" selected>7 DAYS</option><option value="30">30 DAYS</option></select><button id="historyRefresh" class="history-refresh" type="button">REFRESH</button></div></div>
+        <div class="history-head"><div class="history-head-left"><div class="section-title">RECENT TRADES</div><div class="section-sub" id="historySub">Waiting for verified broker history.</div></div><div class="history-tools"><select id="historyRange" class="history-select" aria-label="History range"><option value="1">TODAY</option><option value="3">3 DAYS</option><option value="7" selected>7 DAYS</option><option value="30">30 DAYS</option></select><button id="historyRefresh" class="history-refresh" type="button">REFRESH</button></div></div>
         <div class="history-scroll"><table class="history-table"><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Size / Stake</th><th>Entry</th><th>Exit</th><th>P&amp;L</th><th>Result</th></tr></thead><tbody id="historyTable"><tr><td colspan="8"><div class="empty"><strong>LOADING HISTORY</strong><span>Reading confirmed broker trade records.</span></div></td></tr></tbody></table></div>
         <div class="history-foot"><span>DATA SOURCE <strong id="historySource">BROKER</strong></span><span>LAST UPDATE <strong id="historyUpdated">—</strong></span></div>
       </div>
-      <div class="history-panel performance-wrap"><div class="panel-head" style="padding:0 0 10px;border:0"><div class="panel-head-left"><div class="section-title">REALIZED PERFORMANCE</div><div class="section-sub">Calculated only from returned closed broker records.</div></div><span class="panel-badge" id="historyBadge">SYNCING</span></div>
+      <div class="history-panel performance-wrap"><div class="panel-head" style="padding:0 0 10px;border:0"><div class="panel-head-left"><div class="section-title">PERFORMANCE</div><div class="section-sub">Calculated from confirmed closed trades.</div></div><span class="panel-badge" id="historyBadge">SYNCING</span></div>
         <div class="performance-stats"><div class="performance-stat"><span>Realized P&amp;L</span><strong id="histPnl">—</strong></div><div class="performance-stat"><span>Closed Trades</span><strong id="histCount" class="cyan">—</strong></div><div class="performance-stat"><span>Win Rate</span><strong id="histWinRate">—</strong></div><div class="performance-stat"><span>Best Trade</span><strong id="histBest">—</strong></div></div>
         <div class="curve-box"><div class="curve-meta"><span>CUMULATIVE REALIZED CURVE</span><strong id="histCurveRange">7 DAYS</strong></div><svg class="curve-svg" id="historyCurve" viewBox="0 0 640 150" preserveAspectRatio="none" aria-label="Cumulative realized P&amp;L curve"></svg></div>
         <div class="history-foot"><span>LOSSES <strong id="histLosses">—</strong></span><span>WINS <strong id="histWins">—</strong></span><span>HISTORY BUS <strong id="histBus">WAITING</strong></span></div>
@@ -617,20 +1025,20 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
   <section class="section">
     <div class="risk-grid">
       <div class="panel risk-card">
-        <div class="panel-head" style="padding:0 0 10px;border:0"><div class="panel-head-left"><div class="section-title">RISK COMMAND</div><div class="section-sub">Current policy values associated with the saved engine.</div></div><span class="panel-badge" id="riskBadge">SYNCING</span></div>
+        <div class="panel-head" style="padding:0 0 10px;border:0"><div class="panel-head-left"><div class="section-title">RISK MONITOR</div><div class="section-sub">Your current risk limits and protection levels.</div></div><span class="panel-badge" id="riskBadge">SYNCING</span></div>
         <div class="risk-row"><div><div class="risk-name">Risk per trade</div><div class="risk-detail" id="riskPerTradeDetail">—</div><div class="risk-meter"><i id="riskMeter"></i></div></div><div class="risk-value" id="riskPct">—</div></div>
         <div class="risk-row"><div><div class="risk-name">Daily drawdown</div><div class="risk-detail" id="dailyDdDetail">—</div><div class="risk-meter"><i id="dailyMeter"></i></div></div><div class="risk-value" id="dailyDd">—</div></div>
         <div class="risk-row"><div><div class="risk-name">Total drawdown</div><div class="risk-detail" id="totalDdDetail">—</div><div class="risk-meter"><i id="totalMeter"></i></div></div><div class="risk-value" id="totalDd">—</div></div>
       </div>
 
       <div class="panel activity-card">
-        <div class="panel-head" style="padding:0 0 10px;border:0"><div class="panel-head-left"><div class="section-title">TERMINAL ACTIVITY</div><div class="section-sub">Newest backend observations appear here automatically.</div></div><button class="sync-button" id="syncNow" type="button">SYNC NOW</button></div>
+        <div class="panel-head" style="padding:0 0 10px;border:0"><div class="panel-head-left"><div class="section-title">RECENT ACTIVITY</div><div class="section-sub">Latest connection and trading events.</div></div><button class="sync-button" id="syncNow" type="button">SYNC NOW</button></div>
         <div class="activity-list" id="activityList"></div>
       </div>
     </div>
   </section>
 
-  <div class="footer-sync"><span>LAST SYSTEM SYNC <strong id="lastSystemSync">—</strong> · NEXT AUTO SYNC <strong id="nextSync">3s</strong></span><span id="footerState">Terminal ready</span></div>
+  <div class="footer-sync"><span>LAST UPDATED <strong id="lastSystemSync">—</strong> · NEXT AUTO REFRESH <strong id="nextSync">3s</strong></span><span id="footerState">Terminal ready</span></div>
 </main>
 
 <div class="toast" id="toast"><strong id="toastTitle">KINGBOT</strong><span id="toastMessage">—</span></div>
@@ -1013,7 +1421,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       return x;
     }catch(e){
       // Do not select a first/earliest bot. This is deliberately fail-closed.
-      setSync("selection","ERROR","Saved selection unavailable",new Date().toISOString());
+      setSync("selection","ERROR","Saved bot unavailable",new Date().toISOString());
       $("heroEngineName").textContent="SAVED ENGINE UNAVAILABLE";$("heroState").textContent="SYNC ERROR";$("heroStatePill").style.color="var(--orange)";
       $("runtimeState").textContent="NO AUTHORITATIVE STATE";$("runtimeNote").textContent="Terminal did not replace the selected engine with another bot. Refresh or use Bot Control.";
       addActivity("Selection telemetry: "+e.message);
@@ -1198,7 +1606,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       $("accountNote").textContent="Broker snapshot unavailable. The realtime channel will continue retrying.";
       $("accountBadge").textContent="RECONNECTING";
       setSync("account","ERROR","BROKER SNAPSHOT UNAVAILABLE",new Date().toISOString());
-      setSync("broker","ERROR","BROKER CONNECTION UNAVAILABLE",new Date().toISOString());
+      setSync("broker","ERROR","MANAGE BROKER UNAVAILABLE",new Date().toISOString());
       addActivity("Terminal snapshot: "+e.message);
     }
   }
@@ -1223,7 +1631,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
       toast("XAUUSD demo BUY failed: "+e.message);
     }finally{
       button.disabled=false;
-      button.textContent="TEST BUY GOLD DEMO";
+      button.textContent="TEST DEMO TRADE";
     }
   }
 
