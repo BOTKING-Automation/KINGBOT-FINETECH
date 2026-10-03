@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
 import { runStandaloneMarketScan } from "./ai-market-scanner.js";
 import { loadAdaptivePerformance, applyAdaptivePerformance, classifySetup, recordAdaptiveDecision, settleAdaptiveDecision, ensureAdaptiveIntelligenceSchema, adaptiveDecisionState } from "./adaptive-intelligence.js";
-import { identitySnapshot, buildCognitivePlan, capabilitySet } from "./kingbot-intelligence-core.js";
+import { identitySnapshot, buildCognitivePlan, capabilitySet, normalizeThinkingLevel, thinkingProfile } from "./kingbot-intelligence-core.js";
 
 const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
 const MODEL = "KINGBOT-CORTEX-1";
@@ -299,9 +299,10 @@ function cacheKey(market, options = {}) {
   });
 }
 
-export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {}, memory = [], adaptivePerformance = {} } = {}) {
+export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {}, memory = [], adaptivePerformance = {}, thinkingLevel = "EXPERT" } = {}) {
   const market = normalizeMarket(inputMarket);
-  const cognitivePlan = buildCognitivePlan({ intent: "MARKET_INTELLIGENCE", symbol: market.symbol, conversation: [] });
+  const level = normalizeThinkingLevel(thinkingLevel || options.thinkingLevel || "EXPERT");
+  const cognitivePlan = buildCognitivePlan({ intent: "MARKET_INTELLIGENCE", symbol: market.symbol, conversation: [], thinkingLevel: level });
   const key = cacheKey(market, options);
   const cached = cache.get(key);
   if (cached && Date.now() - cached.at <= CACHE_MS) return { ...cached.result, cached: true };
