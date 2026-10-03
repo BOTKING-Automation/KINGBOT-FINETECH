@@ -395,7 +395,7 @@ function selectBroker(slug){
   document.querySelectorAll(".broker").forEach(el=>el.classList.toggle("selected",el.dataset.broker===slug));
   const d=cfg[slug];
   $("modalTitle").textContent=d.name;
-   $("modalSubtitle").textContent=selected==="exness"?"EXNESS PUBLIC TRADER API":selected==="deriv"?"DERIV CFD · MT5 · BRIDGE":selected==="derivmt5"?"KINGBOT MT5 BRIDGE · NATIVE CFD · LOTS":"SECURE BROKER CONNECTION FLOW";
+   $("modalSubtitle").textContent=selected==="exness"?"EXNESS PUBLIC TRADER API":selected==="derivmt5"?"KINGBOT MT5 BRIDGE · NATIVE CFD · LOTS":"SECURE BROKER CONNECTION FLOW";
   $("modalLogo").src=logos[slug];$("modalLogo").alt=d.name;
   $("accountId").value="";$("apiKey").value="";$("secretKey").value="";$("apiHost").value="";$("accessToken").value="";$("oandaToken").value="";if($("mt5BridgeToken"))$("mt5BridgeToken").value="";if($("mt5BridgeStatus"))$("mt5BridgeStatus").textContent="TOKEN NOT GENERATED";if(mt5BridgePollTimer){clearInterval(mt5BridgePollTimer);mt5BridgePollTimer=null;}
   $("accountList").innerHTML="";$("authorizeBtn").disabled=true;$("accountId").parentElement.style.display="block";
@@ -802,7 +802,6 @@ $("nextStep").addEventListener("click",()=>{
 });
 $("verifyBtn").addEventListener("click",async()=>{
   if(!selected)return;
-  if(selected==="deriv"){startDerivOAuth();return;}
   const accountId=$("accountId").value.trim(),token=$("accessToken").value.trim();
   if(selected==="derivmt5"){setStatus("Use GENERATE BRIDGE TOKEN above instead of entering broker credentials.");return;}
   if(selected==="exness"){
