@@ -4,6 +4,9 @@
   "use strict";
   const root=window.KINGBOT_CLIENT_STATE||{};
   const state={auth:null,broker:null,account:null,subscription:null,risk:null,bot:null,market:null,events:[],updatedAt:0,loading:false};
+  let activeSessionKey="";
+  const resetPrivateState=()=>{state.auth=null;state.broker=null;state.account=null;state.subscription=null;state.risk=null;state.bot=null;state.market=null;state.events=[];state.loading=false;};
+  const sessionKey=()=>String(window.KINGBOT_FIREBASE?.auth?.currentUser?.uid||"").trim();
   const listeners=new Set();
   const inflight=new Map();
   let bc=null;
@@ -20,7 +23,10 @@
     });
     listeners.forEach(fn=>{try{fn(snapshot,reason)}catch(e){console.warn("[KINGBOT STATE] listener",e)}});
     try{window.dispatchEvent(new CustomEvent("kingbot:state",{detail:{state:snapshot,reason}}))}catch{}
-    if(bc)try{bc.postMessage({type:"STATE_UPDATE",reason,payload:snapshot})}catch{}
+    if(bc){
+      const key=activeSessionKey||sessionKey();
+      if(key)try{bc.postMessage({type:"STATE_UPDATE",sessionKey:key,reason,payload:snapshot})}catch{}
+    }
   };
   const token=async(force=false)=>{
     try{return window.KINGBOT_FIREBASE?.getToken?await window.KINGBOT_FIREBASE.getToken(Boolean(force)):null}catch{return null}
@@ -43,6 +49,9 @@
 
   const set=(key,value,reason)=>{state[key]=value;emit(reason||key);};
   async function refresh({includeMarket=false,reason="refresh"}={}){
+    const keyAtStart=sessionKey();
+    if(activeSessionKey && activeSessionKey!==keyAtStart)resetPrivateState();
+    activeSessionKey=keyAtStart;
     if(state.loading)return;
     state.loading=true;emit("refresh:start");
     try{
@@ -55,6 +64,8 @@
         return {...state};
       }
 
+      const keyAfter= sessionKey();
+      if(keyAfter!==activeSessionKey){resetPrivateState();activeSessionKey=keyAfter;return {...state};}
       state.auth={ok:true,authenticated:true,user:core.user||null};
       state.broker=core.broker||null;
       state.account=core.account?{ok:true,account:core.account}:null;
@@ -87,8 +98,10 @@
     if(!("BroadcastChannel" in window))return;
     try{
       bc=new BroadcastChannel("kingbot-client-state");
-      bc.onmessage=e=>{
+      bc.onmessage=async e=>{
         if(e?.data?.type==="STATE_UPDATE"&&e.data.payload){
+          const current=sessionKey();
+          if(!current || e.data.sessionKey!==current)return;
           const incoming=e.data.payload;
           Object.keys(state).forEach(k=>{if(Object.prototype.hasOwnProperty.call(incoming,k)&&k!=="events")state[k]=incoming[k]});
           if(Array.isArray(incoming.events))state.events=incoming.events.slice(0,80);
@@ -109,6 +122,10 @@
   window.KINGBOT_CLIENT_STATE=root;
   initBroadcast();
   window.addEventListener("kingbot:event",e=>addEvent(e.detail));
-  window.addEventListener("kingbot:session-change",()=>refresh({reason:"session-change"}));
+  window.addEventListener("kingbot:session-change",e=>{
+    const next=String(e?.detail?.user?.id||sessionKey()||"").trim();
+    if(next!==activeSessionKey){resetPrivateState();activeSessionKey=next;emit("session-reset");}
+    refresh({reason:"session-change"});
+  });
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>refresh(),{once:true}); else void refresh();
 })(window,document);
