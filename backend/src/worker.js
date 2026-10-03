@@ -21,6 +21,7 @@ import {
   validateExecutionGovernance,
   heartbeatExecution,
   reconcileBrokerPositions,
+  haltExecution,
   recordExecutionOutcome,
   touchExecutionCycle,
   governanceWorkerId
