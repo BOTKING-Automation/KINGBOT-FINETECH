@@ -239,7 +239,15 @@ export function conversationalReply(question = "", conversation = []) {
   const mode = routeIntent(question, conversation);
   const i = variantIndex(question, conversation);
 
-  if (mode === "WHAT_IS_UP") {\n    return responseBase([\n      "I’m online and working normally. 🤖 What do you want to tackle?",\n      "All good here. KINGBOT is active. What are we working on?",\n      "Nothing dramatic — I’m online and ready. Give me the next task."\n    ][i], "Continue with your next question or task.");\n  }\n\n  if (mode === "GREETING") {
+  if (mode === "WHAT_IS_UP") {
+    return responseBase([
+      "I’m online and working normally. 🤖 What do you want to tackle?",
+      "All good here. KINGBOT is active. What are we working on?",
+      "Nothing dramatic — I’m online and ready. Give me the next task."
+    ][i], "Continue with your next question or task.");
+  }
+
+  if (mode === "GREETING") {
     return responseBase([
       "Hey! 👋 I'm here and fully online. What are we working on?",
       "Hello! 🤖 KINGBOT is online and ready. Tell me what you want to work through.",
