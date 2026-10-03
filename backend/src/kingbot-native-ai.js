@@ -11,6 +11,7 @@ import { think } from "./kingbot-cognitive-engine.js";
 import { conversationalReply, conversationSignals, conversationFrame } from "./kingbot-dialogue-cortex.js";
 import { createKingbotAgent, agentAnswer } from "./kingbot-agent-core.js";
 import { getMarketPageSnapshot } from "./market-page-feed.js";
+import { loadUserMemory, learnExplicitUserMemory, summarizeUserMemory } from "./kingbot-user-memory.js";
 
 const SYMBOLS = ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 
@@ -436,10 +437,12 @@ function generalKnowledgeReply(question,search){
   };
 }
 
-async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,userId,conversation=[],thinkingLevel="EXPERT",timeframe="15m"}={}){
+async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,userId,conversation=[],thinkingLevel="EXPERT",timeframe="15m",userMemory=null}={}){
   const signals=conversationSignals(question,conversation)||{};
   const effectiveQuestion=String(signals.resolvedQuestion||question).trim();
   const userFrame=conversationFrame(question,conversation);
+  const memoryRows = Array.isArray(userMemory) ? userMemory : await loadUserMemory(pool,userId,{limit:30});
+  const memorySummary = summarizeUserMemory(memoryRows);
   const requested=symbolFromText(effectiveQuestion,symbol||"XAUUSD");
   const kind=intent(effectiveQuestion,conversation);
   const agent=createKingbotAgent({
@@ -449,7 +452,8 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
     conversation,
     frame:userFrame,
     thinkingLevel,
-    verified:{}
+    verified:{},
+    memory:memoryRows
   });
   const utility=utilityReply(effectiveQuestion);
   if(kind==="TECHNICAL_ANALYSIS_BOOK"){
@@ -815,6 +819,8 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
 
 
 export async function runNativeKingbotAI(input = {}) {
+  const learnedMemory = await learnExplicitUserMemory(input?.pool,input?.userId,{question:input?.question||"",conversation:input?.conversation||[]}).catch(()=>[]);
+  const persistentMemory = await loadUserMemory(input?.pool,input?.userId,{limit:30}).catch(()=>[]);
   const conversationSignalsResult = conversationSignals(input?.question || "", input?.conversation || []) || {};
   const conversationMode = String(conversationSignalsResult.intent || "");
   const socialModes = new Set([
@@ -834,7 +840,7 @@ export async function runNativeKingbotAI(input = {}) {
         reply:conversationalReply(input?.question || "", input?.conversation || []),
         verified:{native:true,dialogueCortex:true,conversationFirst:true}
       }
-    : await runNativeKingbotAIBase(input);
+    : await runNativeKingbotAIBase({...input,userMemory:persistentMemory});
   const thinkingLevel = normalizeThinkingLevel(input?.thinkingLevel || "EXPERT");
   const plan = buildCognitivePlan({
     intent: result?.intent || "PLATFORM_SUPPORT",
@@ -889,6 +895,7 @@ export async function runNativeKingbotAI(input = {}) {
     identity,
     cognition: {
       plan,
+      memory: { available: persistentMemory.length > 0, count: persistentMemory.length, learned: learnedMemory.length },
       capabilities: [...capabilities, "PROPRIETARY_REASONING_KERNEL"],
       userFrame: conversationFrame(input?.question || "", input?.conversation || []),
       agentPlan: agent.plan
