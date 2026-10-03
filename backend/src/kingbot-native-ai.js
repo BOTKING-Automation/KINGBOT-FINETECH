@@ -8,6 +8,7 @@ import { buildCognitivePlan, capabilitySet, identitySnapshot, qualityAudit, norm
 import { orchestrateKingbotIntelligence } from "./intelligence-orchestrator.js";
 import { loadAdaptivePerformance } from "./adaptive-intelligence.js";
 import { think } from "./kingbot-cognitive-engine.js";
+import { conversationalReply, conversationSignals } from "./kingbot-dialogue-cortex.js";
 
 const SYMBOLS = ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 
@@ -22,8 +23,10 @@ function symbolFromText(text, fallback="XAUUSD"){
   return fallback;
 }
 
-function intent(text){
+function intent(text, conversation=[]){
   const t=String(text||"").toLowerCase().trim();
+  const dialogueIntent=conversationSignals(text,conversation)?.intent;
+  if(dialogueIntent) return dialogueIntent;
   if(/^(hi|hello|hey|yo|good morning|good afternoon|good evening|howdy|greetings)\b/.test(t)||/\bhow are you\b|\bwho are you\b|\bwhat are you\b|\bthank you\b|\bthanks\b|\bbye\b|\bgood night\b/.test(t)) return "CONVERSATION";
   if(/^(what is|what's|tell me about|explain)\s+(kingbot|kingbot fintech|this platform|the platform)\b/.test(t)
     ||/\bwhat does kingbot do\b|\bwhat is kingbot fintech\b|\bwhat can kingbot do\b/.test(t)) return "KINGBOT_KNOWLEDGE";
@@ -371,12 +374,12 @@ function platformSupportReply(question){
 
 async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,userId,conversation=[],thinkingLevel="EXPERT",timeframe="15m"}={}){
   const requested=symbolFromText(question,symbol||"XAUUSD");
-  const kind=intent(question);
+  const kind=intent(question,conversation);
   const utility=utilityReply(question);
   if(kind==="TECHNICAL_ANALYSIS_BOOK"){
     return {
       provider:"KINGBOT_NATIVE",
-      model:"KINGBOT-CORE-1",
+      model:"KINGBOT-CORTEX-1",
       intent:kind,
       symbol:requested,
       reply:technicalAnalysisBookReply(question),
@@ -389,20 +392,20 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
     };
   }
   if(kind==="KINGBOT_KNOWLEDGE"){
-    return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:kingbotKnowledgeReply(question),verified:{platformKnowledge:true,engineDefinitions:true}};
+    return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,reply:kingbotKnowledgeReply(question),verified:{platformKnowledge:true,engineDefinitions:true}};
   }
-  if(utility) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:"TIME",symbol:requested,reply:utility,verified:{native:true,timeSource:"server"}};
-  if(kind==="CONVERSATION") return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:conversationalReply(question),verified:{native:true}};
+  if(utility) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:"TIME",symbol:requested,reply:utility,verified:{native:true,timeSource:"server"}};
+  if(["GREETING","WELLBEING","FOLLOW_UP","PRESENCE","APPRECIATION","GOODBYE","IDENTITY","INTELLIGENCE","CAPABILITY","EMOTION_PROBE","CASUAL"].includes(kind)) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:"CONVERSATION",symbol:requested,reply:conversationalReply(question,conversation),verified:{native:true,dialogueCortex:true}};
   if(kind==="CONNECTION_INTELLIGENCE"){
-    return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:await connectionSupport(broker,userId),verified:{broker:true,userSpecific:Boolean(userId)}};
+    return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,reply:await connectionSupport(broker,userId),verified:{broker:true,userSpecific:Boolean(userId)}};
   }
   if(kind==="RUNTIME_INTELLIGENCE"){
     const runtime=await runtimeSupport(pool,userId);
-    if(runtime) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:runtime,verified:{runtime:true,userSpecific:Boolean(userId)}};
+    if(runtime) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,reply:runtime,verified:{runtime:true,userSpecific:Boolean(userId)}};
   }
   if(kind==="STORE_INTELLIGENCE"){
     const support=await storeSupport(pool,userId,question);
-    return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:{
+    return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,reply:{
       ...support,
       technicalAnalysis:[],
       setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Not a market setup request.",invalidation:"Not applicable."}
@@ -417,7 +420,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
     const search=await searchWeb(rawQuery,{limit:8,freshnessDays:fresh});
     if(!search.ok){
       return {
-        provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,
+        provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,
         reply:{
           answer:"Google research is available to the KINGBOT brain, but the Google connector is not configured on the backend yet.",
           facts:[search.error||"GOOGLE_SEARCH_NOT_CONFIGURED",...(search.setup?[search.setup]:[])],
@@ -448,7 +451,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
       ? "KINGBOT combined current Google research with the market context available from the trading-data layer for "+requested+". Research and market observations are kept separate from execution authorization."
       : "KINGBOT searched Google for “"+search.query+"” and returned "+search.results.length+" result(s). The source metadata is preserved for the reasoning layer.";
     return {
-      provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,
+      provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,
       reply:{answer,facts,technicalAnalysis:marketContext?.brain?[String(marketContext.brain.signal)+" · direction "+String(marketContext.brain.direction)+" · "+String(marketContext.brain.confidence)+"% confluence confidence"]:[ ],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No direct execution request.",invalidation:"Research is informational and is not execution authorization."},riskFlags:["AI_RESEARCH_IS_NOT_EXECUTION_AUTHORIZATION"],nextAction:kind==="MARKET_RESEARCH"?"Ask KINGBOT for a deeper market/news synthesis.":"Ask me to summarize, compare, or investigate the sources."},
       sources:search.results,
       research:{google:true,freshnessDays:fresh,marketContext},
@@ -506,7 +509,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
         if(!riskFlags.includes("EXECUTION_AUTHORIZATION_NOT_GRANTED"))riskFlags.push("EXECUTION_AUTHORIZATION_NOT_GRANTED");
         return {
           provider:"KINGBOT_NATIVE",
-          model:"KINGBOT-CORE-1",
+          model:"KINGBOT-CORTEX-1",
           intent:kind,
           symbol:requested,
           scanner:scan,
@@ -555,7 +558,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
       }
       return {
         provider:"KINGBOT_NATIVE",
-        model:"KINGBOT-CORE-1",
+        model:"KINGBOT-CORTEX-1",
         intent:kind,
         symbol:requested,
         reply:{
@@ -571,7 +574,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
     }catch(error){
       return {
         provider:"KINGBOT_NATIVE",
-        model:"KINGBOT-CORE-1",
+        model:"KINGBOT-CORTEX-1",
         intent:kind,
         symbol:requested,
         reply:{
@@ -596,7 +599,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
     const list=requestedBot?[requestedBot]:Object.entries(defs);
     return {
       provider:"KINGBOT_NATIVE",
-      model:"KINGBOT-CORE-1",
+      model:"KINGBOT-CORTEX-1",
       intent:kind,
       symbol:requested,
       reply:{
@@ -612,7 +615,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
 
   if(["RISK_REVIEW","PLATFORM_SUPPORT"].includes(kind) && userId){
     const support=await databaseSupport(pool,userId,question);
-    if(support) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:{...support,technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Not a market setup request.",invalidation:"Not applicable."}}};
+    if(support) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,reply:{...support,technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"Not a market setup request.",invalidation:"Not applicable."}}};
   }
 
   if(kind==="ACCOUNT_INTELLIGENCE" && broker && userId){
@@ -623,7 +626,7 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
       const a=account?.data||account||{};
       const p=Array.isArray(positions?.data)?positions.data:(Array.isArray(positions)?positions:[]);
       return {
-        provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,
+        provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,
         reply:{
           answer:status?.connected?"KINGBOT verified the connected broker account and current positions.":"No connected broker account is available.",
           facts:[`Broker connected: ${Boolean(status?.connected)}`,`Balance: ${a.balance ?? "unavailable"}`,`Equity: ${a.equity ?? "unavailable"}`,`Open positions: ${p.length}`],
@@ -634,12 +637,14 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
     }catch{}
   }
 
-  if(kind==="PLATFORM_SUPPORT") return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply:platformSupportReply(question),verified:{native:true}};
+  if(kind==="PLATFORM_SUPPORT") const dialogue=conversationalReply(question,conversation);
+  if(dialogue) return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:"CONVERSATION",symbol:requested,reply:dialogue,verified:{native:true,dialogueCortex:true}};
+  return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,reply:platformSupportReply(question),verified:{native:true}};
 
   const snapshot=await latestSnapshot(pool,requested,"5m");
   const brain=snapshot?evaluateKingbotBrain(snapshot,{maxAgeMs:Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS||5000)}):null;
   const reply=nativeMarketAnswer({question,symbol:requested,quote,snapshot,brain});
-  return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply,verified:{quote:Boolean(quote?.available),technicalSnapshot:Boolean(snapshot),brain:Boolean(brain)}};
+  return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORTEX-1",intent:kind,symbol:requested,reply,verified:{quote:Boolean(quote?.available),technicalSnapshot:Boolean(snapshot),brain:Boolean(brain)}};
 }
 
 
