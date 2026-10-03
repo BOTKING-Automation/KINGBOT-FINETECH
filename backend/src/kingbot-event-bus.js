@@ -162,7 +162,6 @@ export class KingbotEventBus {
       ]
     );
 
-    this.remember(event.eventId);
     this.stats.published += 1;
 
     try {
