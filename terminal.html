@@ -704,6 +704,35 @@ body.kb-terminal-page:after{opacity:.13!important}
   .footer-sync{align-items:flex-start!important;flex-direction:column!important}
 }
 
+/* Terminal document scrolling: one scroll owner only. */
+html{
+  height:auto!important;
+  min-height:100%!important;
+  overflow-x:hidden!important;
+  overflow-y:scroll!important;
+  overscroll-behavior-y:auto!important;
+}
+html.kb-nav-lock{overflow-y:scroll!important}
+body.kb-terminal-page{
+  display:block!important;
+  position:relative!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:100vh!important;
+  overflow:visible!important;
+  overflow-x:hidden!important;
+  overflow-y:visible!important;
+  overscroll-behavior-y:auto!important;
+}
+body.kb-terminal-page > main.shell{
+  display:block!important;
+  position:relative!important;
+  height:auto!important;
+  min-height:0!important;
+  margin-bottom:0!important;
+}
+body.kb-terminal-page > .toast{position:fixed!important}
+
 </style>
 </head>
 <body class="kb-terminal-page">
