@@ -15,6 +15,7 @@ import { isAdminUser } from "./admin-access.js";
 import { ensureBotEngineSchema } from "./bot-engines.js";
 import { ensureBotRuntimeSchema } from "./bot-runtime.js";
 import { ensureGlobalRiskSchema, getGlobalRiskState, globalExecutionGate, recordWorkerHeartbeat } from "./global-risk.js";
+import { recordAdaptiveDecision, settleAdaptiveDecision } from "./adaptive-intelligence.js";
 
 const { Pool } = pg;
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined }) : null;
@@ -40,7 +41,9 @@ async function ensureWorkerSchema(){
   await broker.ensureSchema();
   await ensureGlobalRiskSchema(pool);
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_account_risk_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,baseline_date DATE NOT NULL,day_start_equity NUMERIC NOT NULL,peak_equity NUMERIC NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,provider,account_id))");
-  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_execution_journal (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,execution_mode TEXT NOT NULL,symbol TEXT NOT NULL,side TEXT NOT NULL,volume NUMERIC NOT NULL,status TEXT NOT NULL,broker_result JSONB,error_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_execution_journal (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,bot_id TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,decision_id UUID,execution_mode TEXT NOT NULL,symbol TEXT NOT NULL,side TEXT NOT NULL,volume NUMERIC NOT NULL,status TEXT NOT NULL,broker_result JSONB,error_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+  await pool.query("ALTER TABLE kingbot_execution_journal ADD COLUMN IF NOT EXISTS decision_id UUID");
+  await pool.query("CREATE INDEX IF NOT EXISTS idx_kb_execution_decision ON kingbot_execution_journal(user_id,decision_id)");
 }
 
 async function audit(userId,event,metadata){
@@ -355,6 +358,42 @@ function positionIdentities(position){
   add(position?.id);add(position?.positionId);add(position?.position_id);add(position?.tradeId);add(position?.tradeID);
   if(Array.isArray(position?.tradeIds))for(const id of position.tradeIds)add(id);
   return [...new Set(ids)];
+}
+async function recordExecutionAdaptiveDecision({userId,botId,config,analysis,risk,account,aiTradeGate,aiStrategySignal}={}) {
+  if(!analysis?.ok || analysis.signal==="NO_SIGNAL") return null;
+  const direction=analysis.signal==="LONG_CANDIDATE"?"BUY":analysis.signal==="SHORT_CANDIDATE"?"SELL":"HOLD";
+  if(direction==="HOLD") return null;
+  const fit=Math.min(100,Math.abs(Number(analysis.score||0)));
+  const equity=Number(account?.equity||0);
+  const riskPct=Number(risk?.requestedRiskPct||0);
+  const result={
+    market:{
+      symbol:String(config?.symbol||"").toUpperCase(),
+      timeframe:String(config?.timeframe||"5m"),
+      price:Number(analysis?.price||0),
+      atr:Number(analysis?.atr||0),
+      volatility:Number(analysis?.volatility||0),
+      trend:Number(analysis?.trend||0),
+      momentum:Number(analysis?.momentum||0),
+      structure:String(analysis?.structure||"unknown"),
+      liquiditySweep:Boolean(analysis?.liquiditySweep),
+      orderBlock:Boolean(analysis?.orderBlock),
+      fairValueGap:Boolean(analysis?.fairValueGap),
+      displacement:Boolean(analysis?.displacement),
+      breakout:Boolean(analysis?.breakout),
+      retest:Boolean(analysis?.retest),
+      timestamp:new Date().toISOString()
+    },
+    summary:{confidence:fit,bias:direction==="BUY"?"BULLISH":"BEARISH",regime:"EXECUTION_OBSERVED"},
+    debate:{direction:direction==="BUY"?"BULLISH":"BEARISH"},
+    routing:{selectedEngine:botId,direction,candidate:{botId,score:Number(analysis.score||0),fit,currentFit:fit}},
+    riskCouncil:{status:risk?.allowed?"NORMAL":"BLOCKED",blocks:risk?.blockedReasons||[],flags:[]},
+    execution:{authority:"WORKER_EXECUTION_RECORD",authorized:false,riskAmount:equity>0&&riskPct>0?equity*riskPct/100:null},
+    adaptive:{decisionId:crypto.randomUUID(),decisionState:risk?.allowed?"TRADE_CANDIDATE":"BLOCKED"}
+  };
+  result.aiTradeGate=aiTradeGate?{confirm:Boolean(aiTradeGate.confirm),direction:aiTradeGate.direction,engine:aiTradeGate.engine||null,strategyMatch:Boolean(aiTradeGate.strategyMatch),status:aiTradeGate.status}:null;
+  result.aiStrategySignal=aiStrategySignal?{direction:aiStrategySignal.direction,engine:aiStrategySignal.engine,strategyMatch:Boolean(aiStrategySignal.strategyMatch),trigger:aiStrategySignal.trigger}:null;
+  return {decisionId:result.adaptive.decisionId,recordedId:await recordAdaptiveDecision(pool,userId,result)};
 }
 function orderExecutionIds(value,out=new Set(),depth=0){
   if(depth>6||value==null)return [...out];
