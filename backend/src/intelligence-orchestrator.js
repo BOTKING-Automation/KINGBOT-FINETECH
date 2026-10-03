@@ -365,7 +365,7 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
 
 export async function ensureIntelligenceOrchestratorSchema(pool) {
   if (!pool) return;
-  await pool.query(\`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS kingbot_ai_intelligence_memory (
       id BIGSERIAL PRIMARY KEY,
       user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,
@@ -378,7 +378,7 @@ export async function ensureIntelligenceOrchestratorSchema(pool) {
       result JSONB NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
-  \`);
+  `);
   await pool.query("CREATE INDEX IF NOT EXISTS idx_kingbot_ai_intelligence_memory_user_symbol ON kingbot_ai_intelligence_memory(user_id, symbol, created_at DESC)");
 }
 
