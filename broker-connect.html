@@ -141,6 +141,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
       </div>
     </div>
 
+<div class="status-line" style="margin:0 0 12px;border-color:rgba(246,195,75,.18);color:#d9c890;background:rgba(246,195,75,.035)">DERIV ROUTE: <strong>CFD / MT5 ONLY</strong> · Deriv Options accounts are not supported by KINGBOT's lot-based bot execution.</div>
     <div class="grid" id="brokerGrid">
       <article class="broker oanda" data-broker="oanda" data-mode="api" data-cap-demo="yes" data-cap-live="yes" data-native="yes" data-search="oanda fx forex metals account api demo practice live">
         <div class="broker-inner">
@@ -299,7 +300,6 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
 const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbot-fintech-api-etfv.onrender.com/api";
 const cfg={
   oanda:{name:"OANDA",login:"https://fxtrade.oanda.com/",api:"https://developer.oanda.com/rest-live-v20/authentication/",native:true,mode:"oanda"},
-  deriv:{name:"DERIV",login:"https://app.deriv.com/",api:"https://auth.deriv.com/oauth2/auth",native:true,mode:"oauth"},
   derivmt5:{name:"DERIV CFD / MT5",login:"https://deriv.com/trading-platforms/mt5/web-terminal",api:"https://deriv.com/trading-platforms/mt5/web-terminal",native:true,mode:"mt5-bridge"},
   exness:{name:"EXNESS",login:"https://my.exness.com/",api:"https://my.exness.com/",native:false,mode:"exness"},
   ig:{name:"IG",login:"https://my.ig.com/",api:"https://labs.ig.com/gettingstarted",native:false,mode:"metaapi"},
@@ -308,7 +308,6 @@ const cfg={
 };
 const logos={
   oanda:"https://mma.prnewswire.com/media/1581985/OANDA_colour_logo_Logo.jpg?p=facebook",
-  deriv:"https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg",
   exness:"https://www.forextradinghunters.com/wp-content/uploads/2022/12/Vertical_Exness_Logo_Black.jpg",
   ig:"https://cdn.sanity.io/images/k8qzcdw3/prod1503/8cd8307f715b88868cd45fa7fbeebbcec5dc2f64-1920x1080.png?w=1200",
   fxcm:"https://fxcmpy.tpq.io/_static/fxcm_logo_bg.png",
@@ -350,22 +349,14 @@ function textFor(){
   }[step];
   $("flowCopy").innerHTML="<strong>"+copy[0]+"</strong><br>"+copy[1];
   $("brokerLogin").textContent=step===1?"OPEN "+d.name+" ↗":step===2?"OPEN API ACCESS ↗":"OPEN "+d.name+" ↗";
-  if(selected==="deriv"){
-    $("brokerLogin").textContent="CONTINUE WITH DERIV ↗";
-    $("brokerLogin").href="#";
-    $("nextStep").style.display="none";
-  }else if(selected==="derivmt5"){
+  if(selected==="derivmt5"){
     $("brokerLogin").textContent="OPEN DERIV MT5 ↗";
     $("brokerLogin").href=d.login;
   }else{
     $("brokerLogin").href=step===1?(selected==="exness" && partnerOpened ? $("brokerLogin").href : d.login):d.api;
   }
-  if(selected!=="deriv")$("nextStep").style.display=(selected==="derivmt5"?"none":(step<2||(!verified&&step===2&&d.native&&!["oanda"].includes(selected)))?"inline-flex":"none");
-  if(selected==="deriv"){
-    $("credentials").classList.remove("show");
-    $("verifyBtn").style.display="none";
-    $("flowStatus").textContent="Deriv CFD execution uses the native MT5/CFD bridge. Options accounts are not accepted by KINGBOT CFD execution.";
-  }else if(selected==="derivmt5"){
+  $("nextStep").style.display=(selected==="derivmt5"?"none":(step<2||(!verified&&step===2&&d.native&&!["oanda"].includes(selected)))?"inline-flex":"none");
+  if(selected==="derivmt5"){
     $("credentials").classList.add("show");
     $("verifyBtn").style.display="none";
     $("accountId").parentElement.style.display="none";
@@ -421,7 +412,6 @@ function selectBroker(slug){
   if(selected==="exness")trackExnessPartner();
   else if(selected==="derivmt5")trackBrokerPartner("deriv");
   else trackBrokerPartner(selected);
-  else trackBrokerPartner("deriv");
 }
 
 async function generateMt5BridgeToken(){
@@ -723,20 +713,7 @@ async function firebaseToken(){
   if(!token)throw new Error("KINGBOT authentication token could not be issued. Sign in again.");
   return token;
 }
-async function startDerivOAuth(){
-  try{
-    const fb=window.KINGBOT_FIREBASE;
-    if(fb?.persist) await fb.persist(true);
-    const t=await firebaseToken();
-    const mode=selectedExecution;
-    setStatus("Opening secure Deriv authorization…");
-    const r=await fetch(API_BASE+"/broker/deriv/oauth/start?executionMode="+encodeURIComponent(mode),{headers:{Authorization:"Bearer "+t}});
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok||!d.authorizationUrl)throw new Error(d.error||"Deriv OAuth is not configured.");
-    window.location.href=d.authorizationUrl;
-  }catch(e){setStatus(e.message||"Unable to start Deriv authorization.");}
-}
-function setStatus(t){$("flowStatus").textContent=t}
+async function setStatus(t){$("flowStatus").textContent=t}
 async function disconnectCurrentBroker(){
   const buttons=[$("disconnectBtn"),$("globalDisconnectBtn")].filter(Boolean);
   buttons.forEach(btn=>{btn.disabled=true;btn.textContent="DISCONNECTING…";});
@@ -805,12 +782,7 @@ function renderAccounts(list){
   }));
 }
 document.querySelectorAll("[data-open]").forEach(btn=>btn.addEventListener("click",()=>selectBroker(btn.dataset.open)));
-$("brokerLogin").addEventListener("click",e=>{
-  if(selected==="deriv"){
-    e.preventDefault();
-    startDerivOAuth();
-  }
-});
+
 $("generateMt5Token").addEventListener("click",generateMt5BridgeToken);
 $("copyMt5Token").addEventListener("click",copyMt5Token);
 $("saveVpsConfig").addEventListener("click",saveMt5VpsProfile);
@@ -920,39 +892,7 @@ function applyExecutionMode(){
 modeButtons.forEach(btn=>btn.addEventListener("click",()=>{selectedExecution=btn.dataset.exec||"DEMO";applyExecutionMode()}));
 applyExecutionMode();
 
-(async function handleDerivReturn(){
-  const params=new URLSearchParams(window.location.search);
-  const pendingId=params.get("deriv_pending")||"";
-  const error=params.get("deriv_error")||"";
-  if(!pendingId&&!error)return;
-  selectBroker("deriv");
-  if(error){setStatus(error);window.history.replaceState({},document.title,window.location.pathname);return;}
-  selectedExecution=(params.get("executionMode")||"DEMO").toUpperCase()==="LIVE"?"LIVE":"DEMO";
-  applyExecutionMode();
-  window.__KINGBOT_DERIV_PENDING={pendingId};
-  verified=false;
-  setStep(3);
-  $("brokerLogin").style.display="none";
-  $("nextStep").style.display="none";
-  $("credentials").classList.remove("show");
-  $("accountSelect").classList.add("show");
-  $("flowCopy").innerHTML="<strong>STEP 3 · AUTHORIZATION VERIFIED</strong><br>Deriv approved KINGBOT. Choose the exact Demo or Real trading account you want KINGBOT to manage.";
-  setStatus("Loading your authorized Deriv accounts…");
-  try{
-    const t=await firebaseToken();
-    const r=await fetch(API_BASE+"/broker/deriv/oauth/pending?pendingId="+encodeURIComponent(pendingId),{headers:{Authorization:"Bearer "+t},cache:"no-store"});
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok||!Array.isArray(d.accounts))throw new Error(d.error||"Unable to load authorized Deriv accounts.");
-    if(!d.accounts.length)throw new Error("No active Deriv Options trading accounts were returned.");
-    renderAccounts(d.accounts);
-    setStatus("Authorization verified. Select one authorized Deriv account.");
-  }catch(e){
-    window.__KINGBOT_DERIV_PENDING=null;
-    setStatus(e.message||"Unable to load Deriv accounts.");
-    $("authorizeBtn").disabled=true;
-  }
-  window.history.replaceState({},document.title,window.location.pathname);
-})();; 
+ 
 
 (function(){
   const cards=[...document.querySelectorAll(".broker")];
