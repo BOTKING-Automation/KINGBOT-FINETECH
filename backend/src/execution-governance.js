@@ -20,12 +20,19 @@ function idsFromValue(value,out=new Set(),depth=0){
   }
   return out;
 }
-function brokerPositionIds(position){
-  return [...idsFromValue(position)];
+function idsForKeys(value,accepted,out=new Set(),depth=0){
+  if(depth>4||value==null)return out;
+  if(Array.isArray(value)){for(const x of value)idsForKeys(x,accepted,out,depth+1);return out;}
+  if(typeof value!=="object")return out;
+  for(const [k,v] of Object.entries(value)){
+    const key=String(k).toLowerCase().replace(/[^a-z0-9]/g,"");
+    if(accepted.has(key)&&(typeof v==="string"||typeof v==="number"))out.add(String(v));
+    if(v&&typeof v==="object")idsForKeys(v,accepted,out,depth+1);
+  }
+  return out;
 }
-function brokerOrderIds(order){
-  return [...idsFromValue(order)];
-}
+function brokerPositionIds(position){return [...idsForKeys(position,new Set(["positionid","tradeid","contractid"]))];}
+function brokerOrderIds(order){return [...idsForKeys(order,new Set(["orderid","dealid"]))];}
 function slippageBps(intended,filled){
   const a=finite(intended),b=finite(filled);
   if(!(a>0)||!(b>0))return null;
@@ -274,19 +281,29 @@ export async function validateExecutionGovernance(pool,{userId,userEmail,botId,p
 export async function reconcileBrokerPositions(pool,{userId,provider,accountId,botId,positions=[]}={}){
   if(!pool)return {status:"UNKNOWN"};
   const observed=[...new Set(positions.flatMap(brokerPositionIds).map(String))];
+  const latestSnapshot=await pool.query("SELECT position_ids FROM kingbot_broker_position_snapshots WHERE user_id=$1 AND provider=$2 AND account_id=$3 AND bot_id=$4 ORDER BY captured_at DESC LIMIT 1",[userId,provider,accountId,botId]);
+  const latestIds=latestSnapshot.rowCount&&Array.isArray(latestSnapshot.rows[0].position_ids)?latestSnapshot.rows[0].position_ids.map(String):[];
+  const snapshotChanged=!latestSnapshot.rowCount||latestIds.length!==observed.length||latestIds.some(x=>!observed.includes(String(x)));
+  if(snapshotChanged){
   await pool.query(`INSERT INTO kingbot_broker_position_snapshots(user_id,provider,account_id,bot_id,position_count,position_ids,positions)
     VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb)`,[userId,provider,accountId,botId,positions.length,JSON.stringify(observed),JSON.stringify(positions.slice(0,50))]);
+  }
   const ladder=await pool.query(`SELECT position_ids FROM kingbot_ladder_v8_state WHERE user_id=$1 AND bot_id=$2 AND active=TRUE LIMIT 1`,[userId,botId]);
   const expected=ladder.rowCount&&Array.isArray(ladder.rows[0].position_ids)?ladder.rows[0].position_ids.map(String):[];
   const missing=expected.filter(x=>!observed.includes(String(x)));
   let status="CONSISTENT",reason=null;
   if(missing.length){status="MISMATCH";reason="TRACKED_POSITIONS_MISSING_FROM_BROKER";}
   if(!expected.length&&status==="CONSISTENT")status="OBSERVED";
-  const q=await pool.query(`INSERT INTO kingbot_execution_reconciliations(user_id,provider,account_id,bot_id,status,reason,expected_ids,observed_ids,details)
+  const latestRecon=await pool.query("SELECT id,status,reason,expected_ids,observed_ids FROM kingbot_execution_reconciliations WHERE user_id=$1 AND provider=$2 AND account_id=$3 AND bot_id=$4 ORDER BY created_at DESC LIMIT 1",[userId,provider,accountId,botId]);
+  const previous=latestRecon.rowCount?latestRecon.rows[0]:null;
+  const previousExpected=Array.isArray(previous?.expected_ids)?previous.expected_ids.map(String):[];
+  const previousObserved=Array.isArray(previous?.observed_ids)?previous.observed_ids.map(String):[];
+  const changed=!previous||String(previous.status)!==status||String(previous.reason||"")!==String(reason||"")||previousExpected.join("|")!==expected.join("|")||previousObserved.join("|")!==observed.join("|");
+  const q=changed ? await pool.query(`INSERT INTO kingbot_execution_reconciliations(user_id,provider,account_id,bot_id,status,reason,expected_ids,observed_ids,details)
     VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb) RETURNING id`,
-    [userId,provider,accountId,botId,status,reason,JSON.stringify(expected),JSON.stringify(observed),JSON.stringify({positionCount:positions.length,missing})]);
+    [userId,provider,accountId,botId,status,reason,JSON.stringify(expected),JSON.stringify(observed),JSON.stringify({positionCount:positions.length,missing})]) : {rows:[]};
   if(status==="MISMATCH")await haltExecution(pool,{userId,provider,accountId,reason,source:"RECONCILIATION"});
-  return {status,reason,expected,observed,reconciliationId:q.rows[0]?.id||null};
+  return {status,reason,expected,observed,reconciliationId:q.rows[0]?.id||previous?.id||null};
 }
 
 export async function recordExecutionOutcome(pool,{journalId,order,intendedPrice,submittedAt}={}){
@@ -294,8 +311,8 @@ export async function recordExecutionOutcome(pool,{journalId,order,intendedPrice
   const filled=finite(order?.fillPrice??order?.filledPrice??order?.executionPrice??order?.price);
   const ids=brokerOrderIds(order);
   const orderId=ids[0]||null;
-  const posIds=[...idsFromValue(order)].filter((x)=>/position|trade|deal|contract/i.test(String(x))).map(String);
-  const positionId=posIds[0]||null;
+  const positionIds=idsForKeys(order,new Set(["positionid","tradeid","contractid"]));
+  const positionId=[...positionIds][0]||null;
   const latency=Number.isFinite(new Date(submittedAt||0).getTime())&&Number.isFinite(Date.now()-new Date(submittedAt||0).getTime())?Math.max(0,Date.now()-new Date(submittedAt||0).getTime()):null;
   const slip=slippageBps(intendedPrice,filled);
   await pool.query(`UPDATE kingbot_execution_journal SET broker_order_id=COALESCE($2,broker_order_id),broker_position_id=COALESCE($3,broker_position_id),
