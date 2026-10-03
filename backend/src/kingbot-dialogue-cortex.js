@@ -32,6 +32,7 @@ const SPEECH_ACTS = Object.freeze({
   PRESENCE: /^(you there|are you there|you online|are you online|are you awake|you awake|can you hear me|can you see me|are you active|still there|still online)[?! .]*$/i,
   THANKS: /^(thanks|thank you|thank u|much appreciated|appreciate it)[!. ,]*$/i,
   GOODBYE: /^(bye|goodbye|see you|see ya|talk later|catch you later|good night|have a good night)[!. ,]*$/i,
+  WHAT_IS_UP: /^(what.?s up|sup|how goes it)[?! .]*$/i,
   IDENTITY: /\b(who are you|what are you|what is your name|tell me about yourself|introduce yourself)\b/i,
   INTELLIGENCE: /\b(are you smart|are you intelligent|how intelligent are you|how smart are you|are you an ai|are you artificial intelligence)\b/i,
   CAPABILITY: /\b(what can you do|what do you do|what are you capable of|your capabilities|what can you help with|how can you help me|what can you help me with)\b/i,
@@ -165,9 +166,12 @@ function classify(text, conversation = []) {
   const direct = speechAct(t);
   const resolved = resolveReference(t, conversation);
   const effective = resolved.question || t;
+  const currentScores = domainScores(t);
+  const currentRanked = Object.entries(currentScores).sort((a,b) => b[1] - a[1]);
+  const currentDomain = currentRanked[0]?.[1] > 0 ? currentRanked[0][0] : null;
   const scores = domainScores(effective);
   const rankedDomains = Object.entries(scores).sort((a,b) => b[1] - a[1]);
-  const domain = rankedDomains[0]?.[1] > 0 ? rankedDomains[0][0] : topDomain(t, conversation);
+  const domain = currentDomain || (rankedDomains[0]?.[1] > 0 ? rankedDomains[0][0] : topDomain(t, conversation));
 
   if (direct) return { act:direct, domain, score:1, effectiveQuestion:effective, resolved:resolved.resolved };
 
@@ -200,7 +204,7 @@ function routeIntent(text, conversation = []) {
   const info = classify(text, conversation);
   const t = WORDS(info.effectiveQuestion || text);
 
-  if (info.act === "GREETING" || info.act === "WELLBEING" || info.act === "PRESENCE" ||
+  if (info.act === "GREETING" || info.act === "WELLBEING" || info.act === "WHAT_IS_UP" || info.act === "PRESENCE" ||
       info.act === "THANKS" || info.act === "GOODBYE" || info.act === "IDENTITY" ||
       info.act === "INTELLIGENCE" || info.act === "CAPABILITY" || info.act === "EMOTION_PROBE" ||
       info.act === "HELP" || info.act === "META_FEEDBACK" || info.act === "CASUAL") return info.act;
@@ -235,7 +239,7 @@ export function conversationalReply(question = "", conversation = []) {
   const mode = routeIntent(question, conversation);
   const i = variantIndex(question, conversation);
 
-  if (mode === "GREETING") {
+  if (mode === "WHAT_IS_UP") {\n    return responseBase([\n      "I’m online and working normally. 🤖 What do you want to tackle?",\n      "All good here. KINGBOT is active. What are we working on?",\n      "Nothing dramatic — I’m online and ready. Give me the next task."\n    ][i], "Continue with your next question or task.");\n  }\n\n  if (mode === "GREETING") {
     return responseBase([
       "Hey! 👋 I'm here and fully online. What are we working on?",
       "Hello! 🤖 KINGBOT is online and ready. Tell me what you want to work through.",
