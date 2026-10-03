@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getBotDefinitions } from "./bot-engines.js";
 import { runNativeKingbotAI } from "./kingbot-native-ai.js";
@@ -6,10 +5,8 @@ import { webSearchStatus } from "./kingbot-web-search.js";
 import { identitySnapshot, buildCognitivePlan, capabilitySet, qualityAudit } from "./kingbot-intelligence-core.js";
 
 const DEFAULT_SYMBOLS=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
-const MODEL=String(process.env.GEMINI_AGENT_MODEL||process.env.GEMINI_MODEL||"gemini-3.8-flash").trim();
-const API_KEY=String(process.env.GEMINI_API_KEY||"").trim();
-const ai=API_KEY?new GoogleGenAI({apiKey:API_KEY}):null;
-const EXTERNAL_PROVIDER=String(process.env.KINGBOT_AI_EXTERNAL_PROVIDER || (API_KEY?"gemini":"none")).trim().toLowerCase();
+const MODEL="KINGBOT-CORTEX-1";
+const EXTERNAL_PROVIDER="none";
 
 const SYSTEM=`You are KINGBOT AI, the proprietary intelligence agent for KINGBOT FINTECH.
 You operate as a persistent intelligence core, not a chatbot. Maintain the KINGBOT identity, mission and cognitive discipline supplied in context.
@@ -68,94 +65,20 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
       return res.json({ok:true,agent:"KINGBOT",...native,cognitivePlan,sources:native.sources||[],generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
     }
 
-    if(EXTERNAL_PROVIDER!=="gemini" || !ai){
-      return res.json({ok:true,agent:"KINGBOT",...native,cognitivePlan,sources:native.sources||[],generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
-    }
-
-    const context=buildContext({symbol,twelveData:feed,broker,botDefinitions:getBotDefinitions()});
-    context.nativeKingbotAI=native.reply;
-    context.marketScanner=native.scanner||null;
-    context.nativeProvider=native.provider;
-    context.webResearch=native.sources||[];
-    context.conversation=conversation;
-    context.kingbotIdentity=identitySnapshot();
-    context.cognitivePlan=cognitivePlan;
-    context.cognitiveAudit=native?.cognition?.audit || null;
-    context.deliberation={level:"HIGH",reason:"Complex KINGBOT intelligence synthesis",model:MODEL};
-    let account=null,positions=[];
-    try{
-      const status=await broker.getStatus(user.id);
-      if(status?.connected){
-        try{const a=await broker.getAccount(user.id);const r=a?.data||a;account={balance:Number.isFinite(Number(r?.balance))?Number(r.balance):null,equity:Number.isFinite(Number(r?.equity))?Number(r.equity):null,currency:r?.currency||null,executionMode:status.executionMode||null}}catch{}
-        try{const p=await broker.getPositions(user.id);positions=(Array.isArray(p?.data)?p.data:Array.isArray(p)?p:[]).slice(0,20).map(x=>({symbol:x.symbol||null,type:x.type||x.side||null,volume:Number.isFinite(Number(x.volume))?Number(x.volume):null,profit:Number.isFinite(Number(x.profit))?Number(x.profit):null}))}catch{}
-      }
-    }catch{}
-    context.account=account;
-    context.positions=positions;
-
-    const prompt=`USER REQUEST:
-${question}
-
-VERIFIED KINGBOT CONTEXT:
-${JSON.stringify(context)}
-
-
-COGNITIVE OPERATING CONTRACT:
-- Treat KINGBOT identity as persistent system state, not a chat persona.
-- Execute the supplied cognitive plan in order: identify -> observe -> correlate -> challenge -> adapt -> verify -> explain, using only the stages required for this request.
-- Distinguish observed facts, derived analysis, uncertainty and decisions.
-- When evidence conflicts, surface the conflict instead of averaging it away.
-- When evidence is missing or stale, downgrade confidence and say what is missing.
-- Do not manufacture reasoning steps, live values, broker state, sources or outcomes.
-- The response is advisory; execution remains outside the conversational model.
-
-RESEARCH RULES:
-- If webResearch contains results, treat them as source material, not guaranteed truth.
-- Do not invent facts that are absent from the supplied sources.
-- For current or news questions, identify the relevant source title or URL when relying on it.
-- Separate researched facts from KINGBOT market interpretation and uncertainty.
-- Conversation history is context only; verified backend data takes precedence.
-Respond with JSON:
-{
- "answer":"...",
- "symbol":"...",
- "intent":"MARKET_ANALYSIS|BOT_INTELLIGENCE|RISK_REVIEW|PLATFORM_HELP|GENERAL",
- "facts":["..."],
- "technicalAnalysis":["..."],
- "setup":{"signal":"ENTRY_CONFIRMING|WAIT|NO_TRADE|DATA_INSUFFICIENT","entry":null,"waitFor":"...","invalidation":"..."},
- "riskFlags":["..."],
- "nextAction":"...",
- "reasoningSummary":["..."],
- "evidenceFor":["..."],
- "evidenceAgainst":["..."],
- "uncertainties":["..."],
- "alternativeHypotheses":["..."],
- "validationSteps":["..."],
- "intelligence": {"mode":"...", "epistemicStatus":"CONTROLLED", "capabilitiesUsed":[]}
-}`;
-
-    try{
-      const response=await ai.models.generateContent({
-        model:MODEL,
-        contents:prompt,
-        config:{systemInstruction:SYSTEM,responseMimeType:"application/json",maxOutputTokens:1600,thinkingConfig:{thinkingLevel:"high"}}
-      });
-      const parsed=safeJson(response.text)||{answer:String(response.text||"KINGBOT AI returned no structured answer.")};
-      const generatedAudit=qualityAudit({reply:parsed,plan:cognitivePlan,verified:native.verified||{}});
-      const intelligence={
-        identity:"KINGBOT",
-        deliberation:"HIGH",
-        mode:cognitivePlan.mode,
-        stages:cognitivePlan.stages,
-        capabilities:capabilitySet(cognitivePlan),
-        epistemicStatus:generatedAudit.epistemicStatus,
-        authority:"NONE"
-      };
-      const finalReply={...parsed,intelligence};
-      return res.json({ok:true,agent:"KINGBOT",model:MODEL,symbol,context,identity:identitySnapshot(),cognitivePlan,cognitionAudit:generatedAudit,reply:finalReply,sources:native.sources||[],generatedAt:new Date().toISOString(),executionAuthority:"NONE"});
-    }catch(error){
-      console.error("[KINGBOT AI AGENT]",error?.message||error);
-      return res.status(502).json({ok:false,error:"KINGBOT_AI_AGENT_FAILED",message:String(error?.message||"AI agent failed").slice(0,220)});
-    }
+    return res.json({
+      ok:true,
+      agent:"KINGBOT",
+      model:MODEL,
+      provider:"KINGBOT_NATIVE",
+      symbol,
+      identity:identitySnapshot(),
+      cognitivePlan,
+      cognitionAudit:native?.cognition?.audit||null,
+      cognition:native?.cognition||null,
+      reply:native?.reply||{},
+      sources:native.sources||[],
+      generatedAt:new Date().toISOString(),
+      executionAuthority:"NONE"
+    });
   });
 }
