@@ -42,7 +42,7 @@ export function createBotRuntimeRouter({pool,broker}){
 
   router.get("/",async(req,res)=>{
     const user=await requireUser(pool,req,res);if(!user)return;
-    const bots=await Promise.all(Object.values(getBotDefinitions()).map(async b=>{const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id),entitled=await entitlement(pool,user.id,b.id,user.email);return {botId:b.id,name:b.name,mode:b.mode||null,entitled,runtime:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||b.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null,signalThreshold:b.signalThreshold||null,tradePlan:b.tradePlan||null,strategies:b.strategies||[]};}));
+    const bots=await Promise.all(Object.values(getBotDefinitions()).map(async b=>{const r=await runtime(pool,user.id,b.id),s=await settings(pool,user.id,b.id),entitled=await entitlement(pool,user.id,b.id,user.email);return {botId:b.id,name:b.name,mode:b.mode||null,entitled,runtime:r?.state||"STOPPED",executionMode:s.executionMode,killSwitch:s.killSwitch,symbol:r?.symbol||null,timeframe:r?.timeframe||bot.timeframeProfile?.execution||"5m",lastSignal:r?.last_signal||null,lastRunAt:r?.last_run_at||null,lastError:r?.last_error||null,signalThreshold:b.signalThreshold||null,tradePlan:b.tradePlan||null,strategies:b.strategies||[]};}));
     res.json({ok:true,bots});
   });
 
