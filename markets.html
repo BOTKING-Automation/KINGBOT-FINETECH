@@ -2554,6 +2554,13 @@ overscroll-behavior:none;}
           INDICES
         </button>
 
+        <button
+          class="filter"
+          data-filter="synthetics"
+        >
+          SYNTHETICS
+        </button>
+
       </div>
 
 
@@ -2905,6 +2912,46 @@ overscroll-behavior:none;}
       }
 
     ];
+
+    let SYNTHETICS_LOADED = false;
+
+    async function loadSyntheticMarkets() {
+      if (SYNTHETICS_LOADED) return;
+      try {
+        const response = await fetch(
+          "https://kingbot-fintech-api-etfv.onrender.com/api/markets/synthetics",
+          { cache: "no-store" }
+        );
+        if (!response.ok) return;
+        const payload = await response.json().catch(() => ({}));
+        const rows = Array.isArray(payload.markets) ? payload.markets : [];
+        for (const item of rows.slice(0, 100)) {
+          const id = String(item.symbol || "").trim().toUpperCase();
+          if (!id || MARKETS.some(m => m.id === id)) continue;
+          const chartName = String(item.name || id).trim();
+          const tvSlug = chartName
+            .toUpperCase()
+            .replace(/\(1S\)/g, "1S")
+            .replace(/[^A-Z0-9]+/g, "_")
+            .replace(/^_|_$/g, "");
+          MARKETS.push({
+            id,
+            name: chartName,
+            symbol: "DERIV:" + tvSlug,
+            category: "synthetics",
+            icon: "SYN",
+            source: "deriv",
+            brokerSymbol: id,
+            syntheticFamily: item.familyLabel || "Synthetic Index"
+          });
+        }
+        SYNTHETICS_LOADED = true;
+        renderAll();
+      } catch (error) {
+        console.warn("KINGBOT synthetic market discovery failed", error);
+      }
+    }
+
 
 
     const state = {
@@ -3285,30 +3332,28 @@ overscroll-behavior:none;}
     const DERIV_MARKETS = MARKETS.filter(m => !m.binance);
 
     async function fetchDerivData() {
-      if (!DERIV_MARKETS.length) return;
-      await Promise.allSettled(
-        DERIV_MARKETS.map(async market => {
-          try {
-            const response = await fetch(
-              "https://kingbot-fintech-api-etfv.onrender.com/api/market/quote?symbol=" +
-              encodeURIComponent(market.id),
-              { cache: "no-store" }
-            );
-            if (!response.ok) return;
-            const payload = await response.json().catch(() => ({}));
-            const quote = payload?.market;
-            if (!quote || !Number.isFinite(Number(quote.price))) return;
-
-            state.data[market.id] = {
-              ...(state.data[market.id] || {}),
-              price: Number(quote.price),
-              updated: Date.now(),
-              source: quote.source || "deriv-shared-live-feed",
-              feedAgeMs: Number(quote.ageMs || 0)
-            };
-          } catch {}
-        })
-      );
+      const markets = MARKETS.filter(m => !m.binance);
+      if (!markets.length) return;
+      try {
+        const symbols = markets.map(m => m.id).join(",");
+        const response = await fetch(
+          "https://kingbot-fintech-api-etfv.onrender.com/api/market-scanner/quotes?symbols=" +
+          encodeURIComponent(symbols),
+          { cache: "no-store" }
+        );
+        if (!response.ok) return;
+        const payload = await response.json().catch(() => ({}));
+        for (const quote of Array.isArray(payload.quotes) ? payload.quotes : []) {
+          if (!quote?.available || !Number.isFinite(Number(quote.price))) continue;
+          state.data[quote.symbol] = {
+            ...(state.data[quote.symbol] || {}),
+            price: Number(quote.price),
+            updated: Date.now(),
+            source: quote.source || "deriv-public-live-feed",
+            feedAgeMs: Number(quote.ageMs || 0)
+          };
+        }
+      } catch {}
       state.lastUpdate = Date.now();
       renderAll();
     }
@@ -4645,6 +4690,7 @@ overscroll-behavior:none;}
     ========================================================== */
 
     async function initialize() {
+      await loadSyntheticMarkets();
 
       /*
         XAUUSD is intentionally the
@@ -4689,7 +4735,7 @@ overscroll-behavior:none;}
 
       setInterval(
         fetchDerivData,
-        2000
+        5000
       );
 
 
