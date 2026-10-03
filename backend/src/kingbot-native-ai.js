@@ -4,6 +4,7 @@ import { evaluateKingbotBrain } from "./kingbot-brain.js";
 import { searchWeb, webSearchStatus } from "./kingbot-web-search.js";
 import { getPlans, BOT_NAMES } from "./subscriptions.js";
 import { searchTechnicalAnalysisBook, technicalAnalysisBookContext } from "./technical-analysis-book.js";
+import { buildCognitivePlan, capabilitySet, identitySnapshot, qualityAudit } from "./kingbot-intelligence-core.js";
 
 const SYMBOLS = ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 
@@ -321,7 +322,7 @@ function platformSupportReply(question){
   return {answer:"I understand the request as a KINGBOT platform question, not a market-analysis request.",facts:["No market-analysis trigger was detected.","No unsupported account or market values were fabricated."],technicalAnalysis:[],setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"A specific platform question.",invalidation:"Not applicable."},riskFlags:[],nextAction:"Ask your question directly and I will route it to the appropriate intelligence capability."};
 }
 
-export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker,userId,conversation=[]}={}){
+async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,userId,conversation=[]}={}){
   const requested=symbolFromText(question,symbol||"XAUUSD");
   const kind=intent(question);
   const utility=utilityReply(question);
@@ -539,4 +540,44 @@ export async function runNativeKingbotAI({question,symbol,twelveData,pool,broker
   const brain=snapshot?evaluateKingbotBrain(snapshot,{maxAgeMs:Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS||5000)}):null;
   const reply=nativeMarketAnswer({question,symbol:requested,quote,snapshot,brain});
   return {provider:"KINGBOT_NATIVE",model:"KINGBOT-CORE-1",intent:kind,symbol:requested,reply,verified:{quote:Boolean(quote?.available),technicalSnapshot:Boolean(snapshot),brain:Boolean(brain)}};
+}
+
+
+export async function runNativeKingbotAI(input = {}) {
+  const result = await runNativeKingbotAIBase(input);
+  const plan = buildCognitivePlan({
+    intent: result?.intent || "PLATFORM_SUPPORT",
+    symbol: result?.symbol || input?.symbol || "XAUUSD",
+    conversation: input?.conversation || []
+  });
+  const identity = identitySnapshot();
+  const capabilities = capabilitySet(plan);
+  const audit = qualityAudit({
+    reply: result?.reply || {},
+    plan,
+    verified: result?.verified || {}
+  });
+
+  const reply = {
+    ...(result?.reply || {}),
+    intelligence: {
+      identity: identity.id,
+      mode: plan.mode,
+      stages: plan.stages,
+      capabilities,
+      epistemicStatus: audit.epistemicStatus,
+      authority: "NONE"
+    }
+  };
+
+  return {
+    ...result,
+    identity,
+    cognition: {
+      plan,
+      capabilities,
+      audit
+    },
+    reply
+  };
 }
