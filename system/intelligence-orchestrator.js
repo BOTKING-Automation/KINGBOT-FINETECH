@@ -58,6 +58,8 @@
     text("orchTimeframe",String(market.timeframe||"—").toUpperCase());
     text("orchFreshness",market.freshness?.ok?"FRESH":"STALE / UNKNOWN");
     text("orchUpdated",data.generatedAt?new Date(data.generatedAt).toLocaleTimeString():"—");
+    text("identityDeliberation",data.cognitive?.plan?.thinking?.label||data.adaptive?.thinkingLevel||"EXPERT");
+    text("identityReasoning","NATIVE MULTI-PASS");
     text("identityState","COGNITIVE PASS ACTIVE");
     text("identityMode",cognitivePlan.mode||"MARKET INTELLIGENCE");
     text("identityCapabilities",Array.isArray(cognitive.capabilities)?cognitive.capabilities.join(" · "):"PERCEPTION · REASONING · VERIFICATION");
@@ -184,7 +186,7 @@
       const timeframe=$("timeframeSelect")?.value||"15m";
       const data=await request("/ai/intelligence/orchestrate",{
         method:"POST",
-        body:JSON.stringify({symbol,timeframe})
+        body:JSON.stringify({symbol,timeframe,thinkingLevel:$("thinkingLevelSelect")?.value||"EXPERT"})
       });
       render(data);
       text("orchLiveState","ORCHESTRATOR ONLINE");
