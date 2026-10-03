@@ -2,7 +2,7 @@ import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getBotDefinitions } from "./bot-engines.js";
 import { runNativeKingbotAI } from "./kingbot-native-ai.js";
 import { webSearchStatus } from "./kingbot-web-search.js";
-import { identitySnapshot, buildCognitivePlan, capabilitySet, qualityAudit } from "./kingbot-intelligence-core.js";
+import { identitySnapshot, buildCognitivePlan, capabilitySet, qualityAudit, thinkingProfile, normalizeThinkingLevel } from "./kingbot-intelligence-core.js";
 
 const DEFAULT_SYMBOLS=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 const MODEL="KINGBOT-CORTEX-1";
@@ -45,7 +45,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     res.json({
       ok:true,agentReady:true,nativeReady:true,externalProvider:EXTERNAL_PROVIDER,model:MODEL,mode:"KINGBOT_NATIVE_INTELLIGENCE_AGENT",
       authority:"ANALYSIS_ONLY",marketData:feed.status(),brokerConnected:Boolean(brokerStatus?.connected),
-      engines:Object.keys(getBotDefinitions()),webResearch:webSearchStatus(),identity:identitySnapshot(),cognitiveLoop:identitySnapshot().cognitiveLoop
+      engines:Object.keys(getBotDefinitions()),webResearch:webSearchStatus(),identity:identitySnapshot(),cognitiveLoop:identitySnapshot().cognitiveLoop,thinkingLevels:["FAST","STANDARD","DEEP","EXPERT"],defaultThinkingLevel:"EXPERT",defaultProfile:thinkingProfile("EXPERT")
     });
   });
 
