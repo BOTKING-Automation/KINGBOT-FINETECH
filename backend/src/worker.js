@@ -522,7 +522,7 @@ async function executeLadderV8DerivStart({userId,botId,config,s,account,quote,in
     // Round before the API request so Gemini-confirmed trades are not rejected by broker precision rules.
     const stopLoss=Number(Math.max(0.01,Math.min(stake*0.9,atrStop*multiplier)).toFixed(2));
     const takeProfit=Number(Math.max(stake*1.05,stake+stopLoss*Number(cfg.takeProfitRR||2.0)).toFixed(2));
-    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,s.executionMode,config.symbol,sideName,stake]);
+    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,decision_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,decisionId,s.executionMode,config.symbol,sideName,stake]);
     if(!journal.rowCount)continue;
     try{
       await broker.assertExecutionAuthorized(userId);
@@ -693,7 +693,7 @@ async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,pos
     const sl=ladderPrice(side==="BUY"?entry-stopDistance:entry+stopDistance,ls.point);
     const clientId="kbv8_"+crypto.randomUUID();
     const volume=volumes[i];
-    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,s.executionMode,config.symbol,side,volume]);
+    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,decision_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,decisionId,s.executionMode,config.symbol,side,volume]);
     if(!journal.rowCount)continue;
     try{
       await broker.assertExecutionAuthorized(userId);
@@ -977,7 +977,7 @@ async function execute(row){
       const spreadOk=derivBroker||spreadPoints<=ladderCfg.maxSpreadPoints;
       if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&spreadOk&&(!aiExecutionGateEnabled()||aiTradeGate?.confirm)){
         try{
-          const start=await executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity});
+          const start=await executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity,decisionId:adaptiveExecutionDecision?.decisionId||null});
           action=start.action;started=start.state;startDetails=start.details||null;
         }catch(error){
           action="DERIV_V8_EXECUTION_REJECTED";
@@ -1019,7 +1019,7 @@ async function execute(row){
     let action="NO_ACTION";
     let started=null;
     if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&spreadOk&&(!aiExecutionGateEnabled()||aiTradeGate?.confirm)){
-      const start=await executeLadderV8Start({userId,botId,config,s,account,quote,ind,positions,spec,velocity});
+      const start=await executeLadderV8Start({userId,botId,config,s,account,quote,ind,positions,spec,velocity,decisionId:adaptiveExecutionDecision?.decisionId||null});
       action=start.action;started=start.state;
     }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!spreadOk)action="V8_SPREAD_FILTER_BLOCKED";
     else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!risk.allowed)action="RISK_BLOCKED";
@@ -1057,7 +1057,7 @@ async function execute(row){
     if(!Number.isFinite(volume)||volume<minVolume||volume>maxVolume)throw new Error("RISK_SIZED_VOLUME_OUT_OF_RANGE");
     if(positions.filter(p=>String(p.symbol||"").toUpperCase()===String(config.symbol).toUpperCase()).length>=s.maxPositions)throw new Error("MAX_SYMBOL_POSITIONS");
     const clientId="kb_"+crypto.randomUUID();
-    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,s.executionMode,config.symbol,side,volume]);
+    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,decision_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,decisionId,s.executionMode,config.symbol,side,volume]);
     if(!journal.rowCount)throw new Error("DUPLICATE_EXECUTION_REQUEST");
     try{
       order=await broker.placeOrder({side,symbol:config.symbol,volume,stopLoss,takeProfit,comment:"KINGBOT",clientId,userId,multiplier:String(status.broker||"").toLowerCase()==="deriv"?100:undefined});
