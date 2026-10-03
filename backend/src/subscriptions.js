@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { Router } from "express";
 import { resolveFirebaseUser } from "./auth.js";
 import { isAdminEmail } from "./admin-access.js";
+import { appendCommercialLedger } from "./commercial-ledger.js";
 
 const PLANS = {
   starter: { id:"starter", name:"Basic", priceUsd:130, billing:"monthly", botLimit:1, selectableBots:["strategic","breakout"], bots:["strategic","breakout"], requiresBotSelection:true, features:["Choose 1 of 2 entry bots","Strategic or Breakout","Core risk controls","Equity tracking"] },
@@ -143,6 +144,7 @@ export function createSubscriptionRouter({pool,broker}) {
       const s=await client.query("INSERT INTO kingbot_subscriptions(user_id,plan_id,status,started_at,expires_at,approved_at,approved_by,payment_id) VALUES($1,$2,'active',NOW(),NOW()+INTERVAL '1 month',NOW(),$3,$4) RETURNING id,plan_id,status,started_at,expires_at",[p.user_id,p.plan_id,a.email,p.id]);
       await client.query("UPDATE kingbot_bot_entitlements SET active=FALSE WHERE user_id=$1",[p.user_id]);
       for(const bot of grantedBots) await client.query("INSERT INTO kingbot_bot_entitlements(user_id,bot_id,subscription_id,active) VALUES($1,$2,$3,TRUE)",[p.user_id,bot,s.rows[0].id]);
+      await appendCommercialLedger(client,{userId:p.user_id,entryType:"SUBSCRIPTION_SALE",direction:"CREDIT",currency:"KES",amount:p.amount_kes,referenceType:"PAYMENT",referenceId:String(p.id),metadata:{subscriptionId:s.rows[0].id,planId:p.plan_id,grantedBots}});
       await client.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'PAYMENT_APPROVED',$2::jsonb)",[p.user_id,JSON.stringify({paymentId:p.id,subscriptionId:s.rows[0].id,planId:p.plan_id,selectedBotId:p.selected_bot_id||null,grantedBots,approvedBy:a.email})]);
       await client.query("COMMIT");
       res.json({ok:true,subscription:s.rows[0],grantedBots:grantedBots.map(x=>BOT_NAMES[x])});
