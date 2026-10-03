@@ -268,7 +268,7 @@
 
     setTelemetry(
       "aiCoreStatus",
-      aiReady ? "KINGBOT NATIVE" : "OFFLINE",
+      aiReady ? "KINGBOT CORTEX" : "OFFLINE",
       aiReady ? "good" : "bad"
     );
     setTelemetry("apiStatus", apiReady ? "LIVE" : "OFFLINE", apiReady ? "good" : "bad");
@@ -276,12 +276,12 @@
 
     setText(
       "coreStateLabel",
-      aiReady ? "KINGBOT NATIVE AI ONLINE" : "AI CORE UNAVAILABLE"
+      aiReady ? "KINGBOT CORTEX AI ONLINE" : "AI CORE UNAVAILABLE"
     );
     setText(
       "coreStateSub",
       aiReady
-        ? "Native KINGBOT intelligence is active through the secured backend" + (model ? " · " + model : "") + (googleReady ? " · GOOGLE RESEARCH READY" : "") + "."
+        ? "KINGBOT proprietary intelligence is active through the secured backend" + (model ? " · " + model : "") + (googleReady ? " · GOOGLE RESEARCH READY" : "") + "."
         : "Server AI is not configured or is unavailable."
     );
   }
@@ -510,8 +510,8 @@
 
       state.lastQueryAt = new Date();
       setText("lastQuery", state.lastQueryAt.toLocaleTimeString());
-      setChatState("NATIVE AI ONLINE");
-      showToast("KINGBOT Native AI responded.", "good");
+      setChatState("KINGBOT CORTEX ONLINE");
+      showToast("KINGBOT Cortex completed the cognitive pass.", "good");
     } catch (error) {
       hideTyping();
       const messageText = error?.message || "KINGBOT AI is temporarily unavailable.";
@@ -603,10 +603,10 @@
     setChatState("READY");
     setInterval(loadContext, 20000);
     loadHealth();
-    /* Native KINGBOT AI is the production chat path. No browser AI provider is loaded. */
-    setTelemetry("aiCoreStatus", "KINGBOT NATIVE", "good");
-    setText("coreStateLabel", "KINGBOT NATIVE AI ONLINE");
-    setText("coreStateSub", "Native KINGBOT intelligence is active. External browser AI providers are not required.");
+    /* KINGBOT Cortex is the production chat path. No external reasoning model is required. */
+    setTelemetry("aiCoreStatus", "KINGBOT CORTEX", "good");
+    setText("coreStateLabel", "KINGBOT CORTEX AI ONLINE");
+    setText("coreStateSub", "KINGBOT proprietary intelligence is active. External browser AI providers are not required.");
     window.setTimeout(() => {
       loadAgentStatus();
       loadContext();
