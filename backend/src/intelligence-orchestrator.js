@@ -488,8 +488,13 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
       model: ai ? MODEL : null,
       memoryPersistence: Boolean(pool),
       executionAuthority: "NONE",
-      cacheMs: CACHE_MS
+      cacheMs: CACHE_MS,
+      adaptiveMemory: true,
+      adaptiveMinSamples: Number(process.env.KINGBOT_ADAPTIVE_MIN_SAMPLES || 8),
+      adaptiveWindowDays: Number(process.env.KINGBOT_ADAPTIVE_WINDOW_DAYS || 90)
     });
+  });
+
   app.get("/api/ai/intelligence/adaptive", async (req, res) => {
     try {
       const user = await requireUser(pool, req, res);
