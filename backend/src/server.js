@@ -390,6 +390,7 @@ app.post("/api/broker/deriv/direct/connect",async(req,res)=>{
 
     const connected=await broker.connect(user.id,mode);
     if(!connected?.connected){
+      await broker.disconnect(user.id,{disableMapping:true}).catch(()=>{});
       return res.status(502).json({ok:false,error:"DERIV_DIRECT_CONNECTION_FAILED",reason:String(connected?.reason||"DERIV_CONNECTION_FAILED").slice(0,220)});
     }
 
