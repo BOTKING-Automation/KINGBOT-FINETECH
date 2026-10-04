@@ -56,7 +56,10 @@
     text("orchState",risk.status||"—");
     text("orchSymbol",market.symbol||"—");
     text("orchTimeframe",String(market.timeframe||"—").toUpperCase());
-    text("orchFreshness",market.freshness?.ok?"FRESH":"STALE / UNKNOWN");
+    const freshnessLabel = market.freshness?.ok
+      ? (market.freshnessMode === "LIVE_QUOTE" ? "LIVE QUOTE" : "FRESH")
+      : "STALE / UNKNOWN";
+    text("orchFreshness",freshnessLabel);
     text("orchUpdated",data.generatedAt?new Date(data.generatedAt).toLocaleTimeString():"—");
     text("identityDeliberation",data.cognitive?.plan?.thinking?.label||data.adaptive?.thinkingLevel||"EXPERT");
     text("identityReasoning","NATIVE MULTI-PASS");
@@ -76,11 +79,21 @@
 
     const engineList=$("orchEngines");
     if(engineList){
-      const rows=[...(data.engines||[])].sort((a,b)=>Number(b.fit||0)-Number(a.fit||0));
+      const council=data.strategyCouncil||{};
+      const rows=Array.isArray(data.specialists)&&data.specialists.length
+        ? data.specialists
+        : (Array.isArray(council.engines)?council.engines:[]);
+      const primaryId=String(council.primarySpecialist?.botId||routing.primarySpecialist||routing.selectedEngine||"");
       engineList.innerHTML=rows.map(e=>{
-        const selected=e.botId===routing.selectedEngine;
-        return '<div class="orch-engine '+(selected?"selected":"")+'"><div><span>'+esc(e.name)+'</span><small>'+esc(e.botId)+' · '+esc(e.signal||"NO_SIGNAL")+'</small></div><strong>'+esc(fmt(e.fit))+'</strong></div>';
-      }).join("")||'<div class="orch-empty">NO ENGINE EVALUATIONS</div>';
+        const selected=String(e.botId||"")===primaryId;
+        const direction=String(e.direction||"WAIT").toUpperCase();
+        const confidence=fmt(e.confidence);
+        const councilScore=e.councilScore!=null?fmt(e.councilScore):"—";
+        const status=e.strategyMatch ? direction+" · QUALIFIED" : "WAIT · CONDITIONS PENDING";
+        const reason=(e.entryConditions?.[0]||e.waitConditions?.[0]||e.reason||"No specialist reason supplied.");
+        return '<div class="orch-engine '+(selected?"selected":"")+'"><div><span>'+esc(e.name||e.botId||"SPECIALIST")+'</span><small>'+esc(e.strategyIdentity||e.botId||"")+' · '+esc(status)+' · CONF '+esc(confidence)+'</small><small>'+esc(reason)+'</small></div><strong>'+esc(councilScore)+'</strong></div>';
+      }).join("")||'<div class="orch-empty">NO SPECIALIST EVALUATIONS</div>';
+      text("orchLiveState", council.state ? "COUNCIL "+council.state : "ORCHESTRATOR ONLINE");
     }
 
     const bull=$("orchBull"),bear=$("orchBear");
@@ -88,7 +101,8 @@
     if(bear)bear.innerHTML=(debate.bearCase||[]).slice(0,6).map(x=>'<div>− '+esc(x)+'</div>').join("")||'<div class="orch-muted">No bearish evidence supplied.</div>';
 
     const riskFlags=[...(risk.blocks||[]),...(risk.flags||[])];
-    text("orchRiskStatus",risk.status||"—");
+    const councilState=String(data.strategyCouncil?.state||routing.councilState||"").toUpperCase();
+    text("orchRiskStatus",risk.status||councilState||"—");
     const riskList=$("orchRiskList");
     if(riskList)riskList.innerHTML=riskFlags.length
       ? riskFlags.map(x=>'<span class="orch-chip bad">'+esc(x)+'</span>').join("")
@@ -144,7 +158,7 @@
         const adjusted=fmt(e.fit);
         const samples=Number(e.historicalSampleSize||0);
         const delta=Number(e.adaptiveAdjustment||0);
-        return '<div style="display:grid;grid-template-columns:1.6fr .8fr .8fr .9fr .7fr .7fr;gap:7px;align-items:center;padding:8px;border:1px solid '+(selected?"rgba(25,230,255,.28)":"rgba(255,255,255,.05)")+';border-radius:9px;background:'+(selected?"rgba(25,230,255,.05)":"rgba(255,255,255,.015)")+'"><div><strong style="font:900 8px JetBrains Mono">'+esc(e.name||e.botId)+'</strong><small style="display:block;color:var(--muted);font:700 7px JetBrains Mono">'+esc(e.adaptationState||"BASELINE")+'</small></div><span style="font:800 8px JetBrains Mono">NOW "+esc(current)+"</span><span style="font:800 8px JetBrains Mono">HIST "+esc(historical)+"</span><span style="font:900 8px JetBrains Mono">FIT "+esc(adjusted)+"</span><span style="font:800 8px JetBrains Mono">N="+esc(samples)+"</span><span style="font:800 8px JetBrains Mono">Δ "+esc(delta>=0?"+":"")+esc(delta)+"</span></div>';
+        return `<div style="display:grid;grid-template-columns:1.6fr .8fr .8fr .9fr .7fr .7fr;gap:7px;align-items:center;padding:8px;border:1px solid ${selected?"rgba(25,230,255,.28)":"rgba(255,255,255,.05)"};border-radius:9px;background:${selected?"rgba(25,230,255,.05)":"rgba(255,255,255,.015)"}"><div><strong style="font:900 8px JetBrains Mono">${esc(e.name||e.botId)}</strong><small style="display:block;color:var(--muted);font:700 7px JetBrains Mono">${esc(e.adaptationState||"BASELINE")}</small></div><span style="font:800 8px JetBrains Mono">NOW ${esc(current)}</span><span style="font:800 8px JetBrains Mono">HIST ${esc(historical)}</span><span style="font:900 8px JetBrains Mono">FIT ${esc(adjusted)}</span><span style="font:800 8px JetBrains Mono">N=${esc(samples)}</span><span style="font:800 8px JetBrains Mono">Δ ${esc(delta>=0?"+":"")}${esc(delta)}</span></div>`;
       }).join("")||'<div class="orch-muted">No adaptive engine context.</div>';
     }
 
