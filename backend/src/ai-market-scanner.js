@@ -211,7 +211,7 @@ function atrValue(bars, period=14) {
   for(let i=1;i<bars.length;i++){const h=bars[i].high,l=bars[i].low,pc=bars[i-1].close;trs.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));}
   return sma(trs,period);
 }
-function deriveTechnicalFromBars(bars) {
+export function deriveTechnicalFromBars(bars) {
   if(!Array.isArray(bars)||bars.length<80)return null;
   const clean=bars.map(b=>({
     open:finite(b.open),high:finite(b.high),low:finite(b.low),close:finite(b.close),
