@@ -9,6 +9,7 @@ BUY / SELL / HOLD probabilities from a scikit-learn + PyTorch ensemble.
 """
 from __future__ import annotations
 
+import hmac
 import json
 import math
 import os
@@ -28,11 +29,14 @@ from torch import nn
 HOST = "0.0.0.0"
 PORT = int(os.getenv("PORT", "10000"))
 SECRET = os.getenv("KINGBOT_ML_SIGNAL_SECRET", "").strip()
-MAX_BODY_BYTES = 1_500_000
+MAX_BODY_BYTES = max(64_000, int(os.getenv("KINGBOT_ML_MAX_BODY_BYTES", "1500000")))
 MIN_BARS = max(120, int(os.getenv("KINGBOT_ML_MIN_BARS", "150")))
 FORWARD_HORIZON = max(1, int(os.getenv("KINGBOT_ML_FORWARD_BARS", "3")))
 LABEL_ATR = float(os.getenv("KINGBOT_ML_LABEL_ATR", "0.35"))
 MAX_MODELS = max(10, int(os.getenv("KINGBOT_ML_MAX_MODELS", "50")))
+MAX_MARKETS = max(1, int(os.getenv("KINGBOT_ML_MAX_MARKETS", "12")))
+MAX_BARS_PER_MARKET = max(MIN_BARS, int(os.getenv("KINGBOT_ML_MAX_BARS_PER_MARKET", "320")))
+TRAINING_KEYS: set[str] = set()
 
 LABELS = [-1, 0, 1]
 LABEL_TO_INDEX = {-1: 0, 0: 1, 1: 2}
@@ -322,95 +326,141 @@ def train_torch(X: np.ndarray, y: np.ndarray, scaler: StandardScaler, sample_wei
     return model, accuracy
 
 
+def normalize_market_bars(bars: Any) -> list[dict[str, float]]:
+    if not isinstance(bars, list):
+        raise ValueError("ML_MARKET_BARS_INVALID")
+    rows: list[dict[str, float]] = []
+    for bar in bars:
+        if not isinstance(bar, dict):
+            continue
+        o = finite(bar.get("open"))
+        h = finite(bar.get("high"))
+        l = finite(bar.get("low"))
+        close = finite(bar.get("close"))
+        volume = finite(bar.get("volume"))
+        if not all(math.isfinite(v) and v > 0 for v in (o, h, l, close)):
+            continue
+        if h < max(o, l, close) or l > min(o, h, close):
+            continue
+        rows.append({
+            "open": o,
+            "high": h,
+            "low": l,
+            "close": close,
+            "volume": max(volume, 0.0),
+        })
+    if len(rows) > MAX_BARS_PER_MARKET:
+        rows = rows[-MAX_BARS_PER_MARKET:]
+    return rows
+
+
 def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) -> dict[str, Any]:
-    combined_x: list[np.ndarray] = []
-    combined_y: list[np.ndarray] = []
-    combined_weights: list[np.ndarray] = []
-    symbols: list[str] = []
-    total_bar_count = 0
-
-    for market in markets:
-        symbol = str(market.get("symbol") or "").strip().upper()
-        bars = market.get("bars")
-        if not symbol or not isinstance(bars, list):
-            continue
-        normalized: list[dict[str, float]] = []
-        for bar in bars[-320:]:
-            try:
-                row = {
-                    "open": finite(bar.get("open")),
-                    "high": finite(bar.get("high")),
-                    "low": finite(bar.get("low")),
-                    "close": finite(bar.get("close")),
-                    "volume": finite(bar.get("volume")),
-                }
-                if row["high"] >= row["low"] > 0 and row["close"] > 0:
-                    normalized.append(row)
-            except AttributeError:
-                continue
-
-        if len(normalized) < MIN_BARS:
-            continue
-        total_bar_count += len(normalized)
-        X_part, y_part, weights_part = bars_to_training_arrays(normalized, strategy)
-        if len(X_part):
-            combined_x.append(X_part)
-            combined_y.append(y_part)
-            combined_weights.append(weights_part)
-            symbols.append(symbol)
-
-    if not combined_x:
-        raise ValueError(f"ML_TRAINING_REQUIRES_{MIN_BARS}_BARS")
-
-    X = np.concatenate(combined_x, axis=0)
-    y = np.concatenate(combined_y, axis=0)
-    weights = np.concatenate(combined_weights, axis=0)
-    if len(X) < 70:
-        raise ValueError("ML_TRAINING_FEATURES_INSUFFICIENT")
-
-    present = sorted(set(int(v) for v in y))
-    if len(present) < 3:
-        raise ValueError("ML_TRAINING_REQUIRES_BUY_SELL_HOLD_CLASSES")
-
-    cutoff = max(20, int(len(X) * 0.78))
-    scaler = StandardScaler()
-    scaler.fit(X[:cutoff])
-
-    rf = RandomForestClassifier(
-        n_estimators=180,
-        max_depth=7,
-        min_samples_leaf=4,
-        random_state=42,
-        class_weight="balanced_subsample",
-        n_jobs=1,
-    )
-    rf.fit(X[:cutoff], y[:cutoff], sample_weight=weights[:cutoff])
-
-    rf_pred = rf.predict(X[cutoff:]) if cutoff < len(X) else np.empty((0,), dtype=np.int64)
-    rf_accuracy = float(accuracy_score(y[cutoff:], rf_pred)) if len(rf_pred) else 0.0
-    torch_model, torch_accuracy = train_torch(X, y, scaler, weights)
-
     key = f"{strategy}:{timeframe.lower()}"
     with LOCK:
-        MODELS[key] = {
-            "rf": rf,
-            "torch": torch_model,
-            "scaler": scaler,
-            "trained_at": time.time(),
-            "strategy": strategy,
-            "symbols": sorted(set(symbols)),
-            "timeframe": timeframe.lower(),
-            "samples": int(len(X)),
-            "rf_accuracy": rf_accuracy,
-            "torch_accuracy": torch_accuracy,
-            "bar_count": total_bar_count,
-            "feature_version": "ai-strategies-v1",
-        }
-        while len(MODELS) > MAX_MODELS:
-            oldest = min(MODELS.items(), key=lambda item: item[1]["trained_at"])[0]
-            MODELS.pop(oldest, None)
+        if key in TRAINING_KEYS:
+            raise RuntimeError("ML_TRAINING_IN_PROGRESS")
+        TRAINING_KEYS.add(key)
 
-    return model_status(key)
+    try:
+        if not isinstance(markets, list) or not markets:
+            raise ValueError("ML_TRAIN_PAYLOAD_REQUIRED")
+        if len(markets) > MAX_MARKETS:
+            raise ValueError(f"ML_TRAINING_MAX_MARKETS_{MAX_MARKETS}")
+
+        combined_x: list[np.ndarray] = []
+        combined_y: list[np.ndarray] = []
+        combined_weights: list[np.ndarray] = []
+        symbols: list[str] = []
+        total_bar_count = 0
+        accepted_markets = 0
+
+        for market in markets:
+            if not isinstance(market, dict):
+                continue
+            symbol = str(market.get("symbol") or "").strip().upper()
+            if not symbol or not isinstance(market.get("bars"), list):
+                continue
+            normalized = normalize_market_bars(market["bars"])
+            if len(normalized) < MIN_BARS:
+                continue
+
+            accepted_markets += 1
+            total_bar_count += len(normalized)
+            X_part, y_part, weights_part = bars_to_training_arrays(normalized, strategy)
+            if len(X_part):
+                combined_x.append(X_part)
+                combined_y.append(y_part)
+                combined_weights.append(weights_part)
+                symbols.append(symbol)
+
+        if not combined_x or accepted_markets == 0:
+            raise ValueError(f"ML_TRAINING_REQUIRES_{MIN_BARS}_BARS")
+
+        X = np.concatenate(combined_x, axis=0)
+        y = np.concatenate(combined_y, axis=0)
+        weights = np.concatenate(combined_weights, axis=0)
+        if len(X) < 70:
+            raise ValueError("ML_TRAINING_FEATURES_INSUFFICIENT")
+
+        present = sorted(set(int(v) for v in y))
+        if len(present) < 3:
+            raise ValueError("ML_TRAINING_REQUIRES_BUY_SELL_HOLD_CLASSES")
+
+        cutoff = max(20, min(len(X) - 1, int(len(X) * 0.78)))
+        if cutoff < 40 or len(X) - cutoff < 10:
+            raise ValueError("ML_TRAINING_SPLIT_INSUFFICIENT")
+
+        scaler = StandardScaler()
+        scaler.fit(X[:cutoff])
+
+        rf = RandomForestClassifier(
+            n_estimators=180,
+            max_depth=7,
+            min_samples_leaf=4,
+            random_state=42,
+            class_weight="balanced_subsample",
+            n_jobs=1,
+        )
+        rf.fit(X[:cutoff], y[:cutoff], sample_weight=weights[:cutoff])
+
+        rf_pred = rf.predict(X[cutoff:]) if cutoff < len(X) else np.empty((0,), dtype=np.int64)
+        rf_accuracy = float(accuracy_score(y[cutoff:], rf_pred)) if len(rf_pred) else 0.0
+        torch_model, torch_accuracy = train_torch(X, y, scaler, weights)
+
+        with LOCK:
+            MODELS[key] = {
+                "rf": rf,
+                "torch": torch_model,
+                "scaler": scaler,
+                "trained_at": time.time(),
+                "strategy": strategy,
+                "symbols": sorted(set(symbols)),
+                "timeframe": timeframe.lower(),
+                "samples": int(len(X)),
+                "rf_accuracy": rf_accuracy,
+                "torch_accuracy": torch_accuracy,
+                "bar_count": total_bar_count,
+                "feature_version": "ai-strategies-v2",
+            }
+            while len(MODELS) > MAX_MODELS:
+                oldest = min(MODELS.items(), key=lambda item: item[1]["trained_at"])[0]
+                MODELS.pop(oldest, None)
+
+        return {
+            **model_status(key),
+            "dataset": {
+                "marketsAccepted": accepted_markets,
+                "symbols": sorted(set(symbols)),
+                "bars": total_bar_count,
+                "samples": int(len(X)),
+                "classes": present,
+                "forwardBars": FORWARD_HORIZON,
+                "labelAtr": LABEL_ATR,
+            },
+        }
+    finally:
+        with LOCK:
+            TRAINING_KEYS.discard(key)
 
 
 def model_status(key: str) -> dict[str, Any]:
@@ -441,7 +491,7 @@ def current_market_features(market: dict[str, Any]) -> np.ndarray:
     ema_slow = finite(market.get("emaSlow") or market.get("ema50"))
     rsi_value = finite(market.get("rsi") or market.get("rsi14"), 50.0)
     adx_value = finite(market.get("adx") or market.get("adx14"))
-    spread = finite(market.get("spread"))
+    spread_atr = finite(market.get("spreadAtr"))
     trend = clamp(finite(market.get("trend")), -1.0, 1.0)
     momentum = clamp(finite(market.get("momentum")), -1.0, 1.0)
     volatility = clamp(finite(market.get("volatility")), 0.0, 1.0)
@@ -459,7 +509,7 @@ def current_market_features(market: dict[str, Any]) -> np.ndarray:
         clamp((rsi_value - 50.0) / 50.0, -1.0, 1.0),
         clamp(adx_value / 50.0, 0.0, 2.0),
         clamp(ema_gap, -5.0, 5.0) / 5.0,
-        clamp(abs(spread) / atr_value, 0.0, 2.0) / 2.0,
+        clamp(abs(spread_atr), 0.0, 2.0) / 2.0,
         1.0 if structure == "bullish" else 0.0,
         1.0 if structure == "bearish" else 0.0,
         bool_feature(market.get("liquiditySweep")),
@@ -470,7 +520,10 @@ def current_market_features(market: dict[str, Any]) -> np.ndarray:
         bool_feature(market.get("retest")),
         velocity if abs(velocity) > 0 else direction * momentum * 0.25,
     ]
-    return np.asarray([values], dtype=np.float32)
+    array = np.asarray([values], dtype=np.float32)
+    if not np.isfinite(array).all():
+        raise ValueError("ML_PREDICT_FEATURES_INVALID")
+    return array
 
 
 def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, Any]) -> dict[str, Any]:
@@ -480,6 +533,10 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
     if not item:
         return {"ok": True, "ready": False, "status": "MODEL_NOT_READY", "modelKey": key}
 
+    price = finite(market.get("price") or market.get("close"))
+    atr_value = finite(market.get("atr") or market.get("atr14"))
+    if price <= 0 or atr_value <= 0:
+        raise ValueError("ML_PREDICT_MARKET_DATA_INVALID")
     X = current_market_features(market)
     scaled = item["scaler"].transform(X).astype(np.float32)
 
@@ -554,7 +611,7 @@ class Handler(BaseHTTPRequestHandler):
         if not SECRET:
             return False
         provided = self.headers.get("x-kingbot-ml-secret", "")
-        return provided == SECRET
+        return hmac.compare_digest(provided, SECRET)
 
     def _body(self) -> dict[str, Any] | None:
         try:
@@ -580,6 +637,9 @@ class Handler(BaseHTTPRequestHandler):
                 "libraries": ["scikit-learn", "PyTorch"],
                 "modelsLoaded": len(MODELS),
                 "configured": bool(SECRET),
+                "ready": bool(SECRET),
+                "training": len(TRAINING_KEYS),
+                "maxModels": MAX_MODELS,
             })
             return
         if self.path == "/models":
@@ -634,6 +694,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             self._json(404, {"ok": False, "error": "NOT_FOUND"})
+        except RuntimeError as error:
+            self._json(409, {"ok": False, "error": str(error)[:180]})
         except ValueError as error:
             self._json(422, {"ok": False, "error": str(error)[:180]})
         except Exception as error:
@@ -645,6 +707,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     server = ThreadingHTTPServer((HOST, PORT), Handler)
+    server.daemon_threads = True
+    server.allow_reuse_address = True
     print(f"KINGBOT ML signal service listening on {HOST}:{PORT}")
     server.serve_forever()
 
