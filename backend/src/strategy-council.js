@@ -113,6 +113,9 @@ export function buildStrategyCouncil(engines = [], {
   } else if (!strongest) {
     state = "WAIT";
     reason = "All five AI specialists are waiting for their own strategy conditions.";
+  } else if (upper(multiTimeframe.policy) === "BASE_TIMEFRAME_ONLY") {
+    state = "WAIT";
+    reason = "Higher-timeframe evidence is unavailable; the Council will not route a trade from a base timeframe alone.";
   } else if (upper(multiTimeframe.setupState) === "DATA_INSUFFICIENT") {
     state = "WAIT";
     reason = "Required multi-timeframe market evidence is incomplete.";
@@ -159,6 +162,7 @@ export function buildStrategyCouncil(engines = [], {
   const whatToWait = [];
   if (blockers.length) whatToWait.push(...blockers.map(x => "Resolve " + x + "."));
   if (state === "WAIT" || state === "CONFLICTED") {
+    if (upper(multiTimeframe.policy) === "BASE_TIMEFRAME_ONLY") whatToWait.push("Restore higher-timeframe market data before any directional route.");
     if (upper(multiTimeframe.setupState) === "DATA_INSUFFICIENT") whatToWait.push("Restore all required 5m/15m/1h/4h market data.");
     if (upper(multiTimeframe.setupState) === "CONFLICTED") whatToWait.push("Wait for higher/lower timeframe alignment.");
     if (marketDecision !== "BUY" && marketDecision !== "SELL") whatToWait.push("Wait for the independent evidence gate to confirm direction.");
