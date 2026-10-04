@@ -79,8 +79,11 @@ export class UserBrokerManager {
     const state=crypto.randomBytes(32).toString("base64url");
     const mode=(String(executionMode||"DEMO").toUpperCase()==="PAPER"?"DEMO":String(executionMode||"DEMO").toUpperCase());
     if(!["DEMO","LIVE"].includes(mode))throw new Error("INVALID_EXECUTION_MODE");
-    await this.pool.query("DELETE FROM kingbot_deriv_oauth_states WHERE expires_at<NOW()");
     await this.pool.query("INSERT INTO kingbot_deriv_oauth_states(state,user_id,code_verifier,execution_mode,expires_at) VALUES($1,$2,$3,$4,NOW()+INTERVAL '10 minutes')",[state,userId,String(codeVerifier||""),mode]);
+    // Cleanup is intentionally non-blocking so OAuth authorization URLs are generated immediately.
+    void this.pool.query("DELETE FROM kingbot_deriv_oauth_states WHERE expires_at<NOW()").catch(error=>{
+      console.warn("[KINGBOT DERIV OAUTH] Expired state cleanup deferred:",error?.message||error);
+    });
     return {state,executionMode:mode};
   }
 
