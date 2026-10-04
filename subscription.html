@@ -542,6 +542,21 @@
 
     .submit:disabled{opacity:.55;cursor:not-allowed;transform:none}
 
+    .payment-mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:13px;padding:5px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.018)}
+    .payment-mode{min-height:36px;border:1px solid transparent;border-radius:9px;background:transparent;color:#71809d;font:800 7px var(--mono);letter-spacing:.08em;cursor:pointer}
+    .payment-mode.active{color:#061018;background:linear-gradient(90deg,var(--gold),var(--cyan));box-shadow:0 8px 22px rgba(25,230,255,.10)}
+    .checkout-link-card{margin-top:10px;padding:12px;border:1px solid rgba(155,92,255,.16);border-radius:12px;background:linear-gradient(135deg,rgba(155,92,255,.04),rgba(25,230,255,.03))}
+    .checkout-link-head{display:flex;justify-content:space-between;gap:10px;align-items:center;color:#8e9ab6;font:800 7px var(--mono);letter-spacing:.1em}
+    .checkout-link-row{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:8px}
+    .checkout-link-row input{margin-top:0;font-size:8px;color:#b9c5dc}
+    .copy-link{min-width:72px;border:1px solid rgba(25,230,255,.14);border-radius:9px;background:rgba(25,230,255,.04);color:#89eefe;font:800 7px var(--mono);cursor:pointer}
+    .checkout-link-note{margin-top:7px;color:#64728e;font-size:8px;line-height:1.5}
+    .stk-status{margin-top:10px;padding:11px 12px;border-radius:11px;border:1px solid rgba(25,230,255,.12);background:rgba(25,230,255,.03);color:#91a1bf;font:700 8px var(--mono);line-height:1.6}
+    .stk-status.success{color:#9fffd4;border-color:rgba(35,247,163,.22);background:rgba(35,247,163,.04)}
+    .stk-status.failed{color:#ff9baa;border-color:rgba(255,77,109,.24);background:rgba(255,77,109,.05)}
+    .stk-status[hidden]{display:none}
+    @media(max-width:560px){.checkout-link-row{grid-template-columns:1fr}.copy-link{min-height:36px}}
+
     .summary-head{
       display:flex;
       justify-content:space-between;
@@ -775,6 +790,23 @@
                 <div class="receiver">Loading secure payment instructions.</div>
               </div>
 
+              <div class="payment-mode-switch" role="tablist" aria-label="M-Pesa payment method">
+                <button type="button" class="payment-mode active" data-payment-mode="stk" aria-selected="true">M-PESA PUSH</button>
+                <button type="button" class="payment-mode" data-payment-mode="manual" aria-selected="false">MANUAL CODE</button>
+              </div>
+
+              <div class="checkout-link-card">
+                <div class="checkout-link-head">
+                  <span>KINGBOT M-PESA CHECKOUT LINK</span>
+                  <span id="checkoutLinkState">READY</span>
+                </div>
+                <div class="checkout-link-row">
+                  <input id="checkoutLink" type="text" readonly value="Select a plan to generate your checkout link.">
+                  <button id="copyCheckoutLink" type="button" class="copy-link">COPY LINK</button>
+                </div>
+                <div class="checkout-link-note">This is a KINGBOT-hosted checkout link. It opens this payment page with the selected plan and M-Pesa Push mode preselected.</div>
+              </div>
+
               <form id="paymentForm" class="form">
 
                 <div class="row">
@@ -802,7 +834,7 @@
                 </div>
 
                 <div class="row">
-                  <div>
+                  <div id="manualCodeField">
                     <label for="mpesaCode">M-Pesa transaction code</label>
                     <input id="mpesaCode" maxlength="30" autocomplete="off" placeholder="e.g. ABC123XYZ" required>
                   </div>
@@ -819,17 +851,17 @@
                 </div>
 
                 <button class="submit" id="submitButton" type="submit">
-                  SUBMIT PAYMENT FOR VERIFICATION
+                  SEND M-PESA PUSH
                 </button>
 
               </form>
 
-              <div class="notice">
-                Payment submission does not unlock trading access immediately.
-                The transaction remains subject to the existing manual verification and entitlement workflow.
+              <div id="paymentNotice" class="notice">
+                M-Pesa Push sends a payment prompt to the customer phone. Successful payments remain pending until the existing KINGBOT verification and entitlement workflow approves the payment.
               </div>
 
-              <div id="status" class="status-box">Awaiting payment submission.</div>
+              <div id="status" class="status-box">Ready for M-Pesa Push.</div>
+              <div id="stkStatus" class="stk-status" hidden></div>
 
             </div>
 
@@ -919,6 +951,16 @@
     const accountStatus=document.getElementById("accountStatus");
     const history=document.getElementById("history");
     const submitButton=document.getElementById("submitButton");
+    const manualCodeField=document.getElementById("manualCodeField");
+    const mpesaCodeInput=document.getElementById("mpesaCode");
+    const paymentNotice=document.getElementById("paymentNotice");
+    const stkStatus=document.getElementById("stkStatus");
+    const checkoutLink=document.getElementById("checkoutLink");
+    const copyCheckoutLink=document.getElementById("copyCheckoutLink");
+    const checkoutLinkState=document.getElementById("checkoutLinkState");
+    let paymentMode=(new URLSearchParams(location.search).get("method")||"stk").toLowerCase()==="manual" ? "manual" : "stk";
+    let stkPollTimer=null;
+    let stkPollDeadline=0;
 
     const summaryName=document.getElementById("summaryName");
     const summaryStatus=document.getElementById("summaryStatus");
@@ -1005,6 +1047,14 @@
       summaryTier.textContent=p.tier;
       summaryNote.textContent=p.description;
 
+      const linkUrl=new URL("subscription.html",window.location.href);
+      linkUrl.search="";
+      linkUrl.hash="";
+      linkUrl.searchParams.set("plan",p.key);
+      linkUrl.searchParams.set("method","stk");
+      checkoutLink.value=linkUrl.toString();
+      checkoutLinkState.textContent="PLAN / "+p.key.toUpperCase();
+
       document.querySelectorAll(".plan-card").forEach(card=>{
         card.classList.toggle("selected",card.dataset.plan===p.key);
       });
@@ -1045,6 +1095,23 @@
       renderSummary();
     }
 
+    function syncPaymentMode(){
+      document.querySelectorAll("[data-payment-mode]").forEach(button=>{
+        const active=button.dataset.paymentMode===paymentMode;
+        button.classList.toggle("active",active);
+        button.setAttribute("aria-selected",String(active));
+      });
+      const stk=paymentMode==="stk";
+      manualCodeField.hidden=stk;
+      mpesaCodeInput.required=!stk;
+      submitButton.textContent=stk ? "SEND M-PESA PUSH" : "SUBMIT PAYMENT FOR VERIFICATION";
+      paymentNotice.textContent=stk
+        ? "M-Pesa Push sends a payment prompt to the customer phone. Successful payments remain pending until the existing KINGBOT verification and entitlement workflow approves the payment."
+        : "Payment submission does not unlock trading access immediately. The transaction remains subject to the existing manual verification and entitlement workflow.";
+      status.className="status-box";
+      if(!stk)stkStatus.hidden=true;
+    }
+
     function syncBasicBotChoice(){
       const picker=document.getElementById("basicBotChoice");
       const botSelect=document.getElementById("basicBotId");
@@ -1082,7 +1149,13 @@
           return '<option value="'+esc(p.id)+'">'+esc(d.name)+' — $'+d.price.toLocaleString()+'</option>';
         }).join("");
 
+        const requestedPlan=String(new URLSearchParams(location.search).get("plan")||"").toLowerCase();
+        const requested=plans.find(p=>planKey(p)===requestedPlan);
+        if(requested)select.value=requested.id;
+
         renderPlans();
+        syncPaymentMode();
+        syncBasicBotChoice();
         await loadMe();
 
       }catch(error){
@@ -1180,6 +1253,98 @@
 
     select.addEventListener("change",()=>{renderSummary();syncBasicBotChoice();});
     document.getElementById("basicBotId").addEventListener("change",syncBasicBotChoice);
+    document.querySelectorAll("[data-payment-mode]").forEach(button=>{
+      button.addEventListener("click",()=>{
+        paymentMode=button.dataset.paymentMode==="manual" ? "manual" : "stk";
+        syncPaymentMode();
+      });
+    });
+
+    copyCheckoutLink.addEventListener("click",async()=>{
+      try{
+        await navigator.clipboard.writeText(checkoutLink.value);
+        copyCheckoutLink.textContent="COPIED";
+        setTimeout(()=>copyCheckoutLink.textContent="COPY LINK",1200);
+      }catch{
+        checkoutLink.focus();
+        checkoutLink.select();
+        status.textContent="Select and copy the checkout link manually.";
+      }
+    });
+
+    function stopStkPolling(){
+      if(stkPollTimer){clearInterval(stkPollTimer);stkPollTimer=null;}
+    }
+
+    async function refreshStkStatus(paymentId){
+      try{
+        const response=await window.KINGBOT_API.request("/api/subscription/payments/"+encodeURIComponent(paymentId)+"/stk-status");
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok||!data.ok)throw new Error(data.error||"STK status unavailable.");
+        const p=data.payment||{};
+        const stkState=String(p.stk_status||"").toUpperCase();
+        const state=String(p.status||"").toLowerCase();
+        stkStatus.hidden=false;
+
+        if(state==="approved"){
+          stkStatus.className="stk-status success";
+          stkStatus.innerHTML="<strong>● PAYMENT APPROVED.</strong> Subscription access has been granted.";
+          stopStkPolling();
+          await loadMe();
+          return true;
+        }
+        if(stkState==="COMPLETED"){
+          stkStatus.className="stk-status success";
+          stkStatus.innerHTML="<strong>● PAYMENT RECEIVED.</strong> M-Pesa receipt "+esc(p.mpesa_receipt||"received")+" recorded. Awaiting KINGBOT verification.";
+          await loadMe();
+          stopStkPolling();
+          return true;
+        }
+        if(state==="failed"||stkState==="FAILED"){
+          stkStatus.className="stk-status failed";
+          stkStatus.innerHTML="<strong>● PAYMENT FAILED.</strong> "+esc(p.stk_result_desc||"The M-Pesa payment was not completed.");
+          stopStkPolling();
+          await loadMe();
+          return true;
+        }
+
+        stkStatus.className="stk-status";
+        stkStatus.textContent=stkState==="PROMPT_SENT"
+          ? "● PROMPT SENT — check the M-Pesa prompt on your phone and enter your PIN."
+          : "● PROCESSING — awaiting M-Pesa confirmation.";
+        await loadMe();
+        return false;
+      }catch(error){
+        stkStatus.hidden=false;
+        stkStatus.className="stk-status failed";
+        stkStatus.textContent=error.message||"STK status unavailable.";
+        return false;
+      }
+    }
+
+    async function startStkPolling(paymentId){
+      stopStkPolling();
+      stkPollDeadline=Date.now()+90000;
+      if(!paymentId)return;
+      await refreshStkStatus(paymentId);
+      stkPollTimer=setInterval(async()=>{
+        if(Date.now()>stkPollDeadline){
+          stopStkPolling();
+          stkStatus.hidden=false;
+          stkStatus.className="stk-status";
+          stkStatus.textContent="● STILL AWAITING CALLBACK — refresh the payment state before submitting another request.";
+          return;
+        }
+        await refreshStkStatus(paymentId);
+      },2500);
+      setTimeout(async()=>{
+        if(!stkPollTimer)return;
+        try{
+          await window.KINGBOT_API.request("/api/subscription/payments/"+encodeURIComponent(paymentId)+"/stk-reconcile",{method:"POST"});
+          await refreshStkStatus(paymentId);
+        }catch{}
+      },12000);
+    }
 
     document.getElementById("paymentForm").addEventListener("submit",async event=>{
       event.preventDefault();
@@ -1203,7 +1368,7 @@
         return;
       }
 
-      if(!mpesaCode){
+      if(paymentMode==="manual"&&!mpesaCode){
         status.textContent="Enter the M-Pesa transaction code.";
         return;
       }
@@ -1219,17 +1384,20 @@
       }
 
       submitButton.disabled=true;
-      submitButton.textContent="SUBMITTING SECURELY…";
-      status.textContent="Sending payment reference to the KINGBOT verification desk…";
+      submitButton.textContent=paymentMode==="stk" ? "SENDING M-PESA PUSH…" : "SUBMITTING SECURELY…";
+      status.textContent=paymentMode==="stk"
+        ? "Requesting a secure M-Pesa payment prompt…"
+        : "Sending payment reference to the KINGBOT verification desk…";
 
       try{
-        const response=await window.KINGBOT_API.request("/api/subscription/payments",{
+        const endpoint=paymentMode==="stk" ? "/api/subscription/payments/stk-push" : "/api/subscription/payments";
+        const response=await window.KINGBOT_API.request(endpoint,{
           method:"POST",
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({
             planId:selectedPlan.id,
             amountKes,
-            mpesaCode,
+            ...(paymentMode==="manual" ? {mpesaCode} : {}),
             payerPhone,
             payerName,
             selectedBotId
@@ -1251,18 +1419,27 @@
         }
 
         status.className="status-box";
-        status.innerHTML='<span style="color:var(--green);font-weight:800">PAYMENT SUBMITTED.</span> Your access remains locked until manual verification.';
-        document.getElementById("mpesaCode").value="";
-        await loadMe();
+        if(paymentMode==="stk"){
+          status.innerHTML='<span style="color:var(--green);font-weight:800">PUSH SENT.</span> Check your phone and complete the M-Pesa PIN prompt.';
+          stkStatus.hidden=false;
+          stkStatus.className="stk-status";
+          stkStatus.textContent=data.customerMessage||"● PROMPT SENT — complete the M-Pesa payment on your phone.";
+          await startStkPolling(String(data.payment?.id||""));
+        }else{
+          status.innerHTML='<span style="color:var(--green);font-weight:800">PAYMENT SUBMITTED.</span> Your access remains locked until manual verification.';
+          mpesaCodeInput.value="";
+          await loadMe();
+        }
 
       }catch(error){
         status.textContent=error.message||"Payment submission failed.";
       }finally{
         submitButton.disabled=false;
-        submitButton.textContent="SUBMIT PAYMENT FOR VERIFICATION";
+        submitButton.textContent=paymentMode==="stk" ? "SEND M-PESA PUSH" : "SUBMIT PAYMENT FOR VERIFICATION";
       }
     });
 
+    syncPaymentMode();
     load();
   })();
   </script>
