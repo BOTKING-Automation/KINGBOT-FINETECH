@@ -1,6 +1,7 @@
 import { isSyntheticSymbol } from "./synthetic-markets.js";
 import "dotenv/config";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
+import { getGoldPriceFeed } from "./gold-price-feed.js";
 import { getDerivMarketFeed } from "./deriv-market-feed.js";
 import { predictPendingOrderZones } from "./pending-order-model.js";
 import { technicalAnalysisBookContext } from "./technical-analysis-book.js";
@@ -10,6 +11,7 @@ import { trainMlStrategyModel, mlSignalServiceStatus, probeMlSignalService } fro
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
+const publicGoldPriceFeed = getGoldPriceFeed();
 const publicDerivFeed = getDerivMarketFeed();
 const publicDerivTechnicalCache = new Map();
 const PUBLIC_TECHNICAL_CACHE_MS = Math.max(5000, Number(process.env.KINGBOT_SCANNER_TECHNICAL_CACHE_MS || 15000));
@@ -339,15 +341,44 @@ async function fetchPublicDerivQuotes(symbols) {
 
 async function getFastStandaloneQuotes({ twelveData, symbols }) {
   const normalized=cleanSymbols(symbols).length ? cleanSymbols(symbols) : DEFAULT_SYMBOLS;
-  if(twelveData?.enabled){
-    const tdQuotes=await twelveData.latestQuotes(normalized,{allowRestFallback:false});
-    const missing=tdQuotes.filter(q=>!q.available).map(q=>q.symbol);
-    if(!missing.length)return tdQuotes;
-    const deriv=await fetchPublicDerivQuotes(missing);
-    const derivMap=Object.fromEntries(deriv.map(q=>[q.symbol,q]));
-    return tdQuotes.map(q=>q.available?q:(derivMap[q.symbol]||q));
+  const needsGold=normalized.includes("XAUUSD");
+  const [goldResult, tdResult] = await Promise.all([
+    needsGold
+      ? publicGoldPriceFeed.getQuote().catch(error => ({
+          symbol:"XAUUSD",
+          available:false,
+          verified:false,
+          source:"GoldPrice.dev direct free XAU/USD spot",
+          error:String(error?.message || "GOLDPRICE_DIRECT_FEED_UNAVAILABLE").slice(0,140)
+        }))
+      : Promise.resolve(null),
+    twelveData?.enabled
+      ? twelveData.latestQuotes(normalized,{allowRestFallback:false}).catch(() => [])
+      : Promise.resolve([])
+  ]);
+
+  let quotes = tdResult.length
+    ? tdResult
+    : await fetchPublicDerivQuotes(normalized);
+
+  if (twelveData?.enabled) {
+    const missing=quotes.filter(q=>!q.available).map(q=>q.symbol);
+    if (missing.length) {
+      const deriv=await fetchPublicDerivQuotes(missing);
+      const derivMap=Object.fromEntries(deriv.map(q=>[q.symbol,q]));
+      quotes=quotes.map(q=>q.available?q:(derivMap[q.symbol]||q));
+    }
   }
-  return fetchPublicDerivQuotes(normalized);
+
+  if (goldResult?.available) {
+    const goldMap=new Map(quotes.map(q=>[q.symbol,q]));
+    goldMap.set("XAUUSD",goldResult);
+    quotes=normalized.map(symbol=>goldMap.get(symbol)||{
+      symbol,available:false,source:"KINGBOT market feed"
+    });
+  }
+
+  return quotes;
 }
 
 function overlayLiveQuotes(technical, quotes) {
@@ -408,7 +439,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
   const normalizedSymbols = cleanSymbols(symbols).length ? cleanSymbols(symbols) : DEFAULT_SYMBOLS;
   const normalizedTimeframe = cleanTimeframe(timeframe);
 
-  if (!twelveData?.enabled && !pool) {
+  if (!twelveData?.enabled && !pool && !publicGoldPriceFeed.enabled) {
     return {
       ok:false,
       error:"MARKET_DATA_ENGINE_NOT_CONFIGURED",
@@ -523,7 +554,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     model:"KINGBOT-CORTEX-1",
     executionAuthority:"NONE",
     source:technicalSource,
-    liveQuoteSource:twelveData?.enabled ? "Twelve Data WebSocket + public fallback" : "Deriv public live feed",
+    liveQuoteSource:"GoldPrice.dev direct free XAU/USD spot + Twelve Data/Deriv fallback",
     scannerLatencyHint:"Quotes are served independently from AI analysis.",
     marketData:twelveData?.status ? twelveData.status() : {configured:false},
     symbols:normalizedSymbols,
@@ -539,6 +570,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
       brokerIndependent:true,
       derivPublic:true,
       twelveData:Boolean(twelveData?.enabled),
+      freeDirectGold:Boolean(quotes.some(q => q.symbol==="XAUUSD" && q.source==="GoldPrice.dev direct free XAU/USD spot")),
       tradingView:Boolean(tv.length)
     },
     tradingViewCount:tv.length,
