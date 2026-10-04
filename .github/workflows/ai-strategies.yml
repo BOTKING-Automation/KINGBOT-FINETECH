@@ -21,7 +21,6 @@ on:
       - "backend/test/strategy-council.test.js"
       - "backend/test/intelligence-orchestrator.test.js"
       - "backend/test/gold-price-feed.test.js"
-      - "backend/test/strategy-council.test.js"
       - "system/intelligence-orchestrator.js"
       - "system/ai-support.js"
       - ".github/workflows/ai-strategies.yml"
