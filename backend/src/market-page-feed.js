@@ -1,4 +1,5 @@
 import { getDerivMarketFeed } from "./deriv-market-feed.js";
+import { getGoldPriceFeed } from "./gold-price-feed.js";
 import { syntheticCatalog, CORE_SYNTHETIC_FAMILIES } from "./synthetic-markets.js";
 
 const TRADITIONAL_MARKETS = [
@@ -27,6 +28,7 @@ const BINANCE_ENDPOINTS = [
 ];
 
 const DERIV = getDerivMarketFeed();
+const GOLD = getGoldPriceFeed();
 let snapshotCache = { at: 0, value: null, key: "" };
 let refreshPromise = null;
 
@@ -111,6 +113,19 @@ async function fetchBinanceQuotes() {
 async function fetchTraditionalQuotes(twelveData) {
   const symbols = TRADITIONAL_MARKETS.map(m => m.id);
   let primary = [];
+  let goldDirect = null;
+
+  const [goldResult] = await Promise.all([
+    GOLD.getQuote().catch(error => ({
+      symbol:"XAUUSD",
+      available:false,
+      verified:false,
+      source:"GoldPrice.dev direct free XAU/USD spot",
+      error:String(error?.message || "GOLDPRICE_DIRECT_FEED_UNAVAILABLE").slice(0,140)
+    })),
+    Promise.resolve()
+  ]);
+  if (goldResult?.available) goldDirect = goldResult;
 
   if (twelveData?.enabled) {
     try {
@@ -179,7 +194,10 @@ async function fetchTraditionalQuotes(twelveData) {
   }
 
   return TRADITIONAL_MARKETS.map(market => {
-    const quote = bySymbol.get(market.id) || { symbol: market.id, available: false };
+    const base = bySymbol.get(market.id) || { symbol: market.id, available: false };
+    const quote = market.id === "XAUUSD" && goldDirect
+      ? { ...base, ...goldDirect, change: base.change, volume: base.volume, high: base.high, low: base.low }
+      : base;
     return {
       symbol: market.id,
       name: market.name,
@@ -193,8 +211,10 @@ async function fetchTraditionalQuotes(twelveData) {
       high: finite(quote.high),
       low: finite(quote.low),
       timestamp: finite(quote.timestamp) || Date.now(),
-      time: quote.time || null,
+      time: quote.time || quote.computedAt || null,
       ageMs: Number(quote.ageMs ?? ageMs(quote.timestamp)),
+      freshnessMaxAgeMs: finite(quote.freshnessMaxAgeMs),
+      quoteVerified: Boolean(quote.verified),
       available: Boolean(quote.available && Number.isFinite(Number(quote.price))),
       quoteMode: quote.quoteMode || (quote.available ? "LIVE" : (Number.isFinite(Number(quote.price)) ? "LAST_AVAILABLE" : "UNAVAILABLE")),
       source: quote.source || "KINGBOT shared live market feed",
@@ -323,7 +343,7 @@ async function refreshSnapshot({ twelveData, includeSynthetics = true } = {}) {
     crossMarket: compactCrossMarket(quotes),
     sourcePolicy: {
       marketPage: "Shared KINGBOT feed",
-      traditional: twelveData?.enabled ? "Twelve Data primary + Deriv public fallback" : "Deriv public live feed",
+      traditional: "Direct free GoldPrice.dev XAU/USD for gold + Twelve Data/Deriv fallback for other traditional markets",
       crypto: "Binance public live ticker",
       synthetic: "Deriv public live feed",
       executionAuthority: "NONE"
