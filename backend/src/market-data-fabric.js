@@ -49,21 +49,6 @@ export function normalizeMarketSymbol(value) {
     SILVER: "XAGUSD",
     "BTC/USD": "BTCUSD",
     "BTC-USDT": "BTCUSDT",
-    "BTCUSDT": "BTCUSD",
-    "ETHUSDT": "ETHUSD",
-    "SOLUSDT": "SOLUSD",
-    "BNBUSDT": "BNBUSD",
-    "XRPUSDT": "XRPUSD",
-    "DOGEUSDT": "DOGEUSD",
-    "ADAUSDT": "ADAUSD",
-    "AVAXUSDT": "AVAXUSD",
-    "LINKUSDT": "LINKUSD",
-    "LTCUSDT": "LTCUSD",
-    "TRXUSDT": "TRXUSD",
-    "UNIUSDT": "UNIUSD",
-    "NEARUSDT": "NEARUSD",
-    "INJUSDT": "INJUSD",
-    "SUIUSDT": "SUIUSD",
     "S&P500": "SPX",
     "SP500": "SPX",
     "US500": "SPX",
@@ -78,7 +63,7 @@ export function normalizeMarketSymbol(value) {
 export function classifyMarketSymbol(symbol) {
   const s = normalizeMarketSymbol(symbol);
   if (GOLD_API_SYMBOLS.has(s)) return "metals";
-  if (CRYPTO_QUOTES[s] || /^[A-Z]{3}USD$/.test(s) && s.length === 6 && !MAJOR_FOREX.test(s.slice(0, 3) + s.slice(3))) return "crypto";
+  if (CRYPTO_QUOTES[s] || /^[A-Z]{2,8}USDT$/.test(s) || (/^[A-Z]{3}USD$/.test(s) && !MAJOR_FOREX.test(s))) return "crypto";
   if (MAJOR_FOREX.test(s)) return "forex";
   if (/^(SPX|NASDAQ|DJI|DAX|FTSE|NIKKEI|RUSSELL|VIX)$/.test(s)) return "indices";
   if (/^(USOIL|UKOIL|BRENT|WTI|NATGAS|COPPER|PLATINUM|PALLADIUM)$/.test(s)) return "commodities";
@@ -143,7 +128,7 @@ async function fetchJson(url, { timeoutMs = REQUEST_TIMEOUT_MS, headers = {} } =
 }
 
 function cryptoTicker(symbol) {
-  return CRYPTO_QUOTES[normalizeMarketSymbol(symbol)] || `${normalizeMarketSymbol(symbol).replace(/USD$/, "")}USDT`;
+  const s = normalizeMarketSymbol(symbol);\n  return s.endsWith("USDT") ? s : (CRYPTO_QUOTES[s] || `${s.replace(/USD$/, "")}USDT`);
 }
 
 async function readGoldApi(symbol, goldFeed) {
@@ -220,7 +205,7 @@ async function readMassive(symbol, category, apiKey) {
     const ticker = "C:" + s;
     payload = await fetchJson(base + "/v2/snapshot/locale/global/markets/forex/tickers/" + encodeURIComponent(ticker) + "?apiKey=" + encodeURIComponent(apiKey), { timeoutMs: REQUEST_TIMEOUT_MS });
   } else if (category === "crypto") {
-    const ticker = "X:" + s.replace(/USD$/, "USD");
+    const ticker = "X:" + s.replace(/USDT$/, "USD");
     payload = await fetchJson(base + "/v2/snapshot/locale/global/markets/crypto/tickers/" + encodeURIComponent(ticker) + "?apiKey=" + encodeURIComponent(apiKey), { timeoutMs: REQUEST_TIMEOUT_MS });
   } else if (category === "indices") {
     const indexMap = { SPX: "I:SPX", NASDAQ: "I:NDX", DJI: "I:DJI", DAX: "I:DAX", FTSE: "I:UKX", NIKKEI: "I:NI225" };
