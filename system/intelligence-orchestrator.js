@@ -57,8 +57,10 @@
     text("orchCouncil",String(data.strategyCouncil?.state||routing.councilState||"WAIT").toUpperCase());
     text("orchSymbol",market.symbol||"—");
     text("orchTimeframe",String(market.timeframe||"—").toUpperCase());
+    const quoteVerified = Boolean(market.verifiedQuote);
+    const technicalLimited = (market.technicalReady === false) || (data.analysts||[]).some(a => a?.status === "MARKET_TECHNICAL_DATA_INCOMPLETE");
     const freshnessLabel = market.freshness?.ok
-      ? (market.freshnessMode === "LIVE_QUOTE" ? "LIVE QUOTE" : "FRESH")
+      ? (quoteVerified ? (technicalLimited ? "LIVE VERIFIED · TECH LIMITED" : "LIVE VERIFIED") : (market.freshnessMode === "LIVE_QUOTE" ? "LIVE QUOTE" : "FRESH"))
       : "STALE / UNKNOWN";
     text("orchFreshness",freshnessLabel);
     text("orchUpdated",data.generatedAt?new Date(data.generatedAt).toLocaleTimeString():"—");
@@ -104,9 +106,9 @@
     const riskFlags=[...(risk.blocks||[]),...(risk.flags||[])];
     const councilState=String(data.strategyCouncil?.state||routing.councilState||"").toUpperCase();
     text("orchRiskStatus",risk.status||councilState||"—");
-    const riskList=$("orchRiskList");
+    const warnFlags = new Set(["TECHNICAL_DATA_INCOMPLETE","BROKER_ACCOUNT_NOT_MAPPED_RETRYING","DEMO_REQUIRES_DEMO_ACCOUNT","DEMO_REQUIRES_DERIV_DEMO_ACCOUNT","PAPER_REQUIRES_DEMO_ACCOUNT"]);
     if(riskList)riskList.innerHTML=riskFlags.length
-      ? riskFlags.map(x=>'<span class="orch-chip bad">'+esc(x)+'</span>').join("")
+      ? riskFlags.map(x=>'<span class="orch-chip '+(warnFlags.has(String(x))?"warn":"bad")+'">'+esc(x)+'</span>').join("")
       : '<span class="orch-chip good">NO DETERMINISTIC BLOCKERS</span>';
 
     const plan=data.tradePlan||null;
@@ -164,7 +166,11 @@
     }
 
     const note=$("orchSummary");
-    if(note)note.textContent=String(s.summary||"KINGBOT completed the intelligence pass without execution authority.");
+    if(note){
+      const direct = market.verifiedQuote ? " XAU/USD live price is verified by the direct free Gold API." : "";
+      const limited = technicalLimited ? " Technical/MTF evidence remains limited, so no directional route is inferred." : "";
+      note.textContent=String(s.summary||"KINGBOT completed the intelligence pass without execution authority.") + direct + limited;
+    }
 
     const provider=data.aiSynthesis?.provider||"deterministic";
     text("orchProvider",provider.toUpperCase());
