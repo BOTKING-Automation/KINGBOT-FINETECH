@@ -439,24 +439,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     tvPromise
   ]);
 
-  const derivQuotes = derivData.map(x => {
-    if(!x.quote) return {symbol:x.symbol,available:false,source:"Deriv public live feed",error:x.quoteError||"DERIV_PUBLIC_QUOTE_UNAVAILABLE"};
-    return {
-      symbol:x.symbol,
-      brokerSymbol:x.quote.brokerSymbol||null,
-      price:x.quote.price,
-      bid:x.quote.bid,
-      ask:x.quote.ask,
-      spread:x.quote.bid!=null&&x.quote.ask!=null?x.quote.ask-x.quote.bid:null,
-      time:x.quote.time||null,
-      timestamp:x.quote.epoch!=null?Number(x.quote.epoch)*1000:Date.now(),
-      available:true,
-      source:"Deriv public live feed"
-    };
-  });
-  const quotes=directQuotes.some(q=>q.available)
-    ? directQuotes
-    : derivQuotes;
+  const quotes=directQuotes;
   const combinedTechnical=[...tdTechnical,...derivData.map(x=>x.technical).filter(Boolean)];
   const technicalBySymbol=new Map();
   for(const item of combinedTechnical) if(!technicalBySymbol.has(item.symbol)) technicalBySymbol.set(item.symbol,item);
@@ -531,9 +514,15 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     model:"KINGBOT-CORTEX-1",
     executionAuthority:"NONE",
     source:technicalSource,
-    liveQuoteSource:"Gold API direct free XAU/USD price + Twelve Data/Deriv fallback",
+    liveQuoteSource:"KINGBOT Market Data Fabric: Gold API/Twelve Data/Binance/Massive/Deriv provider routing",
     scannerLatencyHint:"Quotes are served independently from AI analysis.",
-    marketData:twelveData?.status ? twelveData.status() : {configured:false},
+    marketData:{
+      engine:"KINGBOT_MARKET_DATA_FABRIC",
+      model:"KMF-1",
+      executionAuthority:"NONE",
+      providers:new MarketDataFabric({twelveData, goldFeed:publicGoldPriceFeed, derivFeed:publicDerivFeed}).providerStatus(),
+      quoteVerification:"source-aware freshness + explicit provider provenance"
+    },
     symbols:normalizedSymbols,
     timeframe:normalizedTimeframe,
     quotes,
