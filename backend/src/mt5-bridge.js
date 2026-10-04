@@ -40,6 +40,8 @@ export class Mt5BridgeRegistry{
       mt5_login TEXT,
       mt5_server TEXT,
       account_type TEXT,
+      last_state JSONB,
+      last_state_at TIMESTAMPTZ,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
     await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens DROP CONSTRAINT IF EXISTS kingbot_mt5_bridge_tokens_expected_mode_check");
@@ -48,6 +50,8 @@ export class Mt5BridgeRegistry{
     await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens DROP CONSTRAINT IF EXISTS kingbot_mt5_bridge_tokens_expected_mode_check");
     await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens ADD CONSTRAINT kingbot_mt5_bridge_tokens_expected_mode_check CHECK(expected_mode IN ('DEMO','LIVE'))");
     await this.pool.query("CREATE INDEX IF NOT EXISTS kingbot_mt5_bridge_tokens_user_idx ON kingbot_mt5_bridge_tokens(user_id,revoked,expires_at)");
+    await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens ADD COLUMN IF NOT EXISTS last_state JSONB");
+    await this.pool.query("ALTER TABLE kingbot_mt5_bridge_tokens ADD COLUMN IF NOT EXISTS last_state_at TIMESTAMPTZ");
     await this.pool.query("CREATE INDEX IF NOT EXISTS kingbot_mt5_bridge_tokens_seen_idx ON kingbot_mt5_bridge_tokens(last_seen_at)");
   }
   async issueToken({userId,mode="DEMO",label="KINGBOT MT5 Bridge"}={}){
@@ -82,7 +86,7 @@ export class Mt5BridgeRegistry{
     const raw=String(token||"").trim();
     if(!this.pool||raw.length<24)return null;
     const q=await this.pool.query(
-      "SELECT id,user_id,token_hash,label,expected_mode,expires_at,revoked,mt5_login,mt5_server,account_type FROM kingbot_mt5_bridge_tokens WHERE token_hash=$1 LIMIT 1",
+      "SELECT id,user_id,token_hash,label,expected_mode,expires_at,revoked,mt5_login,mt5_server,account_type,last_state,last_state_at FROM kingbot_mt5_bridge_tokens WHERE token_hash=$1 LIMIT 1",
       [hashToken(raw)]
     );
     if(!q.rowCount)return null;
@@ -97,6 +101,41 @@ export class Mt5BridgeRegistry{
     return latest;
   }
   getState(userId){const s=this.getSessionByUser(userId);return s&&this.isSessionLive(s)?s:null;}
+  async restoreSessionFromDb(userId){
+    if(!this.pool||!userId)return null;
+    const q=await this.pool.query(
+      "SELECT id,user_id,token_hash,expected_mode,expires_at,revoked,mt5_login,mt5_server,account_type,last_seen_at,last_state,last_state_at FROM kingbot_mt5_bridge_tokens WHERE user_id=$1 AND revoked=FALSE AND expires_at>NOW() AND last_seen_at IS NOT NULL AND last_seen_at>=NOW()-INTERVAL '7 seconds' ORDER BY last_seen_at DESC LIMIT 1",
+      [userId]
+    );
+    if(!q.rowCount)return null;
+    const row=q.rows[0],lastSeen= new Date(row.last_seen_at).getTime();
+    if(!Number.isFinite(lastSeen)||Date.now()-lastSeen>=LIVE_WINDOW_MS||!row.last_state)return null;
+    let state={};
+    try{state=typeof row.last_state==="string"?JSON.parse(row.last_state):row.last_state||{};}catch{return null;}
+    const session={
+      tokenHash:row.token_hash,userId:row.user_id,tokenId:row.id,
+      login:clean(row.mt5_login,64),server:clean(row.mt5_server,120),
+      accountType:terminalTypeOf(row.account_type),mode:modeOf(row.expected_mode),
+      state,lastSeenAt:lastSeen,connectedAt:lastSeen,restoredAt:Date.now()
+    };
+    this.sessions.set(row.token_hash,session);
+    return session;
+  }
+  async getStateAsync(userId){
+    const current=this.getState(userId);
+    if(current)return current;
+    return await this.restoreSessionFromDb(userId);
+  }
+  async waitConnected(userId,timeoutMs=5000){
+    const deadline=Date.now()+timeoutMs;
+    do{
+      const s=await this.getStateAsync(userId);
+      if(s)return true;
+      if(Date.now()>=deadline)break;
+      await new Promise(r=>setTimeout(r,250));
+    }while(Date.now()<deadline);
+    return Boolean(await this.getStateAsync(userId));
+  }
 
   async acceptPoll({token,login,server,accountType,state}={}){
     const row=await this.authenticate(token);
@@ -125,7 +164,26 @@ export class Mt5BridgeRegistry{
     const session={...previous,tokenHash:key,userId:row.user_id,tokenId:row.id,login:mt5Login,server:mt5Server,
       accountType:terminalMode,mode:expected,state:mergedState,lastSeenAt:Date.now(),connectedAt:previous.connectedAt||Date.now()};
     this.sessions.set(key,session);
-    await this.pool.query("UPDATE kingbot_mt5_bridge_tokens SET last_seen_at=NOW(),mt5_login=$2,mt5_server=$3,account_type=$4,updated_at=NOW() WHERE id=$1",[row.id,mt5Login,mt5Server,terminalMode]);
+    const persistedState={
+      account:incomingState.account&&typeof incomingState.account==="object"?incomingState.account:null,
+      positions:Array.isArray(incomingState.positions)?incomingState.positions:[],
+      orders:Array.isArray(incomingState.orders)?incomingState.orders:[],
+      quotes:incomingState.quotes&&typeof incomingState.quotes==="object"?incomingState.quotes:{},
+      specs:incomingState.specs&&typeof incomingState.specs==="object"?incomingState.specs:{},
+      symbols:Array.isArray(incomingState.symbols)?incomingState.symbols:[]
+    };
+    const shouldPersistState=!row.last_state_at || Date.now()-new Date(row.last_state_at).getTime()>=3000;
+    if(shouldPersistState){
+      await this.pool.query(
+        "UPDATE kingbot_mt5_bridge_tokens SET last_seen_at=NOW(),mt5_login=$2,mt5_server=$3,account_type=$4,last_state=$5::jsonb,last_state_at=NOW(),updated_at=NOW() WHERE id=$1",
+        [row.id,mt5Login,mt5Server,terminalMode,JSON.stringify(persistedState)]
+      );
+    }else{
+      await this.pool.query(
+        "UPDATE kingbot_mt5_bridge_tokens SET last_seen_at=NOW(),mt5_login=$2,mt5_server=$3,account_type=$4 WHERE id=$1",
+        [row.id,mt5Login,mt5Server,terminalMode]
+      );
+    }
     if(!active.rowCount){
       return {ok:true,needsMapping:true,userId:row.user_id,tokenId:row.id,login:mt5Login,server:mt5Server,accountType:terminalMode,mode:expected,displayMode:displayMode(expected),connected:true};
     }
@@ -135,7 +193,7 @@ export class Mt5BridgeRegistry{
   }
 
   async queueCommand({userId,command}={}){
-    const session=this.getState(userId);
+    const session=await this.getStateAsync(userId);
     if(!session)throw new Error("MT5_BRIDGE_OFFLINE");
     const commandId=clean(command?.commandId||crypto.randomUUID(),100);
     const existing=this.pending.get(commandId)||this.completed.get(commandId);
@@ -179,7 +237,7 @@ export class Mt5BridgeRegistry{
       message:clean(message||result?.message||"",300),result:result&&typeof result==="object"?result:{},acknowledgedAt:new Date().toISOString()});
   }
   async statusForUser(userId){
-    const session=this.getState(userId);
+    const session=await this.getStateAsync(userId);
     if(!session)return {connected:false,configured:false,broker:"mt5-bridge",reason:"MT5_BRIDGE_OFFLINE"};
     const mapping=await this.pool.query("SELECT account_id,execution_mode FROM kingbot_broker_accounts WHERE user_id=$1 AND enabled=TRUE AND provider='mt5-bridge' ORDER BY updated_at DESC LIMIT 1",[userId]);
     const state=session.state||{};
@@ -195,23 +253,23 @@ export class Mt5BridgeRegistry{
 export class Mt5BridgeConnection{
   constructor({registry,token,userId}={}){this.registry=registry;this.token=String(token||"").trim();this.userId=userId;this.provider="mt5-bridge";this.ownerUserId=userId;}
   get connected(){return Boolean(this.registry.getState(this.userId));}
-  async waitConnected(timeoutMs=5000){const deadline=Date.now()+timeoutMs;while(Date.now()<deadline){if(this.connected)return true;await new Promise(r=>setTimeout(r,250));}return this.connected;}
+  async waitConnected(timeoutMs=5000){return await this.registry.waitConnected(this.userId,timeoutMs);}
   async close(){return true;}
-  async getAccountInformation(){const s=this.registry.getState(this.userId);if(!s)throw new Error("MT5_BRIDGE_OFFLINE");return s.state.account||{};}
-  async getPositions(){return this.registry.getState(this.userId)?.state?.positions||[];}
-  async getOrders(){return this.registry.getState(this.userId)?.state?.orders||[];}
-  async getHistoryOrdersByTimeRange(start,end){const rows=this.registry.getState(this.userId)?.state?.history?.orders||[];return rows.filter(r=>{const t=timeMs(r?.time||r?.timestamp);return !t||(t>=start.getTime()&&t<=end.getTime());});}
-  async getDealsByTimeRange(start,end){const rows=this.registry.getState(this.userId)?.state?.history?.deals||[];return rows.filter(r=>{const t=timeMs(r?.time||r?.timestamp);return !t||(t>=start.getTime()&&t<=end.getTime());});}
+  async getAccountInformation(){const s=await this.registry.getStateAsync(this.userId);if(!s)throw new Error("MT5_BRIDGE_OFFLINE");return s.state.account||{};}
+  async getPositions(){return (await this.registry.getStateAsync(this.userId))?.state?.positions||[];}
+  async getOrders(){return (await this.registry.getStateAsync(this.userId))?.state?.orders||[];}
+  async getHistoryOrdersByTimeRange(start,end){const rows=(await this.registry.getStateAsync(this.userId))?.state?.history?.orders||[];return rows.filter(r=>{const t=timeMs(r?.time||r?.timestamp);return !t||(t>=start.getTime()&&t<=end.getTime());});}
+  async getDealsByTimeRange(start,end){const rows=(await this.registry.getStateAsync(this.userId))?.state?.history?.deals||[];return rows.filter(r=>{const t=timeMs(r?.time||r?.timestamp);return !t||(t>=start.getTime()&&t<=end.getTime());});}
   async getSymbolPrice(symbol){
-    const s=this.registry.getState(this.userId);if(!s)throw new Error("MT5_BRIDGE_OFFLINE");
+    const s=await this.registry.getStateAsync(this.userId);if(!s)throw new Error("MT5_BRIDGE_OFFLINE");
     const wanted=String(symbol||"").toUpperCase(),quotes=s.state.quotes||{};
     for(const [key,value] of Object.entries(quotes))if(String(key).toUpperCase()===wanted)return value;
     if(s.state.quote&&String(s.state.quote.symbol||"").toUpperCase()===wanted)return s.state.quote;
     throw new Error("MT5_QUOTE_UNAVAILABLE:"+wanted);
   }
-  async getSymbols(){return Array.isArray(this.registry.getState(this.userId)?.state?.symbols)?this.registry.getState(this.userId).state.symbols:[];}
+  async getSymbols(){const s=await this.registry.getStateAsync(this.userId);return Array.isArray(s?.state?.symbols)?s.state.symbols:[];}
   async getMarketCatalog(){
-    const session=this.registry.getState(this.userId);
+    const session=await this.registry.getStateAsync(this.userId);
     if(!session)throw new Error("MT5_BRIDGE_OFFLINE");
     const state=session.state||{},out=[],seen=new Set();
     const add=(rawSymbol,meta={})=>{
@@ -249,7 +307,7 @@ export class Mt5BridgeConnection{
     return out;
   }
   async getSymbolSpecification(symbol){
-    const s=this.registry.getState(this.userId);if(!s)throw new Error("MT5_BRIDGE_OFFLINE");
+    const s=await this.registry.getStateAsync(this.userId);if(!s)throw new Error("MT5_BRIDGE_OFFLINE");
     const wanted=String(symbol||"").toUpperCase(),specs=s.state.specs||{};
     for(const [key,value] of Object.entries(specs))if(String(key).toUpperCase()===wanted)return value;
     throw new Error("MT5_SYMBOL_NOT_AVAILABLE:"+wanted);
