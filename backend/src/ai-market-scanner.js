@@ -999,6 +999,11 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
       scannerStandalone:true,
       brokerRequired:false,
       model:"KINGBOT-CORTEX-1",
+      aiStrategies:{
+        stage:"AI_STRATEGIES",
+        purpose:"ML_SIGNAL_GENERATION",
+        modelService:mlSignalServiceStatus()
+      },
       tradingViewConnected:tvCount>0, tradingViewSnapshotsLast10m:tvCount, webhookConfigured:Boolean(process.env.TRADINGVIEW_WEBHOOK_SECRET),
       defaultSymbols:DEFAULT_SYMBOLS,
       websocket:{
