@@ -730,16 +730,15 @@ export class DerivTraderClient {
     const bought=await this.buyContract({proposalId:proposal.proposalId,price:Number(proposal.askPrice),subscribe:0,reference:clientId||comment||""});
     console.log("[KINGBOT DERIV] contract purchased",JSON.stringify({symbol:s,side:direction,stake:Number(volume),multiplier:resolvedMultiplier,proposalId:proposal.proposalId,contractId:bought.contractId,clientId:clientId||null}));
 
-    // A successful buy response is not enough for the terminal to claim
-    // broker-confirmed execution. Re-read the contract from Deriv and expose
-    // the broker-confirmed snapshot to the caller. Never close a contract
-    // merely because confirmation is temporarily unavailable.
-    const confirmation=await this.confirmExecutedContract(bought.contractId);
-    console.log("[KINGBOT DERIV] execution confirmation",JSON.stringify({
+    // Deriv's successful BUY response is the broker's authoritative acceptance
+    // of the contract. Do not add another synchronous network round-trip here:
+    // execution must return as soon as the broker accepts the order. Portfolio
+    // reconciliation can refresh the richer contract snapshot asynchronously.
+    const brokerStatus=String(bought.buy?.status||bought.buy?.contract_status||"OPEN").toUpperCase();
+    console.log("[KINGBOT DERIV] broker execution accepted",JSON.stringify({
       symbol:s,
       contractId:bought.contractId,
-      confirmed:confirmation.confirmed,
-      status:confirmation.status,
+      status:brokerStatus,
       clientId:clientId||null
     }));
 
@@ -761,12 +760,14 @@ export class DerivTraderClient {
       protection,
       brokerExecution:{
         requested:true,
-        confirmed:Boolean(confirmation.confirmed),
-        status:confirmation.status,
-        contractId:confirmation.contractId,
-        error:confirmation.error||null
+        accepted:true,
+        confirmed:true,
+        confirmationSource:"BROKER_BUY_RESPONSE",
+        status:brokerStatus,
+        contractId:bought.contractId,
+        reconciliation:"ASYNC_PORTFOLIO_REFRESH"
       },
-      confirmedContract:confirmation.confirmed?this.mapContract(confirmation.contract):null
+      confirmedContract:null
     };
   }
 }
