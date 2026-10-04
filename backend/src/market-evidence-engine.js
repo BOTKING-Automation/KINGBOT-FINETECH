@@ -13,15 +13,15 @@ function freshness(timestamp,maxAgeMs=5000){
   const age=Math.max(0,Date.now()-t);
   return {ok:age<=maxAgeMs,ageMs:age,reason:age>maxAgeMs?"STALE_MARKET_DATA":"FRESH"};
 }
-function direction(v){const x=up(v);return ["BULLISH","BUY","LONG"].includes(x)?"BULLISH":["BEARISH","SELL","SHORT"].includes(x)?"BEARISH":"NEUTRAL";}
+function direction(v){const x=up(v);if(["BULLISH","BUY","LONG"].includes(x))return "BULLISH";if(["BEARISH","SELL","SHORT"].includes(x))return "BEARISH";const z=n(v);return z!=null?(z>.15?"BULLISH":z<-.15?"BEARISH":"NEUTRAL"):"NEUTRAL";}
 function scoreDirection(market){
   const evidence=[],positive=[],negative=[];
   const add=(label,bull,bear,weight=1)=>{if(bull){positive.push({label,weight});evidence.push({label,direction:"BULLISH",weight});}else if(bear){negative.push({label,weight});evidence.push({label,direction:"BEARISH",weight});}};
-  add("trend",direction(market.trend)==="BULLISH",direction(market.trend)==="BEARISH",2);
-  add("structure",direction(market.structure)==="BULLISH",direction(market.structure)==="BEARISH",2);
-  add("BOS",direction(market.bos)==="BULLISH",direction(market.bos)==="BEARISH",2);
-  add("CHOCH",direction(market.choch)==="BULLISH",direction(market.choch)==="BEARISH",1.5);
-  add("liquidity sweep",direction(market.liquiditySweep)==="BULLISH",direction(market.liquiditySweep)==="BEARISH",1.5);
+  add("trend",direction(market.rawTrend??market.trend)==="BULLISH",direction(market.rawTrend??market.trend)==="BEARISH",2);
+  add("structure",direction(market.rawStructure??market.structure)==="BULLISH",direction(market.rawStructure??market.structure)==="BEARISH",2);
+  add("BOS",direction(market.rawBos??market.bos)==="BULLISH",direction(market.rawBos??market.bos)==="BEARISH",2);
+  add("CHOCH",direction(market.rawChoch??market.choch)==="BULLISH",direction(market.rawChoch??market.choch)==="BEARISH",1.5);
+  add("liquidity sweep",direction(market.rawLiquiditySweep??market.liquiditySweep)==="BULLISH",direction(market.rawLiquiditySweep??market.liquiditySweep)==="BEARISH",1.5);
   const ef=n(market.emaFast??market.ema20),es=n(market.emaSlow??market.ema50);
   add("EMA alignment",ef!=null&&es!=null&&ef>es,ef!=null&&es!=null&&ef<es,1.5);
   const r=n(market.rsi14??market.rsi);
