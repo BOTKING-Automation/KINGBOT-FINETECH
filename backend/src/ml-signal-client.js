@@ -4,6 +4,7 @@ const PORT = String(process.env.KINGBOT_ML_SIGNAL_PORT || "").trim();
 const URL = EXPLICIT_URL || (HOST ? "http://" + HOST + (PORT ? ":" + PORT : "") : "");
 const SECRET = String(process.env.KINGBOT_ML_SIGNAL_SECRET || "").trim();
 const TIMEOUT_MS = Math.max(800, Number(process.env.KINGBOT_ML_SIGNAL_TIMEOUT_MS || 2200));
+const TRAIN_TIMEOUT_MS = Math.max(8000, Number(process.env.KINGBOT_ML_TRAIN_TIMEOUT_MS || 30000));
 
 function enabled() {
   return Boolean(URL && SECRET);
@@ -26,12 +27,44 @@ async function request(path, body, timeoutMs = TIMEOUT_MS) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data?.ok === false) {
-      throw new Error(String(data?.error || data?.reason || "ML_SIGNAL_SERVICE_UNAVAILABLE").slice(0, 220));
+      const code = String(data?.error || data?.reason || `ML_SIGNAL_HTTP_${response.status}`);
+      throw new Error(code.slice(0, 220));
     }
+    if (!data || typeof data !== "object") throw new Error("ML_SIGNAL_RESPONSE_INVALID");
     return data;
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("ML_SIGNAL_REQUEST_TIMEOUT");
+    throw error;
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function health() {
+  if (!enabled()) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(500, TIMEOUT_MS));
+  try {
+    const response = await fetch(URL + "/health", {
+      headers: { "accept": "application/json", "x-kingbot-ml-secret": SECRET },
+      signal: controller.signal
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const code = String(data?.error || `ML_HEALTH_HTTP_${response.status}`);
+      throw new Error(code.slice(0, 180));
+    }
+    return data;
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("ML_HEALTH_REQUEST_TIMEOUT");
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function normalizeError(error, fallback) {
+  return String(error?.message || fallback).slice(0, 180);
 }
 
 export function mlSignalServiceStatus() {
@@ -42,25 +75,63 @@ export function mlSignalServiceStatus() {
     stage: "AI_STRATEGIES",
     purpose: "ML_SIGNAL_GENERATION",
     endpoint: enabled() ? URL : null,
+    healthEndpoint: enabled() ? URL + "/health" : null,
+    timeoutMs: TIMEOUT_MS,
+    trainTimeoutMs: TRAIN_TIMEOUT_MS,
     libraries: ["scikit-learn", "PyTorch"]
   };
 }
 
-export async function predictMlStrategySignal({ botId, market } = {}) {
-  if (!enabled() || !botId || !market?.symbol) return null;
+export async function probeMlSignalService() {
+  if (!enabled()) {
+    return {
+      ok: false,
+      ready: false,
+      status: "ML_SERVICE_NOT_CONFIGURED",
+      ...mlSignalServiceStatus()
+    };
+  }
   try {
-    return await request("/predict", {
-      botId: String(botId).trim().toLowerCase(),
-      symbol: String(market.symbol).trim().toUpperCase(),
-      timeframe: String(market.timeframe || "5m").trim().toLowerCase(),
-      market
-    });
+    const remote = await health();
+    return {
+      ok: true,
+      ready: Boolean(remote?.ready || remote?.configured),
+      status: remote?.ready ? "ML_SERVICE_READY" : "ML_SERVICE_DEGRADED",
+      ...mlSignalServiceStatus(),
+      remote
+    };
   } catch (error) {
     return {
       ok: false,
       ready: false,
       status: "ML_SERVICE_UNAVAILABLE",
-      error: String(error?.message || "ML_SERVICE_UNAVAILABLE").slice(0, 180)
+      error: normalizeError(error, "ML_SERVICE_UNAVAILABLE"),
+      ...mlSignalServiceStatus()
+    };
+  }
+}
+
+export async function predictMlStrategySignal({ botId, market } = {}) {
+  if (!enabled() || !botId || !market?.symbol) return null;
+  try {
+    const result = await request("/predict", {
+      botId: String(botId).trim().toLowerCase(),
+      symbol: String(market.symbol).trim().toUpperCase(),
+      timeframe: String(market.timeframe || "5m").trim().toLowerCase(),
+      market
+    });
+    if (result?.ready && !["BUY", "SELL", "HOLD"].includes(String(result.direction || "").toUpperCase())) {
+      throw new Error("ML_PREDICTION_DIRECTION_INVALID");
+    }
+    return result;
+  } catch (error) {
+    const code = normalizeError(error, "ML_SERVICE_UNAVAILABLE");
+    return {
+      ok: false,
+      ready: false,
+      status: code === "ML_SIGNAL_REQUEST_TIMEOUT" ? "ML_SERVICE_TIMEOUT" :
+        code === "ML_SERVICE_UNAUTHORIZED" ? "ML_SERVICE_UNAUTHORIZED" : "ML_SERVICE_UNAVAILABLE",
+      error: code
     };
   }
 }
@@ -84,13 +155,16 @@ export async function trainMlStrategyModel({ botId, symbol, timeframe, bars, mar
       botId: String(botId).trim().toLowerCase(),
       timeframe: String(timeframe || "5m").trim().toLowerCase(),
       markets: datasets
-    }, Math.max(8000, TIMEOUT_MS * 12));
+    }, TRAIN_TIMEOUT_MS);
   } catch (error) {
+    const code = normalizeError(error, "ML_TRAINING_SERVICE_UNAVAILABLE");
     return {
       ok: false,
       ready: false,
-      status: "ML_TRAINING_SERVICE_UNAVAILABLE",
-      error: String(error?.message || "ML_TRAINING_SERVICE_UNAVAILABLE").slice(0, 180)
+      status: code === "ML_TRAINING_IN_PROGRESS" ? "ML_TRAINING_IN_PROGRESS" :
+        code === "ML_SIGNAL_REQUEST_TIMEOUT" ? "ML_TRAINING_TIMEOUT" :
+        code === "ML_SERVICE_UNAUTHORIZED" ? "ML_SERVICE_UNAUTHORIZED" : "ML_TRAINING_SERVICE_UNAVAILABLE",
+      error: code
     };
   }
 }
