@@ -42,6 +42,7 @@ export class TwelveDataFeed {
     this.started = false;
     this.technicalCache = new Map();
     this.technicalInflight = new Map();
+    this.historyCache = new Map();
     this.quoteListeners = new Set();
   }
 
@@ -161,6 +162,37 @@ export class TwelveDataFeed {
     })();
     this.technicalInflight.set(key,load);
     return load;
+  }
+
+  async historicalBars(symbol, timeframe="5m", { limit=240, maxAgeMs=60000, force=false } = {}) {
+    if (!this.enabled) return [];
+    const intervalMap={ "1m":"1min","3m":"3min","5m":"5min","15m":"15min","30m":"30min","1h":"1h","2h":"2h","4h":"4h","1d":"1day","1w":"1week" };
+    const interval=intervalMap[String(timeframe).toLowerCase()]||"5min";
+    const tdSymbol=normalizeSymbol(symbol);
+    const normalizedLimit=Math.max(120,Math.min(320,Number(limit)||240));
+    const key=kingbotSymbol(tdSymbol)+":"+String(timeframe).toLowerCase();
+    const cached=this.historyCache.get(key);
+    const cacheAge=cached ? Date.now()-Number(cached.cachedAt||0) : Infinity;
+    if(!force&&Array.isArray(cached?.bars)&&cached.bars.length>=Math.min(normalizedLimit,120)&&cacheAge<=Math.max(5000,Number(maxAgeMs)||60000)){
+      return cached.bars.slice(-normalizedLimit);
+    }
+    const url="https://api.twelvedata.com/time_series?symbol="+encodeURIComponent(tdSymbol)+"&interval="+encodeURIComponent(interval)+"&outputsize="+encodeURIComponent(normalizedLimit)+"&order=ASC&apikey="+encodeURIComponent(this.apiKey);
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),10000);
+    try{
+      const res=await fetch(url,{signal:controller.signal,headers:{Accept:"application/json"}});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok||data?.status==="error"||!Array.isArray(data?.values)) throw new Error(data?.message||"TWELVE_DATA_TIME_SERIES_FAILED");
+      const bars=data.values.map(x=>({
+        datetime:x.datetime,
+        open:finite(x.open),high:finite(x.high),low:finite(x.low),close:finite(x.close),volume:finite(x.volume)
+      })).filter(x=>[x.open,x.high,x.low,x.close].every(Number.isFinite));
+      if(bars.length<120) throw new Error("INSUFFICIENT_OHLC_DATA");
+      this.historyCache.set(key,{bars,cachedAt:Date.now()});
+      return bars.slice(-normalizedLimit);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async latestQuotes(symbols, { allowRestFallback=true, restTimeoutMs=1500 } = {}) {
