@@ -4,7 +4,7 @@ import { evaluateStrategySpecialists } from "../src/strategy-specialists.js";
 
 const mtf={higherTimeframeBias:"BULLISH",lowerTimeframeBias:"BULLISH",setupState:"BUY_CANDIDATE",triggerPresent:true,alignment:{direction:"BULLISH"}};
 const base={
-  symbol:"XAUUSD",price:2500,atr:5,trend:.7,momentum:.6,volatility:.45,
+  symbol:"XAUUSD",price:2505,atr:5,trend:.7,momentum:.6,volatility:.45,
   structure:"bullish",emaFast:2502,emaSlow:2495,adx:25,rsi:58,
   breakout:false,retest:false,liquiditySweep:false,orderBlock:false,fairValueGap:false,
   displacement:false,rawBos:"NONE",rawChoch:"NONE",rawLiquiditySweep:"NONE",rawDisplacement:"NONE"
