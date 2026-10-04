@@ -343,13 +343,13 @@
         const bot = runtime.find(item => item.bot_id === botId);
         const [code, label] = botLabels[botId];
         const rawState = String(bot?.state || "STOPPED").toUpperCase();
-        const lastError = String(bot?.last_error || "").toUpperCase();
+        const lastError = String(bot?.lastError || bot?.last_error || "").toUpperCase();
         const displayState = lastError === "SUBSCRIPTION_NOT_ACTIVE"
           ? "LOCKED"
           : rawState === "ERROR" ? "ERROR" : rawState;
         const reason = lastError === "SUBSCRIPTION_NOT_ACTIVE"
           ? "SUBSCRIPTION REQUIRED"
-          : (bot?.last_error ? String(bot.last_error).replaceAll("_", " ") : "SERVER TELEMETRY");
+          : (bot?.lastError || bot?.last_error ? String(bot.lastError || bot.last_error).replaceAll("_", " ") : "SERVER TELEMETRY");
         const row = document.createElement("div");
         row.className = "runtime-row";
         row.innerHTML = '<div><span class="runtime-code">' + code + '</span><span class="runtime-name">' + label + ' · ' + reason + '</span></div><div class="runtime-state">' + displayState + '</div>';
