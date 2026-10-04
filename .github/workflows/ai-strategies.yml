@@ -15,6 +15,9 @@ on:
       - "backend/src/intelligence-orchestrator.js"
       - "backend/test/strategy-specialists.test.js"
       - "backend/test/strategy-council.test.js"
+      - "backend/test/intelligence-orchestrator.test.js"
+      - "system/intelligence-orchestrator.js"
+      - "system/ai-support.js"
       - ".github/workflows/ai-strategies.yml"
   pull_request:
     paths:
@@ -29,6 +32,9 @@ on:
       - "backend/src/intelligence-orchestrator.js"
       - "backend/test/strategy-specialists.test.js"
       - "backend/test/strategy-council.test.js"
+      - "backend/test/intelligence-orchestrator.test.js"
+      - "system/intelligence-orchestrator.js"
+      - "system/ai-support.js"
 
 jobs:
   ai-strategies:
@@ -132,10 +138,12 @@ jobs:
           node --check backend/src/strategy-specialists.js
           node --check backend/src/strategy-council.js
           node --check backend/src/intelligence-orchestrator.js
+          node --check system/intelligence-orchestrator.js
+          node --check system/ai-support.js
 
       - name: Specialist brain and strategy council tests
         working-directory: backend
-        run: node --test test/strategy-specialists.test.js test/strategy-council.test.js
+        run: node --test test/strategy-specialists.test.js test/strategy-council.test.js test/intelligence-orchestrator.test.js
 
       - name: End-to-end Node → ML service gate test
         run: |
