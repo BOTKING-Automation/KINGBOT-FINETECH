@@ -59,7 +59,7 @@ function evaluateFlipper(m,mtf){
   const momentum=num(m.momentum,0), rsi=num(m.rsi);
   const sweep=upper(m.rawLiquiditySweep||m.liquiditySweep);
   const choch=upper(m.rawChoch);
-  const displacement=upper(m.displacement);
+  const displacement=upper(m.rawDisplacement||m.displacement);
   const volatility=num(m.volatility,0);
   const reversalBuy=(sweep==="BULLISH"||choch==="BULLISH")&&displacement==="BULLISH";
   const reversalSell=(sweep==="BEARISH"||choch==="BEARISH")&&displacement==="BEARISH";
