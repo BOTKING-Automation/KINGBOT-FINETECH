@@ -95,6 +95,7 @@ export class TwelveDataFeed {
           price,
           bid: finite(data?.bid),
           ask: finite(data?.ask),
+          spread: finite(data?.bid) !== null && finite(data?.ask) !== null ? finite(data?.ask) - finite(data?.bid) : null,
           volume: finite(data?.day_volume ?? data?.volume),
           timestamp: finite(data?.timestamp) ? Number(data.timestamp) * 1000 : Date.now(),
           source: "Twelve Data WebSocket",
