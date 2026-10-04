@@ -3428,7 +3428,7 @@ overscroll-behavior:none;}
             source: quote.source || "KINGBOT shared live market feed",
             feedAgeMs: Number(quote.ageMs || 0),
             quoteMode: quote.quoteMode || (quote.available ? "LIVE" : (Number.isFinite(Number(quote.price)) ? "LAST_AVAILABLE" : "UNAVAILABLE")),
-            verified: Boolean(quote.quoteVerified ?? quote.verified ?? (quote.available && String(quote.source || "").includes("GoldPrice.dev"))),
+            verified: Boolean(quote.quoteVerified ?? quote.verified ?? (quote.available && String(quote.source || "").includes("Gold API"))),
             freshnessMaxAgeMs: Number(quote.freshnessMaxAgeMs || 120000),
             available: Boolean(quote.available)
           };
