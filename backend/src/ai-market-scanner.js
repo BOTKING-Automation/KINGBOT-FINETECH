@@ -4,6 +4,7 @@ import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getDerivMarketFeed } from "./deriv-market-feed.js";
 import { predictPendingOrderZones } from "./pending-order-model.js";
 import { technicalAnalysisBookContext } from "./technical-analysis-book.js";
+import { WebSocketServer, WebSocket } from "ws";
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
@@ -521,7 +522,338 @@ export async function ensureAiMarketScannerSchema(pool) {
   await ensureScannerSchema(pool);
 }
 
-export function registerAiMarketScanner(app, { pool, rateLimit, twelveData }) {
+
+function scannerCanonicalSymbol(value) {
+  const raw = String(value || "").trim().toUpperCase().replace(/_/g, "");
+  return raw.startsWith("FRX") ? raw.slice(3) : raw.replace("/", "");
+}
+
+class AiMarketScannerStream {
+  constructor({ server, pool, twelveData }) {
+    this.server = server;
+    this.pool = pool;
+    this.twelveData = twelveData;
+    this.clients = new Set();
+    this.channels = new Map();
+    this.derivBindings = new Map();
+    this.startedAt = Date.now();
+    this.scanIntervalMs = Math.max(
+      2500,
+      Math.min(30000, Number(process.env.AI_SCANNER_WS_SCAN_INTERVAL_MS || 5000))
+    );
+    this.maxClients = Math.max(
+      10,
+      Math.min(500, Number(process.env.AI_SCANNER_WS_MAX_CLIENTS || 100))
+    );
+    this.maxMessageBytes = 8192;
+    this.upstreamQuoteUnsubscribe = this.twelveData?.onQuote?.((quote) => {
+      this.broadcastQuote(quote);
+    }) || null;
+
+    if (!server) {
+      throw new Error("AI_SCANNER_WEBSOCKET_SERVER_REQUIRED");
+    }
+
+    this.wss = new WebSocketServer({
+      server,
+      path: "/api/ai/market-scanner/ws",
+      maxPayload: this.maxMessageBytes,
+      perMessageDeflate: false
+    });
+
+    this.wss.on("connection", (ws, req) => this.handleConnection(ws, req));
+    this.wss.on("error", (error) => {
+      console.error("[KINGBOT SCANNER WS]", error?.message || error);
+    });
+  }
+
+  send(ws, payload) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      ws.send(JSON.stringify(payload));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  closeClient(client) {
+    if (!client || client.closed) return;
+    client.closed = true;
+    for (const unsubscribe of client.derivUnsubs || []) {
+      try { unsubscribe(); } catch {}
+    }
+    client.derivUnsubs = [];
+    if (client.channel) {
+      client.channel.clients.delete(client);
+      this.cleanupChannel(client.channel);
+    }
+    this.clients.delete(client);
+    try { client.ws.close(1000, "scanner client closed"); } catch {}
+  }
+
+  cleanupChannel(channel) {
+    if (!channel || channel.clients.size || channel.running) return;
+    if (channel.timer) clearInterval(channel.timer);
+    this.channels.delete(channel.key);
+  }
+
+  async ensureDerivBindings(symbols) {
+    if (!this.publicDerivFeed) return;
+    const requested = [...new Set((symbols || []).map(scannerCanonicalSymbol).filter(Boolean))];
+    const twelveSubscribed = new Set(
+      this.twelveData?.status?.()?.subscribedSymbols?.map(scannerCanonicalSymbol) || []
+    );
+
+    for (const symbol of requested) {
+      if (this.twelveData?.enabled && twelveSubscribed.has(symbol)) continue;
+      if (this.derivBindings.has(symbol)) continue;
+
+      try {
+        const unsubscribe = await publicDerivFeed.onTick(symbol, (quote) => {
+          this.broadcastQuote(quote);
+        });
+        this.derivBindings.set(symbol, { unsubscribe });
+      } catch (error) {
+        this.sendToSymbol(symbol, {
+          type: "upstream_status",
+          symbol,
+          connected: false,
+          error: String(error?.message || "DERIV_PUBLIC_FEED_UNAVAILABLE").slice(0, 160),
+          at: new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  sendToSymbol(symbol, payload) {
+    const target = scannerCanonicalSymbol(symbol);
+    for (const client of this.clients) {
+      if (client.closed || !client.symbols.includes(target)) continue;
+      this.send(client.ws, payload);
+    }
+  }
+
+  broadcastQuote(rawQuote) {
+    const quote = rawQuote && typeof rawQuote === "object"
+      ? { ...rawQuote, symbol: scannerCanonicalSymbol(rawQuote.symbol || rawQuote.twelveDataSymbol || rawQuote.brokerSymbol) }
+      : null;
+    if (!quote?.symbol || !Number.isFinite(Number(quote.price))) return;
+
+    for (const client of this.clients) {
+      if (client.closed || !client.symbols.includes(quote.symbol)) continue;
+      client.lastQuoteAt = Date.now();
+      this.send(client.ws, {
+        type: "quote",
+        quote,
+        streamAt: new Date().toISOString()
+      });
+    }
+  }
+
+  channelFor(symbols, timeframe) {
+    const clean = [...new Set(symbols.map(scannerCanonicalSymbol).filter(Boolean))].slice(0, 12);
+    const tf = cleanTimeframe(timeframe);
+    const key = clean.slice().sort().join(",") + "|" + tf;
+    let channel = this.channels.get(key);
+
+    if (!channel) {
+      channel = {
+        key,
+        symbols: clean,
+        timeframe: tf,
+        clients: new Set(),
+        timer: null,
+        running: false,
+        lastScanAt: null,
+        lastScan: null,
+        scanError: null
+      };
+      this.channels.set(key, channel);
+      channel.timer = setInterval(() => {
+        void this.scanChannel(channel);
+      }, this.scanIntervalMs);
+    }
+    return channel;
+  }
+
+  async scanChannel(channel) {
+    if (!channel || channel.running || !channel.clients.size) return;
+    channel.running = true;
+
+    try {
+      await this.ensureDerivBindings(channel.symbols);
+      const result = await standaloneMarketScan({
+        pool: this.pool,
+        twelveData: this.twelveData,
+        symbols: channel.symbols,
+        timeframe: channel.timeframe
+      });
+
+      channel.lastScanAt = Date.now();
+      channel.lastScan = result;
+      channel.scanError = null;
+
+      for (const client of [...channel.clients]) {
+        if (client.closed) continue;
+        this.send(client.ws, {
+          type: "scan",
+          data: result,
+          stream: {
+            state: "LIVE",
+            scanIntervalMs: this.scanIntervalMs,
+            upstream: this.twelveData?.enabled
+              ? (this.twelveData.status?.() || { source: "Twelve Data WebSocket" })
+              : publicDerivFeed.status()
+          }
+        });
+      }
+    } catch (error) {
+      channel.scanError = String(error?.message || "AI_MARKET_SCANNER_STREAM_FAILED").slice(0, 220);
+      for (const client of [...channel.clients]) {
+        if (client.closed) continue;
+        this.send(client.ws, {
+          type: "scanner_error",
+          error: "AI_MARKET_SCANNER_STREAM_FAILED",
+          reason: channel.scanError,
+          at: new Date().toISOString()
+        });
+      }
+    } finally {
+      channel.running = false;
+      this.cleanupChannel(channel);
+    }
+  }
+
+  async subscribe(client, symbols, timeframe) {
+    const clean = cleanSymbols(symbols).map(scannerCanonicalSymbol).filter(Boolean).slice(0, 12);
+    const effectiveSymbols = clean.length ? clean : DEFAULT_SYMBOLS.map(scannerCanonicalSymbol);
+    const effectiveTimeframe = cleanTimeframe(timeframe);
+
+    if (client.channel) {
+      client.channel.clients.delete(client);
+      this.cleanupChannel(client.channel);
+    }
+    for (const unsubscribe of client.derivUnsubs || []) {
+      try { unsubscribe(); } catch {}
+    }
+    client.derivUnsubs = [];
+
+    const channel = this.channelFor(effectiveSymbols, effectiveTimeframe);
+    channel.clients.add(client);
+    client.channel = channel;
+    client.symbols = channel.symbols;
+    client.timeframe = channel.timeframe;
+
+    await this.ensureDerivBindings(channel.symbols);
+
+    this.send(client.ws, {
+      type: "subscribed",
+      symbols: channel.symbols,
+      timeframe: channel.timeframe,
+      scanIntervalMs: this.scanIntervalMs,
+      source: this.twelveData?.enabled ? "Twelve Data WebSocket + Deriv fallback" : "Deriv public WebSocket",
+      at: new Date().toISOString()
+    });
+
+    await this.scanChannel(channel);
+  }
+
+  handleConnection(ws, req) {
+    if (this.clients.size >= this.maxClients) {
+      try { ws.close(1013, "scanner capacity reached"); } catch {}
+      return;
+    }
+
+    const client = {
+      ws,
+      symbols: DEFAULT_SYMBOLS.map(scannerCanonicalSymbol),
+      timeframe: DEFAULT_TF,
+      channel: null,
+      derivUnsubs: [],
+      closed: false,
+      lastMessageAt: 0,
+      lastQuoteAt: null
+    };
+    this.clients.add(client);
+
+    this.send(ws, {
+      type: "hello",
+      scanner: "KINGBOT AI MARKET SCANNER",
+      transport: "websocket",
+      state: "CONNECTING",
+      path: "/api/ai/market-scanner/ws",
+      serverTime: new Date().toISOString(),
+      scanIntervalMs: this.scanIntervalMs
+    });
+
+    let initialSymbols = DEFAULT_SYMBOLS;
+    let initialTimeframe = DEFAULT_TF;
+    try {
+      const url = new URL(req.url || "", "http://kingbot-scanner.local");
+      const rawSymbols = url.searchParams.get("symbols");
+      const rawTimeframe = url.searchParams.get("timeframe");
+      if (rawSymbols) initialSymbols = rawSymbols;
+      if (rawTimeframe) initialTimeframe = rawTimeframe;
+    } catch {}
+
+    ws.on("message", (raw) => {
+      if (raw?.length > this.maxMessageBytes) {
+        try { ws.close(1009, "scanner message too large"); } catch {}
+        return;
+      }
+      if (Date.now() - client.lastMessageAt < 750) return;
+      client.lastMessageAt = Date.now();
+
+      let message;
+      try { message = JSON.parse(String(raw)); } catch { return; }
+
+      if (String(message?.type || "").toLowerCase() === "subscribe") {
+        void this.subscribe(
+          client,
+          message.symbols || DEFAULT_SYMBOLS,
+          message.timeframe || DEFAULT_TF
+        ).catch((error) => {
+          this.send(ws, {
+            type: "scanner_error",
+            error: "SCANNER_SUBSCRIPTION_FAILED",
+            reason: String(error?.message || "SCANNER_SUBSCRIPTION_FAILED").slice(0, 220),
+            at: new Date().toISOString()
+          });
+        });
+      }
+    });
+
+    ws.on("close", () => this.closeClient(client));
+    ws.on("error", () => this.closeClient(client));
+
+    void this.subscribe(client, initialSymbols, initialTimeframe).catch((error) => {
+      this.send(ws, {
+        type: "scanner_error",
+        error: "SCANNER_SUBSCRIPTION_FAILED",
+        reason: String(error?.message || "SCANNER_SUBSCRIPTION_FAILED").slice(0, 220),
+        at: new Date().toISOString()
+      });
+    });
+  }
+
+  close() {
+    for (const client of [...this.clients]) this.closeClient(client);
+    for (const channel of [...this.channels.values()]) {
+      if (channel.timer) clearInterval(channel.timer);
+    }
+    this.channels.clear();
+    for (const { unsubscribe } of this.derivBindings.values()) {
+      try { unsubscribe(); } catch {}
+    }
+    this.derivBindings.clear();
+    this.upstreamQuoteUnsubscribe?.();
+    try { this.wss.close(); } catch {}
+  }
+}
+
+export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server }) {
+  const stream = new AiMarketScannerStream({ server, pool, twelveData });
   void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
 
   const limiter = rateLimit({
@@ -597,7 +929,14 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData }) {
       brokerRequired:false,
       model:"KINGBOT-CORTEX-1",
       tradingViewConnected:tvCount>0, tradingViewSnapshotsLast10m:tvCount, webhookConfigured:Boolean(process.env.TRADINGVIEW_WEBHOOK_SECRET),
-      defaultSymbols:DEFAULT_SYMBOLS
+      defaultSymbols:DEFAULT_SYMBOLS,
+      websocket:{
+        enabled:true,
+        path:"/api/ai/market-scanner/ws",
+        scanIntervalMs:stream.scanIntervalMs,
+        clients:stream.clients.size,
+        channels:stream.channels.size
+      }
     });
   });
 
