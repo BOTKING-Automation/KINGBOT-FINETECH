@@ -29,6 +29,7 @@ import { webSearchStatus } from "./kingbot-web-search.js";
 import { registerAiAgent } from "./ai-agent.js";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getMarketPageSnapshot, marketPageSymbols } from "./market-page-feed.js";
+import { MarketDataFabric } from "./market-data-fabric.js";
 import { evaluateKingbotBrain } from "./kingbot-brain.js";
 import { createMt5HostingRouter, ensureMt5HostingSchema } from "./mt5-hosting.js";
 import { createFintechOpsRouter, ensureFintechOpsSchema } from "./fintech-operations.js";
@@ -59,6 +60,7 @@ const pool = DATABASE_URL ? new pg.Pool({
 const broker = new UserBrokerManager({pool});
 const twelveData = new TwelveDataFeed();
 twelveData.start();
+const marketDataFabric = new MarketDataFabric({twelveData});
 const partners = new PartnerManager({pool});
 const eventBus = new KingbotEventBus({pool,name:"kingbot-api"});
 
@@ -186,6 +188,51 @@ app.get("/api/broker/identity", async (req,res)=>{
   }catch(error){
     console.error("[KINGBOT BROKER] stored identity lookup failed:",error?.message||error);
     res.status(503).json({ok:false,error:"BROKER_IDENTITY_UNAVAILABLE",reason:String(error?.message||"BROKER_IDENTITY_UNAVAILABLE").slice(0,220)});
+  }
+});
+
+app.get("/api/market-data/status", (_req,res)=>{
+  res.json({
+    ok:true,
+    engine:"KINGBOT_MARKET_DATA_FABRIC",
+    model:"KMF-1",
+    executionAuthority:"NONE",
+    generatedAt:new Date().toISOString(),
+    providers:marketDataFabric.providerStatus(),
+    capabilities:marketDataFabric.capabilities()
+  });
+});
+
+app.get("/api/market-data/quote", async (req,res)=>{
+  const symbol=String(req.query?.symbol||"").trim();
+  if(!symbol)return res.status(400).json({ok:false,error:"MARKET_SYMBOL_REQUIRED"});
+  try{
+    const quote=await marketDataFabric.getQuote(symbol);
+    return res.status(quote.ok?200:503).json(quote);
+  }catch(error){
+    return res.status(503).json({
+      ok:false,
+      symbol,
+      provider:"KINGBOT_MARKET_DATA_FABRIC",
+      error:"MARKET_DATA_QUOTE_FAILED",
+      reason:String(error?.message||"MARKET_DATA_QUOTE_FAILED").slice(0,180)
+    });
+  }
+});
+
+app.get("/api/market-data/quotes", async (req,res)=>{
+  const symbols=String(req.query?.symbols||"").split(",").map(x=>x.trim()).filter(Boolean);
+  if(!symbols.length)return res.status(400).json({ok:false,error:"MARKET_SYMBOLS_REQUIRED"});
+  try{
+    const snapshot=await marketDataFabric.snapshot(symbols);
+    return res.status(snapshot.ok?200:503).json(snapshot);
+  }catch(error){
+    return res.status(503).json({
+      ok:false,
+      provider:"KINGBOT_MARKET_DATA_FABRIC",
+      error:"MARKET_DATA_SNAPSHOT_FAILED",
+      reason:String(error?.message||"MARKET_DATA_SNAPSHOT_FAILED").slice(0,180)
+    });
   }
 });
 
