@@ -72,6 +72,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       <div class="metric"><span>AI ENGINE</span><strong id="aiState">CHECKING</strong></div>
       <div class="metric"><span>MARKET FEED</span><strong id="marketState">CHECKING</strong></div>
       <div class="metric"><span>LAST SCAN</span><strong id="lastScan">—</strong></div>
+      <div class="metric"><span>STREAM</span><strong id="streamState">CONNECTING</strong></div>
     </div>
   </aside>
 </section>
@@ -152,7 +153,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
   "use strict";
   const API=window.KINGBOT_API?.baseUrl||"https://kingbot-fintech-api-etfv.onrender.com/api";
   const qs=id=>document.getElementById(id);
-  const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false};
+  const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false,streamSocket:null,streamReconnectTimer:null,streamBackoffMs:1000,lastStreamMessageAt:0,streamGeneration:0};
 
   function toast(text,tone){
     const el=qs("toast"); if(!el)return;
@@ -177,6 +178,145 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
   }
 
   function fmt(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:5}):"—";}
+
+  function setStreamState(label,tone=""){
+    const el=qs("streamState");
+    if(!el)return;
+    el.textContent=label;
+    el.className=tone||"";
+  }
+
+  function mergeLiveQuote(incoming){
+    const symbol=String(incoming?.symbol||"").trim().toUpperCase();
+    if(!symbol)return;
+    const next={...incoming,symbol,available:incoming.available!==false};
+    const index=state.quotes.findIndex(q=>String(q?.symbol||"").toUpperCase()===symbol);
+    if(index>=0)state.quotes[index]={...state.quotes[index],...next};
+    else state.quotes=[...state.quotes,next];
+    renderQuotes();
+    qs("marketState").textContent="LIVE WS";
+    qs("marketState").className="good";
+    qs("lastScan").textContent="LIVE";
+  }
+
+  function websocketUrl(){
+    const url=new URL(API);
+    url.protocol=url.protocol==="https:"?"wss:":"ws:";
+    url.pathname=url.pathname.replace(/\/$/,"")+"/ai/market-scanner/ws";
+    url.searchParams.set("symbols",state.symbols.join(","));
+    url.searchParams.set("timeframe",qs("timeframe")?.value||"5m");
+    return url.toString();
+  }
+
+  function stopScannerStream(){
+    state.streamGeneration+=1;
+    clearTimeout(state.streamReconnectTimer);
+    state.streamReconnectTimer=null;
+    const ws=state.streamSocket;
+    state.streamSocket=null;
+    if(ws){
+      try{ws.onclose=null;ws.close(1000,"scanner reconfigure");}catch{}
+    }
+  }
+
+  function scheduleScannerStream(){
+    clearTimeout(state.streamReconnectTimer);
+    const delay=Math.min(15000,Math.max(1000,state.streamBackoffMs));
+    state.streamReconnectTimer=setTimeout(()=>connectScannerStream(),delay);
+    state.streamBackoffMs=Math.min(15000,Math.round(state.streamBackoffMs*1.8));
+  }
+
+  function connectScannerStream(){
+    stopScannerStream();
+    const generation=state.streamGeneration;
+    setStreamState("CONNECTING","warn");
+    try{
+      const ws=new WebSocket(websocketUrl());
+      state.streamSocket=ws;
+
+      ws.onopen=()=>{
+        if(generation!==state.streamGeneration){try{ws.close();}catch{};return;}
+        state.streamBackoffMs=1000;
+        setStreamState("LIVE","good");
+        qs("scanState").textContent="LIVE STREAM";
+        try{
+          ws.send(JSON.stringify({type:"subscribe",symbols:state.symbols,timeframe:qs("timeframe").value||"5m"}));
+        }catch{}
+      };
+
+      ws.onmessage=event=>{
+        state.lastStreamMessageAt=Date.now();
+        let message;
+        try{message=JSON.parse(String(event.data||""));}catch{return;}
+        const type=String(message?.type||"").toLowerCase();
+
+        if(type==="hello"){
+          setStreamState("CONNECTED","good");
+          return;
+        }
+
+        if(type==="subscribed"){
+          setStreamState("LIVE","good");
+          qs("coreSub").textContent="Continuous market stream · "+(message.scanIntervalMs||5000)+"ms intelligence cycle";
+          return;
+        }
+
+        if(type==="quote"){
+          mergeLiveQuote(message.quote);
+          return;
+        }
+
+        if(type==="scan" && message.data){
+          const data=message.data;
+          if(Array.isArray(data.quotes))state.quotes=data.quotes;
+          renderQuotes();
+          renderScan(data);
+          qs("lastScan").textContent=new Date(data.generatedAt||Date.now()).toLocaleTimeString();
+          qs("scanState").textContent="LIVE SCAN";
+          setStreamState("LIVE","good");
+          qs("coreSub").textContent=(data.source||"Live market feed")+" · continuous AI scan";
+          return;
+        }
+
+        if(type==="upstream_status"){
+          if(message.connected===false){
+            setStreamState("UPSTREAM OFFLINE","warn");
+            qs("marketState").textContent="UPSTREAM OFFLINE";
+            qs("marketState").className="warn";
+          }
+          return;
+        }
+
+        if(type==="scanner_error"){
+          setStreamState("DEGRADED","warn");
+          qs("scanState").textContent="STREAM ERROR";
+          qs("coreSub").textContent=message.reason||message.error||"Scanner stream error";
+        }
+      };
+
+      ws.onerror=()=>{
+        if(generation!==state.streamGeneration)return;
+        setStreamState("RECONNECTING","warn");
+      };
+
+      ws.onclose=()=>{
+        if(generation!==state.streamGeneration)return;
+        state.streamSocket=null;
+        setStreamState("RECONNECTING","warn");
+        scheduleScannerStream();
+      };
+    }catch(error){
+      setStreamState("UNAVAILABLE","warn");
+      scheduleScannerStream();
+    }
+  }
+
+  setInterval(()=>{
+    if(state.lastStreamMessageAt && Date.now()-state.lastStreamMessageAt>15000){
+      setStreamState("STALE","warn");
+      qs("scanState").textContent="STREAM STALE";
+    }
+  },3000);
 
   function renderQuotes(){
     const grid=qs("symbolGrid"); if(!grid)return;
@@ -349,7 +489,11 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
     }finally{state.busy=false; qs("scanNow").disabled=false;}
   }
 
-  qs("applySymbols")?.addEventListener("click",()=>{listFromInput();syncQuotes().catch(()=>{});});
+  qs("applySymbols")?.addEventListener("click",()=>{
+    listFromInput();
+    stopScannerStream();
+    syncQuotes().catch(()=>{}).finally(()=>connectScannerStream());
+  });
   qs("refreshQuotes")?.addEventListener("click",()=>syncQuotes().catch(()=>{}));
   qs("scanNow")?.addEventListener("click",runScan);
   qs("loadSynthetics")?.addEventListener("click",async()=>{
@@ -367,8 +511,10 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
   (async()=>{
     listFromInput(); renderQuotes();
     await checkStatus();
-    syncQuotes().catch(()=>{});
+    syncQuotes().catch(()=>{}).finally(()=>connectScannerStream());
   })();
+
+  window.addEventListener("beforeunload",()=>stopScannerStream());
 })();
 </script>
 </body>
