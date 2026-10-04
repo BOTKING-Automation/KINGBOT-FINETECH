@@ -2084,6 +2084,45 @@ overscroll-behavior:none;}
 
     }
 
+  
+    /* =========================================================
+       TRADINGVIEW × KINGBOT COPILOT LAYER
+    ========================================================== */
+    .hybrid-panel{margin-top:18px;padding:18px}
+    .hybrid-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);gap:14px}
+    .hybrid-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:13px}
+    .hybrid-title{font:800 15px Orbitron;letter-spacing:.035em}
+    .hybrid-sub{margin-top:5px;color:var(--muted);font-size:10px;line-height:1.55}
+    .hybrid-badge{padding:7px 9px;border-radius:999px;border:1px solid rgba(28,232,255,.22);background:rgba(28,232,255,.05);color:var(--cyan);font:800 8px "JetBrains Mono";white-space:nowrap}
+    .hybrid-copilot{min-height:230px;padding:17px;border:1px solid rgba(255,255,255,.08);border-radius:17px;background:linear-gradient(145deg,rgba(28,232,255,.045),rgba(166,108,255,.045),rgba(255,209,90,.025))}
+    .copilot-top{display:flex;align-items:center;gap:10px}
+    .copilot-orb{width:36px;height:36px;display:grid;place-items:center;border-radius:12px;color:#06101c;background:linear-gradient(135deg,var(--cyan),var(--violet));box-shadow:0 0 25px rgba(28,232,255,.2);font:900 11px Orbitron}
+    .copilot-name{font:800 10px Orbitron;letter-spacing:.08em}
+    .copilot-state{margin-top:3px;color:var(--green);font:800 8px "JetBrains Mono"}
+    .copilot-read{margin-top:16px;padding:13px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(0,0,0,.2)}
+    .copilot-read strong{display:block;color:var(--gold);font:800 8px "JetBrains Mono";letter-spacing:.08em}
+    .copilot-read p{margin:7px 0 0;color:#dbe4f7;font-size:11px;line-height:1.65}
+    .copilot-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+    .copilot-actions a,.copilot-actions button{border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:8px 10px;color:#fff;background:rgba(255,255,255,.035);font:800 8px "JetBrains Mono";text-decoration:none}
+    .copilot-actions a:hover,.copilot-actions button:hover{border-color:rgba(28,232,255,.3);box-shadow:0 0 18px rgba(28,232,255,.07)}
+    .bot-matrix{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+    .bot-node{position:relative;padding:13px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.025);overflow:hidden}
+    .bot-node::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,var(--cyan),var(--violet),transparent)}
+    .bot-node:nth-child(2)::before{background:linear-gradient(90deg,var(--pink),var(--violet),transparent)}
+    .bot-node:nth-child(3)::before{background:linear-gradient(90deg,var(--gold),#ff8b3d,transparent)}
+    .bot-node:nth-child(4)::before{background:linear-gradient(90deg,var(--green),var(--cyan),transparent)}
+    .bot-node:nth-child(5)::before{background:linear-gradient(90deg,var(--violet),var(--pink),transparent)}
+    .bot-code{color:var(--cyan);font:800 7px "JetBrains Mono";letter-spacing:.08em}
+    .bot-node:nth-child(2) .bot-code{color:var(--pink)} .bot-node:nth-child(3) .bot-code{color:var(--gold)} .bot-node:nth-child(4) .bot-code{color:var(--green)} .bot-node:nth-child(5) .bot-code{color:var(--violet)}
+    .bot-node h4{margin:7px 0 5px;font-size:10px}
+    .bot-node p{margin:0;color:var(--muted);font-size:8px;line-height:1.5}
+    .bot-state{display:inline-block;margin-top:9px;color:#aab5cb;font:800 7px "JetBrains Mono"}
+    .hybrid-flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:12px;padding:12px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(0,0,0,.16)}
+    .flow-node{padding:7px 9px;border-radius:8px;border:1px solid rgba(255,255,255,.08);color:#dfe8fa;background:rgba(255,255,255,.025);font:800 7px "JetBrains Mono"}
+    .flow-arrow{color:var(--cyan);font:900 10px "JetBrains Mono"}
+    @media(max-width:1050px){.hybrid-grid{grid-template-columns:1fr}.bot-matrix{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:640px){.hybrid-panel{padding:13px}.bot-matrix{grid-template-columns:1fr}.hybrid-head{align-items:flex-start;flex-direction:column}}
+
   </style>
 </head>
 
@@ -2700,7 +2739,69 @@ overscroll-behavior:none;}
 
     </footer>
 
-  </main>
+  
+    <section class="glow-card hybrid-panel" id="kingbotHybridDesk">
+      <div class="hybrid-head">
+        <div>
+          <div class="hybrid-title">TRADINGVIEW × KINGBOT CORTEX</div>
+          <div class="hybrid-sub">A visual market workstation connected to KINGBOT's conversational intelligence and five independent AI trading specialists.</div>
+        </div>
+        <span class="hybrid-badge">LIVE MARKET DESK · AI READY</span>
+      </div>
+
+      <div class="hybrid-grid">
+        <article class="hybrid-copilot">
+          <div class="copilot-top">
+            <div class="copilot-orb">KB</div>
+            <div>
+              <div class="copilot-name">KINGBOT MARKET COPILOT</div>
+              <div class="copilot-state">● CONNECTED TO THE INTELLIGENCE CENTER</div>
+            </div>
+          </div>
+          <div class="copilot-read">
+            <strong>ASK THE MARKET — NOT A STATIC DASHBOARD</strong>
+            <p id="marketCopilotText">Select an instrument above and open KINGBOT Intelligence to ask why the market is trending, what evidence supports the setup, what could invalidate it, and what confirmation is still missing.</p>
+          </div>
+          <div class="copilot-actions">
+            <a href="ai.html?symbol=XAUUSD&tf=15m">ANALYZE GOLD ↗</a>
+            <a href="ai.html?symbol=XAUUSD&tf=5m">5M SETUP ↗</a>
+            <a href="ai.html?symbol=BTCUSD&tf=1h">ANALYZE BTC ↗</a>
+            <a href="ai.html">OPEN AI COMMAND CENTER ↗</a>
+          </div>
+        </article>
+
+        <article class="hybrid-copilot">
+          <div class="copilot-top">
+            <div class="copilot-orb">Σ</div>
+            <div>
+              <div class="copilot-name">STRATEGY COUNCIL</div>
+              <div class="copilot-state">5 SPECIALIST BRAINS · INDEPENDENT</div>
+            </div>
+          </div>
+          <div class="copilot-read">
+            <strong>THE COUNCIL DOES NOT FORCE A MAJORITY</strong>
+            <p>Each AI evaluates the market through its own strategy identity. A valid specialist can lead; strong opposing evidence can produce CONFLICTED; missing confirmation produces WAIT.</p>
+          </div>
+          <div class="hybrid-flow">
+            <span class="flow-node">LIVE DATA</span><span class="flow-arrow">→</span>
+            <span class="flow-node">5 AI BOTS</span><span class="flow-arrow">→</span>
+            <span class="flow-node">COUNCIL</span><span class="flow-arrow">→</span>
+            <span class="flow-node">RISK</span><span class="flow-arrow">→</span>
+            <span class="flow-node">EXECUTION</span>
+          </div>
+        </article>
+      </div>
+
+      <div class="bot-matrix" style="margin-top:10px">
+        <article class="bot-node"><span class="bot-code">01 · DIRECTION</span><h4>STRATEGIC AI</h4><p>Trend, momentum, EMA structure, context and confluence.</p><span class="bot-state">INDEPENDENT BRAIN</span></article>
+        <article class="bot-node"><span class="bot-code">02 · REVERSAL</span><h4>FLIPPER AI</h4><p>Exhaustion, liquidity events, CHOCH and displacement.</p><span class="bot-state">INDEPENDENT BRAIN</span></article>
+        <article class="bot-node"><span class="bot-code">03 · BREAKOUT</span><h4>BREAKOUT AI</h4><p>Compression, boundary break, confirmation and retest.</p><span class="bot-state">INDEPENDENT BRAIN</span></article>
+        <article class="bot-node"><span class="bot-code">04 · SMART MONEY</span><h4>SMC PRO AI</h4><p>Liquidity, BOS/CHOCH, displacement, FVG and order blocks.</p><span class="bot-state">INDEPENDENT BRAIN</span></article>
+        <article class="bot-node"><span class="bot-code">05 · LADDER</span><h4>LADDER FLIP V8 AI</h4><p>EMA, ADX, RSI, ATR and staged re-entry conditions.</p><span class="bot-state">INDEPENDENT BRAIN</span></article>
+      </div>
+    </section>
+
+</main>
 
 
 
