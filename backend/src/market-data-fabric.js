@@ -204,10 +204,10 @@ async function readMassive(symbol, category, apiKey) {
 
   if (category === "forex") {
     const ticker = "C:" + s;
-    payload = await fetchJson(base + "/v2/snapshot/locale/global/markets/forex/tickers/" + encodeURIComponent(ticker) + "?apiKey=" + encodeURIComponent(apiKey), { timeoutMs: REQUEST_TIMEOUT_MS });
+    payload = await fetchJson(base + "/v3/snapshot?ticker=" + encodeURIComponent(ticker) + "&apiKey=" + encodeURIComponent(apiKey), { timeoutMs: REQUEST_TIMEOUT_MS });
   } else if (category === "crypto") {
     const ticker = "X:" + s.replace(/USDT$/, "USD");
-    payload = await fetchJson(base + "/v2/snapshot/locale/global/markets/crypto/tickers/" + encodeURIComponent(ticker) + "?apiKey=" + encodeURIComponent(apiKey), { timeoutMs: REQUEST_TIMEOUT_MS });
+    payload = await fetchJson(base + "/v3/snapshot?ticker=" + encodeURIComponent(ticker) + "&apiKey=" + encodeURIComponent(apiKey), { timeoutMs: REQUEST_TIMEOUT_MS });
   } else if (category === "indices") {
     const indexMap = { SPX: "I:SPX", NASDAQ: "I:NDX", DJI: "I:DJI", DAX: "I:DAX", FTSE: "I:UKX", NIKKEI: "I:NI225" };
     const ticker = indexMap[s] || ("I:" + s);
