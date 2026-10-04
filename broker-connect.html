@@ -141,7 +141,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
       </div>
     </div>
 
-<div class="status-line" style="margin:0 0 12px;border-color:rgba(246,195,75,.18);color:#d9c890;background:rgba(246,195,75,.035)">DERIV ROUTE: <strong>CFD / MT5 ONLY</strong> · Deriv Options accounts are not supported by KINGBOT's lot-based bot execution.</div>
+<div class="status-line" style="margin:0 0 12px;border-color:rgba(246,195,75,.18);color:#d9c890;background:rgba(246,195,75,.035)">KINGBOT AI EXECUTION: <strong>AI STRATEGIES → RISK ENGINE → BROKER API</strong> · No EA, MT5 terminal or VPS agent is required.</div>
     <div class="grid" id="brokerGrid">
       <article class="broker oanda" data-broker="oanda" data-mode="api" data-cap-demo="yes" data-cap-live="yes" data-native="yes" data-search="oanda fx forex metals account api demo practice live">
         <div class="broker-inner">
@@ -310,6 +310,7 @@ const cfg={
 };
 const logos={
   oanda:"https://mma.prnewswire.com/media/1581985/OANDA_colour_logo_Logo.jpg?p=facebook",
+  deriv:"https://55brokers.com/wp-content/uploads/2023/04/og_deriv-7765b1f93af49430017646938596af4f.jpg",
   exness:"https://www.forextradinghunters.com/wp-content/uploads/2022/12/Vertical_Exness_Logo_Black.jpg",
   ig:"https://cdn.sanity.io/images/k8qzcdw3/prod1503/8cd8307f715b88868cd45fa7fbeebbcec5dc2f64-1920x1080.png?w=1200",
   fxcm:"https://fxcmpy.tpq.io/_static/fxcm_logo_bg.png",
@@ -352,14 +353,14 @@ function textFor(){
   $("flowCopy").innerHTML="<strong>"+copy[0]+"</strong><br>"+copy[1];
   $("brokerLogin").textContent=step===1?"OPEN "+d.name+" ↗":step===2?"OPEN API ACCESS ↗":"OPEN "+d.name+" ↗";
   if(selected==="deriv"){
-    $("brokerLogin").textContent="OPEN DERIV MT5 ↗";
+    $("brokerLogin").textContent="AUTHORIZE DERIV ↗";
     $("brokerLogin").href=d.login;
   }else{
     $("brokerLogin").href=step===1?(selected==="exness" && partnerOpened ? $("brokerLogin").href : d.login):d.api;
   }
-  $("nextStep").style.display=(selected==="deriv"?"none":(step<2||(!verified&&step===2&&d.native&&!["oanda"].includes(selected)))?"inline-flex":"none");
+  $("nextStep").style.display=(selected==="deriv"?(step===1?"inline-flex":"none"):(step<2||(!verified&&step===2&&d.native&&!["oanda"].includes(selected)))?"inline-flex":"none");
   if(selected==="deriv"){
-    $("credentials").classList.add("show");
+    $("credentials").classList.remove("show");
     $("verifyBtn").style.display="none";
     $("accountId").parentElement.style.display="none";
     $("bridgeTokenField").style.display="none";
@@ -367,13 +368,9 @@ function textFor(){
     $("secretKeyField").style.display="none";
     $("hostField").style.display="none";
     $("oandaTokenField").style.display="none";
-    $("mt5BridgePanel").style.display="block";
-    $("mt5BridgeMode").textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO · BROKER API";
-    $("credentialHelp").textContent="Choose either the manual MT5 bridge or the user-owned VPS route below. For VPS hosting, enter the exact Windows VPS and MT5 account details, save them, enroll the KINGBOT agent, then deploy.";
-    $("mt5VpsPanel").style.display="block";
-    $("vpsExecutionMode").value=selectedExecution;
-    $("vpsLiveConfirmField").style.display=selectedExecution==="LIVE"?"block":"none";
-    $("flowStatus").textContent="DERIV CFD / MT5 route selected. Only MT5 CFD accounts are supported for KINGBOT execution; Options accounts are excluded.";
+    $("mt5BridgePanel").style.display="none";
+    $("mt5VpsPanel").style.display="none";
+    $("flowStatus").textContent="DERIV OAuth selected. Start the secure authorization flow; KINGBOT will receive only the scoped trading token and authorized account list.";
 
   }else if(step===2 && (!d.native || selected==='oanda')){
     $("credentials").classList.add("show");
@@ -410,7 +407,7 @@ function selectBroker(slug){
   $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION"; $("verifyBtn").style.display=selected==="deriv"?"none":"inline-flex"; $("executionMode").value=selectedExecution;
   if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
   textFor();showDrawer();
-  if(selected==="deriv"){void loadVpsSyntheticSymbols();void loadMt5VpsProfile();}
+  if(selected==="deriv"){ $("credentials").classList.remove("show"); }
   if(selected==="exness")trackExnessPartner();
   else if(selected==="deriv")trackBrokerPartner("deriv");
   else trackBrokerPartner(selected);
@@ -940,8 +937,8 @@ function applyExecutionMode(){
   modeButtons.forEach(b=>b.classList.toggle("active",b.dataset.exec===selectedExecution));
   modeState.textContent=selectedExecution==="LIVE"?"LIVE / REAL":"DEMO · BROKER API";
   modeCopy.textContent=selectedExecution==="LIVE"
-    ?"Production mode. KINGBOT targets the explicitly authorised broker REAL account."
-    :"DEMO mode executes on the selected broker-side DEMO account with broker virtual funds and live API execution. It is not a KINGBOT paper simulator.";
+    ?"Production mode. KINGBOT targets the explicitly authorised broker REAL account after explicit live authorization."
+    :"DEMO mode executes on the selected broker-side DEMO account with virtual broker funds through the broker API. It is not a KINGBOT paper simulator.";
   document.querySelectorAll(".broker").forEach(card=>{
     const demo=card.dataset.capDemo==="yes",live=card.dataset.capLive==="yes";
     const connect=card.querySelector(".connect");
