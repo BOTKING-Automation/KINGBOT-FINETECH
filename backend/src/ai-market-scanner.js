@@ -6,7 +6,7 @@ import { predictPendingOrderZones } from "./pending-order-model.js";
 import { technicalAnalysisBookContext } from "./technical-analysis-book.js";
 import { WebSocketServer, WebSocket } from "ws";
 import { getBotDefinitions } from "./bot-engines.js";
-import { trainMlStrategyModel, mlSignalServiceStatus } from "./ml-signal-client.js";
+import { trainMlStrategyModel, mlSignalServiceStatus, probeMlSignalService } from "./ml-signal-client.js";
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
@@ -986,6 +986,7 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
   app.get("/api/ai/market-scanner/status", async (_req,res) => {
     let tvCount=0;
     try { const q=await pool.query("SELECT COUNT(*)::int AS count FROM kingbot_tradingview_snapshots WHERE received_at > NOW() - INTERVAL '10 minutes'"); tvCount=q.rows[0]?.count || 0; } catch {}
+    const mlService = await probeMlSignalService();
     return res.json({
       ok:true, scanner:"KINGBOT AI MARKET SCANNER", aiReady:true, provider:"KINGBOT_NATIVE",
       marketData:{
@@ -1002,7 +1003,7 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
       aiStrategies:{
         stage:"AI_STRATEGIES",
         purpose:"ML_SIGNAL_GENERATION",
-        modelService:mlSignalServiceStatus()
+        modelService:mlService
       },
       tradingViewConnected:tvCount>0, tradingViewSnapshotsLast10m:tvCount, webhookConfigured:Boolean(process.env.TRADINGVIEW_WEBHOOK_SECRET),
       defaultSymbols:DEFAULT_SYMBOLS,
