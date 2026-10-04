@@ -1,6 +1,7 @@
 import { getDerivMarketFeed } from "./deriv-market-feed.js";
 import { getGoldPriceFeed } from "./gold-price-feed.js";
 import { syntheticCatalog, CORE_SYNTHETIC_FAMILIES } from "./synthetic-markets.js";
+import { MarketDataFabric } from "./market-data-fabric.js";
 
 const TRADITIONAL_MARKETS = [
   { id: "XAUUSD", name: "Gold / US Dollar", category: "metals", sourceSymbol: "XAUUSD" },
@@ -29,6 +30,7 @@ const BINANCE_ENDPOINTS = [
 
 const DERIV = getDerivMarketFeed();
 const GOLD = getGoldPriceFeed();
+const FABRIC = new MarketDataFabric();
 let snapshotCache = { at: 0, value: null, key: "" };
 let refreshPromise = null;
 
