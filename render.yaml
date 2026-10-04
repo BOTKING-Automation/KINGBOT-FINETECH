@@ -69,3 +69,33 @@ services:
           name: kingbot-ml-signal
           type: web
           envVarKey: KINGBOT_ML_SIGNAL_SECRET
+
+  - type: web
+    name: kingbot-ml-signal
+    runtime: python
+    plan: free
+    repo: https://github.com/BOTKING-Automation/KINGBOT-FINETECH
+    branch: main
+    rootDir: ml-signal-service
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: python service.py
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: KINGBOT_ML_SIGNAL_SECRET
+        generateValue: true
+      - key: KINGBOT_ML_MIN_BARS
+        value: "150"
+      - key: KINGBOT_ML_FORWARD_BARS
+        value: "3"
+      - key: KINGBOT_ML_LABEL_ATR
+        value: "0.35"
+      - key: KINGBOT_ML_MAX_MODELS
+        value: "50"
+      - key: KINGBOT_ML_MAX_MARKETS
+        value: "12"
+      - key: KINGBOT_ML_MAX_BARS_PER_MARKET
+        value: "320"
+      - key: KINGBOT_ML_MAX_BODY_BYTES
+        value: "1500000"
