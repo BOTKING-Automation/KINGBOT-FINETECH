@@ -54,9 +54,9 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
 <main class="wrap">
 <section class="hero">
   <article class="glass hero-main">
-    <div class="eyebrow">KINGBOT AI MARKET SCANNER · GROK</div>
+    <div class="eyebrow">KINGBOT CORTEX · MARKET INTELLIGENCE</div>
     <h1>Scan the market with <span class="grad">machine intelligence.</span></h1>
-    <p class="hero-copy">Reads live market quotes and OHLC data, computes multi-factor technical structure, then uses Grok to synthesize the verified evidence. AI never invents missing market data.</p>
+    <p class="hero-copy">Reads live market quotes and OHLC data, computes multi-factor technical structure, then KINGBOT CORTEX synthesizes verified evidence through multi-timeframe reasoning, strategy comparison, contradiction testing and deterministic risk gates. AI never invents missing market data.</p>
     <div class="hero-actions">
       <button id="scanNow" class="btn btn-primary" type="button">RUN FULL MARKET SCAN</button>
       <button id="refreshQuotes" class="btn" type="button">SYNC QUOTES</button>
@@ -107,7 +107,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
     </div>
   </article>
   <aside class="glass">
-    <div class="card-head"><div class="section-title">GROK ANALYSIS</div><div class="section-sub" id="analysisMeta">Awaiting scan</div></div>
+    <div class="card-head"><div class="section-title">KINGBOT CORTEX ANALYSIS</div><div class="section-sub" id="analysisMeta">Awaiting scan</div></div>
     <div class="scan-body">
       <div class="scan-summary"><strong style="color:var(--cyan);font:900 9px JetBrains Mono">MARKET INTELLIGENCE</strong>
         <div id="summaryText" class="summary-text">Standalone live market scanner ready. Broker connection is not required.</div>
@@ -396,7 +396,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
   async function checkStatus(){
     try{
       const data=await request("/ai/market-scanner/status");
-      qs("aiState").textContent=data.aiReady?(data.provider==="xai"?"GROK ONLINE":"AI ONLINE"):"NO AI KEY";
+      qs("aiState").textContent=data.aiReady?(data.provider==="xai"?"KINGBOT CORTEX ONLINE":"AI ONLINE"):"NO AI KEY";
       qs("aiState").className=data.aiReady?"good":"warn";
       const twelve=data.marketData?.twelveData||{};
       const derivPublic=data.marketData?.derivPublic||{};
@@ -435,7 +435,7 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       renderQuotes();
       qs("marketState").textContent=(data.quoteCount||0)>0?"LIVE FEED":"TECHNICAL FEED";
       qs("marketState").className="good";
-      qs("aiState").textContent=data.provider==="xai"?"GROK ONLINE":(data.provider==="none"?"ENGINE ONLINE":"AI ONLINE");
+      qs("aiState").textContent=data.provider==="xai"?"KINGBOT CORTEX ONLINE":(data.provider==="none"?"ENGINE ONLINE":"AI ONLINE");
       qs("aiState").className=data.provider==="none"?"warn":"good";
       qs("coreSub").textContent=(data.source||"Live market feed")+" · "+(data.quoteCount||0)+" live quotes · "+(data.latencyMs||0)+"ms";
       qs("lastScan").textContent="LIVE";
