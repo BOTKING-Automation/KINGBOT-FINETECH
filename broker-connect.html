@@ -699,19 +699,54 @@ async function copyMt5Token(){
   catch{setStatus("Copy was blocked by the browser. Select and copy the token manually.");}
 }
 
+async function fetchWithTimeout(input,options={},timeoutMs=15000){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),Math.max(1000,Number(timeoutMs)||15000));
+  try{
+    return await fetch(input,{...options,signal:controller.signal});
+  }catch(error){
+    if(error?.name==="AbortError")throw new Error("DERIV_OAUTH_GATEWAY_TIMEOUT");
+    throw error;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
 async function startDerivOAuth(){
   try{
-    setStatus("OPENING SECURE DERIV OAUTH…");
+    setStatus("AUTHENTICATING KINGBOT SESSION…");
     const t=await firebaseToken();
+    setStatus("OPENING SECURE DERIV GATEWAY…");
     const mode=selectedExecution==="LIVE"?"LIVE":"DEMO";
-    const r=await fetch(API_BASE+"/broker/deriv/oauth/start?executionMode="+encodeURIComponent(mode),{
-      headers:{Authorization:"Bearer "+t},cache:"no-store"
-    });
+    let r;
+    try{
+      r=await fetchWithTimeout(API_BASE+"/broker/deriv/oauth/start?executionMode="+encodeURIComponent(mode),{
+        headers:{Authorization:"Bearer "+t,Accept:"application/json"},
+        cache:"no-store"
+      },15000);
+    }catch(error){
+      if(String(error?.message||"")==="DERIV_OAUTH_GATEWAY_TIMEOUT"){
+        setStatus("SECURE GATEWAY IS WAKING UP… RETRYING DERIV OAUTH");
+        r=await fetchWithTimeout(API_BASE+"/broker/deriv/oauth/start?executionMode="+encodeURIComponent(mode),{
+          headers:{Authorization:"Bearer "+t,Accept:"application/json"},
+          cache:"no-store"
+        },15000);
+      }else{
+        throw error;
+      }
+    }
     const d=await r.json().catch(()=>({}));
     if(!r.ok||!d.authorizationUrl)throw new Error(d.error||d.message||"DERIV_OAUTH_START_FAILED");
+    setStatus("REDIRECTING TO DERIV SECURE AUTHORIZATION…");
     window.location.assign(d.authorizationUrl);
   }catch(e){
-    setStatus(String(e.message||"Deriv OAuth could not be started.").slice(0,220));
+    const code=String(e?.message||"");
+    const message=code==="DERIV_OAUTH_GATEWAY_TIMEOUT"
+      ?"DERIV GATEWAY DID NOT RESPOND. REFRESH THE PAGE AND TRY AGAIN."
+      :code==="Failed to fetch"
+        ?"KINGBOT GATEWAY IS UNREACHABLE. CHECK YOUR CONNECTION AND TRY AGAIN."
+        :code||"DERIV OAUTH COULD NOT BE STARTED.";
+    setStatus(message.slice(0,220));
   }
 }
 
@@ -795,12 +830,33 @@ async function firebaseToken(){
   const fb=window.KINGBOT_FIREBASE;
   if(!fb)throw new Error("Firebase Authentication is unavailable. Refresh the page and sign in again.");
   let u=fb.auth?.currentUser||null;
-  if(!u)u=await fb.waitForAuthReady(12000).catch(()=>fb.auth?.currentUser||null);
+  if(!u)u=await fb.waitForAuthReady(3500).catch(()=>fb.auth?.currentUser||null);
   if(!u)throw new Error("KINGBOT session is not available. Sign in again, then return to Broker Connect.");
-  try{await fb.auth?.currentUser?.reload?.();}catch{}
-  u=fb.auth?.currentUser||u;
+  if(!u.emailVerified){
+    try{
+      await Promise.race([
+        Promise.resolve(fb.auth?.currentUser?.reload?.()),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error("AUTH_RELOAD_TIMEOUT")),3500))
+      ]);
+    }catch{}
+    u=fb.auth?.currentUser||u;
+  }
   if(!u.emailVerified)throw new Error("Verify your email before connecting a broker.");
-  const token=await u.getIdToken(true);
+  let token=null;
+  try{
+    token=await Promise.race([
+      Promise.resolve(u.getIdToken(false)),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error("AUTH_TOKEN_TIMEOUT")),5000))
+    ]);
+  }catch{}
+  if(!token){
+    try{
+      token=await Promise.race([
+        Promise.resolve(u.getIdToken(true)),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error("AUTH_TOKEN_REFRESH_TIMEOUT")),5000))
+      ]);
+    }catch{}
+  }
   if(!token)throw new Error("KINGBOT authentication token could not be issued. Sign in again.");
   return token;
 }
