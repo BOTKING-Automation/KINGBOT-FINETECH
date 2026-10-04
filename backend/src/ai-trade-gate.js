@@ -164,10 +164,10 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
       const mlDirection=candidateDirection(ml.direction);
       const mlScore=num(ml.score,0);
       const nativeScore=num(native.score,0);
-      const combinedScore=Math.round(nativeScore*0.60+mlScore*0.40);
+      const combinedScore=Math.round(nativeScore*0.30+mlScore*0.70);
       const directionAgreement=!nativeDirection||!mlDirection||nativeDirection===mlDirection;
       const mlConfidence=num(ml.confidence,0);
-      const modelAligned=Boolean(mlDirection)&&mlDirection!=="HOLD"&&mlConfidence>=55&&directionAgreement;
+      const modelAligned=Boolean(mlDirection)&&mlDirection!=="HOLD"&&mlConfidence>=60&&directionAgreement;
       const directionalSignal=modelAligned?mlDirection:"HOLD";
 
       item={
@@ -192,7 +192,7 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
         reason:(modelAligned
           ? "AI STRATEGIES combined the deterministic strategy engine with the scikit-learn/PyTorch ensemble; both layers support the current direction. "
           : "AI STRATEGIES kept the candidate on hold because the ML ensemble did not provide sufficient confidence/alignment. ")
-          +"Native score="+nativeScore+"/100; ML score="+mlScore.toFixed(1)+"/100."
+          +"Native context="+nativeScore+"/100; AI model score="+mlScore.toFixed(1)+"/100."
       };
     }else if(aiExecutionGateEnabled() && (!ml || !ml.ready)){
       item={
