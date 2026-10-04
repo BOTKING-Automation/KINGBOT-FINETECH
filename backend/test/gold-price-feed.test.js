@@ -25,7 +25,7 @@ test("source-aware freshness accepts a fresh free-feed quote beyond the old 5-se
     price: 4148.22,
     quoteTimestamp: computedAt,
     quoteFreshnessMaxAgeMs: 90000,
-    source: "GoldPrice.dev direct free XAU/USD spot",
+    source: "Gold API direct free XAU/USD price",
     trend: "BULLISH",
     structure: "bullish",
     bos: "BULLISH",
@@ -47,13 +47,13 @@ test("source-aware freshness accepts a fresh free-feed quote beyond the old 5-se
   assert.notEqual(evidence.dataFlags.includes("STALE_MARKET_DATA"), true);
 });
 
-test("provider-stale quotes are rejected", () => {
+test("old direct-feed quotes are rejected", () => {
   assert.throws(
     () => parseGoldPriceResponse({
       price: 4148.22,
       symbol: "XAU",
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date(Date.now() - 180000).toISOString()
     }),
-    /GOLDPRICE_XAU_PROVIDER_STALE/
+    /GOLD_API_XAU_QUOTE_STALE/
   );
 });
