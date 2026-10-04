@@ -302,7 +302,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
 const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbot-fintech-api-etfv.onrender.com/api";
 const cfg={
   oanda:{name:"OANDA",login:"https://fxtrade.oanda.com/",api:"https://developer.oanda.com/rest-live-v20/authentication/",native:true,mode:"oanda"},
-  deriv:{name:"DERIV",login:"https://developers.deriv.com/",api:"https://developers.deriv.com/docs/intro/authentication/",native:true,mode:"deriv-direct"},
+  deriv:{name:"DERIV",login:"https://deriv.com/",api:"https://developers.deriv.com/docs/intro/oauth/",native:true,mode:"oauth"},
   exness:{name:"EXNESS",login:"https://my.exness.com/",api:"https://my.exness.com/",native:false,mode:"exness"},
   ig:{name:"IG",login:"https://my.ig.com/",api:"https://labs.ig.com/gettingstarted",native:false,mode:"metaapi"},
   fxcm:{name:"FXCM",login:"https://www.fxcm.com/",api:"https://www.fxcm.com/markets/help/api-trading-what-api-interfaces-does-fxcm-have/",native:false,mode:"metaapi"},
@@ -852,15 +852,17 @@ async function refreshConnectionLock(){
   }catch{}
 }
 function renderAccounts(list){
-  const items=Array.isArray(list)?list:[];
-  $("accountList").innerHTML=items.map((a,i)=>{
+  const all=Array.isArray(list)?list:[];
+  const wanted=selectedExecution==="LIVE"?"real":"demo";
+  const items=all.filter(a=>String(a?.account_type||a?.accountType||"").toLowerCase()===wanted);
+  $("accountList").innerHTML=items.length?items.map((a,i)=>{
     const id=String(a.account_id||a.id||a.accountId||"");
     const type=String(a.account_type||a.accountType||"").toLowerCase();
     const mode=type==="real"?"LIVE · REAL":"DEMO · BROKER EXECUTION";
     const balance=a.balance==null?"—":Number(a.balance).toLocaleString(undefined,{maximumFractionDigits:2});
     const label=type==="real"?"DERIV REAL ACCOUNT":"DERIV DEMO ACCOUNT";
     return '<div class="account-item'+(i===0?" active":"")+'" data-account="'+id.replace(/"/g,"&quot;")+'" data-account-type="'+type.replace(/"/g,"&quot;")+'"><div><b>'+label+'</b><span>'+id+' · '+mode+' · '+String(a.currency||"USD")+' · Balance '+balance+'</span></div><span>SELECT</span></div>';
-  }).join("");
+  }).join(""):'<div class="flow-copy"><strong>NO MATCHING '+(wanted==="real"?"LIVE / REAL":"DEMO")+' ACCOUNT</strong><br>Deriv authorized access, but no account matches the selected execution mode. Change DEMO/LIVE mode and authorize Deriv again.</div>';
   selectedAccount=items[0]?.account_id||items[0]?.id||items[0]?.accountId||null;
   $("authorizeBtn").disabled=!selectedAccount;
   $("authorizeBtn").textContent=selectedAccount?"CONNECT SELECTED ACCOUNT":"SELECT AN ACCOUNT";
