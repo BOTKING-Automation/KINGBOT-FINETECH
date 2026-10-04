@@ -55,7 +55,7 @@ function freshness(value, maxAgeMs = 5000) {
     : Date.parse(value || "");
   if (!Number.isFinite(t)) return { ok: false, ageMs: null, reason: "MARKET_TIMESTAMP_MISSING" };
   const ageMs = Math.max(0, Date.now() - t);
-  return { ok: ageMs <= maxAgeMs, ageMs, reason: ageMs <= maxAgeMs ? null : "MARKET_DATA_STALE" };
+  return { ok: ageMs <= maxAgeMs, ageMs, reason: ageMs <= maxAgeMs ? null : "STALE_MARKET_DATA" };
 }
 
 function normalizeMarket(input = {}) {
