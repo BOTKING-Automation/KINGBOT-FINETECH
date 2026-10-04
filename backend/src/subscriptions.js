@@ -7,7 +7,7 @@ import { appendCommercialLedger } from "./commercial-ledger.js";
 const PLANS = {
   starter: { id:"starter", name:"Basic", priceUsd:130, billing:"monthly", botLimit:1, selectableBots:["strategic","breakout"], bots:["strategic","breakout"], requiresBotSelection:true, features:["Choose 1 of 2 entry bots","Strategic or Breakout","Core risk controls","Equity tracking"] },
   pro: { id:"pro", name:"Professional", priceUsd:465, billing:"monthly", botLimit:3, selectableBots:[], bots:["strategic","breakout","smc-pro"], requiresBotSelection:false, features:["3 of 5 bot engines","Strategic + Breakout","SMC PRO","Advanced analytics","AI intelligence","Advanced risk controls"] },
-  institutional: { id:"institutional", name:"Institutional", priceUsd:800, billing:"monthly", botLimit:5, selectableBots:[], bots:["strategic","breakout","smc-pro","flipper","ladder-flip"], requiresBotSelection:false, features:["All 5 bot engines","Full trading OS","Advanced intelligence","MT5 integration layer","Kill switch"] }
+  institutional: { id:"institutional", name:"Institutional", priceUsd:800, billing:"monthly", botLimit:5, selectableBots:[], bots:["strategic","breakout","smc-pro","flipper","ladder-flip"], requiresBotSelection:false, features:["All 5 AI Strategy bots","Full trading OS","Advanced intelligence","Broker API integrations","Kill switch"] }
 };
 const BOT_NAMES = { strategic:"KINGBOT STRATEGIC", flipper:"KINGBOT FLIPPER", breakout:"KINGBOT BREAKOUT", "smc-pro":"KINGBOT SMC PRO", "ladder-flip":"KINGBOT LADDER FLIP V8" };
 const hashToken = token => crypto.createHash("sha256").update(token).digest("hex");
