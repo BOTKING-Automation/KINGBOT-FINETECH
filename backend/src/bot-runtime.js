@@ -98,7 +98,9 @@ export function createBotRuntimeRouter({pool,broker}){
     if(!["DEMO","LIVE"].includes(s.executionMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
     if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before starting DEMO or LIVE execution. No order was submitted."});
     const brokerStatus=await broker.getStatus(user.id);
-    if(String(brokerStatus.broker||"").toLowerCase()==="deriv")return res.status(409).json({ok:false,error:"DERIV_OPTIONS_NOT_VALID_FOR_MT5_BOTS",message:"The connected account is Deriv Options. These bot engines use MT5 lots and require KINGBOT MT5 BRIDGE on the selected Deriv MT5 account."});
+    if(!brokerStatus?.configured||!brokerStatus?.connected){
+      return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect and verify the broker API before configuring the AI Strategy bot. No order was submitted."});
+    }
     await pool.query("ALTER TABLE kingbot_bot_runtime ADD COLUMN IF NOT EXISTS symbol TEXT, ADD COLUMN IF NOT EXISTS timeframe TEXT DEFAULT '5m'");
     const configured=await pool.query("SELECT symbol,timeframe FROM kingbot_bot_runtime WHERE user_id=$1 AND bot_id=$2",[user.id,b.id]);
     const requestedSymbol=String(req.body?.symbol||"").trim().toUpperCase();
