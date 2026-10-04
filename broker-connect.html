@@ -353,7 +353,7 @@ function textFor(){
   $("flowCopy").innerHTML="<strong>"+copy[0]+"</strong><br>"+copy[1];
   $("brokerLogin").textContent=step===1?"OPEN "+d.name+" ↗":step===2?"OPEN API ACCESS ↗":"OPEN "+d.name+" ↗";
   if(selected==="deriv"){
-    $("brokerLogin").textContent="AUTHORIZE DERIV ↗";
+    $("brokerLogin").textContent="OPEN DERIV DEVELOPER DASHBOARD ↗";
     $("brokerLogin").href=d.login;
   }else{
     $("brokerLogin").href=step===1?(selected==="exness" && partnerOpened ? $("brokerLogin").href : d.login):d.api;
