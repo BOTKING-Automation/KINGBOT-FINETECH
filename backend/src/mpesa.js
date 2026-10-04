@@ -29,11 +29,11 @@ export function mpesaStatus(){
 }
 
 export function normalizeMpesaPhone(value){
-  let phone=String(value||"").replace(/[\\s()-]/g,"");
+  let phone=String(value||"").replace(/[\s()-]/g,"");
   if(phone.startsWith("+"))phone=phone.slice(1);
-  if(/^07\\d{8}$/.test(phone)||/^01\\d{8}$/.test(phone))return "254"+phone.slice(1);
-  if(/^[17]\\d{8}$/.test(phone))return "254"+phone;
-  if(/^254[17]\\d{8}$/.test(phone))return phone;
+  if(/^07\d{8}$/.test(phone)||/^01\d{8}$/.test(phone))return "254"+phone.slice(1);
+  if(/^[17]\d{8}$/.test(phone))return "254"+phone;
+  if(/^254[17]\d{8}$/.test(phone))return phone;
   return "";
 }
 
