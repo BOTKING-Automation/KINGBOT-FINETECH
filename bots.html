@@ -164,6 +164,7 @@ async function refreshBrokerExecutionStatus(){
 function esc(s){return String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]))}
 let brokerMarkets=[];
 let brokerMarketsLoaded=false;
+let brokerMarketRetryTimer=null;
 function normalizeMarket(item){
  const symbol=String(item?.symbol||"").trim().toUpperCase();
  if(!symbol)return null;
@@ -219,6 +220,7 @@ async function refreshBrokerMarkets(){
    brokerMarkets=(Array.isArray(d.markets)?d.markets:[]).map(normalizeMarket).filter(Boolean);
    brokerMarketsLoaded=brokerMarkets.length>0;
    renderBrokerMarkets($("symbol")?.value||selected?.symbol||"");
+   if(brokerMarketsLoaded&&brokerMarketRetryTimer){clearInterval(brokerMarketRetryTimer);brokerMarketRetryTimer=null;}
    const title=$("brokerExecutionTitle");
    const note=$("brokerExecutionNote");
    if(title && brokerMarketsLoaded) title.textContent=String(d.broker||"BROKER").toUpperCase()+" · "+brokerMarkets.length+" MARKETS AVAILABLE";
@@ -231,7 +233,8 @@ async function refreshBrokerMarkets(){
    brokerMarkets=[]; brokerMarketsLoaded=false; renderBrokerMarkets("");
    $("brokerExecutionTitle").textContent="BROKER MARKET · UNAVAILABLE";
    $("brokerExecutionNote").textContent="The connected broker did not return a live market catalog. Check the MT5 bridge/connection and refresh this control.";
-   msg(error?.message||"Broker market catalog unavailable. Refresh after the broker connection is online.","error");
+   msg(error?.message||"Broker market catalog unavailable. Waiting for the MT5 bridge heartbeat…","error");
+   if(!brokerMarketRetryTimer) brokerMarketRetryTimer=setInterval(async()=>{if(!brokerMarketsLoaded)await refreshBrokerMarkets();},3000);
    return false;
  }finally{
    if(refreshBtn){refreshBtn.disabled=false;refreshBtn.textContent="↻";}
