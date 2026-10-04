@@ -412,7 +412,7 @@ async function fetchPublicDerivData(symbols, timeframe) {
   }));
   return rows;
 }
-async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
+async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cortexRunner = null, focusSymbol = null }) {
   const normalizedSymbols = cleanSymbols(symbols).length ? cleanSymbols(symbols) : DEFAULT_SYMBOLS;
   const normalizedTimeframe = cleanTimeframe(timeframe);
 
@@ -473,6 +473,40 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
       ? "Deriv public live OHLC + live quote feed"
       : (tv.length ? "TradingView snapshots" : "live quotes only"));
 
+  let cortex = null;
+  let cortexError = null;
+  const focus = scannerCanonicalSymbol(focusSymbol || normalizedSymbols[0] || "");
+  if (cortexRunner && focus && normalizedSymbols.includes(focus)) {
+    const focusTechnical = technical.find(item => item.symbol === focus && item.source !== "none");
+    const focusQuote = quotes.find(item => item.symbol === focus && item.available);
+    if (focusTechnical || focusQuote) {
+      const quoteTimestamp = focusQuote?.timestamp
+        ? new Date(focusQuote.timestamp).toISOString()
+        : null;
+      const receivedAt = focusTechnical?.receivedAt || focusTechnical?.dataFreshness || focusQuote?.receivedAt || null;
+      const cortexMarket = {
+        ...(focusTechnical || {}),
+        ...(focusQuote || {}),
+        symbol: focus,
+        timeframe: normalizedTimeframe,
+        timestamp: quoteTimestamp || receivedAt || focusTechnical?.barTime || null,
+        quoteTimestamp,
+        receivedAt: receivedAt || quoteTimestamp || null,
+        quoteFreshnessMaxAgeMs: finite(focusQuote?.freshnessMaxAgeMs),
+        freshnessMaxAgeMs: finite(focusQuote?.freshnessMaxAgeMs),
+        verifiedQuote: Boolean(focusQuote?.verified),
+        scannerSource: technicalSource
+      };
+      try {
+        cortex = await cortexRunner(cortexMarket);
+      } catch (error) {
+        cortexError = String(error?.message || "CORTEX_UNAVAILABLE").slice(0, 220);
+      }
+    } else {
+      cortexError = "FOCUS_SYMBOL_TECHNICAL_DATA_UNAVAILABLE";
+    }
+  }
+
   if (!technical.some(x => x.source !== "none") && !directQuotes.some(q => q.available)) {
     return {
       ok:false,
@@ -528,6 +562,9 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     quotes,
     technical,
     tradingViewSnapshots:tvMap,
+    cortex,
+    cortexFocusSymbol: focus || null,
+    cortexError,
     analysis:ai.analysis || JSON.stringify(fallbackAnalysis),
     aiError:ai.aiError || null,
     generatedAt:new Date().toISOString(),
@@ -560,7 +597,9 @@ async function runMarketScan({ pool, twelveData, req, res }) {
       pool,
       twelveData,
       symbols:req.query?.symbols || req.body?.symbols,
-      timeframe:req.query?.timeframe || req.body?.timeframe
+      timeframe:req.query?.timeframe || req.body?.timeframe,
+      cortexRunner,
+      focusSymbol:req.query?.focusSymbol || req.body?.focusSymbol || null
     });
     if (!result.ok) return res.status(503).json(result);
     return res.json(result);
@@ -634,10 +673,11 @@ function scannerCanonicalSymbol(value) {
 }
 
 class AiMarketScannerStream {
-  constructor({ server, pool, twelveData }) {
+  constructor({ server, pool, twelveData, cortexRunner = null }) {
     this.server = server;
     this.pool = pool;
     this.twelveData = twelveData;
+    this.cortexRunner = typeof cortexRunner === "function" ? cortexRunner : null;
     this.publicDerivFeed = publicDerivFeed;
     this.clients = new Set();
     this.channels = new Map();
@@ -795,7 +835,9 @@ class AiMarketScannerStream {
         pool: this.pool,
         twelveData: this.twelveData,
         symbols: channel.symbols,
-        timeframe: channel.timeframe
+        timeframe: channel.timeframe,
+        cortexRunner: this.cortexRunner,
+        focusSymbol: channel.symbols?.[0] || null
       });
 
       channel.lastScanAt = Date.now();
@@ -979,8 +1021,8 @@ class AiMarketScannerStream {
   }
 }
 
-export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server }) {
-  const stream = new AiMarketScannerStream({ server, pool, twelveData });
+export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server, cortexRunner = null }) {
+  const stream = new AiMarketScannerStream({ server, pool, twelveData, cortexRunner });
   startAiStrategyModelTraining(twelveData);
   void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
 
