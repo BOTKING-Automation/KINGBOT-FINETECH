@@ -12,7 +12,7 @@ const mtf={timeframes:[
 
 const market={
   symbol:"XAUUSD",timeframe:"15m",price:2000,bid:1999.9,ask:2000.1,spread:.2,atr:10,volatility:.45,
-  trend:.8,momentum:.8,structure:"bullish",rawTrend:.8,rawStructure:"bullish",
+  trend:"BULLISH",momentum:.8,structure:"bullish",rawTrend:"BULLISH",rawStructure:"bullish",
   rawBos:"BULLISH",rawChoch:"BULLISH",rawLiquiditySweep:"BULLISH",liquiditySweep:"BULLISH",
   rawDisplacement:"BULLISH",displacement:"BULLISH",orderBlock:{direction:"BULLISH"},fairValueGap:true,
   breakout:false,retest:false,adx:25,rsi:58,emaFast:2010,emaSlow:1990,receivedAt:now,quoteTimestamp:now,barTime:now,multiTimeframe:mtf
@@ -23,6 +23,8 @@ test("orchestrator exposes five specialists and stays fresh with live receivedAt
   assert.equal(result.ok,true);
   assert.equal(result.market.freshness.ok,true);
   assert.equal(result.market.freshnessMode,"LIVE_QUOTE");
+  assert.equal(result.summary.regime,"TRENDING_VOLATILE");
+  assert.equal(result.summary.bias,"BULLISH");
   assert.equal(result.specialists.length,5);
   assert.ok(result.specialists.every(x=>x.botId));
   assert.equal(result.strategyCouncil.state,"BUY");
@@ -38,4 +40,12 @@ test("orchestrator blocks deterministically when market telemetry is stale",asyn
   assert.ok(result.riskCouncil.blocks.includes("STALE_MARKET_DATA"));
   assert.equal(result.execution.authorized,false);
   assert.notEqual(result.decisionGate.state,"BUY");
+});
+
+test("directional flags are not treated as truthy when scanner reports NONE",async()=>{
+  const neutral={...market,trend:"NEUTRAL",rawTrend:"NEUTRAL",structure:"range",rawStructure:"range",rawBos:"NONE",rawChoch:"NONE",rawLiquiditySweep:"NONE",liquiditySweep:"NONE",rawDisplacement:"NONE",displacement:"NONE",orderBlock:null,fairValueGap:false,momentum:0};
+  const result=await orchestrateKingbotIntelligence({market:neutral,options:{botId:null},adaptivePerformance:{}});
+  assert.equal(result.analysts.find(x=>x.id==="technical")?.evidence.includes("liquiditySweep=yes"),false);
+  assert.equal(result.riskCouncil.blocks.length,0);
+  assert.ok(["WAIT","CONFLICTED"].includes(result.strategyCouncil.state));
 });
