@@ -468,34 +468,44 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
   const technicalBySymbol=new Map();
   for(const item of combinedTechnical) if(!technicalBySymbol.has(item.symbol)) technicalBySymbol.set(item.symbol,item);
   const tdMap = Object.fromEntries([...technicalBySymbol.entries()].map(([k,v]) => [k,v]));
+  // Technical decisions must come from verified OHLC telemetry only.
+  // TradingView remains a visualization/context surface and can never satisfy
+  // the scanner's technical-data gate on its own.
   let technical = normalizedSymbols.map(symbol => {
-    const snapshot = tdMap[symbol] || tv.find(x => x.symbol === symbol);
+    const snapshot = tdMap[symbol] || null;
     return snapshot
       ? {
           symbol,
           ...technicalEngine(snapshot),
           timeframe: normalizedTimeframe,
-          source: tdMap[symbol]?.source || (tv.find(x => x.symbol === symbol) ? "TradingView" : "live OHLC"),
+          source: snapshot.source || "KINGBOT native OHLC",
           barTime: snapshot.barTime,
           dataFreshness: snapshot.receivedAt || snapshot.barTime,
-          technicalCacheAgeMs: finite(snapshot.cacheAgeMs)
+          technicalCacheAgeMs: finite(snapshot.cacheAgeMs),
+          technicalVerified: true
         }
       : {
           symbol,
           ...technicalEngine(null),
           timeframe: normalizedTimeframe,
-          source:"none"
+          source:"none",
+          technicalVerified:false
         };
   });
   technical = overlayLiveQuotes(technical, directQuotes);
   technical = technical.map(item => ({ ...item, pendingOrderZones: predictPendingOrderZones(item) }));
 
   const tvMap = Object.fromEntries(tv.map(x => [x.symbol, x]));
-  const technicalSource = tdTechnical.length
-    ? "Twelve Data live OHLC + live quote feed"
-    : (derivData.some(x=>x.technical)
-      ? "Deriv public live OHLC + live quote feed"
-      : (tv.length ? "TradingView snapshots" : "live quotes only"));
+  const nativeTechnicalCount = technical.filter(item => item.technicalVerified).length;
+  const hasTwelveDataTechnical = tdTechnical.length > 0;
+  const hasDerivTechnical = derivData.some(x => x.technical) || derivFallbackData.some(x => x.technical);
+  const technicalSource = nativeTechnicalCount
+    ? hasTwelveDataTechnical && hasDerivTechnical
+      ? "KINGBOT native OHLC: Twelve Data primary + Deriv fallback"
+      : hasTwelveDataTechnical
+        ? "KINGBOT native OHLC: Twelve Data"
+        : "KINGBOT native OHLC: Deriv public candles"
+    : "no verified OHLC";
 
   let cortex = null;
   let cortexError = null;
@@ -601,7 +611,13 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
       tradingView:Boolean(tv.length)
     },
     tradingViewCount:tv.length,
-    technicalCount:technical.filter(x=>x.source!=="none").length,
+    technicalCount:technical.filter(x=>x.technicalVerified).length,
+    technicalDataQuality:{
+      verifiedSymbols:technical.filter(x=>x.technicalVerified).length,
+      missingSymbols:technical.filter(x=>!x.technicalVerified).map(x=>x.symbol),
+      nativeOnly:true,
+      tradingViewCanProvideContextOnly:true
+    },
     technicalSource,
     brokerRequired:false,
     marketTypes: {
