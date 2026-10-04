@@ -15,7 +15,7 @@ test("free XAU feed parser returns a verified quote with provider freshness meta
   assert.equal(quote.price, 4148.22);
   assert.equal(quote.verified, true);
   assert.equal(quote.source, "Gold API direct free XAU/USD price");
-  assert.equal(quote.freshnessMaxAgeMs, 90000);
+  assert.equal(quote.freshnessMaxAgeMs, 120000);
 });
 
 test("source-aware freshness accepts a fresh free-feed quote beyond the old 5-second gate", () => {
