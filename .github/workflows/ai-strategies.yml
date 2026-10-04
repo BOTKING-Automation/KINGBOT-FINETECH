@@ -152,6 +152,7 @@ jobs:
           node --check backend/src/strategy-specialists.js
           node --check backend/src/strategy-council.js
           node --check backend/src/intelligence-orchestrator.js
+          node --check backend/src/server.js
           node --check system/intelligence-orchestrator.js
           node --check system/ai-support.js
 
