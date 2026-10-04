@@ -20,6 +20,21 @@ services:
         sync: false
       - key: WORKER_STANDBY
         value: "1"
+      - key: KINGBOT_ML_SIGNAL_HOST
+        fromService:
+          name: kingbot-ml-signal
+          type: web
+          property: host
+      - key: KINGBOT_ML_SIGNAL_PORT
+        fromService:
+          name: kingbot-ml-signal
+          type: web
+          property: port
+      - key: KINGBOT_ML_SIGNAL_SECRET
+        fromService:
+          name: kingbot-ml-signal
+          type: web
+          envVarKey: KINGBOT_ML_SIGNAL_SECRET
 
   - type: worker
     name: kingbot-fintech-worker
@@ -39,3 +54,18 @@ services:
         sync: false
       - key: WORKER_STANDBY
         value: "1"
+      - key: KINGBOT_ML_SIGNAL_HOST
+        fromService:
+          name: kingbot-ml-signal
+          type: web
+          property: host
+      - key: KINGBOT_ML_SIGNAL_PORT
+        fromService:
+          name: kingbot-ml-signal
+          type: web
+          property: port
+      - key: KINGBOT_ML_SIGNAL_SECRET
+        fromService:
+          name: kingbot-ml-signal
+          type: web
+          envVarKey: KINGBOT_ML_SIGNAL_SECRET
