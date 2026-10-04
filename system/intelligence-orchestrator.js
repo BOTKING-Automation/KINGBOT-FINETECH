@@ -54,6 +54,7 @@
     text("orchConfidence",Number.isFinite(Number(s.confidence))?Math.round(Number(s.confidence))+" / 100":"—");
     text("orchEngine",routing.selectedEngine||"NO ROUTE");
     text("orchState",risk.status||"—");
+    text("orchCouncil",String(data.strategyCouncil?.state||routing.councilState||"WAIT").toUpperCase());
     text("orchSymbol",market.symbol||"—");
     text("orchTimeframe",String(market.timeframe||"—").toUpperCase());
     const freshnessLabel = market.freshness?.ok
