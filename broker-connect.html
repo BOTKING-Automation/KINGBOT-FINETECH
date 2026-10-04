@@ -411,7 +411,7 @@ function selectBroker(slug){
   $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":selected==="deriv"?"CONNECT DERIV DIRECT":"VERIFY CONNECTION"; $("verifyBtn").style.display="inline-flex"; $("executionMode").value=selectedExecution;
   if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
   textFor();showDrawer();
-  if(selected==="deriv"){ $("credentials").classList.remove("show"); $("mt5BridgePanel").style.display="none"; $("mt5VpsPanel").style.display="none"; }
+  if(selected==="deriv"){ $("credentials").classList.add("show"); $("mt5BridgePanel").style.display="none"; $("mt5VpsPanel").style.display="none"; $("derivAppIdField").style.display="block"; $("bridgeTokenField").style.display="block"; }
   if(selected==="exness")trackExnessPartner();
   else if(selected==="deriv")trackBrokerPartner("deriv");
   else trackBrokerPartner(selected);
