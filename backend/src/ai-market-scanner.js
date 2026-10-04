@@ -554,7 +554,7 @@ async function trainAiStrategyModels(twelveData){
 }
 
 function startAiStrategyModelTraining(twelveData){
-  if(!twelveData?.enabled||!mlSignalServiceStatus().configured)return;
+  if(!mlSignalServiceStatus().configured)return;
   const intervalMs=Math.max(5*60*1000,Number(process.env.KINGBOT_ML_RETRAIN_MS||30*60*1000));
   let running=false;
   const run=async()=>{
