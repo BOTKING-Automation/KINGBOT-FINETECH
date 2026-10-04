@@ -352,7 +352,18 @@
           : (bot?.lastError || bot?.last_error ? String(bot.lastError || bot.last_error).replaceAll("_", " ") : "SERVER TELEMETRY");
         const row = document.createElement("div");
         row.className = "runtime-row";
-        row.innerHTML = '<div><span class="runtime-code">' + code + '</span><span class="runtime-name">' + label + ' · ' + reason + '</span></div><div class="runtime-state">' + displayState + '</div>';
+        const left = document.createElement("div");
+        const codeEl = document.createElement("span");
+        codeEl.className = "runtime-code";
+        codeEl.textContent = code;
+        const nameEl = document.createElement("span");
+        nameEl.className = "runtime-name";
+        nameEl.textContent = label + " · " + reason;
+        const stateEl = document.createElement("div");
+        stateEl.className = "runtime-state";
+        stateEl.textContent = displayState;
+        left.append(codeEl, nameEl);
+        row.append(left, stateEl);
         botList.appendChild(row);
       });
     }
