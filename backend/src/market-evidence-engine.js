@@ -38,7 +38,8 @@ function multiTimeframe(market){
   return {frames:usable.map(x=>({timeframe:x.timeframe,trend:up(x.trend),signal:up(x.signal),score:n(x.score,0)})),bull,bear,total:usable.length,direction:bull>bear?"BULLISH":bear>bull?"BEARISH":"MIXED",ratio:usable.length?Number((Math.max(bull,bear)/usable.length).toFixed(2)):0};
 }
 export function buildMarketEvidence(market={},options={}){
-  const maxAgeMs=n(options.maxAgeMs,5000);
+  const defaultMaxAgeMs=n(options.maxAgeMs,5000);
+  const maxAgeMs=n(market.quoteFreshnessMaxAgeMs??market.freshnessMaxAgeMs,defaultMaxAgeMs);
   const quoteFresh=freshness(market.quoteTimestamp||market.timestamp||market.receivedAt,maxAgeMs);
   const barFresh=freshness(market.barTime||market.receivedAt||market.timestamp,Math.max(maxAgeMs,30000));
   const side=scoreDirection(market),mtf=multiTimeframe(market),flags=[];
