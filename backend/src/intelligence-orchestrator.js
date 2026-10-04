@@ -96,7 +96,13 @@ function normalizeMarket(input = {}) {
     quoteFreshnessMaxAgeMs: num(input.quoteFreshnessMaxAgeMs ?? input.freshnessMaxAgeMs),
     barTime: input.barTime || input.time || null,
     multiTimeframe: input.multiTimeframe || null,
-    crossMarket: input.crossMarket || null
+    crossMarket: input.crossMarket || null,
+    technicalReady: Boolean(
+      Number.isFinite(Number(input.atr ?? input.atr14)) &&
+      Number.isFinite(Number(input.rsi ?? input.rsi14)) &&
+      Number.isFinite(Number(input.emaFast ?? input.ema20)) &&
+      Number.isFinite(Number(input.emaSlow ?? input.ema50))
+    )
   };
 }
 
@@ -430,7 +436,9 @@ async function synthesize(payload) {
   } else if (councilState === "CONFLICTED") {
     statusSummary = "KINGBOT CORTEX found conflicting specialist and market evidence; no route is authorized.";
   } else if (councilState === "WAIT" || !selected) {
-    statusSummary = "KINGBOT CORTEX is waiting: no specialist currently satisfies a complete, verified setup.";
+    statusSummary = payload?.market?.verifiedQuote && payload?.market?.technicalReady === false
+      ? "KINGBOT CORTEX has a verified live XAU/USD quote, but technical/MTF evidence is incomplete; no directional route is inferred."
+      : "KINGBOT CORTEX is waiting: no specialist currently satisfies a complete, verified setup.";
   } else if (selected) {
     statusSummary = "KINGBOT CORTEX routed the strongest verified specialist toward " + selected + ".";
   }
