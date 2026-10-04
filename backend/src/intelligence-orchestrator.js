@@ -466,6 +466,8 @@ function cacheKey(market, options = {}) {
     trend: market.trend,
     momentum: market.momentum,
     structure: market.structure,
+    quoteTimestamp: market.quoteTimestamp || null,
+    barTime: market.barTime || null,
     crossMarket: market.crossMarket?.breadth ? {
       live: market.crossMarket.breadth.live,
       up: market.crossMarket.breadth.up,
