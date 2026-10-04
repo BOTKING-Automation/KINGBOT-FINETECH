@@ -100,7 +100,7 @@ function evaluateBreakout(m,mtf){
 function evaluateSmc(m,mtf){
   const conditions=[],missing=[],entry=[],wait=[],contradictions=[];
   const structure=lower(m.structure), bos=upper(m.rawBos), choch=upper(m.rawChoch);
-  const sweep=upper(m.rawLiquiditySweep||m.liquiditySweep), displacement=upper(m.displacement);
+  const sweep=upper(m.rawLiquiditySweep||m.liquiditySweep), displacement=upper(m.rawDisplacement||m.displacement);
   const bull=structure==="bullish"||bos==="BULLISH"||choch==="BULLISH";
   const bear=structure==="bearish"||bos==="BEARISH"||choch==="BEARISH";
   const d=sweep==="BULLISH"&&displacement==="BULLISH"&&bull?"BUY":sweep==="BEARISH"&&displacement==="BEARISH"&&bear?"SELL":"WAIT";
