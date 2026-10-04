@@ -3,6 +3,7 @@ import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
 import { runStandaloneMarketScan } from "./ai-market-scanner.js";
 import { loadAdaptivePerformance, applyAdaptivePerformance, classifySetup, recordAdaptiveDecision, settleAdaptiveDecision, ensureAdaptiveIntelligenceSchema, adaptiveDecisionState } from "./adaptive-intelligence.js";
 import { identitySnapshot, buildCognitivePlan, capabilitySet, normalizeThinkingLevel, thinkingProfile } from "./kingbot-intelligence-core.js";
+import { buildMarketEvidence, marketDecisionGate } from "./market-evidence-engine.js";
 
 const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
 const MODEL = "KINGBOT-CORTEX-1";
@@ -350,6 +351,7 @@ function cacheKey(market, options = {}) {
 
 export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {}, memory = [], adaptivePerformance = {}, thinkingLevel = "EXPERT" } = {}) {
   const market = normalizeMarket(inputMarket);
+  const marketEvidence = buildMarketEvidence(market, { maxAgeMs: Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000) });
   const level = normalizeThinkingLevel(thinkingLevel || options.thinkingLevel || "EXPERT");
   const cognitivePlan = buildCognitivePlan({ intent: "MARKET_INTELLIGENCE", symbol: market.symbol, conversation: [], thinkingLevel: level });
   const key = cacheKey(market, options);
@@ -357,6 +359,8 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
   if (cached && Date.now() - cached.at <= CACHE_MS) return { ...cached.result, cached: true };
 
   const technical = analyzeTechnical(market);
+  technical.evidenceQuality = marketEvidence.evidenceQuality;
+  technical.marketEvidence = marketEvidence.scores;
   const regime = analyzeRegime(market);
   const execution = analyzeExecution(market);
   const context = analyzeMacroAndSentiment(inputMarket);
@@ -366,6 +370,7 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
   const debate = buildDebate(analysts, engines, market);
   const routing = chooseEngine(engines, debate);
   const risk = riskCouncil(market, engines, riskContext);
+  const decisionGate = marketDecisionGate(marketEvidence, risk.blocks);
 
   let tradePlan = null;
   if (routing.selectedEngine && routing.candidate && risk.blocks.length === 0) {
@@ -405,13 +410,21 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
       minSamples: Number(process.env.KINGBOT_ADAPTIVE_MIN_SAMPLES || 8)
     },
     generatedAt: new Date().toISOString(),
-    market: { ...market, freshness: freshness(market.timestamp, Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)) },
+    market: { ...market, freshness: freshness(market.timestamp, Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)), evidence: marketEvidence },
     analysts,
     debate,
     engines,
     routing: { ...routing, direction: routing.candidate ? (routing.candidate.score > 0 ? "BUY" : routing.candidate.score < 0 ? "SELL" : "HOLD") : "HOLD" },
     tradePlan,
     riskCouncil: risk,
+    decisionGate,
+    decision: {
+      state: decisionGate.state,
+      confidence: marketEvidence.confidence,
+      waitFor: marketEvidence.waitFor,
+      invalidation: marketEvidence.invalidation,
+      dataFlags: marketEvidence.dataFlags
+    },
     execution: {
       authority: "NONE",
       authorized: false,
@@ -423,6 +436,11 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
     }
   };
 
+  // The evidence gate is advisory only; deterministic risk/execution controls remain authoritative.
+  if (decisionGate.state !== "BUY" && decisionGate.state !== "SELL") {
+    result.routing = { ...result.routing, selectedEngine: null, reason: decisionGate.reason };
+    result.tradePlan = null;
+  }
   const synthesis = await synthesize(result);
   result.aiSynthesis = synthesis;
   result.summary = synthesis.result || {
