@@ -47,7 +47,7 @@ test("two strong opposing specialists create CONFLICTED state",()=>{
     card("flipper","WAIT",0,0,{strategyMatch:false}),
     card("breakout","SELL",86,90),
     card("smc-pro","BUY",91,94),
-    card("ladder-flip","WAIT",0,0,{strategyMatch:false})
+    card("ladder-flip","SELL",82,88)
   ];
   const r=buildStrategyCouncil(cards.map((s)=>engine(s.botId,s)),{multiTimeframe:aligned,marketDecision:"BUY"});
   assert.equal(r.state,"CONFLICTED");
