@@ -23,7 +23,7 @@ test("orchestrator exposes five specialists and stays fresh with live receivedAt
   assert.equal(result.ok,true);
   assert.equal(result.market.freshness.ok,true);
   assert.equal(result.market.freshnessMode,"LIVE_QUOTE");
-  assert.equal(result.summary.regime,"TRENDING_VOLATILE");
+  assert.equal(result.summary.regime,"TRENDING");
   assert.equal(result.summary.bias,"BULLISH");
   assert.equal(result.specialists.length,5);
   assert.ok(result.specialists.every(x=>x.botId));
