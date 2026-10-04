@@ -2123,7 +2123,7 @@ overscroll-behavior:none;}
     @media(max-width:1050px){.hybrid-grid{grid-template-columns:1fr}.bot-matrix{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:640px){.hybrid-panel{padding:13px}.bot-matrix{grid-template-columns:1fr}.hybrid-head{align-items:flex-start;flex-direction:column}}
 
-  </style>
+  <style>.hybrid-workspace{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(320px,.65fr);gap:12px}.workspace-chart,.workspace-copilot{min-width:0;border:1px solid rgba(255,255,255,.08);border-radius:17px;background:rgba(2,7,18,.58);overflow:hidden}.workspace-toolbar{height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 13px;border-bottom:1px solid rgba(255,255,255,.07)}.workspace-symbol{display:flex;align-items:center;gap:8px;font:800 10px "JetBrains Mono"}.workspace-symbol strong{font:900 13px Orbitron}.symbol-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}.workspace-status{font:800 8px "JetBrains Mono";color:var(--muted)}.chart-frame{position:relative;height:480px;background:#030914}.tv-live-container{width:100%;height:100%}.chart-overlay{position:absolute;z-index:2;top:10px;left:12px;display:flex;align-items:center;gap:7px;pointer-events:none}.chart-overlay span{padding:4px 6px;border-radius:5px;background:rgba(0,255,170,.1);color:var(--green);font:900 7px "JetBrains Mono"}.chart-overlay b{font:900 10px Orbitron}.chart-overlay small{color:var(--muted);font:700 8px "JetBrains Mono"}.workspace-strip{display:flex;gap:18px;flex-wrap:wrap;padding:11px 13px;border-top:1px solid rgba(255,255,255,.07);color:var(--muted);font:800 8px "JetBrains Mono"}.workspace-strip b{color:#e9f2ff}.workspace-copilot{padding:16px}.cortex-context{display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;margin-top:16px;padding:10px;border:1px solid rgba(255,255,255,.07);border-radius:11px}.cortex-context span{color:var(--muted);font:800 7px "JetBrains Mono"}.cortex-context b{font:900 9px "JetBrains Mono"}.cortex-read{margin-top:10px;padding:13px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:linear-gradient(145deg,rgba(28,232,255,.045),rgba(166,108,255,.04))}.cortex-read strong{color:var(--gold);font:900 8px "JetBrains Mono"}.cortex-read p{margin:8px 0 0;color:#dbe4f7;font-size:10px;line-height:1.65}.cortex-actions,.quick-prompts{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.cortex-actions a,.quick-prompts button{padding:8px 9px;border:1px solid rgba(255,255,255,.09);border-radius:8px;background:rgba(255,255,255,.035);color:#fff;text-decoration:none;font:800 7px "JetBrains Mono";cursor:pointer}.specialist-console{margin-top:12px;padding:13px;border:1px solid rgba(255,255,255,.08);border-radius:17px;background:rgba(2,7,18,.48)}.specialist-console-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:9px}.specialist-console-head b{font:900 10px Orbitron}.specialist-console-head small{display:block;margin-top:4px;color:var(--muted);font-size:8px}.specialist-console-head span{color:var(--cyan);font:800 7px "JetBrains Mono";text-align:right}.hybrid-flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:10px;padding:10px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(0,0,0,.16)}.flow-node{padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,.08);color:#dfe8fa;background:rgba(255,255,255,.025);font:800 7px "JetBrains Mono"}.flow-arrow{color:var(--cyan);font:900 10px "JetBrains Mono"}@media(max-width:1050px){.hybrid-workspace{grid-template-columns:1fr}.chart-frame{height:420px}}@media(max-width:640px){.chart-frame{height:340px}.specialist-console-head{flex-direction:column}.specialist-console-head span{text-align:left}}</style></style>
 </head>
 
 <body>
@@ -2749,56 +2749,12 @@ overscroll-behavior:none;}
         <span class="hybrid-badge">LIVE MARKET DESK · AI READY</span>
       </div>
 
-      <div class="hybrid-grid">
-        <article class="hybrid-copilot">
-          <div class="copilot-top">
-            <div class="copilot-orb">KB</div>
-            <div>
-              <div class="copilot-name">KINGBOT MARKET COPILOT</div>
-              <div class="copilot-state">● CONNECTED TO THE INTELLIGENCE CENTER</div>
-            </div>
-          </div>
-          <div class="copilot-read">
-            <strong>ASK THE MARKET — NOT A STATIC DASHBOARD</strong>
-            <p id="marketCopilotText">Select an instrument above and open KINGBOT Intelligence to ask why the market is trending, what evidence supports the setup, what could invalidate it, and what confirmation is still missing.</p>
-          </div>
-          <div class="copilot-actions">
-            <a href="ai.html?symbol=XAUUSD&tf=15m">ANALYZE GOLD ↗</a>
-            <a href="ai.html?symbol=XAUUSD&tf=5m">5M SETUP ↗</a>
-            <a href="ai.html?symbol=BTCUSD&tf=1h">ANALYZE BTC ↗</a>
-            <a href="ai.html">OPEN AI COMMAND CENTER ↗</a>
-          </div>
-        </article>
-
-        <article class="hybrid-copilot">
-          <div class="copilot-top">
-            <div class="copilot-orb">Σ</div>
-            <div>
-              <div class="copilot-name">STRATEGY COUNCIL</div>
-              <div class="copilot-state">5 SPECIALIST BRAINS · INDEPENDENT</div>
-            </div>
-          </div>
-          <div class="copilot-read">
-            <strong>THE COUNCIL DOES NOT FORCE A MAJORITY</strong>
-            <p>Each AI evaluates the market through its own strategy identity. A valid specialist can lead; strong opposing evidence can produce CONFLICTED; missing confirmation produces WAIT.</p>
-          </div>
-          <div class="hybrid-flow">
-            <span class="flow-node">LIVE DATA</span><span class="flow-arrow">→</span>
-            <span class="flow-node">5 AI BOTS</span><span class="flow-arrow">→</span>
-            <span class="flow-node">COUNCIL</span><span class="flow-arrow">→</span>
-            <span class="flow-node">RISK</span><span class="flow-arrow">→</span>
-            <span class="flow-node">EXECUTION</span>
-          </div>
-        </article>
-      </div>
-
-      <div class="bot-matrix" style="margin-top:10px">
-        <article class="bot-node"><span class="bot-code">01 · DIRECTION</span><h4>STRATEGIC AI</h4><p>Trend, momentum, EMA structure, context and confluence.</p><span class="bot-state">INDEPENDENT BRAIN</span></article>
-        <article class="bot-node"><span class="bot-code">02 · REVERSAL</span><h4>FLIPPER AI</h4><p>Exhaustion, liquidity events, CHOCH and displacement.</p><span class="bot-state">INDEPENDENT BRAIN</span></article>
-        <article class="bot-node"><span class="bot-code">03 · BREAKOUT</span><h4>BREAKOUT AI</h4><p>Compression, boundary break, confirmation and retest.</p><span class="bot-state">INDEPENDENT BRAIN</span></article>
-        <article class="bot-node"><span class="bot-code">04 · SMART MONEY</span><h4>SMC PRO AI</h4><p>Liquidity, BOS/CHOCH, displacement, FVG and order blocks.</p><span class="bot-state">INDEPENDENT BRAIN</span></article>
-        <article class="bot-node"><span class="bot-code">05 · LADDER</span><h4>LADDER FLIP V8 AI</h4><p>EMA, ADX, RSI, ATR and staged re-entry conditions.</p><span class="bot-state">INDEPENDENT BRAIN</span></article>
-      </div>
+      <div class="hybrid-workspace">
+<div class="workspace-chart"><div class="workspace-toolbar"><div class="workspace-symbol"><span class="symbol-dot"></span><strong id="workspaceSymbol">XAUUSD</strong><span id="workspaceTf">15m</span></div><div class="workspace-status" id="workspaceStatus">MARKET FEED READY</div></div><div class="chart-frame"><div class="chart-overlay"><span>LIVE</span><b id="chartInstrument">XAUUSD</b><small id="chartPrice">Awaiting verified quote…</small></div><div id="tradingview-widget-container" class="tv-live-container"></div></div><div class="workspace-strip"><span>PRICE <b id="wsPrice">—</b></span><span>SPREAD <b id="wsSpread">—</b></span><span>REGIME <b id="wsRegime">—</b></span><span>EVIDENCE <b id="wsEvidence">VERIFYING</b></span></div></div>
+<aside class="workspace-copilot"><div class="copilot-top"><div class="copilot-orb">KB</div><div><div class="copilot-name">KINGBOT CORTEX</div><div class="copilot-state">● MARKET COPILOT ONLINE</div></div></div><div class="cortex-context"><span>INSTRUMENT</span><b id="cortexSymbol">XAUUSD</b><span>TIMEFRAME</span><b id="cortexTf">15m</b></div><div class="cortex-read" id="cortexRead"><strong>LIVE MARKET REASONING</strong><p>Connect a verified live feed to receive evidence-based market context. KINGBOT will never invent a live price or setup.</p></div><div class="cortex-actions"><a href="ai.html?symbol=XAUUSD&tf=15m">ASK KINGBOT ↗</a><a href="ai.html?symbol=XAUUSD&tf=5m">5M ANALYSIS ↗</a></div><div class="quick-prompts"><button data-prompt="Analyze the current market bias and explain the evidence.">WHY THIS BIAS?</button><button data-prompt="What confirmation is still missing before a trade candidate?">WHAT SHOULD I WAIT FOR?</button><button data-prompt="What would invalidate the current setup?">WHAT INVALIDATES IT?</button></div></aside></div>
+<div class="specialist-console"><div class="specialist-console-head"><div><b>ACTIVE STRATEGY INTELLIGENCE</b><small>Five independent trading brains — no forced majority.</small></div><span id="councilState">COUNCIL: WAITING FOR VERIFIED EVIDENCE</span></div>
+<div class="bot-matrix"><article class="bot-node"><span class="bot-code">01 · DIRECTION</span><h4>STRATEGIC AI</h4><p>Trend, momentum, EMA structure and broad context.</p><span class="bot-state">INDEPENDENT BRAIN</span></article><article class="bot-node"><span class="bot-code">02 · REVERSAL</span><h4>FLIPPER AI</h4><p>Exhaustion, liquidity events, CHOCH and displacement.</p><span class="bot-state">INDEPENDENT BRAIN</span></article><article class="bot-node"><span class="bot-code">03 · BREAKOUT</span><h4>BREAKOUT AI</h4><p>Compression, boundary break, confirmation and retest.</p><span class="bot-state">INDEPENDENT BRAIN</span></article><article class="bot-node"><span class="bot-code">04 · SMART MONEY</span><h4>SMC PRO AI</h4><p>Liquidity, BOS/CHOCH, displacement, FVG and order blocks.</p><span class="bot-state">INDEPENDENT BRAIN</span></article><article class="bot-node"><span class="bot-code">05 · LADDER</span><h4>LADDER FLIP V8 AI</h4><p>EMA, ADX, RSI, ATR and staged re-entry conditions.</p><span class="bot-state">INDEPENDENT BRAIN</span></article></div>
+<div class="hybrid-flow"><span class="flow-node">LIVE MARKET</span><span class="flow-arrow">→</span><span class="flow-node">5 AI BOTS</span><span class="flow-arrow">→</span><span class="flow-node">STRATEGY COUNCIL</span><span class="flow-arrow">→</span><span class="flow-node">RISK ENGINE</span><span class="flow-arrow">→</span><span class="flow-node">EXECUTION</span></div></div>
     </section>
 
 </main>
