@@ -529,14 +529,16 @@ const AI_STRATEGY_BOTS = ["strategic","flipper","breakout","smc-pro","ladder-fli
 
 async function trainAiStrategyModels(twelveData){
   const status=mlSignalServiceStatus();
-  if(!status.configured||!twelveData?.enabled||typeof twelveData.historicalBars!=="function")return {configured:status.configured,trained:0};
+  if(!status.configured)return {configured:false,trained:0,reason:"ML_SERVICE_NOT_CONFIGURED"};
   let trained=0;
   for(const botId of AI_STRATEGY_BOTS){
     const timeframe=String(getBotDefinitions()[botId]?.timeframeProfile?.execution||"5m").toLowerCase();
     const markets=[];
     for(const symbol of DEFAULT_SYMBOLS){
       try{
-        const bars=await twelveData.historicalBars(symbol,timeframe,{limit:240,maxAgeMs:10*60*1000});
+        const bars=twelveData?.enabled && typeof twelveData.historicalBars==="function"
+          ? await twelveData.historicalBars(symbol,timeframe,{limit:240,maxAgeMs:10*60*1000})
+          : await publicDerivFeed.getHistoricalCandles(symbol,{timeframe,limit:240,timeoutMs:12000});
         if(Array.isArray(bars)&&bars.length>=120)markets.push({symbol,bars});
       }catch(error){
         console.warn("[KINGBOT ML TRAIN]",botId,symbol,error?.message||error);
