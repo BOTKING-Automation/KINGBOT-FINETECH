@@ -106,17 +106,28 @@ function normalizeMarket(input = {}) {
   };
 }
 
-async function buildMultiTimeframeContext({pool,twelveData,symbol,baseTimeframe="15m"}={}){
-  const requestedLevels=[...new Set([String(baseTimeframe).toLowerCase(),"5m","15m","1h","4h"])];
-  const fullMultiTimeframe=Boolean(twelveData?.enabled);
-  const levels=fullMultiTimeframe ? requestedLevels : [String(baseTimeframe).toLowerCase()];
+export async function buildMultiTimeframeContext({pool,twelveData,symbol,baseTimeframe="15m",scanRunner=runStandaloneMarketScan}={}){
+  const requestedLevels=[...new Set(["5m","15m","1h","4h",String(baseTimeframe).toLowerCase()])];
+  // MTF analysis is a KINGBOT capability, not a Twelve Data entitlement.
+  // Each timeframe uses the same native scanner pipeline and its own verified
+  // OHLC source ladder (Twelve Data when available, Deriv fallback otherwise).
+  const levels=requestedLevels;
   const scans=await Promise.all(levels.map(async timeframe=>{
     try{
-      const scan=await runStandaloneMarketScan({pool,twelveData,symbols:[symbol],timeframe});
+      const scan=await scanRunner({pool,twelveData,symbols:[symbol],timeframe});
       const item=(scan.technical||[]).find(x=>x.symbol===symbol)||{};
       const quote=(scan.quotes||[]).find(x=>x.symbol===symbol)||null;
+      const technicalReady=Boolean(
+        scan.ok &&
+        item.technicalVerified !== false &&
+        item.source !== "none" &&
+        Number.isFinite(Number(item.atr14 ?? item.atr)) &&
+        Number.isFinite(Number(item.rsi14 ?? item.rsi)) &&
+        Number.isFinite(Number(item.ema20 ?? item.emaFast)) &&
+        Number.isFinite(Number(item.ema50 ?? item.emaSlow))
+      );
       return {
-        timeframe,ok:Boolean(scan.ok),price:num(item.price??quote?.price),
+        timeframe,ok:technicalReady,technicalReady,price:num(item.price??quote?.price),
         trend:upper(item.trend||"NEUTRAL"),
         structure:lower(item.structure||"unknown"),
         bos:upper(item.bos||"NONE"),choch:upper(item.choch||"NONE"),
@@ -126,10 +137,16 @@ async function buildMultiTimeframeContext({pool,twelveData,symbol,baseTimeframe=
         momentum:num(item.momentum,0),volatility:num(item.volatility,0),
         rsi:num(item.rsi??item.rsi14),atr:num(item.atr??item.atr14),
         timestamp:quote?.timestamp||item.receivedAt||item.barTime||null,
-        source:scan.source||item.source||"KINGBOT market engine"
+        barTime:item.barTime||null,
+        source:item.source||scan.source||"KINGBOT native market engine",
+        verification:{
+          technical:technicalReady,
+          quote:Boolean(quote?.verified),
+          native:true
+        }
       };
     }catch(error){
-      return {timeframe,ok:false,error:String(error?.message||"MTF_SCAN_FAILED").slice(0,140)};
+      return {timeframe,ok:false,technicalReady:false,error:String(error?.message||"MTF_SCAN_FAILED").slice(0,140),verification:{technical:false,quote:false,native:true}};
     }
   }));
   const usable=scans.filter(x=>x.ok);
@@ -152,8 +169,10 @@ async function buildMultiTimeframeContext({pool,twelveData,symbol,baseTimeframe=
     htfBias!=="MIXED"&&ltfBias===htfBias?"WAIT_CONFIRMATION":"WAIT";
   return {
     timeframes:scans,requiredTimeframes:levels,requestedTimeframes:requestedLevels,
-    policy:fullMultiTimeframe?"FULL_MTF":"BASE_TIMEFRAME_ONLY",
-    limitation:fullMultiTimeframe?null:"Higher-timeframe evidence is unavailable on the current free market-data path; the Council must not infer a directional execution route from the base timeframe alone.",
+    policy:"NATIVE_FULL_MTF",
+    limitation:usable.length===levels.length
+      ? null
+      : "One or more higher/lower timeframes lacks verified OHLC telemetry; the Council must not infer a directional route from incomplete MTF evidence.",
     alignment:{bullish:bull,bearish:bear,total:usable.length,required:levels.length,
       ratio:usable.length?Number((Math.max(bull,bear)/usable.length).toFixed(2)):0,
       direction:bull>bear?"BULLISH":bear>bull?"BEARISH":"MIXED",
