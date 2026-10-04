@@ -128,7 +128,8 @@ async function fetchJson(url, { timeoutMs = REQUEST_TIMEOUT_MS, headers = {} } =
 }
 
 function cryptoTicker(symbol) {
-  const s = normalizeMarketSymbol(symbol);\n  return s.endsWith("USDT") ? s : (CRYPTO_QUOTES[s] || `${s.replace(/USD$/, "")}USDT`);
+  const s = normalizeMarketSymbol(symbol);
+  return s.endsWith("USDT") ? s : (CRYPTO_QUOTES[s] || `${s.replace(/USD$/, "")}USDT`);
 }
 
 async function readGoldApi(symbol, goldFeed) {
