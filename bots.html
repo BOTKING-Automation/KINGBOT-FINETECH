@@ -311,13 +311,18 @@ async function getBotsAuthToken(timeoutMs=2500){
  return {firebase,token};
 }
 async function api(path,options={}){
+ const timeoutMs=Math.max(5000,Number(options.timeoutMs)||20000);
+ let auth;
+ try{
+   auth=await getBotsAuthToken(Math.min(7000,timeoutMs));
+ }catch(error){
+   throw error;
+ }
  const controller=new AbortController();
- const timeoutMs=Number(options.timeoutMs)||9000;
  const timer=setTimeout(()=>controller.abort(),timeoutMs);
  const requestOptions={...options,signal:controller.signal};
  delete requestOptions.timeoutMs;
  try{
-  const auth=await getBotsAuthToken(Math.min(2500,timeoutMs));
   const headers=new Headers(requestOptions.headers||{});
   headers.set("Accept","application/json");
   if(requestOptions.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
@@ -336,7 +341,7 @@ async function api(path,options={}){
   if(!r.ok||data?.ok===false)throw new Error(data.error||data.reason||data.message||("HTTP "+r.status));
   return data;
  }catch(error){
-  if(error?.name==="AbortError")throw new Error("REQUEST_TIMEOUT: "+path);
+  if(error?.name==="AbortError")throw new Error("REQUEST_TIMEOUT: "+path+" (20s)");
   throw error;
  }finally{clearTimeout(timer)}
 }
