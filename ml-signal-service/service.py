@@ -238,6 +238,18 @@ def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list
     ]
 
 
+
+def apply_strategy_focus(features: list[float], strategy: str) -> list[float]:
+    focus = STRATEGY_FOCUS.get(strategy, set())
+    # Each bot gets the same stable feature schema, but its own model is
+    # explicitly weighted toward strategy-relevant evidence. Non-focus
+    # features remain available at reduced strength so models can still learn
+    # cross-factor interactions without becoming identical clones.
+    return [
+        float(value) if name in focus else float(value) * 0.25
+        for name, value in zip(FEATURE_NAMES, features)
+    ]
+
 def bars_to_training_arrays(bars: list[dict[str, float]], strategy: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     rows: list[list[float]] = []
     labels: list[int] = []
@@ -248,6 +260,7 @@ def bars_to_training_arrays(bars: list[dict[str, float]], strategy: str) -> tupl
         features = extract_features_from_bars(bars, index)
         if features is None:
             continue
+        features = apply_strategy_focus(features, strategy)
         current = bars[index]["close"]
         current_atr = atr(bars[: index + 1], 14)
         future = bars[index + FORWARD_HORIZON]["close"]
@@ -440,7 +453,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "rf_accuracy": rf_accuracy,
                 "torch_accuracy": torch_accuracy,
                 "bar_count": total_bar_count,
-                "feature_version": "ai-strategies-v2",
+                "feature_version": "ai-strategies-v3",
             }
             while len(MODELS) > MAX_MODELS:
                 oldest = min(MODELS.items(), key=lambda item: item[1]["trained_at"])[0]
@@ -484,7 +497,7 @@ def model_status(key: str) -> dict[str, Any]:
     }
 
 
-def current_market_features(market: dict[str, Any]) -> np.ndarray:
+def current_market_features(market: dict[str, Any], strategy: str) -> np.ndarray:
     price = finite(market.get("price") or market.get("close"))
     atr_value = max(finite(market.get("atr") or market.get("atr14")), 1e-12)
     ema_fast = finite(market.get("emaFast") or market.get("ema20"))
@@ -520,6 +533,7 @@ def current_market_features(market: dict[str, Any]) -> np.ndarray:
         bool_feature(market.get("retest")),
         velocity if abs(velocity) > 0 else direction * momentum * 0.25,
     ]
+    values = apply_strategy_focus(values, strategy)
     array = np.asarray([values], dtype=np.float32)
     if not np.isfinite(array).all():
         raise ValueError("ML_PREDICT_FEATURES_INVALID")
@@ -537,7 +551,7 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
     atr_value = finite(market.get("atr") or market.get("atr14"))
     if price <= 0 or atr_value <= 0:
         raise ValueError("ML_PREDICT_MARKET_DATA_INVALID")
-    X = current_market_features(market)
+    X = current_market_features(market, strategy)
     scaled = item["scaler"].transform(X).astype(np.float32)
 
     rf_prob = item["rf"].predict_proba(scaled)[0]
@@ -588,6 +602,7 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
             },
         },
         "focusFeatures": focus_note,
+        "focusScale": "1.00 focus / 0.25 non-focus",
         "modelKey": key,
         "featureVersion": item["feature_version"],
         "trainedAt": item["trained_at"],
