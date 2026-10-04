@@ -1,6 +1,5 @@
 import WebSocket from "ws";
 
-const DERIV_LEGACY_WS = "wss://ws.binaryws.com/websockets/v3";
 const DERIV_NEW_WS = "wss://api.derivws.com/trading/v1/options/ws/public";
 
 const finite = (value) => {
@@ -57,7 +56,7 @@ export class DerivMarketFeed {
 
     this.connectPromise = (async()=>{
       let lastError = null;
-      for (const endpoint of [DERIV_NEW_WS, DERIV_LEGACY_WS]) {
+      for (const endpoint of [DERIV_NEW_WS]) {
         try {
           await this.openEndpoint(endpoint);
           this.retryDelayMs = 1000;
