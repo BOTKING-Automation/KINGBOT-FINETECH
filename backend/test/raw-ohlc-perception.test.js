@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { deriveTechnicalFromBars } from "../src/ai-market-scanner.js";
+import { deriveTechnicalFromBars, symbolsMissingTechnicalData } from "../src/ai-market-scanner.js";
 
 function makeBars(count=140){
   return Array.from({length:count},(_,i)=>{
@@ -26,6 +26,15 @@ test("raw OHLC perception returns structure and confluence fields",()=>{
   assert.ok(result.marketStructure);
   assert.ok(result.swingPoints);
   assert.equal(result.source,"KINGBOT raw OHLC perception engine");
+});
+
+
+test("scanner identifies symbols that need OHLC fallback",()=>{
+  const missing=symbolsMissingTechnicalData(
+    ["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],
+    [{symbol:"XAUUSD",source:"Twelve Data"}]
+  );
+  assert.deepEqual(missing,["EURUSD","GBPUSD","USDJPY","BTCUSD"]);
 });
 
 test("raw OHLC perception rejects insufficient candles",()=>{
