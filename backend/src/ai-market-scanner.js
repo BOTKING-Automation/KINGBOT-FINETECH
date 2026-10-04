@@ -348,8 +348,8 @@ async function getFastStandaloneQuotes({ twelveData, symbols }) {
           symbol:"XAUUSD",
           available:false,
           verified:false,
-          source:"GoldPrice.dev direct free XAU/USD spot",
-          error:String(error?.message || "GOLDPRICE_DIRECT_FEED_UNAVAILABLE").slice(0,140)
+          source:"Gold API direct free XAU/USD price",
+          error:String(error?.message || "GOLD_API_DIRECT_FEED_UNAVAILABLE").slice(0,140)
         }))
       : Promise.resolve(null),
     twelveData?.enabled
@@ -555,7 +555,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     model:"KINGBOT-CORTEX-1",
     executionAuthority:"NONE",
     source:technicalSource,
-    liveQuoteSource:"GoldPrice.dev direct free XAU/USD spot + Twelve Data/Deriv fallback",
+    liveQuoteSource:"Gold API direct free XAU/USD price + Twelve Data/Deriv fallback",
     scannerLatencyHint:"Quotes are served independently from AI analysis.",
     marketData:twelveData?.status ? twelveData.status() : {configured:false},
     symbols:normalizedSymbols,
@@ -571,7 +571,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
       brokerIndependent:true,
       derivPublic:true,
       twelveData:Boolean(twelveData?.enabled),
-      freeDirectGold:Boolean(quotes.some(q => q.symbol==="XAUUSD" && q.source==="GoldPrice.dev direct free XAU/USD spot")),
+      freeDirectGold:Boolean(quotes.some(q => q.symbol==="XAUUSD" && q.source==="Gold API direct free XAU/USD price")),
       tradingView:Boolean(tv.length)
     },
     tradingViewCount:tv.length,
