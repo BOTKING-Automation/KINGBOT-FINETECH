@@ -133,6 +133,16 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
         <div id="pendingOrderGrid" class="pending-grid"></div>
       </div>
       </div>
+      <div class="cortex-panel" id="cortexPanel" style="margin-top:14px;padding:14px;border:1px solid rgba(34,230,255,.16);border-radius:14px;background:linear-gradient(135deg,rgba(34,230,255,.05),rgba(168,85,247,.04));box-shadow:0 0 24px rgba(34,230,255,.05)">
+        <div style="font:900 8px 'JetBrains Mono';letter-spacing:.16em;color:#22e6ff">KINGBOT CORTEX // LIVE DECISION CHAIN</div>
+        <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px">
+          <strong id="cortexSymbol" style="font:900 18px Orbitron">—</strong>
+          <span id="cortexState" class="bias WAIT" style="font:900 9px 'JetBrains Mono'">WAIT</span>
+        </div>
+        <div id="cortexPrimary" style="margin-top:8px;color:#dce6fa;font:800 10px 'JetBrains Mono'">Waiting for CORTEX...</div>
+        <div id="cortexReason" style="margin-top:7px;color:#7f8aa3;font-size:9px;line-height:1.6">CORTEX will evaluate the focused symbol through independent evidence, five AI specialists, Strategy Council and deterministic risk gates.</div>
+        <div id="cortexWait" style="margin-top:8px;color:#ffd166;font-size:9px;line-height:1.6"></div>
+      </div>
       <div class="detail-grid">
         <div class="detail"><span>SYMBOLS</span><strong id="scannedCount">—</strong></div>
         <div class="detail"><span>QUOTES</span><strong id="availableCount">—</strong></div>
@@ -331,6 +341,10 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
     });
   }
 
+  function cortexErrorMessage(error,fallback){
+    return error ? "CORTEX STATUS · "+String(error) : fallback;
+  }
+
   function renderScan(data){
     qs("scannedCount").textContent=String((data.symbols||[]).length);
     qs("availableCount").textContent=String(data.quoteCount??(data.quotes||[]).filter(q=>q.available).length);
@@ -379,6 +393,22 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
         pendingGrid.innerHTML=cards.map(([label,value,meta])=>'<div class="pending-card"><span>'+label+'</span><strong>'+value+'</strong><small>'+meta+'</small></div>').join("");
       }
     }
+    const cortex=data.cortex||null;
+    const cortexPanel=qs("cortexPanel");
+    if(cortexPanel){
+      const council=cortex.strategyCouncil||{};
+      const decision=cortex.decision||{};
+      const primary=council.primarySpecialist||null;
+      qs("cortexSymbol").textContent=cortex.market?.symbol||data.cortexFocusSymbol||"—";
+      qs("cortexState").textContent=String(council.state||decision.state||"WAIT").toUpperCase();
+      qs("cortexState").className="bias "+String(council.state||decision.state||"WAIT").toUpperCase();
+      qs("cortexPrimary").textContent=primary
+        ? String(primary.name||primary.botId).replace(/^KINGBOT\s*/,"")+" · "+String(primary.direction||"WAIT")+" · "+String(primary.confidence??0)+"/100"
+        : "No specialist has a validated route.";
+      qs("cortexReason").textContent=cortexErrorMessage(data.cortexError,council.reason||decision.waitFor||"CORTEX waiting for stronger evidence.");
+      qs("cortexWait").textContent=decision.waitFor ? "WAIT FOR · "+decision.waitFor : "";
+    }
+
     const body=qs("rankingBody");
     if(!ranked.length){
       body.innerHTML='<tr><td colspan="5"><div class="empty">NO VERIFIED TECHNICAL SNAPSHOTS YET</div></td></tr>';
@@ -462,7 +492,8 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
     try{
       state.busy=true; qs("scanState").textContent="SCANNING"; qs("scanNow").disabled=true;
       listFromInput();
-      const path="/ai/market-scanner?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value);
+      const focusSymbol=state.symbols[0]||"XAUUSD";
+      const path="/ai/market-scanner?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value)+"&focusSymbol="+encodeURIComponent(focusSymbol);
       const quotePath="/ai/market-scanner/quotes?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value);
 
       const scanPromise=request(path,{method:"GET"});
