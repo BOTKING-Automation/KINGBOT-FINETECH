@@ -49,7 +49,13 @@ const httpServer = createServer(app);
 const PORT = Number(process.env.PORT || 10000);
 const AI_PROVIDER = "kingbot-native";
 const DATABASE_URL = process.env.DATABASE_URL || "";
-const pool = DATABASE_URL ? new pg.Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false } }) : null;
+const pool = DATABASE_URL ? new pg.Pool({
+  connectionString: DATABASE_URL,
+  ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
+  max: Number(process.env.PG_POOL_MAX || 10),
+  connectionTimeoutMillis: Number(process.env.PG_CONNECTION_TIMEOUT_MS || 8000),
+  idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 30000)
+}) : null;
 const broker = new UserBrokerManager({pool});
 const twelveData = new TwelveDataFeed();
 twelveData.start();
