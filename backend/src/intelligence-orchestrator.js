@@ -4,6 +4,7 @@ import { runStandaloneMarketScan } from "./ai-market-scanner.js";
 import { loadAdaptivePerformance, applyAdaptivePerformance, classifySetup, recordAdaptiveDecision, settleAdaptiveDecision, ensureAdaptiveIntelligenceSchema, adaptiveDecisionState } from "./adaptive-intelligence.js";
 import { identitySnapshot, buildCognitivePlan, capabilitySet, normalizeThinkingLevel, thinkingProfile } from "./kingbot-intelligence-core.js";
 import { buildMarketEvidence, marketDecisionGate } from "./market-evidence-engine.js";
+import { buildStrategyCouncil } from "./strategy-council.js";
 
 const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
 const MODEL = "KINGBOT-CORTEX-1";
@@ -439,9 +440,22 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
   const analysts = [technical, regime, context, execution, crossMarket];
   const engines = BOT_IDS.map(id => engineFit(id, market, regime, adaptivePerformance));
   const debate = buildDebate(analysts, engines, market);
-  const routing = chooseEngine(engines, debate);
   const risk = riskCouncil(market, engines, riskContext);
   const decisionGate = marketDecisionGate(marketEvidence, risk.blocks);
+  const strategyCouncil = buildStrategyCouncil(engines, {
+    multiTimeframe: market.multiTimeframe,
+    riskBlocks: risk.blocks,
+    marketDecision: decisionGate.state,
+    minAgreement: Number(process.env.KINGBOT_STRATEGY_COUNCIL_MIN_AGREEMENT || 0.6)
+  });
+  const routing = strategyCouncil.state === "BUY" || strategyCouncil.state === "SELL"
+    ? chooseEngine(engines, debate)
+    : { selectedEngine: null, reason: "STRATEGY_COUNCIL_" + strategyCouncil.state, candidate: strategyCouncil.strongestEngine };
+  if (strategyCouncil.strongestEngine && strategyCouncil.state !== "WAIT" && strategyCouncil.state !== "CONFLICTED") {
+    routing.selectedEngine = strategyCouncil.strongestEngine.botId;
+    routing.candidate = engines.find(e => e.botId === strategyCouncil.strongestEngine.botId) || null;
+    routing.reason = "STRATEGY_COUNCIL_CONSENSUS";
+  }
 
   let tradePlan = null;
   if (routing.selectedEngine && routing.candidate && risk.blocks.length === 0) {
@@ -508,11 +522,11 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
   };
 
   // The evidence gate is advisory only; deterministic risk/execution controls remain authoritative.
-  if (decisionGate.state !== "BUY" && decisionGate.state !== "SELL") {
+  if (decisionGate.state !== "BUY" && decisionGate.state !== "SELL" || strategyCouncil.state !== decisionGate.state) {
     result.routing = { ...result.routing, selectedEngine: null, reason: decisionGate.reason };
     result.tradePlan = null;
   }
-  const synthesis = await synthesize(result);
+  result.routing = { ...result.routing, councilState: strategyCouncil.state, councilConfidence: strategyCouncil.confidence };\n  const synthesis = await synthesize(result);
   result.aiSynthesis = synthesis;
   result.summary = synthesis.result || {
     regime: regime.regime,
