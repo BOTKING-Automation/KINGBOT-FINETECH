@@ -3373,6 +3373,25 @@ overscroll-behavior:none;}
         market.symbol
       );
 
+      const wsSymbol = $("workspaceSymbol");
+      const wsTf = $("workspaceTf");
+      const chartInstrument = $("chartInstrument");
+      const cortexSymbol = $("cortexSymbol");
+      const cortexTf = $("cortexTf");
+      if (wsSymbol) wsSymbol.textContent = market.id;
+      if (wsTf) wsTf.textContent = "15m";
+      if (chartInstrument) chartInstrument.textContent = market.id;
+      if (cortexSymbol) cortexSymbol.textContent = market.id;
+      if (cortexTf) cortexTf.textContent = "15m";
+      const quote = state.data[market.id];
+      const wsPrice = $("wsPrice");
+      const chartPrice = $("chartPrice");
+      if (quote && Number.isFinite(Number(quote.price))) {
+        const p = Number(quote.price).toLocaleString(undefined,{maximumFractionDigits:8});
+        if (wsPrice) wsPrice.textContent = p;
+        if (chartPrice) chartPrice.textContent = p;
+      }
+
 
       window.scrollTo({
         top: 0,
