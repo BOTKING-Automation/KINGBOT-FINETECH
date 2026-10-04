@@ -39,10 +39,10 @@ function technicalEngine(snapshot) {
     signal: "DATA_INSUFFICIENT",
     bias: "DATA_INSUFFICIENT",
     score: 0,
-    waitFor: "TradingView snapshot is not available yet.",
-    reason: "KINGBOT requires a verified TradingView market snapshot before technical analysis.",
+    waitFor: "A fresh technical OHLC snapshot is not available yet.",
+    reason: "KINGBOT requires fresh verified OHLC/technical market data before technical analysis. TradingView is optional visualization/context, not a required data source.",
     technicalAnalysis: [],
-    invalidation: "No valid market data.",
+    invalidation: "No valid technical market data.",
   };
 
   const price = finite(snapshot.close ?? snapshot.price);
