@@ -21,6 +21,16 @@ function cleanSymbols(value) {
   const input = Array.isArray(value) ? value : String(value || "").split(",");
   return [...new Set(input.map(s => String(s || "").trim().toUpperCase()).filter(s => /^[A-Z0-9._:-]{3,40}$/.test(s)))].slice(0, 12);
 }
+
+export function symbolsMissingTechnicalData(symbols, technical) {
+  const normalized = cleanSymbols(symbols);
+  const covered = new Set(
+    (Array.isArray(technical) ? technical : [])
+      .filter(item => item?.symbol && item.source !== "none")
+      .map(item => String(item.symbol).trim().toUpperCase())
+  );
+  return normalized.filter(symbol => !covered.has(symbol));
+}
 function finite(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
@@ -439,8 +449,22 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
     tvPromise
   ]);
 
+  // Twelve Data stays primary for technical OHLC. When it returns no usable
+  // technical snapshot for a symbol, fall through to the free public Deriv
+  // candle feed so quotes and technical analysis do not become disconnected.
+  const missingTechnical = twelveData?.enabled
+    ? symbolsMissingTechnicalData(normalizedSymbols, tdTechnical)
+    : [];
+  const derivFallbackData = missingTechnical.length
+    ? await fetchPublicDerivData(missingTechnical, normalizedTimeframe)
+    : [];
+
   const quotes=directQuotes;
-  const combinedTechnical=[...tdTechnical,...derivData.map(x=>x.technical).filter(Boolean)];
+  const combinedTechnical=[
+    ...tdTechnical,
+    ...derivData.map(x=>x.technical).filter(Boolean),
+    ...derivFallbackData.map(x=>x.technical).filter(Boolean)
+  ];
   const technicalBySymbol=new Map();
   for(const item of combinedTechnical) if(!technicalBySymbol.has(item.symbol)) technicalBySymbol.set(item.symbol,item);
   const tdMap = Object.fromEntries([...technicalBySymbol.entries()].map(([k,v]) => [k,v]));
