@@ -2,67 +2,77 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildStrategyCouncil } from "../src/strategy-council.js";
 
-const engine=(botId,score,fit=85,match=Math.abs(score)>=75)=>({
-  botId,name:botId,score,fit,strategyMatch:match,signal:score>=75?"LONG_CANDIDATE":score<=-75?"SHORT_CANDIDATE":"NO_SIGNAL",reason:"test"
-});
-
 const aligned={higherTimeframeBias:"BULLISH",setupState:"BUY_CANDIDATE",triggerPresent:true,alignment:{direction:"BULLISH"}};
+const card=(botId,direction,score=85,confidence=85,extra={})=>({
+  botId,strategyIdentity:botId+" specialist",direction,rawScore:direction==="SELL"?-score:score,
+  confidence,conditions:["core condition"],missingConditions:[],entryConditions:["valid specialist setup"],
+  waitConditions:[],invalidation:"test invalidation",evidenceUsed:["verified market evidence"],
+  contradictions:[],strategyMatch:direction!=="WAIT",...extra
+});
+const engine=(botId,specialist,score=85)=>({botId,name:botId,score,fit:85,strategyMatch:true,signal:specialist.direction==="BUY"?"LONG_CANDIDATE":"SHORT_CANDIDATE",specialist});
 
-test("five aligned BUY engines produce BUY consensus",()=>{
-  const r=buildStrategyCouncil([
-    engine("strategic",90),engine("flipper",84),engine("breakout",80),engine("smc-pro",88),engine("ladder-flip",82)
-  ],{multiTimeframe:aligned,marketDecision:"BUY"});
+test("a single valid specialist can lead without majority voting",()=>{
+  const cards=[
+    card("strategic","WAIT",0,0,{strategyMatch:false}),
+    card("flipper","WAIT",0,0,{strategyMatch:false}),
+    card("breakout","WAIT",0,0,{strategyMatch:false}),
+    card("smc-pro","BUY",91,92),
+    card("ladder-flip","WAIT",0,0,{strategyMatch:false})
+  ];
+  const r=buildStrategyCouncil(cards.map((s)=>engine(s.botId,s,s.rawScore)),{multiTimeframe:aligned,marketDecision:"BUY"});
   assert.equal(r.state,"BUY");
-  assert.equal(r.bullishVotes,5);
-  assert.equal(r.strongestEngine.botId,"strategic");
-  assert.equal(r.executionAuthorized,false);
+  assert.equal(r.primarySpecialist.botId,"smc-pro");
+  assert.equal(r.bullishVotes,1);
+  assert.equal(r.waitVotes,4);
 });
 
-test("3 BUY versus 2 SELL stays directionally calibrated rather than pretending unanimity",()=>{
-  const r=buildStrategyCouncil([
-    engine("strategic",90),engine("flipper",84),engine("breakout",80),engine("smc-pro",-88),engine("ladder-flip",-82)
-  ],{multiTimeframe:aligned,marketDecision:"BUY"});
+test("SMC PRO can lead while Ladder Flip is recorded as independent dissent",()=>{
+  const cards=[
+    card("strategic","BUY",84,82),
+    card("flipper","WAIT",0,0,{strategyMatch:false}),
+    card("breakout","WAIT",0,0,{strategyMatch:false}),
+    card("smc-pro","BUY",91,94),
+    card("ladder-flip","SELL",78,78)
+  ];
+  const r=buildStrategyCouncil(cards.map((s)=>engine(s.botId,s)),{multiTimeframe:aligned,marketDecision:"BUY"});
   assert.equal(r.state,"BUY");
-  assert.equal(r.bullishVotes,3);
-  assert.equal(r.bearishVotes,2);
-  assert.ok(r.confidence < 92);
+  assert.equal(r.primarySpecialist.botId,"smc-pro");
+  assert.equal(r.supportingSpecialists[0].botId,"strategic");
+  assert.equal(r.dissentingSpecialists[0].botId,"ladder-flip");
 });
 
-test("2 BUY, 2 SELL and 1 WAIT is conflicted",()=>{
-  const r=buildStrategyCouncil([
-    engine("strategic",90),engine("flipper",84),engine("breakout",-80),engine("smc-pro",-88),engine("ladder-flip",0,false)
-  ],{multiTimeframe:aligned,marketDecision:"BUY",minAgreement:0.6});
+test("two strong opposing specialists create CONFLICTED state",()=>{
+  const cards=[
+    card("strategic","BUY",88,90),
+    card("flipper","WAIT",0,0,{strategyMatch:false}),
+    card("breakout","SELL",86,90),
+    card("smc-pro","BUY",91,94),
+    card("ladder-flip","WAIT",0,0,{strategyMatch:false})
+  ];
+  const r=buildStrategyCouncil(cards.map((s)=>engine(s.botId,s)),{multiTimeframe:aligned,marketDecision:"BUY"});
   assert.equal(r.state,"CONFLICTED");
+  assert.ok(r.dissentingSpecialists.some(x=>x.botId==="breakout"));
+  assert.ok(r.confidence<=55);
 });
 
-test("MTF conflict cannot authorize a trade",()=>{
-  const r=buildStrategyCouncil([
-    engine("strategic",90),engine("flipper",84),engine("breakout",80),engine("smc-pro",88),engine("ladder-flip",82)
-  ],{multiTimeframe:{...aligned,higherTimeframeBias:"BEARISH",setupState:"CONFLICTED"},marketDecision:"BUY"});
+test("all five specialists waiting produces WAIT",()=>{
+  const cards=["strategic","flipper","breakout","smc-pro","ladder-flip"].map(id=>card(id,"WAIT",0,0,{strategyMatch:false}));
+  const r=buildStrategyCouncil(cards.map((s)=>engine(s.botId,s)),{multiTimeframe:aligned,marketDecision:"BUY"});
+  assert.equal(r.state,"WAIT");
+  assert.equal(r.waitVotes,5);
+});
+
+test("market evidence conflict blocks otherwise valid specialist",()=>{
+  const s=card("smc-pro","BUY",91,94);
+  const r=buildStrategyCouncil([engine("smc-pro",s)],{multiTimeframe:{...aligned,higherTimeframeBias:"BEARISH",setupState:"CONFLICTED"},marketDecision:"BUY"});
   assert.equal(r.state,"CONFLICTED");
   assert.ok(r.confidence<=55);
 });
 
-test("no engine threshold produces WAIT",()=>{
-  const r=buildStrategyCouncil([
-    engine("strategic",50,70,false),engine("flipper",-40,65,false),engine("breakout",30,60,false)
-  ],{multiTimeframe:aligned,marketDecision:"BUY"});
-  assert.equal(r.state,"WAIT");
-  assert.match(r.reason,/signal threshold/i);
-});
-
-test("hard risk block overrides consensus",()=>{
-  const r=buildStrategyCouncil([
-    engine("strategic",95),engine("flipper",90),engine("breakout",85),engine("smc-pro",88),engine("ladder-flip",82)
-  ],{multiTimeframe:aligned,riskBlocks:["SPREAD_GATE"],marketDecision:"BUY"});
+test("hard risk block overrides specialist consensus",()=>{
+  const s=card("smc-pro","BUY",95,98);
+  const r=buildStrategyCouncil([engine("smc-pro",s)],{multiTimeframe:aligned,riskBlocks:["SPREAD_GATE"],marketDecision:"BUY"});
   assert.equal(r.state,"WAIT");
   assert.ok(r.whatToWait.some(x=>x.includes("SPREAD_GATE")));
-});
-
-test("adaptive performance adjusts score but cannot override hard risk",()=>{
-  const r=buildStrategyCouncil([
-    engine("strategic",95,100),engine("flipper",90,100),engine("breakout",85,100),engine("smc-pro",88,100),engine("ladder-flip",82,100)
-  ],{multiTimeframe:aligned,riskBlocks:["BOT_KILL_SWITCH"],marketDecision:"BUY"});
-  assert.equal(r.state,"WAIT");
   assert.equal(r.executionAuthorized,false);
 });
