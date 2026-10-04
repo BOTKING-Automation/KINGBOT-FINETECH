@@ -1594,12 +1594,12 @@ body.kb-terminal-page > .toast{position:fixed!important}
         if(done)break;
         buffer+=decoder.decode(value,{stream:true});
         let boundary;
-        while((boundary=buffer.indexOf("\\n\\n"))>=0){
+        while((boundary=buffer.indexOf("\n\n"))>=0){
           const frame=buffer.slice(0,boundary);
           buffer=buffer.slice(boundary+2);
           let eventName="message";
           let dataText="";
-          for(const line of frame.split(/\\r?\\n/)){
+          for(const line of frame.split(/\r?\n/)){
             if(line.startsWith("event:"))eventName=line.slice(6).trim();
             else if(line.startsWith("data:"))dataText+=line.slice(5).trim();
           }
