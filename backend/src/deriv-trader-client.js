@@ -3,7 +3,6 @@ import { getDerivMarketFeed } from "./deriv-market-feed.js";
 
 const API_BASE = "https://api.derivws.com";
 const DERIV_PUBLIC_WS = "wss://api.derivws.com/trading/v1/options/ws/public";
-const DERIV_PUBLIC_WS_LEGACY = "wss://ws.binaryws.com/websockets/v3";
 
 function finite(value){
   const n = Number(value);
@@ -11,12 +10,13 @@ function finite(value){
 }
 
 export class DerivTraderClient {
-  constructor({accessToken,accountId,executionMode="DEMO",accountType=""}={}){
+  constructor({accessToken,accountId,executionMode="DEMO",accountType="",appId=""}={}){
     this.id="deriv";
     this.accessToken=String(accessToken||"").trim();
     this.accountId=String(accountId||"").trim();
     this.executionMode=(String(executionMode||"DEMO").toUpperCase()==="PAPER"?"DEMO":String(executionMode||"DEMO").toUpperCase());
     this.accountType=String(accountType||"").toLowerCase();
+    this.appId=String(appId||"").trim();
     this.ws=null;
     this.connected=false;
     this.requestId=0;
@@ -48,6 +48,7 @@ export class DerivTraderClient {
     const headers={
       Authorization:"Bearer "+this.accessToken,
       "Content-Type":"application/json",
+      ...(this.appId?{"Deriv-App-ID":this.appId}:{}),
       ...(options.headers||{})
     };
     const response=await fetch(API_BASE+path,{...options,headers});
@@ -197,7 +198,7 @@ export class DerivTraderClient {
   }
 
   async marketOneShot(payload,{timeoutMs=10000}={}){
-    const endpoints=[DERIV_PUBLIC_WS_LEGACY,DERIV_PUBLIC_WS];
+    const endpoints=[DERIV_PUBLIC_WS];
     let lastError=null;
     for(const endpoint of endpoints){
       let ws=null;
@@ -239,8 +240,7 @@ export class DerivTraderClient {
 
   async marketRequest(payload,{timeoutMs=10000}={}){
     const preferred=this.marketEndpoint||DERIV_PUBLIC_WS;
-    const endpoints=[preferred,preferred===DERIV_PUBLIC_WS?DERIV_PUBLIC_WS_LEGACY:DERIV_PUBLIC_WS]
-      .filter((endpoint,index,array)=>array.indexOf(endpoint)===index);
+    const endpoints=[preferred];
     let lastError=null;
     for(const endpoint of endpoints){
       try{
@@ -294,7 +294,7 @@ export class DerivTraderClient {
 
     let response;
     let lastError=null;
-    const endpoints=[DERIV_PUBLIC_WS_LEGACY,DERIV_PUBLIC_WS];
+    const endpoints=[DERIV_PUBLIC_WS];
     for(const endpoint of endpoints){
       try{
         if(this.marketWs&&this.marketConnected)await this.closePublic();
