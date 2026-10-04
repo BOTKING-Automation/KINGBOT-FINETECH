@@ -394,7 +394,8 @@ function overlayLiveQuotes(technical, quotes) {
       ask:finite(quote.ask),
       spread:finite(quote.spread),
       quoteTimestamp:quote.timestamp||null,
-      quoteAgeMs:Number(quote.ageMs??Math.max(0,Date.now()-Number(quote.timestamp||Date.now())))
+      quoteAgeMs:Number(quote.ageMs??Math.max(0,Date.now()-Number(quote.timestamp||Date.now()))),
+      quoteFreshnessMaxAgeMs:finite(quote.freshnessMaxAgeMs)
     };
   });
 }
