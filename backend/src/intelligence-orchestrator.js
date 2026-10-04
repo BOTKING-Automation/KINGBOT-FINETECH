@@ -76,6 +76,7 @@ function normalizeMarket(input = {}) {
     velocityPoints: num(input.velocityPoints, 0),
     timestamp: input.timestamp || input.time || input.receivedAt || null,
     quoteTimestamp: input.quoteTimestamp || input.timestamp || input.time || null,
+    receivedAt: input.receivedAt || input.dataFreshness || null,
     barTime: input.barTime || input.time || null,
     multiTimeframe: input.multiTimeframe || null,
     crossMarket: input.crossMarket || null
@@ -335,7 +336,8 @@ function riskCouncil(market, engines, riskContext = {}) {
   const flags = [];
   if (!(market.price > 0) || !(market.atr > 0)) blocks.push("MARKET_DATA_INCOMPLETE");
   if (Number(market.spread) > 0 && Number(market.atr) > 0 && Number(market.spread) / Number(market.atr) > Number(riskContext.maxSpreadAtrRatio ?? 0.25)) blocks.push("SPREAD_GATE");
-  const stale = freshness(market.timestamp, Number(riskContext.staleDataMs || 5000));
+  const liveTimestamp = market.quoteTimestamp || market.receivedAt || market.timestamp || null;
+  const stale = freshness(liveTimestamp, Number(riskContext.staleDataMs || 5000));
   if (!stale.ok) blocks.push(stale.reason || "STALE_DATA");
   if (bool(riskContext.killSwitch)) blocks.push("BOT_KILL_SWITCH");
   if (bool(riskContext.globalKillSwitch)) blocks.push("GLOBAL_KILL_SWITCH");
@@ -382,6 +384,17 @@ async function synthesize(payload) {
   const engines = Array.isArray(payload?.engines) ? payload.engines : [];
   const blockers = [...(risk.blocks || []), ...(risk.flags || [])];
   const selected = routing.selectedEngine || "";
+  let statusSummary = "KINGBOT CORTEX completed the intelligence pass.";
+  const councilState = String(payload?.strategyCouncil?.state || routing?.councilState || "").toUpperCase();
+  if (councilState === "BLOCKED" || blockers.length) {
+    statusSummary = "KINGBOT CORTEX is blocked by deterministic controls or incomplete verified evidence.";
+  } else if (councilState === "CONFLICTED") {
+    statusSummary = "KINGBOT CORTEX found conflicting specialist and market evidence; no route is authorized.";
+  } else if (councilState === "WAIT" || !selected) {
+    statusSummary = "KINGBOT CORTEX is waiting: no specialist currently satisfies a complete, verified setup.";
+  } else if (selected) {
+    statusSummary = "KINGBOT CORTEX routed the strongest verified specialist toward " + selected + ".";
+  }
   return {
     provider: "KINGBOT_NATIVE",
     model: MODEL,
@@ -390,9 +403,7 @@ async function synthesize(payload) {
       bias: String(summary.bias || debate.direction || "NEUTRAL"),
       confidence: Number(summary.confidence || 0),
       selectedEngine: selected,
-      summary: selected
-        ? "KINGBOT CORTEX synthesized verified specialist evidence and routed the current state toward " + selected + "."
-        : "KINGBOT CORTEX found no sufficiently aligned engine candidate.",
+      summary: statusSummary,
       risks: blockers.slice(0, 8),
       watch: engines.filter(e => !e.strategyMatch).slice(0, 4).map(e => e.botId + ": strategy threshold not met")
     }
@@ -500,10 +511,21 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
       minSamples: Number(process.env.KINGBOT_ADAPTIVE_MIN_SAMPLES || 8)
     },
     generatedAt: new Date().toISOString(),
-    market: { ...market, multiTimeframe: market.multiTimeframe, freshness: freshness(market.timestamp, Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)), evidence: marketEvidence },
+    market: {
+      ...market,
+      multiTimeframe: market.multiTimeframe,
+      freshness: freshness(
+        market.quoteTimestamp || market.receivedAt || market.timestamp,
+        Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)
+      ),
+      freshnessMode: market.quoteTimestamp ? "LIVE_QUOTE" : (market.receivedAt ? "LIVE_DATA_INGESTION" : "BAR_CONTEXT"),
+      evidence: marketEvidence
+    },
     analysts,
     debate,
     engines,
+    specialists: specialistCards,
+    strategyCouncil,
     routing: { ...routing, direction: routing.candidate ? (routing.candidate.score > 0 ? "BUY" : routing.candidate.score < 0 ? "SELL" : "HOLD") : "HOLD" },
     tradePlan,
     riskCouncil: risk,
@@ -531,7 +553,13 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
     result.routing = { ...result.routing, selectedEngine: null, reason: decisionGate.reason };
     result.tradePlan = null;
   }
-  result.routing = { ...result.routing, councilState: strategyCouncil.state, councilConfidence: strategyCouncil.confidence };\n  const synthesis = await synthesize(result);
+  result.routing = {
+    ...result.routing,
+    councilState: strategyCouncil.state,
+    councilConfidence: strategyCouncil.confidence,
+    primarySpecialist: strategyCouncil.primarySpecialist?.botId || null
+  };
+  const synthesis = await synthesize(result);
   result.aiSynthesis = synthesis;
   result.summary = synthesis.result || {
     regime: regime.regime,
@@ -617,7 +645,19 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
         const scan = await runStandaloneMarketScan({ pool, twelveData, symbols: symbol, timeframe });
         const technical = Array.isArray(scan?.technical) ? scan.technical.find(x => x.symbol === symbol) || scan.technical[0] : null;
         const quote = Array.isArray(scan?.quotes) ? scan.quotes.find(x => x.symbol === symbol) || scan.quotes[0] : null;
-        market = { ...(technical || {}), ...(quote || {}), symbol, timeframe, timestamp: quote?.timestamp ? new Date(quote.timestamp).toISOString() : (technical?.dataFreshness || technical?.barTime || null) };
+        const quoteTimestamp = quote?.timestamp
+          ? new Date(quote.timestamp).toISOString()
+          : (quote?.receivedAt ? new Date(quote.receivedAt).toISOString() : null);
+        const receivedAt = technical?.receivedAt || technical?.dataFreshness || quote?.receivedAt || null;
+        market = {
+          ...(technical || {}),
+          ...(quote || {}),
+          symbol,
+          timeframe,
+          timestamp: quoteTimestamp || receivedAt || technical?.barTime || null,
+          quoteTimestamp,
+          receivedAt
+        };
         market.aiScanner = { provider: scan?.provider || "none", model: scan?.model || null, source: scan?.source || null, aiError: scan?.aiError || null };
       }
       const memory = await loadIntelligenceMemory(pool, user.id, symbol);
