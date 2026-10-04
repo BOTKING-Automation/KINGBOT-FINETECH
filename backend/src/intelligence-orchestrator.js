@@ -90,6 +90,8 @@ function normalizeMarket(input = {}) {
     timestamp: input.timestamp || input.time || input.receivedAt || null,
     quoteTimestamp: input.quoteTimestamp || input.timestamp || input.time || null,
     receivedAt: input.receivedAt || input.dataFreshness || null,
+    freshnessMaxAgeMs: num(input.freshnessMaxAgeMs ?? input.quoteFreshnessMaxAgeMs),
+    quoteFreshnessMaxAgeMs: num(input.quoteFreshnessMaxAgeMs ?? input.freshnessMaxAgeMs),
     barTime: input.barTime || input.time || null,
     multiTimeframe: input.multiTimeframe || null,
     crossMarket: input.crossMarket || null
@@ -194,7 +196,7 @@ function analyzeRegime(m) {
 function analyzeExecution(m) {
   const atr = Math.max(Math.abs(m.atr || 0), 1e-12);
   const spreadRatio = Math.abs(m.spread || 0) / atr;
-  const stale = freshness(m.timestamp, Math.max(3000, Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)));
+  const stale = freshness(m.timestamp, Math.max(3000, Number(m.quoteFreshnessMaxAgeMs || m.freshnessMaxAgeMs || Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000))));
   const quality = clamp(100 - spreadRatio * 100 - (stale.ok ? 0 : 45), 0, 100);
   const flags = [];
   if (!m.symbol) flags.push("SYMBOL_MISSING");
@@ -350,7 +352,7 @@ function riskCouncil(market, engines, riskContext = {}) {
   if (!(market.price > 0) || !(market.atr > 0)) blocks.push("MARKET_DATA_INCOMPLETE");
   if (Number(market.spread) > 0 && Number(market.atr) > 0 && Number(market.spread) / Number(market.atr) > Number(riskContext.maxSpreadAtrRatio ?? 0.25)) blocks.push("SPREAD_GATE");
   const liveTimestamp = market.quoteTimestamp || market.receivedAt || market.timestamp || null;
-  const stale = freshness(liveTimestamp, Number(riskContext.staleDataMs || 5000));
+  const stale = freshness(liveTimestamp, Number(market.quoteFreshnessMaxAgeMs || market.freshnessMaxAgeMs || riskContext.staleDataMs || process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000));
   if (!stale.ok) blocks.push(stale.reason || "STALE_DATA");
   if (bool(riskContext.killSwitch)) blocks.push("BOT_KILL_SWITCH");
   if (bool(riskContext.globalKillSwitch)) blocks.push("GLOBAL_KILL_SWITCH");
