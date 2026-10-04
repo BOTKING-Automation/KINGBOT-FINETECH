@@ -3351,6 +3351,7 @@ overscroll-behavior:none;}
             updated: Date.now(),
             source: quote.source || "KINGBOT shared live market feed",
             feedAgeMs: Number(quote.ageMs || 0),
+            quoteMode: quote.quoteMode || (quote.available ? "LIVE" : (Number.isFinite(Number(quote.price)) ? "LAST_AVAILABLE" : "UNAVAILABLE")),
             available: Boolean(quote.available)
           };
         }
@@ -3917,10 +3918,13 @@ overscroll-behavior:none;}
               data.price;
 
 
+            const hasChange =
+              Number.isFinite(Number(data.change));
+
             const change =
-              Number(
-                data.change || 0
-              );
+              hasChange
+                ? Number(data.change)
+                : null;
 
 
             const high =
@@ -3963,7 +3967,7 @@ overscroll-behavior:none;}
 
 
             const positive =
-              change >= 0;
+              hasChange ? change >= 0 : true;
 
 
             const isFavorite =
@@ -4053,9 +4057,9 @@ overscroll-behavior:none;}
                 >
 
                   ${
-                    price !== undefined
+                    price !== undefined && hasChange
                       ? `${positive ? "+" : ""}${change.toFixed(2)}%`
-                      : "--"
+                      : (price !== undefined && data.quoteMode === "LAST_AVAILABLE" ? "LAST" : "--")
                   }
 
                 </div>
@@ -4171,14 +4175,14 @@ overscroll-behavior:none;}
                 state.data[id] || {};
 
 
-              const change =
-                Number(
-                  data.change || 0
-                );
+              const hasChange =
+                Number.isFinite(Number(data.change));
 
+              const change =
+                hasChange ? Number(data.change) : null;
 
               const positive =
-                change >= 0;
+                hasChange ? change >= 0 : true;
 
 
               return `
@@ -4243,9 +4247,9 @@ overscroll-behavior:none;}
                     >
 
                       ${
-                        data.price
+                        data.price && hasChange
                           ? `${positive ? "+" : ""}${change.toFixed(2)}%`
-                          : "--"
+                          : (data.price && data.quoteMode === "LAST_AVAILABLE" ? "LAST" : "--")
                       }
 
                     </div>
