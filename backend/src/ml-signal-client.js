@@ -62,15 +62,26 @@ export async function predictMlStrategySignal({ botId, market } = {}) {
   }
 }
 
-export async function trainMlStrategyModel({ botId, symbol, timeframe, bars } = {}) {
-  if (!enabled() || !botId || !symbol || !Array.isArray(bars)) return null;
+export async function trainMlStrategyModel({ botId, symbol, timeframe, bars, markets } = {}) {
+  if (!enabled() || !botId) return null;
+  const datasets = Array.isArray(markets)
+    ? markets
+        .filter(item => item && item.symbol && Array.isArray(item.bars))
+        .map(item => ({
+          symbol: String(item.symbol).trim().toUpperCase(),
+          bars: item.bars
+        }))
+    : (symbol && Array.isArray(bars) ? [{
+        symbol: String(symbol).trim().toUpperCase(),
+        bars
+      }] : []);
+  if (!datasets.length) return null;
   try {
     return await request("/train", {
       botId: String(botId).trim().toLowerCase(),
-      symbol: String(symbol).trim().toUpperCase(),
       timeframe: String(timeframe || "5m").trim().toLowerCase(),
-      bars
-    }, Math.max(5000, TIMEOUT_MS * 8));
+      markets: datasets
+    }, Math.max(8000, TIMEOUT_MS * 12));
   } catch (error) {
     return {
       ok: false,
