@@ -12,6 +12,7 @@ on:
       - "backend/src/ai-market-scanner.js"
       - "backend/src/gold-price-feed.js"
       - "backend/src/market-page-feed.js"
+      - "backend/src/market-data-fabric.js"
       - "backend/src/market-evidence-engine.js"
       - "backend/src/ai-intelligence.js"
       - "backend/src/strategy-specialists.js"
@@ -21,6 +22,7 @@ on:
       - "backend/test/strategy-council.test.js"
       - "backend/test/intelligence-orchestrator.test.js"
       - "backend/test/gold-price-feed.test.js"
+      - "backend/test/market-data-fabric.test.js"
       - "system/intelligence-orchestrator.js"
       - "system/ai-support.js"
       - ".github/workflows/ai-strategies.yml"
@@ -145,6 +147,7 @@ jobs:
           node --check backend/src/ai-market-scanner.js
           node --check backend/src/gold-price-feed.js
           node --check backend/src/market-page-feed.js
+          node --check backend/src/market-data-fabric.js
           node --check backend/src/market-evidence-engine.js
           node --check backend/src/strategy-specialists.js
           node --check backend/src/strategy-council.js
@@ -154,7 +157,7 @@ jobs:
 
       - name: Specialist brain and strategy council tests
         working-directory: backend
-        run: node --test test/strategy-specialists.test.js test/strategy-council.test.js test/intelligence-orchestrator.test.js test/gold-price-feed.test.js
+        run: node --test test/strategy-specialists.test.js test/strategy-council.test.js test/intelligence-orchestrator.test.js test/gold-price-feed.test.js test/market-data-fabric.test.js
 
       - name: End-to-end Node → ML service gate test
         run: |
