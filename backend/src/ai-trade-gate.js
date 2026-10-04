@@ -4,6 +4,7 @@
  * The deterministic strategy engine and risk engine remain authoritative.
  */
 import { getBotDefinitions } from "./bot-engines.js";
+import { predictMlStrategySignal, mlSignalServiceStatus } from "./ml-signal-client.js";
 
 const MODEL = "KINGBOT-CORTEX-1";
 const signalCache = new Map();
@@ -147,11 +148,57 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
   const cached=signalCache.get(key);
   if(cached&&Date.now()-cached.at<COOLDOWN_MS&&cached.fingerprint===fingerprint)return cached;
   if(inflight.has(key))return inflight.get(key);
-  const run=Promise.resolve().then(()=>{
-    const item={...evaluateNativeSignal({botId,market,analysis,risk}),fingerprint};
+
+  const run=(async()=>{
+    const native=evaluateNativeSignal({botId,market,analysis,risk})||{};
+    const ml=await predictMlStrategySignal({botId,market});
+    let item={...native,fingerprint};
+
+    if(ml?.ready){
+      const nativeDirection=candidateDirection(native.direction)||candidateDirection(analysis?.signal);
+      const mlDirection=candidateDirection(ml.direction);
+      const mlScore=num(ml.score,0);
+      const nativeScore=num(native.score,0);
+      const combinedScore=Math.round(nativeScore*0.60+mlScore*0.40);
+      const directionAgreement=!nativeDirection||!mlDirection||nativeDirection===mlDirection;
+      const mlConfidence=num(ml.confidence,0);
+      const modelAligned=Boolean(mlDirection)&&mlDirection!=="HOLD"&&mlConfidence>=55&&directionAgreement;
+      const directionalSignal=modelAligned?mlDirection:"HOLD";
+
+      item={
+        ...item,
+        direction:directionalSignal,
+        strategyMatch:Boolean(native.strategyMatch)&&modelAligned&&Math.abs(combinedScore)>=65,
+        trigger:[
+          native.trigger||"NATIVE_STRATEGY",
+          "ML="+String(mlDirection||"HOLD"),
+          "ML_CONF="+mlConfidence.toFixed(1)
+        ].join(" + "),
+        score:combinedScore,
+        nativeScore,
+        mlScore,
+        mlConfidence,
+        mlProbabilities:ml.probabilities||null,
+        mlModelKey:ml.modelKey||null,
+        mlModels:ml.models||null,
+        mlStatus:ml.status||"LIVE_ML_SIGNAL",
+        source:"KINGBOT_CORTEX+SCIKIT_LEARN+PYTORCH",
+        model:"KINGBOT-CORTEX-1+ML-ENSEMBLE",
+        reason:(modelAligned
+          ? "AI STRATEGIES combined the deterministic strategy engine with the scikit-learn/PyTorch ensemble; both layers support the current direction. "
+          : "AI STRATEGIES kept the candidate on hold because the ML ensemble did not provide sufficient confidence/alignment. ")
+          +"Native score="+nativeScore+"/100; ML score="+mlScore.toFixed(1)+"/100."
+      };
+    }else if(ml?.status==="ML_SERVICE_UNAVAILABLE"){
+      item={...item,mlStatus:"SERVICE_UNAVAILABLE",source:"KINGBOT_CORTEX",mlError:ml.error||null};
+    }else if(ml?.status==="MODEL_NOT_READY"){
+      item={...item,mlStatus:"MODEL_NOT_READY",source:"KINGBOT_CORTEX",mlModelKey:ml.modelKey||null};
+    }
+
     signalCache.set(key,item);
     return item;
-  }).finally(()=>inflight.delete(key));
+  })().finally(()=>inflight.delete(key));
+
   inflight.set(key,run);
   return run;
 }
@@ -181,6 +228,10 @@ export async function warmAiTradeConfirmation({userId,botId,signal,market,analys
   const x=await warmAiStrategySignal({userId,botId,market,analysis,risk});
   return x?routeAiSignalToEngine({botId,signal:x,candidateSignal:signal}):null;
 }
+export function mlAiStrategyStatus() {
+  return mlSignalServiceStatus();
+}
+
 export function aiTradeGateStatus({userId,botId}={}){
   const x=signalCache.get(keyFor(userId,botId));
   return !x?{ready:false}:{ready:Date.now()-x.at<=TTL_MS,engine:x.engine,direction:x.direction,strategyMatch:Boolean(x.strategyMatch),engineAccepted:Boolean(x.engineAccepted),trigger:x.trigger,reason:x.reason,riskFlags:x.riskFlags||[],expiresAt:x.expiresAt,model:x.model,source:"KINGBOT_CORTEX"};
