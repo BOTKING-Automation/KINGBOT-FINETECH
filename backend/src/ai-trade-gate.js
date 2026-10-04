@@ -194,6 +194,18 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
           : "AI STRATEGIES kept the candidate on hold because the ML ensemble did not provide sufficient confidence/alignment. ")
           +"Native score="+nativeScore+"/100; ML score="+mlScore.toFixed(1)+"/100."
       };
+    }else if(aiExecutionGateEnabled() && (!ml || !ml.ready)){
+      item={
+        ...item,
+        direction:"HOLD",
+        strategyMatch:false,
+        trigger:"AI_MODEL_REQUIRED",
+        engineAccepted:true,
+        mlStatus:ml?.status||"ML_SERVICE_NOT_READY",
+        source:"KINGBOT_CORTEX",
+        mlError:ml?.error||null,
+        reason:"AI STRATEGIES is mandatory for bot execution; no broker order is permitted until the strategy-specific ML model is ready."
+      };
     }else if(ml?.status==="ML_SERVICE_UNAVAILABLE"){
       item={...item,mlStatus:"SERVICE_UNAVAILABLE",source:"KINGBOT_CORTEX",mlError:ml.error||null};
     }else if(ml?.status==="MODEL_NOT_READY"){
