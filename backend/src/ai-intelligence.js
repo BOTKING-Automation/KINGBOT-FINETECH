@@ -1,4 +1,7 @@
 import { DEFAULTS } from "./risk-engine.js";
+import { getGoldPriceFeed } from "./gold-price-feed.js";
+
+const publicGoldPriceFeed = getGoldPriceFeed();
 
 export function registerAiIntelligence(app, { requireUser, pool, broker } = {}) {
   app.get("/api/intelligence/context", async (req, res) => {
@@ -15,6 +18,25 @@ export function registerAiIntelligence(app, { requireUser, pool, broker } = {}) 
       let account = null;
       let positions = [];
       let marketQuote = null;
+
+      try {
+        if (symbol === "XAUUSD") {
+          const gold = await publicGoldPriceFeed.getQuote();
+          if (gold?.verified) {
+            marketQuote = {
+              symbol,
+              price: gold.price,
+              bid: gold.bid,
+              ask: gold.ask,
+              spread: gold.spread,
+              time: gold.timestamp,
+              verified: true,
+              source: gold.source,
+              freshnessMaxAgeMs: gold.freshnessMaxAgeMs
+            };
+          }
+        }
+      } catch {}
 
       if (connected) {
         try {
