@@ -1,5 +1,5 @@
 import { getBotDefinitions } from "./bot-engines.js";
-import { runStandaloneMarketScan } from "./ai-market-scanner.js";
+import { runStandaloneMarketScan, deriveTechnicalFromBars } from "./ai-market-scanner.js";
 import { evaluateKingbotBrain } from "./kingbot-brain.js";
 import { searchWeb, webSearchStatus } from "./kingbot-web-search.js";
 import { getPlans, BOT_NAMES } from "./subscriptions.js";
@@ -194,38 +194,138 @@ function marketTimeframes(baseTimeframe, thinkingLevel){
 
 async function multiTimeframeMarketScan({pool,twelveData,symbol,timeframe,thinkingLevel}={}){
   const levels=marketTimeframes(timeframe,thinkingLevel);
+  const freshnessLimits={ "5m":3*60*1000, "15m":8*60*1000, "1h":30*60*1000, "4h":120*60*1000 };
   const scans=await Promise.all(levels.map(async tf=>{
     try{
-      const scan=await runStandaloneMarketScan({pool,twelveData,symbols:[symbol],timeframe:tf});
-      const item=(scan.technical||[]).find(x=>x.symbol===symbol)||{};
-      const quote=(scan.quotes||[]).find(x=>x.symbol===symbol)||null;
+      let raw=null;
+      let source="KINGBOT market engine";
+      let barCount=0;
+      if(twelveData?.enabled && typeof twelveData.historicalBars==="function"){
+        const bars=await twelveData.historicalBars(symbol,tf,{limit:240,maxAgeMs:60000});
+        raw=deriveTechnicalFromBars(bars);
+        barCount=Array.isArray(bars)?bars.length:0;
+        source=raw?"Twelve Data raw OHLC → KINGBOT perception engine":"Twelve Data";
+      }
+      if(!raw){
+        const scan=await runStandaloneMarketScan({pool,twelveData,symbols:[symbol],timeframe:tf});
+        const item=(scan.technical||[]).find(x=>x.symbol===symbol)||{};
+        const quote=(scan.quotes||[]).find(x=>x.symbol===symbol)||null;
+        return {
+          timeframe:tf,ok:Boolean(scan.ok),price:item.price??quote?.price??null,
+          trend:String(item.trend||"NEUTRAL").toUpperCase(),structure:String(item.structure||item.bias||"unknown").toLowerCase(),
+          bos:String(item.bos||"NONE").toUpperCase(),choch:String(item.choch||"NONE").toUpperCase(),
+          liquiditySweep:String(item.liquiditySweep||"NONE").toUpperCase(),
+          displacement:String(item.displacement||"NONE").toUpperCase(),fvg:Boolean(item.fvg),
+          orderBlock:item.orderBlock||null,swingPoints:item.swingPoints||null,
+          momentum:Number(item.momentum||0),volatility:Number(item.volatility||0),
+          adx:Number(item.adx||item.adx14||0),rsi:Number(item.rsi||item.rsi14||0),
+          emaFast:Number(item.emaFast||item.ema20||0),emaSlow:Number(item.emaSlow||item.ema50||0),
+          signal:String(item.signal||"WAIT"),score:Number(item.score||0),
+          source:scan.source||item.source||source,
+          timestamp:quote?.timestamp||item.receivedAt||item.barTime||null,
+          technicalCount:Number(scan.technicalCount||0),barCount
+        };
+      }
+      const barTime=raw.barTime||null;
+      const ageMs=barTime ? Math.max(0,Date.now()-new Date(barTime).getTime()) : Infinity;
+      const fresh=Number.isFinite(ageMs) && ageMs<=freshnessLimits[tf];
+      const directionalScore={
+        BULLISH:[
+          raw.trend==="BULLISH",raw.structure==="bullish",raw.bos==="BULLISH",
+          raw.choch==="BULLISH",raw.liquiditySweep==="BULLISH",raw.displacement==="BULLISH",
+          raw.fvg===true,Number(raw.ema20)>Number(raw.ema50),Number(raw.rsi14)>=50&&Number(raw.rsi14)<=72,
+          Number(raw.macd)>Number(raw.macdSignal)
+        ].filter(Boolean).length,
+        BEARISH:[
+          raw.trend==="BEARISH",raw.structure==="bearish",raw.bos==="BEARISH",
+          raw.choch==="BEARISH",raw.liquiditySweep==="BEARISH",raw.displacement==="BEARISH",
+          raw.fvg===true,Number(raw.ema20)<Number(raw.ema50),Number(raw.rsi14)<50&&Number(raw.rsi14)>=28,
+          Number(raw.macd)<Number(raw.macdSignal)
+        ].filter(Boolean).length
+      };
+      const direction=directionalScore.BULLISH===directionalScore.BEARISH
+        ?"MIXED"
+        :directionalScore.BULLISH>directionalScore.BEARISH?"BULLISH":"BEARISH";
       return {
-        timeframe:tf, ok:Boolean(scan.ok), price:item.price??quote?.price??null,
-        trend:String(item.trend||"NEUTRAL").toUpperCase(), momentum:Number(item.momentum||0),
-        volatility:Number(item.volatility||0), structure:String(item.structure||item.bias||"unknown").toLowerCase(),
-        adx:Number(item.adx||item.adx14||0), rsi:Number(item.rsi||item.rsi14||0),
-        emaFast:Number(item.emaFast||item.ema20||0), emaSlow:Number(item.emaSlow||item.ema50||0),
-        breakout:Boolean(item.breakout), retest:Boolean(item.retest),
-        signal:String(item.signal||"WAIT"), score:Number(item.score||0),
-        source:scan.source||item.source||"KINGBOT market engine",
-        timestamp:quote?.timestamp||item.receivedAt||item.barTime||null,
-        technicalCount:Number(scan.technicalCount||0)
+        timeframe:tf,ok:fresh,rawOk:true,price:raw.price??null,
+        trend:String(raw.trend||"NEUTRAL").toUpperCase(),
+        structure:String(raw.structure||"unknown").toLowerCase(),
+        bos:String(raw.bos||"NONE").toUpperCase(),
+        choch:String(raw.choch||"NONE").toUpperCase(),
+        liquiditySweep:String(raw.liquiditySweep||"NONE").toUpperCase(),
+        displacement:String(raw.displacement||"NONE").toUpperCase(),
+        fvg:Boolean(raw.fvg),orderBlock:raw.orderBlock||null,swingPoints:raw.swingPoints||null,
+        marketStructure:raw.marketStructure||null,momentum:Number(raw.momentum||0),
+        volatility:Number(raw.volatility||0),rsi:Number(raw.rsi14||0),
+        emaFast:Number(raw.ema20||0),emaSlow:Number(raw.ema50||0),
+        atr:Number(raw.atr14||0),direction,
+        directionalScore,score:Math.round(Math.max(directionalScore.BULLISH,directionalScore.BEARISH)/10*100),
+        source,barTime,timestamp:barTime,ageMs,fresh,
+        technicalCount:1,barCount
       };
     }catch(error){
-      return {timeframe:tf,ok:false,signal:"DATA_INSUFFICIENT",error:String(error?.message||"TIMEFRAME_SCAN_FAILED").slice(0,140)};
+      return {timeframe:tf,ok:false,rawOk:false,signal:"DATA_INSUFFICIENT",
+        direction:"DATA_INSUFFICIENT",error:String(error?.message||"TIMEFRAME_SCAN_FAILED").slice(0,140)};
     }
   }));
+
   const usable=scans.filter(x=>x.ok);
-  const bull=usable.filter(x=>x.trend==="BULLISH").length;
-  const bear=usable.filter(x=>x.trend==="BEARISH").length;
+  const bullish=usable.filter(x=>x.direction==="BULLISH"||x.trend==="BULLISH").length;
+  const bearish=usable.filter(x=>x.direction==="BEARISH"||x.trend==="BEARISH").length;
+  const htf=scans.filter(x=>["1h","4h"].includes(x.timeframe)&&x.ok);
+  const ltf=scans.filter(x=>["5m","15m"].includes(x.timeframe)&&x.ok);
+  const htfBull=htf.filter(x=>x.direction==="BULLISH").length;
+  const htfBear=htf.filter(x=>x.direction==="BEARISH").length;
+  const ltfBull=ltf.filter(x=>x.direction==="BULLISH").length;
+  const ltfBear=ltf.filter(x=>x.direction==="BEARISH").length;
+  const htfBias=htfBull>htfBear?"BULLISH":htfBear>htfBull?"BEARISH":"MIXED";
+  const ltfBias=ltfBull>ltfBear?"BULLISH":ltfBear>ltfBull?"BEARISH":"MIXED";
+  const alignmentDirection=bullish>bearish?"BULLISH":bearish>bullish?"BEARISH":"MIXED";
+  const required=levels.length;
+  const complete=usable.length===required;
+  const conflict=htfBias!=="MIXED"&&ltfBias!=="MIXED"&&htfBias!==ltfBias;
+  const ltfTrigger=ltf.some(x=>
+    x.direction!=="MIXED" &&
+    x.bos===x.direction &&
+    (x.displacement===x.direction||x.liquiditySweep===x.direction||x.choch===x.direction)
+  );
+  const setupState=!complete
+    ?"DATA_INSUFFICIENT"
+    :conflict
+      ?"CONFLICTED"
+      :htfBias==="BULLISH"&&ltfBias==="BULLISH"&&ltfTrigger
+        ?"BUY_CANDIDATE"
+        :htfBias==="BEARISH"&&ltfBias==="BEARISH"&&ltfTrigger
+          ?"SELL_CANDIDATE"
+          :htfBias!=="MIXED"&&ltfBias===htfBias
+            ?"WAIT_CONFIRMATION"
+            :"WAIT";
+
+  const conflicts=[];
+  if(conflict) conflicts.push(`HTF ${htfBias} vs LTF ${ltfBias}`);
+  for(const x of usable){
+    if(x.direction!==alignmentDirection&&alignmentDirection!=="MIXED") conflicts.push(`${x.timeframe} opposes ${alignmentDirection}`);
+  }
   return {
-    level:normalizeThinkingLevel(thinkingLevel), timeframes:scans,
-    alignment:{bullish:bull,bearish:bear,total:usable.length,
-      ratio:usable.length?Number((Math.max(bull,bear)/usable.length).toFixed(2)):0,
-      direction:bull>bear?"BULLISH":bear>bull?"BEARISH":"MIXED"}
+    level:normalizeThinkingLevel(thinkingLevel),
+    timeframes:scans,
+    requiredTimeframes:levels,
+    alignment:{
+      bullish,bearish,total:usable.length,required,
+      complete,ratio:usable.length?Number((Math.max(bullish,bearish)/usable.length).toFixed(2)):0,
+      direction:alignmentDirection,htfBias,ltfBias,conflict,conflicts
+    },
+    higherTimeframeBias:htfBias,
+    lowerTimeframeTrigger:ltfBias,
+    setupState,
+    triggerPresent:ltfTrigger,
+    provenance:{
+      rawOhlc:scans.filter(x=>x.rawOk).map(x=>x.timeframe),
+      staleTimeframes:scans.filter(x=>!x.ok).map(x=>x.timeframe),
+      sources:[...new Set(scans.map(x=>x.source).filter(Boolean))]
+    }
   };
 }
-
 async function latestSnapshot(pool, symbol, timeframe="5m"){
   if(!pool) return null;
   try{
