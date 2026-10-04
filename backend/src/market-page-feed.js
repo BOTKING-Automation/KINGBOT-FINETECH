@@ -30,7 +30,6 @@ const BINANCE_ENDPOINTS = [
 
 const DERIV = getDerivMarketFeed();
 const GOLD = getGoldPriceFeed();
-const FABRIC = new MarketDataFabric();
 let snapshotCache = { at: 0, value: null, key: "" };
 let refreshPromise = null;
 
