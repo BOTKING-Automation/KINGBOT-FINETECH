@@ -3428,6 +3428,8 @@ overscroll-behavior:none;}
             source: quote.source || "KINGBOT shared live market feed",
             feedAgeMs: Number(quote.ageMs || 0),
             quoteMode: quote.quoteMode || (quote.available ? "LIVE" : (Number.isFinite(Number(quote.price)) ? "LAST_AVAILABLE" : "UNAVAILABLE")),
+            verified: Boolean(quote.quoteVerified ?? quote.verified ?? (quote.available && String(quote.source || "").includes("GoldPrice.dev"))),
+            freshnessMaxAgeMs: Number(quote.freshnessMaxAgeMs || 120000),
             available: Boolean(quote.available)
           };
         }
@@ -4651,14 +4653,17 @@ overscroll-behavior:none;}
       const symbol = market.id;
       const price = Number(q.price);
       const fresh = q.updated ? Math.max(0, Date.now() - q.updated) : Infinity;
-      const live = q.available !== false && Number.isFinite(price) && fresh < 120000;
+      const providerAge = Number.isFinite(Number(q.feedAgeMs)) ? Number(q.feedAgeMs) : Infinity;
+      const allowedAge = Math.max(5000, Number(q.freshnessMaxAgeMs || 120000));
+      const live = q.available !== false && q.verified !== false && Number.isFinite(price) && fresh < 120000 && providerAge <= allowedAge;
+      const verified = live && q.verified === true;
       const p = Number.isFinite(price) ? price.toLocaleString(undefined,{maximumFractionDigits:8}) : "—";
       const set=(id,v)=>{const el=$(id);if(el)el.textContent=v};
       set("workspaceSymbol",symbol); set("chartInstrument",symbol); set("cortexSymbol",symbol);
       set("wsPrice",p); set("chartPrice",live ? p : "Quote not verified");
-      set("wsEvidence",live ? "LIVE / FRESH" : "VERIFYING");
-      set("workspaceStatus",live ? "● LIVE FEED" : "FEED WAITING");
-      const badge=$("marketLiveBadge"); if(badge) badge.textContent=live ? "● LIVE MARKET DATA" : "○ DATA VERIFYING";
+      set("wsEvidence",verified ? "LIVE / VERIFIED" : live ? "LIVE / FRESH" : "VERIFYING");
+      set("workspaceStatus",verified ? "● LIVE VERIFIED" : live ? "● LIVE FEED" : "FEED WAITING");
+      const badge=$("marketLiveBadge"); if(badge) badge.textContent=verified ? "● VERIFIED XAU/USD" : live ? "● LIVE MARKET DATA" : "○ DATA VERIFYING";
     }
 
 
