@@ -491,7 +491,7 @@ def current_market_features(market: dict[str, Any]) -> np.ndarray:
     ema_slow = finite(market.get("emaSlow") or market.get("ema50"))
     rsi_value = finite(market.get("rsi") or market.get("rsi14"), 50.0)
     adx_value = finite(market.get("adx") or market.get("adx14"))
-    spread_atr = finite(market.get("spreadAtr"))
+    spread_atr = finite(market.get("spreadAtr") or (finite(market.get("spread")) / atr_value if atr_value > 0 else 0.0))
     trend = clamp(finite(market.get("trend")), -1.0, 1.0)
     momentum = clamp(finite(market.get("momentum")), -1.0, 1.0)
     volatility = clamp(finite(market.get("volatility")), 0.0, 1.0)
