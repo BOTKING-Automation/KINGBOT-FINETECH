@@ -116,7 +116,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 .activity-list{max-height:258px;overflow:auto}.activity{display:grid;grid-template-columns:58px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}.activity time{color:#4e5a6f;font:700 6.5px "JetBrains Mono"}.activity span{color:#9eabbe;font:700 7px "JetBrains Mono";line-height:1.5}
 
 .empty{padding:30px;text-align:center;color:#566176}.empty strong{display:block;color:#7c889d;font:900 9px Orbitron;letter-spacing:.08em}.empty span{display:block;margin-top:7px;font:700 7px "JetBrains Mono";line-height:1.55}
-.footer-sync{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding:12px 14px;border:1px solid var(--line);border-radius:13px;background:rgba(8,13,24,.8);color:#59667b;font:700 7px "JetBrains Mono"}.footer-sync strong{color:#aeb9ca}.sync-button{padding:8px 10px;border-radius:8px;border:1px solid rgba(34,230,255,.14);background:rgba(34,230,255,.045);color:var(--cyan);font:900 7px "JetBrains Mono"}
+.terminal-footer{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;margin-top:12px;margin-bottom:0;padding:13px 15px;border:1px solid var(--line);border-radius:13px;background:rgba(3,10,7,.88);color:#59667b;font:700 7px "JetBrains Mono";box-shadow:inset 0 0 24px rgba(25,255,114,.018)}.terminal-footer strong{color:#aeb9ca}.terminal-footer-brand{color:#cbd7e8;font:900 8px Orbitron;letter-spacing:.08em}.terminal-footer-center{text-align:center;color:#546277;letter-spacing:.08em}.terminal-footer-status{text-align:right;color:#79a989}.sync-button{padding:8px 10px;border-radius:8px;border:1px solid rgba(34,230,255,.14);background:rgba(34,230,255,.045);color:var(--cyan);font:900 7px "JetBrains Mono"}
 
 
 /* =========================================================
@@ -294,7 +294,7 @@ a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
 
 @media(max-width:1180px){.nav{display:none}.hero{grid-template-columns:1fr}.sync-grid{grid-template-columns:repeat(3,1fr)}.main-grid{grid-template-columns:1fr}.grid-4{grid-template-columns:repeat(2,1fr)}.risk-grid,.tables{grid-template-columns:1fr}}
 @media(max-width:1180px){.history-console{grid-template-columns:1fr}}
-@media(max-width:760px){.shell,.topbar-inner{width:min(100% - 18px,1640px)}.brand{min-width:auto}.brand-text span,.clock{display:none}.hero-main{padding:20px}.sync-grid{grid-template-columns:repeat(2,1fr)}.engine-status-hero{grid-template-columns:1fr}.telemetry-grid{grid-template-columns:repeat(2,1fr)}.plan-grid{grid-template-columns:repeat(3,1fr)}.identity{grid-template-columns:1fr}.grid-4{grid-template-columns:1fr 1fr}.top-actions .btn{display:none}}
+@media(max-width:760px){.shell,.topbar-inner{width:min(100% - 18px,1640px)}.brand{min-width:auto}.brand-text span,.clock{display:none}.hero-main{padding:20px}.sync-grid{grid-template-columns:repeat(2,1fr)}.engine-status-hero{grid-template-columns:1fr}.telemetry-grid{grid-template-columns:repeat(2,1fr)}.plan-grid{grid-template-columns:repeat(3,1fr)}.identity{grid-template-columns:1fr}.grid-4{grid-template-columns:1fr 1fr}.top-actions .btn{display:none}.terminal-footer{grid-template-columns:1fr;gap:6px}.terminal-footer-center,.terminal-footer-status{text-align:left}}
 @media(max-width:480px){.grid-4{grid-template-columns:1fr}.sync-grid{grid-template-columns:1fr}.hero h1{font-size:28px}.plan-grid{grid-template-columns:repeat(2,1fr)}.quote-grid{grid-template-columns:1fr 1fr}.hero-actions .btn{width:100%}}
 /* =========================================================
    FRIENDLY TERMINAL UI — clarity-first redesign
@@ -1067,7 +1067,11 @@ body.kb-terminal-page > .toast{position:fixed!important}
     </div>
   </section>
 
-  <div class="footer-sync"><span>LAST UPDATED <strong id="lastSystemSync">—</strong> · NEXT AUTO REFRESH <strong id="nextSync">3s</strong></span><span id="footerState">Terminal ready</span></div>
+  <footer class="terminal-footer" aria-label="KINGBOT terminal footer">
+    <div><span class="terminal-footer-brand">KINGBOT FINETECH</span><span> · LIVE TRADING TERMINAL</span></div>
+    <div class="terminal-footer-center">AI STRATEGIES · RISK CONTROL · BROKER-NATIVE EXECUTION</div>
+    <div class="terminal-footer-status"><span>UPDATED <strong id="lastSystemSync">—</strong> · </span><strong id="nextSync">3s</strong><span> · </span><span id="footerState">Terminal ready</span></div>
+  </footer>
 </main>
 
 <div class="toast" id="toast"><strong id="toastTitle">KINGBOT</strong><span id="toastMessage">—</span></div>
