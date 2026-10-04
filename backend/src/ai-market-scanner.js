@@ -2,6 +2,7 @@ import { isSyntheticSymbol } from "./synthetic-markets.js";
 import "dotenv/config";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getGoldPriceFeed } from "./gold-price-feed.js";
+import { MarketDataFabric } from "./market-data-fabric.js";
 import { getDerivMarketFeed } from "./deriv-market-feed.js";
 import { predictPendingOrderZones } from "./pending-order-model.js";
 import { technicalAnalysisBookContext } from "./technical-analysis-book.js";
@@ -341,44 +342,19 @@ async function fetchPublicDerivQuotes(symbols) {
 
 async function getFastStandaloneQuotes({ twelveData, symbols }) {
   const normalized=cleanSymbols(symbols).length ? cleanSymbols(symbols) : DEFAULT_SYMBOLS;
-  const needsGold=normalized.includes("XAUUSD");
-  const [goldResult, tdResult] = await Promise.all([
-    needsGold
-      ? publicGoldPriceFeed.getQuote().catch(error => ({
-          symbol:"XAUUSD",
-          available:false,
-          verified:false,
-          source:"Gold API direct free XAU/USD price",
-          error:String(error?.message || "GOLD_API_DIRECT_FEED_UNAVAILABLE").slice(0,140)
-        }))
-      : Promise.resolve(null),
-    twelveData?.enabled
-      ? twelveData.latestQuotes(normalized,{allowRestFallback:false}).catch(() => [])
-      : Promise.resolve([])
-  ]);
-
-  let quotes = tdResult.length
-    ? tdResult
-    : await fetchPublicDerivQuotes(normalized);
-
-  if (twelveData?.enabled) {
-    const missing=quotes.filter(q=>!q.available).map(q=>q.symbol);
-    if (missing.length) {
-      const deriv=await fetchPublicDerivQuotes(missing);
-      const derivMap=Object.fromEntries(deriv.map(q=>[q.symbol,q]));
-      quotes=quotes.map(q=>q.available?q:(derivMap[q.symbol]||q));
-    }
+  const fabric=new MarketDataFabric({twelveData, goldFeed:publicGoldPriceFeed, derivFeed:publicDerivFeed});
+  try {
+    return await fabric.getQuotes(normalized);
+  } catch {
+    return normalized.map(symbol => ({
+      symbol,
+      available:false,
+      verified:false,
+      source:"KINGBOT market data fabric",
+      provider:"KINGBOT_MARKET_DATA_FABRIC",
+      error:"MARKET_DATA_FABRIC_UNAVAILABLE"
+    }));
   }
-
-  if (goldResult?.available) {
-    const goldMap=new Map(quotes.map(q=>[q.symbol,q]));
-    goldMap.set("XAUUSD",goldResult);
-    quotes=normalized.map(symbol=>goldMap.get(symbol)||{
-      symbol,available:false,source:"KINGBOT market feed"
-    });
-  }
-
-  return quotes;
 }
 
 function overlayLiveQuotes(technical, quotes) {
