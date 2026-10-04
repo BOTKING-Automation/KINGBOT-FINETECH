@@ -145,7 +145,9 @@ export function createBotRuntimeRouter({pool,broker}){
     if(!/^[A-Z0-9._-]{3,30}$/.test(symbol))return res.status(400).json({ok:false,error:"INVALID_SYMBOL"});
     if(!(await broker.isConnected(user.id)))return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect the verified broker before selecting a market. No bot configuration was saved."});
     const brokerStatus=await broker.getStatus(user.id);
-    if(String(brokerStatus.broker||"").toLowerCase()==="deriv")return res.status(409).json({ok:false,error:"DERIV_OPTIONS_NOT_VALID_FOR_MT5_BOTS",message:"Use KINGBOT MT5 BRIDGE for MT5 lot-based bot execution."});
+    if(!brokerStatus?.configured||!brokerStatus?.connected){
+      return res.status(503).json({ok:false,error:"BROKER_NOT_CONNECTED",message:"Connect and verify the native broker API before configuring the AI Strategy bot. No order was submitted."});
+    }
     try{
       const marketCheck=await broker.validateMarket(user.id,symbol);
       if(!marketCheck.ok)return res.status(400).json({ok:false,error:marketCheck.error,message:"The selected market is not available for the connected broker account. Choose a market from the broker catalog."});
