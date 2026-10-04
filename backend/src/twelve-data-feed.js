@@ -42,6 +42,7 @@ export class TwelveDataFeed {
     this.started = false;
     this.technicalCache = new Map();
     this.technicalInflight = new Map();
+    this.quoteListeners = new Set();
   }
 
   get enabled() {
@@ -88,7 +89,7 @@ export class TwelveDataFeed {
         const price = finite(data?.price);
         if (price === null) return;
 
-        this.last.set(symbol, {
+        const quote = {
           symbol: kingbotSymbol(symbol),
           twelveDataSymbol: symbol,
           price,
@@ -96,8 +97,14 @@ export class TwelveDataFeed {
           ask: finite(data?.ask),
           volume: finite(data?.day_volume ?? data?.volume),
           timestamp: finite(data?.timestamp) ? Number(data.timestamp) * 1000 : Date.now(),
-          source: "Twelve Data WebSocket"
-        });
+          source: "Twelve Data WebSocket",
+          available: true,
+          receivedAt: Date.now()
+        };
+        this.last.set(symbol, quote);
+        for (const listener of [...this.quoteListeners]) {
+          try { listener({...quote}); } catch {}
+        }
       }
     });
 
@@ -202,6 +209,12 @@ export class TwelveDataFeed {
 
     const restMap = Object.fromEntries(restQuotes.map(q => [q.symbol, q]));
     return websocketQuotes.map(q => q.available ? q : (restMap[q.symbol] || q));
+  }
+
+  onQuote(listener) {
+    if (typeof listener !== "function") throw new Error("TWELVE_DATA_QUOTE_LISTENER_REQUIRED");
+    this.quoteListeners.add(listener);
+    return () => this.quoteListeners.delete(listener);
   }
 
   quotes(symbols) {
