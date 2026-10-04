@@ -1461,7 +1461,15 @@ body.kb-terminal-page > .toast{position:fixed!important}
         state.engine=null;setSync("selection","IDLE","NO SAVED ENGINE",x?.updatedAt);setSync("runtime","IDLE","NO SAVED ENGINE",x?.updatedAt);
       }
       renderEngine(state.engine,state.selection);
-      state.marketSymbol=state.engine?.symbol||null;
+      const requestedMarket = (() => {
+        try {
+          const value = new URLSearchParams(window.location.search).get("s");
+          return value ? String(value).trim().toUpperCase().replace(/[/:_-]/g,"") : null;
+        } catch {
+          return null;
+        }
+      })();
+      state.marketSymbol = requestedMarket || state.engine?.symbol || null;
       return x;
     }catch(e){
       // Do not select a first/earliest bot. This is deliberately fail-closed.
