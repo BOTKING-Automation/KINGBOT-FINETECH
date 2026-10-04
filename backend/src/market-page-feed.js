@@ -140,15 +140,36 @@ async function fetchTraditionalQuotes(twelveData) {
           time: quote.time || null,
           ageMs: Number(quote.ageMs || Math.max(0, Date.now() - Number(quote.receivedAt || Date.now()))),
           available: true,
+          quoteMode: "LIVE",
           source: quote.source || "Deriv shared live feed"
         };
-      } catch (error) {
-        return {
-          symbol,
-          available: false,
-          source: "Deriv shared live feed",
-          error: String(error?.message || "DERIV_LIVE_QUOTE_UNAVAILABLE").slice(0, 120)
-        };
+      } catch (liveError) {
+        try {
+          const quote = await DERIV.getLatestAvailableQuote(symbol, { timeoutMs: 4500 });
+          const timestamp = finite(quote.epoch) !== null ? Number(quote.epoch) * 1000 : Date.now();
+          return {
+            symbol,
+            price: finite(quote.price),
+            bid: finite(quote.bid),
+            ask: finite(quote.ask),
+            spread: null,
+            timestamp,
+            time: quote.time || null,
+            ageMs: Math.max(0, Date.now() - Number(timestamp || Date.now())),
+            available: false,
+            quoteMode: "LAST_AVAILABLE",
+            source: quote.source || "Deriv last available tick",
+            error: String(liveError?.message || "DERIV_LIVE_QUOTE_UNAVAILABLE").slice(0, 120)
+          };
+        } catch (historyError) {
+          return {
+            symbol,
+            available: false,
+            quoteMode: "UNAVAILABLE",
+            source: "Deriv market feed",
+            error: String(historyError?.message || liveError?.message || "DERIV_MARKET_QUOTE_UNAVAILABLE").slice(0, 120)
+          };
+        }
       }
     }));
     for (const row of derivRows) {
@@ -175,6 +196,7 @@ async function fetchTraditionalQuotes(twelveData) {
       time: quote.time || null,
       ageMs: Number(quote.ageMs ?? ageMs(quote.timestamp)),
       available: Boolean(quote.available && Number.isFinite(Number(quote.price))),
+      quoteMode: quote.quoteMode || (quote.available ? "LIVE" : (Number.isFinite(Number(quote.price)) ? "LAST_AVAILABLE" : "UNAVAILABLE")),
       source: quote.source || "KINGBOT shared live market feed",
       error: quote.error || null
     };
