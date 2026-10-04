@@ -524,7 +524,7 @@ export async function ensureAiMarketScannerSchema(pool) {
 
 
 function scannerCanonicalSymbol(value) {
-  const raw = String(value || "").trim().toUpperCase().replace(/_/g, "");
+  const raw = String(value || "").trim().toUpperCase();
   return raw.startsWith("FRX") ? raw.slice(3) : raw.replace("/", "");
 }
 
@@ -533,6 +533,7 @@ class AiMarketScannerStream {
     this.server = server;
     this.pool = pool;
     this.twelveData = twelveData;
+    this.publicDerivFeed = publicDerivFeed;
     this.clients = new Set();
     this.channels = new Map();
     this.derivBindings = new Map();
