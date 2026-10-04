@@ -344,6 +344,27 @@ function textFor(){
   if(!selected)return;
   const d=cfg[selected];
   const native=d.native;
+  if(selected==="deriv"){
+    $("flowCopy").innerHTML=step<=1
+      ? "<strong>CONNECT YOUR DERIV ACCOUNT</strong><br>Click <b>CONTINUE WITH DERIV</b>. You will be taken to Deriv to sign in and confirm KINGBOT access. Your Deriv password stays with Deriv. After authorization, you will return here and choose the exact Deriv account KINGBOT should manage."
+      : step===3
+        ? "<strong>CHOOSE YOUR DERIV ACCOUNT</strong><br>Deriv has confirmed your authorization. Select one account below. KINGBOT will bind execution to that account only."
+        : "<strong>DERIV CONNECTED</strong><br>Your selected Deriv account is authorized for KINGBOT AI Strategies."; 
+    $("brokerLogin").style.display=step===1?"none":"inline-flex";
+    $("brokerLogin").textContent="OPEN DERIV ↗";
+    $("brokerLogin").href=d.login;
+    $("nextStep").textContent=step===1?"CONTINUE WITH DERIV ↗":"NEXT";
+    $("nextStep").style.display=step===1?"inline-flex":"none";
+    $("credentials").classList.remove("show");
+    $("accountId").parentElement.style.display="none";
+    $("bridgeTokenField").style.display="none";
+    $("derivAppIdField").style.display="none";
+    $("verifyBtn").style.display="none";
+    $("mt5BridgePanel").style.display="none";
+    $("mt5VpsPanel").style.display="none";
+    $("accountSelect").classList.toggle("show",step===3);
+    return;
+  }
   const copy={
     1:["STEP 1 · BROKER ACCOUNT","Open the official "+d.name+" site. Sign in or create your broker account, then return to this window."],
     2:[native?"STEP 2 · BROKER API ACCESS":"STEP 2 · BRIDGE ACCESS","Use the broker's official API authorization page. For native OAuth brokers, KINGBOT will use delegated authorization after application onboarding. For the current MT4/MT5 bridge route, create the bridge credential and return with the account ID and token."],
@@ -394,11 +415,11 @@ function selectBroker(slug){
   }
   const card=document.querySelector('.broker[data-broker="'+slug+'"]');
   if(card?.querySelector('.connect')?.disabled)return;
-  selected=slug;step=selected==="deriv"?2:1;verified=false;selectedAccount=null;
+  selected=slug;step=1;verified=false;selectedAccount=null;
   document.querySelectorAll(".broker").forEach(el=>el.classList.toggle("selected",el.dataset.broker===slug));
   const d=cfg[slug];
   $("modalTitle").textContent=d.name;
-   $("modalSubtitle").textContent=selected==="exness"?"EXNESS PUBLIC TRADER API":selected==="deriv"?"DERIV DIRECT API · NATIVE WEBSOCKET":"SECURE BROKER CONNECTION FLOW";
+   $("modalSubtitle").textContent=selected==="exness"?"EXNESS PUBLIC TRADER API":selected==="deriv"?"DERIV OAUTH · SECURE ACCOUNT AUTHORIZATION":"SECURE BROKER CONNECTION FLOW";
   $("modalLogo").src=logos[slug];$("modalLogo").alt=d.name;
   $("accountId").value="";$("apiKey").value="";$("secretKey").value="";$("apiHost").value="";$("accessToken").value="";$("derivAppId").value="";$("oandaToken").value="";if($("mt5BridgeToken"))$("mt5BridgeToken").value="";if($("mt5BridgeStatus"))$("mt5BridgeStatus").textContent="TOKEN NOT GENERATED";if(mt5BridgePollTimer){clearInterval(mt5BridgePollTimer);mt5BridgePollTimer=null;}
   $("accountList").innerHTML="";$("authorizeBtn").disabled=true;$("accountId").parentElement.style.display="block";
@@ -408,10 +429,10 @@ function selectBroker(slug){
   $("terminalPath").value="C:\\Program Files\\MetaTrader 5\\terminal64.exe";$("vpsSymbol").value="XAUUSD";$("vpsTimeframe").value="M1";$("vpsBot").value="strategic";$("vpsExecutionMode").value=selectedExecution;$("vpsLiveConfirm").value="";
   $("mt5VpsStatus").textContent="VPS profile not configured.";$("mt5VpsCommand").classList.remove("show");$("vpsAgentCommand").value="";
   $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=(selected==="exness"||selected==="oanda")?"block":"none";$("bridgeTokenField").style.display="block";$("oandaTokenField").style.display=selected==="oanda"?"block":"none";if(selected==="deriv")$("accountId").placeholder="Deriv account ID";
-  $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":selected==="deriv"?"CONNECT DERIV DIRECT":"VERIFY CONNECTION"; $("verifyBtn").style.display="inline-flex"; $("executionMode").value=selectedExecution;
+  $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION"; $("verifyBtn").style.display=selected==="deriv"?"none":"inline-flex"; $("executionMode").value=selectedExecution;
   if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
   textFor();showDrawer();
-  if(selected==="deriv"){ $("credentials").classList.add("show"); $("mt5BridgePanel").style.display="none"; $("mt5VpsPanel").style.display="none"; $("derivAppIdField").style.display="block"; $("bridgeTokenField").style.display="block"; }
+  if(selected==="deriv"){ $("credentials").classList.remove("show"); $("mt5BridgePanel").style.display="none"; $("mt5VpsPanel").style.display="none"; $("derivAppIdField").style.display="none"; $("bridgeTokenField").style.display="none"; $("accountId").parentElement.style.display="none"; $("brokerLogin").style.display="none"; $("nextStep").style.display="inline-flex"; $("nextStep").textContent="CONTINUE WITH DERIV ↗"; $("flowStatus").textContent="Secure Deriv authorization is ready. Continue to Deriv, approve KINGBOT access, then choose your account when you return."; }
   if(selected==="exness")trackExnessPartner();
   else if(selected==="deriv")trackBrokerPartner("deriv");
   else trackBrokerPartner(selected);
@@ -712,14 +733,19 @@ async function restoreDerivOAuthReturn(){
   if(card){
     const d=cfg.deriv;
     $("modalTitle").textContent=d.name;
-    $("modalSubtitle").textContent="DERIV OAUTH · API-NATIVE AI EXECUTION";
+    $("modalSubtitle").textContent="DERIV OAUTH · SECURE ACCOUNT AUTHORIZATION";
     $("modalLogo").src=logos.deriv||"";
     $("modalLogo").alt=d.name;
   }
   setStep(3);
   $("credentials").classList.remove("show");
+  $("accountId").parentElement.style.display="none";
+  $("bridgeTokenField").style.display="none";
+  $("derivAppIdField").style.display="none";
   $("mt5BridgePanel").style.display="none";
   $("mt5VpsPanel").style.display="none";
+  $("brokerLogin").style.display="none";
+  $("nextStep").style.display="none";
   $("accountSelect").classList.add("show");
   $("accountList").innerHTML='<div class="flow-copy"><strong>VERIFYING DERIV AUTHORIZATION…</strong><br>Loading the accounts authorized for KINGBOT.</div>';
   try{
@@ -862,50 +888,14 @@ $("closeModal").addEventListener("click",closeDrawer);
 $("drawer").addEventListener("click",e=>{if(e.target===$("drawer"))closeDrawer()});
 $("nextStep").addEventListener("click",()=>{
   if(!selected)return;
-  if(step===1 && selected==="deriv"){ return; }
+  if(step===1 && selected==="deriv"){ void startDerivOAuth(); return; }
   if(step===1){step=2;textFor();setStatus("Broker selected. Continue to secure authentication.")}
   else if(step===2&&cfg[selected].native){step=3;textFor();$("accountList").innerHTML='<div class="flow-copy"><strong>NATIVE ACCOUNT SELECTION</strong><br>The broker must return its authorized account list through KINGBOT\'s registered OAuth/API adapter. No account is assumed or displayed until that callback is verified.</div>';$("authorizeBtn").disabled=true;setStatus("Native adapter callback required before an account can be selected.")}
 });
 $("verifyBtn").addEventListener("click",async()=>{
   if(!selected)return;
   const accountId=$("accountId").value.trim(),token=$("accessToken").value.trim();
-  if(selected==="deriv"){
-    const directToken=$("accessToken").value.trim();
-    const appId=$("derivAppId").value.trim();
-    if(!accountId||!directToken||!appId){
-      setStatus("Enter the Deriv account ID, PAT and matching App ID.");
-      return;
-    }
-    const btn=$("verifyBtn");
-    btn.disabled=true;btn.textContent="CONNECTING DIRECTLY…";setStep(3);
-    try{
-      const t=await firebaseToken();
-      const r=await fetch(API_BASE+"/broker/deriv/direct/connect",{
-        method:"POST",
-        headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},
-        body:JSON.stringify({accountId,accessToken:directToken,appId,executionMode:$("executionMode").value}),
-        credentials:"omit",cache:"no-store"
-      });
-      const d=await r.json().catch(()=>({}));
-      if(!r.ok||!d.connected)throw new Error(d.message||d.reason||d.error||"Direct Deriv connection failed.");
-      verified=true;selectedAccount=d.accountId||accountId;
-      $("accessToken").value="";$("derivAppId").value="";
-      $("accountSelect").classList.remove("show");
-      setStep(4);
-      $("flowCopy").innerHTML="<strong>STEP 4 · DERIV DIRECT CONNECTION COMPLETE</strong><br>Deriv account ownership, API authorization, account type and native WebSocket session were verified directly with Deriv.";
-      setStatus("DERIV DIRECT CONNECTED ✓ · "+(d.accountType==="real"?"LIVE / REAL":"DEMO · BROKER")+" · "+selectedAccount+" · BALANCE "+(d.account?.balance==null?"—":Number(d.account.balance).toLocaleString(undefined,{maximumFractionDigits:2})));
-      btn.textContent="CONNECTED ✓";
-      applyConnectionLock({connected:true,broker:"deriv",accountId:selectedAccount,executionMode:d.executionMode||$("executionMode").value,accountType:String(d.accountType||"demo").toUpperCase()});
-      return;
-    }catch(e){
-      setStep(2);
-      textFor();
-      setStatus(String(e.message||"Direct Deriv connection failed.").slice(0,220));
-    }finally{
-      btn.disabled=false;btn.textContent="CONNECT DERIV DIRECT";
-    }
-    return;
-  }
+  if(selected==="deriv"){ startDerivOAuth(); return; }
   if(selected==="exness"){
     if(!accountId||!$("apiKey").value.trim()||!$("secretKey").value.trim()){setStatus("Enter the Exness account ID, API key and secret key.");return}
   }else if(selected==="oanda"){
@@ -940,7 +930,7 @@ $("authorizeBtn").addEventListener("click",async()=>{
       const connection=window.__KINGBOT_DERIV_PENDING;
       const el=document.querySelector('.account-item.active');
       const accountType=String(el?.dataset.accountType||"").toLowerCase();
-      if(!connection||!accountType)throw new Error("Deriv authorization session is missing. Start the OAuth flow again.");
+      if(!connection||!accountType)throw new Error("Deriv authorization session is missing. Continue with Deriv again.");
       const r=await fetch(API_BASE+"/broker/deriv/oauth/connect",{
         method:"POST",
         headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},
