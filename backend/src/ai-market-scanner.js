@@ -581,6 +581,8 @@ class AiMarketScannerStream {
   closeClient(client) {
     if (!client || client.closed) return;
     client.closed = true;
+    clearInterval(client.heartbeatTimer);
+    client.heartbeatTimer = null;
     for (const unsubscribe of client.derivUnsubs || []) {
       try { unsubscribe(); } catch {}
     }
@@ -774,7 +776,9 @@ class AiMarketScannerStream {
       derivUnsubs: [],
       closed: false,
       lastMessageAt: 0,
-      lastQuoteAt: null
+      lastQuoteAt: null,
+      isAlive: true,
+      heartbeatTimer: null
     };
     this.clients.add(client);
 
@@ -797,6 +801,23 @@ class AiMarketScannerStream {
       if (rawSymbols) initialSymbols = rawSymbols;
       if (rawTimeframe) initialTimeframe = rawTimeframe;
     } catch {}
+
+    ws.on("pong", () => {
+      client.isAlive = true;
+    });
+
+    client.heartbeatTimer = setInterval(() => {
+      if (client.closed) {
+        clearInterval(client.heartbeatTimer);
+        return;
+      }
+      if (!client.isAlive) {
+        try { ws.terminate(); } catch {}
+        return;
+      }
+      client.isAlive = false;
+      try { ws.ping(); } catch { this.closeClient(client); }
+    }, 20000);
 
     ws.on("message", (raw) => {
       if (raw?.length > this.maxMessageBytes) {
