@@ -333,7 +333,6 @@ async function derivOauthJson(path,options={}){
   return body;
 }
 app.get("/api/broker/deriv/oauth/start",async(req,res)=>{
-  return res.status(410).json({ok:false,error:"DERIV_OPTIONS_ROUTE_DISABLED",message:"KINGBOT Deriv connection is CFD/MT5 only. Connect the Deriv MT5 CFD account through the KINGBOT MT5 Bridge."});
   try{
     const user=await requireUser(pool,req,res);if(!user)return;
     const {clientId,redirectUri,frontendReturn}=derivOauthConfig();
@@ -342,22 +341,180 @@ app.get("/api/broker/deriv/oauth/start",async(req,res)=>{
     const verifier=base64Url(crypto.randomBytes(64));
     const challenge=base64Url(crypto.createHash("sha256").update(verifier).digest());
     const saved=await broker.createDerivOAuthState({userId:user.id,codeVerifier:verifier,executionMode:mode});
-    const params=new URLSearchParams({response_type:"code",client_id:clientId,redirect_uri:redirectUri,scope:"trade",state:saved.state,code_challenge:challenge,code_challenge_method:"S256"});
-    res.json({ok:true,authorizationUrl:"https://auth.deriv.com/oauth2/auth?"+params.toString(),executionMode:mode,returnUrl:frontendReturn||null});
-  }catch(error){res.status(503).json({ok:false,error:String(error?.message||"DERIV_OAUTH_START_FAILED")});}
+    const params=new URLSearchParams({
+      response_type:"code",
+      client_id:clientId,
+      redirect_uri:redirectUri,
+      scope:"trade",
+      state:saved.state,
+      code_challenge:challenge,
+      code_challenge_method:"S256"
+    });
+    res.json({
+      ok:true,
+      authorizationUrl:"https://auth.deriv.com/oauth2/auth?"+params.toString(),
+      executionMode:mode,
+      returnUrl:frontendReturn||null,
+      provider:"deriv",
+      executionArchitecture:"AI_STRATEGIES + BROKER_API"
+    });
+  }catch(error){
+    console.error("[KINGBOT DERIV OAUTH START]",error?.message||error);
+    res.status(503).json({ok:false,error:String(error?.message||"DERIV_OAUTH_START_FAILED").slice(0,220)});
+  }
 });
+
 app.get("/api/broker/deriv/oauth/callback",async(req,res)=>{
   const frontend=String(process.env.DERIV_FRONTEND_RETURN_URL||"").trim()||"https://botking-automation.github.io/KINGBOT-FINETECH/broker-connect.html";
   const url=new URL(frontend);
-  url.searchParams.set("deriv_error","DERIV_OPTIONS_ROUTE_DISABLED_USE_MT5_CFD_BRIDGE");
-  return res.redirect(302,url.toString());
+  try{
+    const oauthError=String(req.query?.error||"").trim();
+    if(oauthError){
+      url.searchParams.set("deriv_error",oauthError);
+      if(req.query?.error_description)url.searchParams.set("deriv_error_description",String(req.query.error_description).slice(0,180));
+      return res.redirect(302,url.toString());
+    }
+
+    const state=String(req.query?.state||"").trim();
+    const code=String(req.query?.code||"").trim();
+    if(!state||!code){
+      url.searchParams.set("deriv_error","DERIV_OAUTH_CALLBACK_INVALID");
+      return res.redirect(302,url.toString());
+    }
+
+    const pending=await broker.consumeDerivOAuthState(state).catch(()=>null);
+    if(!pending){
+      url.searchParams.set("deriv_error","DERIV_OAUTH_STATE_INVALID_OR_EXPIRED");
+      return res.redirect(302,url.toString());
+    }
+
+    const {clientId,redirectUri}=derivOauthConfig();
+    const tokenResponse=await fetch("https://auth.deriv.com/oauth2/token",{
+      method:"POST",
+      headers:{"content-type":"application/x-www-form-urlencoded","accept":"application/json"},
+      body:new URLSearchParams({
+        grant_type:"authorization_code",
+        client_id:clientId,
+        code,
+        code_verifier:String(pending.code_verifier||""),
+        redirect_uri:redirectUri
+      }).toString()
+    });
+    const tokenPayload=await tokenResponse.json().catch(()=>({}));
+    if(!tokenResponse.ok||!tokenPayload?.access_token){
+      throw new Error(String(tokenPayload?.error_description||tokenPayload?.error||"DERIV_TOKEN_EXCHANGE_FAILED").slice(0,220));
+    }
+
+    const accountResponse=await fetch("https://api.derivws.com/trading/v1/options/accounts",{
+      headers:{
+        Authorization:"Bearer "+String(tokenPayload.access_token),
+        Accept:"application/json"
+      }
+    });
+    const accountPayload=await accountResponse.json().catch(()=>({}));
+    if(!accountResponse.ok){
+      throw new Error(String(accountPayload?.errors?.[0]?.message||accountPayload?.error?.message||"DERIV_ACCOUNTS_FETCH_FAILED").slice(0,220));
+    }
+
+    const accounts=Array.isArray(accountPayload?.data)
+      ? accountPayload.data
+      : (accountPayload?.data ? [accountPayload.data] : []);
+
+    const saved=await broker.finalizeDerivOAuthState({
+      state,
+      tokenPayload,
+      accounts
+    });
+
+    url.searchParams.set("deriv_pending_id",String(saved.pending_id));
+    url.searchParams.set("deriv_execution_mode",String(saved.execution_mode||"DEMO"));
+    return res.redirect(302,url.toString());
+  }catch(error){
+    console.error("[KINGBOT DERIV OAUTH CALLBACK]",error?.message||error);
+    url.searchParams.set("deriv_error",String(error?.message||"DERIV_OAUTH_CALLBACK_FAILED").slice(0,180));
+    return res.redirect(302,url.toString());
+  }
 });
+
 app.get("/api/broker/deriv/oauth/pending",async(req,res)=>{
-  return res.status(410).json({ok:false,error:"DERIV_OPTIONS_ROUTE_DISABLED",message:"Use the Deriv CFD/MT5 connection flow."});
+  try{
+    const user=await requireUser(pool,req,res);if(!user)return;
+    const pendingId=String(req.query?.pendingId||"").trim();
+    if(!pendingId)return res.status(400).json({ok:false,error:"DERIV_PENDING_ID_REQUIRED"});
+    const pending=await broker.getDerivOAuthPending({userId:user.id,pendingId});
+    if(!pending)return res.status(404).json({ok:false,error:"DERIV_OAUTH_PENDING_NOT_FOUND"});
+    const accounts=(Array.isArray(pending.accounts)?pending.accounts:[]).map(account=>({
+      accountId:String(account?.account_id||account?.loginid||account?.id||""),
+      accountType:String(account?.account_type||account?.accountType||"").toUpperCase(),
+      currency:String(account?.currency||"").toUpperCase(),
+      balance:Number.isFinite(Number(account?.balance))?Number(account.balance):null,
+      status:String(account?.status||"").toUpperCase()
+    })).filter(x=>x.accountId);
+    res.json({
+      ok:true,
+      provider:"deriv",
+      pendingId,
+      executionMode:String(pending.execution_mode||"DEMO").toUpperCase(),
+      accounts
+    });
+  }catch(error){
+    console.error("[KINGBOT DERIV OAUTH PENDING]",error?.message||error);
+    res.status(503).json({ok:false,error:String(error?.message||"DERIV_OAUTH_PENDING_FAILED").slice(0,220)});
+  }
 });
+
 app.post("/api/broker/deriv/oauth/connect",async(req,res)=>{
-  return res.status(410).json({ok:false,error:"DERIV_OPTIONS_ROUTE_DISABLED",message:"Options accounts are not supported by KINGBOT CFD execution. Use the Deriv MT5 CFD bridge."});
+  try{
+    const user=await requireUser(pool,req,res);if(!user)return;
+    const pendingId=String(req.body?.pendingId||"").trim();
+    const accountId=String(req.body?.accountId||"").trim();
+    const accountType=String(req.body?.accountType||"").trim().toLowerCase();
+    if(!pendingId||!accountId)return res.status(400).json({ok:false,error:"DERIV_ACCOUNT_SELECTION_REQUIRED"});
+
+    const pending=await broker.getDerivOAuthPending({userId:user.id,pendingId});
+    if(!pending)return res.status(404).json({ok:false,error:"DERIV_OAUTH_PENDING_NOT_FOUND"});
+    const selected=(pending.accounts||[]).find(account=>String(account?.account_id||account?.loginid||account?.id||"")===accountId);
+    if(!selected)return res.status(400).json({ok:false,error:"DERIV_ACCOUNT_NOT_IN_AUTHORIZATION_SESSION"});
+
+    const selectedType=String(selected?.account_type||selected?.accountType||accountType||"").toLowerCase();
+    const mode=String(pending.execution_mode||"DEMO").toUpperCase();
+    if(mode==="DEMO"&&selectedType!=="demo")return res.status(409).json({ok:false,error:"DEMO_REQUIRES_DERIV_DEMO_ACCOUNT"});
+    if(mode==="LIVE"&&selectedType!=="real")return res.status(409).json({ok:false,error:"LIVE_REQUIRES_DERIV_REAL_ACCOUNT"});
+
+    const result=await broker.saveMapping({
+      userId:user.id,
+      provider:"deriv",
+      accountId,
+      accountToken:JSON.stringify({
+        accessToken:pending.token?.accessToken,
+        refreshToken:pending.token?.refreshToken,
+        expiresAt:pending.token?.expiresAt,
+        accountType:selectedType
+      }),
+      executionMode:mode,
+      derivAccountType:selectedType
+    });
+    if(!result?.ok)return res.status(409).json(result);
+
+    await broker.consumeDerivOAuthPending({userId:user.id,pendingId});
+    const connected=await broker.connect(user.id,mode);
+    if(!connected?.connected)return res.status(502).json({ok:false,error:connected?.reason||"DERIV_CONNECTION_FAILED"});
+    res.json({
+      ok:true,
+      connected:true,
+      broker:"deriv",
+      accountId,
+      accountType:selectedType.toUpperCase(),
+      executionMode:mode,
+      architecture:"AI_STRATEGIES + BROKER_API",
+      account:connected.account||null
+    });
+  }catch(error){
+    console.error("[KINGBOT DERIV OAUTH CONNECT]",error?.message||error);
+    res.status(503).json({ok:false,error:String(error?.message||"DERIV_OAUTH_CONNECT_FAILED").slice(0,220)});
+  }
 });
+
 app.get("/api/broker/live-authorization", async (req,res)=>{
   try{
     const user=await requireUser(pool,req,res); if(!user)return;
