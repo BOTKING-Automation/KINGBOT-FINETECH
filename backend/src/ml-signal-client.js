@@ -1,4 +1,7 @@
-const URL = String(process.env.KINGBOT_ML_SIGNAL_URL || "").trim().replace(/\/$/, "");
+const EXPLICIT_URL = String(process.env.KINGBOT_ML_SIGNAL_URL || "").trim().replace(/\/$/, "");
+const HOST = String(process.env.KINGBOT_ML_SIGNAL_HOST || "").trim();
+const PORT = String(process.env.KINGBOT_ML_SIGNAL_PORT || "").trim();
+const URL = EXPLICIT_URL || (HOST ? "http://" + HOST + (PORT ? ":" + PORT : "") : "");
 const SECRET = String(process.env.KINGBOT_ML_SIGNAL_SECRET || "").trim();
 const TIMEOUT_MS = Math.max(800, Number(process.env.KINGBOT_ML_SIGNAL_TIMEOUT_MS || 2200));
 
