@@ -903,7 +903,9 @@ async function execute(row){
   const trace=(stage,extra={})=>console.log("[KINGBOT EXEC]",JSON.stringify({botId,stage,symbol:row.symbol||null,...extra,at:new Date().toISOString()}));
   trace("START");
   if(!(await entitled(userId,botId))){
-    await pool.query("UPDATE kingbot_bot_runtime SET state='ERROR',last_error='SUBSCRIPTION_NOT_ACTIVE',updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
+    // A missing/expired entitlement is an access state, not an execution fault.
+    // Keep the runtime stopped so the matrix does not report a false engine error.
+    await pool.query("UPDATE kingbot_bot_runtime SET state='STOPPED',last_error='SUBSCRIPTION_NOT_ACTIVE',last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
     return;
   }
   const config=(await pool.query("SELECT symbol,timeframe FROM kingbot_bot_runtime WHERE user_id=$1 AND bot_id=$2",[userId,botId])).rows[0];
