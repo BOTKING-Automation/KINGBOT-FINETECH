@@ -65,6 +65,7 @@ function normalizeMarket(input = {}) {
     liquiditySweep: bool(input.liquiditySweep),
     orderBlock: bool(input.orderBlock),
     fairValueGap: bool(input.fairValueGap ?? input.fvg),
+    rawDisplacement: input.displacement || null,
     displacement: bool(input.displacement),
     breakout: bool(input.breakout),
     retest: bool(input.retest),
