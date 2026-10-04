@@ -919,7 +919,7 @@ async function execute(row){
   const account=await getWorkerAccount(userId);
   trace("ACCOUNT_READY",{broker:status.broker,accountId:status.accountId,executionMode:s.executionMode});
   const brokerName=String(status.broker||"").toLowerCase();
-  if(brokerName==="deriv")throw new Error("DERIV_OPTIONS_NOT_VALID_FOR_MT5_BOTS");
+  // Deriv is an API-native execution provider. No MT4/MT5 EA is required.
   if(brokerName==="exness"){
     if(s.executionMode==="PAPER")s.executionMode="DEMO";
     if(account.trade_mode==="trading_disabled")throw new Error("EXNESS_TRADING_DISABLED");
@@ -1000,14 +1000,28 @@ async function execute(row){
       execution:multiTimeframe.execution
     }
   };
-  const aiStrategySignal=getAiStrategySignal({userId,botId,market:aiMarket,analysis});
-  const aiTradeGate=aiStrategySignal
-    ? routeAiSignalToEngine({botId,signal:aiStrategySignal,candidateSignal:analysis.signal})
-    : null;
+  let aiStrategySignal=null;
+  let aiTradeGate=null;
   if(analysis.ok){
-    void warmAiStrategySignal({userId,botId,market:aiMarket,analysis,risk,tradePlan:null})
-      .catch(error=>console.error("[KINGBOT AI SIGNAL] warm failed:",error?.message||error));
+    try{
+      aiStrategySignal=await warmAiStrategySignal({userId,botId,market:aiMarket,analysis,risk,tradePlan:null});
+      aiTradeGate=aiStrategySignal
+        ? routeAiSignalToEngine({botId,signal:aiStrategySignal,candidateSignal:analysis.signal})
+        : null;
+    }catch(error){
+      console.error("[KINGBOT AI STRATEGIES] confirmation failed:",error?.message||error);
+      aiStrategySignal={engine:botId,direction:"HOLD",strategyMatch:false,engineAccepted:true,mlStatus:"AI_STRATEGIES_ERROR",reason:String(error?.message||"AI_STRATEGIES_ERROR").slice(0,180)};
+      aiTradeGate=routeAiSignalToEngine({botId,signal:aiStrategySignal,candidateSignal:analysis.signal});
+    }
   }
+  trace("AI_STRATEGIES_READY",{
+    required:aiExecutionGateEnabled(),
+    confirmed:Boolean(aiTradeGate?.confirm),
+    direction:aiStrategySignal?.direction||"HOLD",
+    model:aiStrategySignal?.model||null,
+    mlStatus:aiStrategySignal?.mlStatus||null,
+    source:aiStrategySignal?.source||null
+  });
 
   let adaptiveExecutionDecision=null;
   const adaptiveExecutionEligible=Boolean(
@@ -1205,7 +1219,7 @@ export async function startWorker(options={}){
     stateType:"HEALTH",
     state:{status:"RUNNING",startedAt:new Date().toISOString(),workerRole:"execution"}
   }).catch(()=>{});
-  console.log("[KINGBOT WORKER] real broker execution loop started with centralized risk control");
+  console.log("[KINGBOT WORKER] AI STRATEGIES execution loop started with centralized risk control and broker-native APIs");
   const loop=async()=>{try{await cycle();}catch(error){console.error("[KINGBOT WORKER]",error?.message||error);}if(!stopping)timer=setTimeout(loop,WORKER_POLL_MS);};
   await loop();
 }
