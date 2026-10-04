@@ -637,7 +637,7 @@ tbody tr:hover{background:rgba(34,230,255,.035)}
   function renderScan(data){
     qs("scannedCount").textContent=String((data.symbols||[]).length);
     qs("availableCount").textContent=String(data.quoteCount??(data.quotes||[]).filter(q=>q.available).length);
-    qs("analysisMeta").textContent=(data.provider||"KINGBOT ENGINE")+" · "+(data.model||"deterministic technical engine")+" · "+(data.technicalSource||"live data");
+    qs("analysisMeta").textContent=(data.provider||"KINGBOT NATIVE")+" · "+(data.model||"KINGBOT-CORTEX-1")+" · "+(data.technicalSource||"native OHLC");
     qs("summaryText").textContent=data.analysis||"No analysis returned.";
     let regime="—", ranked=[];
     try{
@@ -719,10 +719,10 @@ tbody tr:hover{background:rgba(34,230,255,.035)}
       qs("aiState").className=data.aiReady?"good":"warn";
       const twelve=data.marketData?.twelveData||{};
       const derivPublic=data.marketData?.derivPublic||{};
-      const configured=Boolean(twelve.configured||derivPublic.standalone||data.tradingViewConnected);
-      const live=Boolean(twelve.connected||derivPublic.connected||data.tradingViewConnected);
+      const configured=Boolean(twelve.configured||derivPublic.standalone);
+      const live=Boolean(twelve.connected||derivPublic.connected);
       if(configured){
-        qs("marketState").textContent=twelve.connected?"TWELVE DATA LIVE":(derivPublic.connected?"DERIV PUBLIC LIVE":(data.tradingViewConnected?"TRADINGVIEW":"MARKET DATA"));
+        qs("marketState").textContent=twelve.connected?"TWELVE DATA LIVE · NATIVE OHLC":(derivPublic.connected?"DERIV PUBLIC LIVE · NATIVE OHLC":"NATIVE MARKET DATA");
         qs("marketState").className=live?"good":"warn";
         qs("coreSub").textContent=data.brokerRequired===false
           ?"Standalone market scanner ready · broker connection is not required."
