@@ -444,6 +444,15 @@ export class UserBrokerManager {
       }
     }
 
+    if(mapping.provider==="mt5-bridge" || mapping.provider==="deriv-mt5"){
+      return {
+        connected:false,
+        mode:"NOT_CONNECTED",
+        reason:"LEGACY_MT5_EA_ROUTE_DISABLED",
+        message:"KINGBOT now uses AI Strategies with broker-native API execution. MT5 EA/bridge execution is no longer supported."
+      };
+    }
+
     const accountToken=credential;
     if(!entry){
       try{
