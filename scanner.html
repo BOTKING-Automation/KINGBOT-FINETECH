@@ -494,21 +494,8 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
       listFromInput();
       const focusSymbol=state.symbols[0]||"XAUUSD";
       const path="/ai/market-scanner?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value)+"&focusSymbol="+encodeURIComponent(focusSymbol);
-      const quotePath="/ai/market-scanner/quotes?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value);
 
-      const scanPromise=request(path,{method:"GET"});
-      try{
-        const quoteData=await request(quotePath,{method:"GET"});
-        state.quotes=quoteData.quotes||[];
-        renderQuotes();
-        qs("marketState").textContent=(quoteData.quoteCount||0)>0?"LIVE FEED":"TECHNICAL FEED";
-        qs("marketState").className="good";
-        qs("coreSub").textContent=(quoteData.source||"Live market feed")+" · "+(quoteData.quoteCount||0)+" live quotes · "+(quoteData.latencyMs||0)+"ms";
-      }catch(error){
-        console.warn("Fast quote sync failed:",error);
-      }
-
-      const data=await scanPromise;
+      const data=await request(path,{method:"GET"});
       state.quotes=data.quotes||state.quotes;
       renderQuotes(); renderScan(data);
       qs("lastScan").textContent=new Date(data.generatedAt||Date.now()).toLocaleTimeString();
