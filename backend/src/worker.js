@@ -1121,7 +1121,37 @@ async function execute(row){
   }
 
   let action="NO_ACTION",order=null,tradePlan=null;
-  if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&(!aiExecutionGateEnabled()||aiTradeGate?.confirm)){
+  if(brokerName==="deriv"){
+    if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&aiExecutionGateEnabled()&&aiTradeGate?.confirm){
+      const side=analysis.signal==="LONG_CANDIDATE"?"BUY":"SELL";
+      tradePlan=getTradePlan(botId,{symbol:config.symbol,timeframe:executionTimeframe,price:(bid+ask)/2,entryPrice:side==="BUY"?ask:bid,atr:ind.atr},side);
+      if(!tradePlan.ok)throw new Error(tradePlan.reason||"TRADE_PLAN_UNAVAILABLE");
+      const riskAmount=Number(account.equity)*(s.maxRiskPerTradePct/100);
+      const minStake=Math.max(1,Number((await broker.getSymbolSpecification(config.symbol,userId)).data?.minVolume||1));
+      if(!Number.isFinite(riskAmount)||riskAmount<minStake){
+        action="DERIV_MIN_STAKE_EXCEEDS_AI_RISK_BUDGET";
+      }else{
+        const stake=Number(riskAmount.toFixed(2));
+        const rr=Math.max(1,Number(tradePlan.riskReward)||2);
+        const stopLoss=Number(Math.max(0.01,stake*0.5).toFixed(2));
+        const takeProfit=Number(Math.max(0.01,stopLoss*rr).toFixed(2));
+        if(positions.length>=s.maxPositions)throw new Error("MAX_POSITIONS");
+        const clientId="kb_"+crypto.randomUUID();
+        const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,decision_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,adaptiveExecutionDecision?.decisionId||null,s.executionMode,config.symbol,side,stake]);
+        if(!journal.rowCount)throw new Error("DUPLICATE_EXECUTION_REQUEST");
+        try{
+          await broker.assertExecutionAuthorized(userId);
+          order=await broker.placeOrder({side,symbol:config.symbol,volume:stake,stopLoss,takeProfit,comment:"KINGBOT AI "+botId,clientId,userId,currency:String(account.currency||"USD"),multiplier:100,derivContractType:side==="BUY"?"MULTUP":"MULTDOWN"});
+          await pool.query("UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,JSON.stringify(order)]);
+          action="AI_ORDER_SUBMITTED";
+        }catch(error){
+          await pool.query("UPDATE kingbot_execution_journal SET status='REJECTED',error_message=$2,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,String(error?.message||"ORDER_REJECTED").slice(0,500)]);
+          throw error;
+        }
+      }
+    }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!risk.allowed)action="RISK_BLOCKED";
+    else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&aiExecutionGateEnabled()&&!aiTradeGate?.confirm)action=aiTradeGate?.status||"AI_STRATEGY_CONFIRMATION_BLOCKED";
+  }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&(!aiExecutionGateEnabled()||aiTradeGate?.confirm)){
     const side=analysis.signal==="LONG_CANDIDATE"?"BUY":"SELL";
     const specResult=await broker.getSymbolSpecification(config.symbol,userId); const spec=specResult?.data??specResult??{};
     const tickSize=Number(spec.tickSize),minVolume=Number(spec.minVolume),maxVolume=Number(spec.maxVolume),volumeStep=Number(spec.volumeStep),point=Number(spec.point),stopsLevel=Number(spec.stopsLevel);
