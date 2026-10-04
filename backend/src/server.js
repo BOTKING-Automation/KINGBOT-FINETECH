@@ -690,7 +690,17 @@ function firstFinite(...values){
 }
 
 registerTerminalSnapshot(app, { requireUser, pool, broker, firstFinite });
-registerAiMarketScanner(app, { pool, rateLimit, twelveData, server:httpServer });
+registerAiMarketScanner(app, {
+  pool,
+  rateLimit,
+  twelveData,
+  server:httpServer,
+  cortexRunner:(market)=>orchestrateKingbotIntelligence({
+    market,
+    riskContext:{},
+    options:{ pool, twelveData, thinkingLevel:"EXPERT" }
+  })
+});
 registerAiAgent(app, { requireUser, pool, broker, rateLimit, twelveData, eventBus });
 registerTerminalLive(app, { requireUser, pool, broker, firstFinite });
 registerElevenLabsVoice(app, { requireUser, pool, rateLimit });
