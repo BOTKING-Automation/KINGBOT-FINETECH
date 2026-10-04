@@ -1,0 +1,214 @@
+name: KINGBOT AI Strategies CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ml-signal-service/**"
+      - "backend/src/ml-signal-client.js"
+      - "backend/src/ai-trade-gate.js"
+      - "backend/src/bot-engines.js"
+      - "backend/src/worker.js"
+      - "backend/src/ai-market-scanner.js"
+      - ".github/workflows/ai-strategies.yml"
+  pull_request:
+    paths:
+      - "ml-signal-service/**"
+      - "backend/src/ml-signal-client.js"
+      - "backend/src/ai-trade-gate.js"
+      - "backend/src/bot-engines.js"
+      - "backend/src/worker.js"
+      - "backend/src/ai-market-scanner.js"
+
+jobs:
+  ai-strategies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ML dependencies
+        run: python -m pip install --upgrade pip && pip install -r ml-signal-service/requirements.txt
+
+      - name: Python syntax check
+        run: python -m py_compile ml-signal-service/service.py
+
+      - name: Train all five AI strategy models
+        run: |
+          python - <<'PY'
+          import math
+          import sys
+          import time
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path("ml-signal-service").resolve()))
+          import service
+
+          bars = []
+          base = 100.0
+          for i in range(260):
+              cycle = math.sin(i / 7.0) * 2.4 + math.sin(i / 17.0) * 1.8
+              drift = ((i % 31) - 15) * 0.08
+              close = base + cycle + drift
+              prev = base + (math.sin((i - 1) / 7.0) * 2.4 + math.sin((i - 1) / 17.0) * 1.8) + (((i - 1) % 31) - 15) * 0.08 if i else 100.0
+              high = max(close, prev) + 0.7 + (i % 5) * 0.05
+              low = min(close, prev) - 0.7 - (i % 3) * 0.05
+              bars.append({"open": prev, "high": high, "low": low, "close": close, "volume": 100 + (i % 20)})
+
+          market = {"symbol": "XAUUSD", "bars": bars}
+          trained = []
+          for strategy in ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"]:
+              result = service.train_model(strategy, "5m", [market])
+              assert result["ready"], result
+              assert result["featureVersion"] == "ai-strategies-v3", result
+              trained.append(result["key"])
+              prediction = service.predict_model(
+                  strategy,
+                  "XAUUSD",
+                  "5m",
+                  {
+                      "price": bars[-1]["close"],
+                      "atr": 1.5,
+                      "emaFast": 101.0,
+                      "emaSlow": 99.5,
+                      "rsi": 58.0,
+                      "adx": 24.0,
+                      "spread": 0.2,
+                      "trend": 0.7,
+                      "momentum": 0.6,
+                      "volatility": 0.45,
+                      "structure": "bullish",
+                      "liquiditySweep": True,
+                      "orderBlock": True,
+                      "fairValueGap": True,
+                      "displacement": True,
+                      "breakout": True,
+                      "retest": True,
+                      "velocityPoints": 0.8,
+                  },
+              )
+              assert prediction["ready"], prediction
+              assert prediction["strategy"] == strategy, prediction
+              assert prediction["modelKey"] == f"{strategy}:5m", prediction
+              assert prediction["direction"] in {"BUY", "SELL", "HOLD"}, prediction
+
+          print("AI strategy models trained:", ",".join(trained))
+          PY
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+
+      - name: Node syntax check
+        run: |
+          node --check backend/src/ml-signal-client.js
+          node --check backend/src/ai-trade-gate.js
+          node --check backend/src/bot-engines.js
+          node --check backend/src/worker.js
+          node --check backend/src/ai-market-scanner.js
+
+      - name: End-to-end Node → ML service gate test
+        run: |
+          KINGBOT_AI_STRATEGIES_REQUIRED=true           KINGBOT_ML_SIGNAL_URL=http://127.0.0.1:19090           KINGBOT_ML_SIGNAL_SECRET=ci-secret           node --input-type=module <<'NODE'
+          import { spawn } from "node:child_process";
+          import { once } from "node:events";
+          import http from "node:http";
+
+          const ml = spawn(process.env.PYTHON || "python3", ["ml-signal-service/service.py"], {
+            env: { ...process.env, PORT: "19090", KINGBOT_ML_SIGNAL_SECRET: "ci-secret", PYTHONUNBUFFERED: "1" },
+            stdio: ["ignore", "pipe", "pipe"]
+          });
+
+          let logs = "";
+          ml.stdout.on("data", chunk => { logs += chunk.toString(); });
+          ml.stderr.on("data", chunk => { logs += chunk.toString(); });
+
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+          try {
+            for (let i = 0; i < 40; i++) {
+              try {
+                const response = await fetch("http://127.0.0.1:19090/health");
+                if (response.ok) break;
+              } catch {}
+              await sleep(250);
+            }
+
+            const bars = [];
+            let base = 100;
+            for (let i = 0; i < 240; i++) {
+              const previous = base;
+              const close = base + Math.sin(i / 6) * 2 + Math.sin(i / 13) * 1.5 + ((i % 17) - 8) * 0.05;
+              base = close;
+              bars.push({
+                open: previous,
+                high: Math.max(previous, close) + 0.6,
+                low: Math.min(previous, close) - 0.6,
+                close,
+                volume: 100 + (i % 10)
+              });
+            }
+
+            const trainResponse = await fetch("http://127.0.0.1:19090/train", {
+              method: "POST",
+              headers: { "content-type": "application/json", "x-kingbot-ml-secret": "ci-secret" },
+              body: JSON.stringify({ botId: "strategic", timeframe: "5m", markets: [{ symbol: "XAUUSD", bars }] })
+            });
+            const train = await trainResponse.json();
+            if (!trainResponse.ok || !train.ok || !train.ready) throw new Error("ML train failed: " + JSON.stringify(train));
+
+            const { warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } = await import("./backend/src/ai-trade-gate.js");
+            const market = {
+              symbol: "XAUUSD", timeframe: "5m", price: base, spread: 0.2, atr: 1.5,
+              volatility: 0.45, trend: 0.7, momentum: 0.6, structure: "bullish",
+              adx: 24, rsi: 58, emaFast: 101, emaSlow: 99.5, velocityPoints: 0.8
+            };
+            const analysis = { ok: true, signal: "LONG_CANDIDATE", score: 80, reason: "CI test" };
+            const signal = await warmAiStrategySignal({
+              userId: "ci-user",
+              botId: "strategic",
+              market,
+              analysis,
+              risk: { blocks: [] }
+            });
+            const routed = routeAiSignalToEngine({
+              botId: "strategic",
+              signal,
+              candidateSignal: analysis.signal
+            });
+
+            if (!aiExecutionGateEnabled()) throw new Error("AI Strategies gate is not required");
+            if (!signal || signal.mlStatus === "SERVICE_UNAVAILABLE" || signal.mlStatus === "MODEL_NOT_READY") {
+              throw new Error("AI Strategies signal was not ready: " + JSON.stringify(signal));
+            }
+            if (signal.engine !== "strategic") throw new Error("Wrong strategy engine");
+            if (!["BUY", "SELL", "HOLD"].includes(signal.direction)) throw new Error("Invalid direction");
+            if (!routed || routed.status === "CORTEX_ENGINE_ROUTE_MISMATCH") throw new Error("Signal routing failed");
+
+            console.log("END-TO-END AI STRATEGIES PASS", JSON.stringify({
+              engine: signal.engine,
+              direction: signal.direction,
+              strategyMatch: signal.strategyMatch,
+              mlStatus: signal.mlStatus,
+              source: signal.source
+            }));
+          } finally {
+            ml.kill("SIGTERM");
+            await Promise.race([once(ml, "exit"), sleep(2000)]);
+            if (!ml.killed) ml.kill("SIGKILL");
+            console.log(logs);
+          }
+          NODE
