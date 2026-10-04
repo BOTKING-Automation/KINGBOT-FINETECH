@@ -2,41 +2,45 @@ const clamp = (v, min, max) => Math.min(max, Math.max(min, Number(v) || 0));
 const upper = v => String(v || "").trim().toUpperCase();
 
 const DEFAULT_WEIGHTS = {
-  rawScore: 0.42,
-  strategyFit: 0.18,
+  specialistScore: 0.42,
+  specialistConfidence: 0.18,
   htfAlignment: 0.14,
   trigger: 0.08,
-  structure: 0.08,
-  adaptive: 0.05,
-  contradiction: 0.05
+  structure: 0.06,
+  adaptive: 0.04,
+  contradiction: 0.08
 };
 
-function directionFromEngine(engine = {}) {
-  const score = Number(engine.score || 0);
-  if (upper(engine.signal) === "LONG_CANDIDATE" || score >= 60) return "BUY";
-  if (upper(engine.signal) === "SHORT_CANDIDATE" || score <= -60) return "SELL";
+function directionFromSpecialist(card = {}) {
+  const d = upper(card.direction);
+  if (d === "BUY" || d === "SELL") return d;
   return "WAIT";
 }
 
-function weightedDirectionScore(engine, mtf = {}, weights = DEFAULT_WEIGHTS) {
-  const raw = Number(engine.score || 0);
-  const direction = directionFromEngine(engine);
-  if (direction === "WAIT") return 0;
-
-  let score = Math.abs(raw) * weights.rawScore;
-  score += Number(engine.fit || 0) * weights.strategyFit;
-
+function specialistCouncilScore(engine, specialist, mtf = {}, weights = DEFAULT_WEIGHTS) {
+  if (!specialist) {
+    const raw = Number(engine?.score || 0);
+    return Number(clamp(Math.abs(raw), 0, 100).toFixed(2));
+  }
+  const direction = directionFromSpecialist(specialist);
+  if (direction === "WAIT" || !specialist.strategyMatch) return 0;
+  const raw = Math.abs(Number(specialist.rawScore || 0));
+  let score = raw * weights.specialistScore;
+  score += Number(specialist.confidence || 0) * weights.specialistConfidence;
   const htf = upper(mtf.higherTimeframeBias);
-  if (htf && htf !== "MIXED") score += direction === htf ? 100 * weights.htfAlignment : -100 * weights.htfAlignment;
+  if (htf && htf !== "MIXED") {
+    const expected = direction === "BUY" ? "BULLISH" : "BEARISH";
+    score += direction === expected ? 100 * weights.htfAlignment : -100 * weights.htfAlignment;
+  }
   if (mtf.triggerPresent) score += 100 * weights.trigger;
-
   const structure = upper(mtf.alignment?.direction);
-  if (structure && structure !== "MIXED") score += direction === structure ? 100 * weights.structure : -100 * weights.structure;
-
-  const adaptive = Number(engine.adaptiveAdjustment || 0);
+  if (structure && structure !== "MIXED") {
+    const expected = direction === "BUY" ? "BULLISH" : "BEARISH";
+    score += structure === expected ? 100 * weights.structure : -100 * weights.structure;
+  }
+  const adaptive = Number(engine?.adaptiveAdjustment || 0);
   score += clamp(adaptive * 2, -12, 12) * weights.adaptive;
-
-  if (mtf.setupState === "CONFLICTED") score -= 100 * weights.contradiction;
+  score -= Math.min(100, (specialist.contradictions?.length || 0) * 12) * weights.contradiction;
   return Number(clamp(score, 0, 100).toFixed(2));
 }
 
@@ -48,107 +52,146 @@ export function buildStrategyCouncil(engines = [], {
   minAgreement = 0.6
 } = {}) {
   const rows = engines.map(engine => {
-    const direction = directionFromEngine(engine);
-    const councilScore = weightedDirectionScore(engine, multiTimeframe, weights);
+    const specialist = engine.specialist || null;
+    const direction = directionFromSpecialist(specialist) || (
+      upper(engine.signal) === "LONG_CANDIDATE" ? "BUY" :
+      upper(engine.signal) === "SHORT_CANDIDATE" ? "SELL" : "WAIT"
+    );
+    const councilScore = specialistCouncilScore(engine, specialist, multiTimeframe, weights);
     return {
       botId: engine.botId,
       name: engine.name,
+      strategyIdentity: specialist?.strategyIdentity || "Legacy bot strategy evaluator",
       direction,
-      rawScore: Number(engine.score || 0),
-      fit: Number(engine.fit || 0),
+      rawScore: Number(specialist?.rawScore ?? engine.score ?? 0),
+      confidence: Number(specialist?.confidence ?? 0),
       councilScore,
-      strategyMatch: Boolean(engine.strategyMatch),
+      strategyMatch: Boolean(specialist?.strategyMatch ?? engine.strategyMatch),
+      conditions: specialist?.conditions || [],
+      missingConditions: specialist?.missingConditions || [],
+      entryConditions: specialist?.entryConditions || [],
+      waitConditions: specialist?.waitConditions || [],
+      invalidation: specialist?.invalidation || "No directional candidate.",
+      timeframeRequirements: specialist?.timeframeRequirements || engine.timeframeProfile || {},
+      marketRegimes: specialist?.marketRegimes || [],
+      evidenceUsed: specialist?.evidenceUsed || [],
+      contradictions: specialist?.contradictions || [],
       adaptiveAdjustment: Number(engine.adaptiveAdjustment || 0),
       historicalSampleSize: Number(engine.historicalSampleSize || 0),
-      reason: engine.reason || "No strategy reason supplied."
+      reason: specialist?.entryConditions?.[0] || specialist?.waitConditions?.[0] || engine.reason || "No strategy reason supplied."
     };
   });
 
   const eligible = rows.filter(r => r.strategyMatch && r.direction !== "WAIT");
-  const bullishVotes = eligible.filter(r => r.direction === "BUY").length;
-  const bearishVotes = eligible.filter(r => r.direction === "SELL").length;
-  const waitVotes = rows.length - bullishVotes - bearishVotes;
-  const buyScore = rows.filter(r => r.direction === "BUY").reduce((s, r) => s + r.councilScore, 0);
-  const sellScore = rows.filter(r => r.direction === "SELL").reduce((s, r) => s + r.councilScore, 0);
-  const totalDirectional = buyScore + sellScore;
-  const weightedDirection = buyScore === sellScore ? "WAIT" : buyScore > sellScore ? "BUY" : "SELL";
-  const winningVotes = Math.max(bullishVotes, bearishVotes);
-  const agreementRatio = rows.length ? winningVotes / rows.length : 0;
-  const directionalAgreement = eligible.length ? winningVotes / eligible.length : 0;
-
-  const sorted = [...eligible].sort((a, b) => b.councilScore - a.councilScore || Math.abs(b.rawScore) - Math.abs(a.rawScore));
+  const bullish = eligible.filter(r => r.direction === "BUY");
+  const bearish = eligible.filter(r => r.direction === "SELL");
+  const waitVotes = rows.length - eligible.length;
+  const buyScore = bullish.reduce((s, r) => s + r.councilScore, 0);
+  const sellScore = bearish.reduce((s, r) => s + r.councilScore, 0);
+  const sorted = [...eligible].sort((a,b) => b.councilScore - a.councilScore || b.confidence - a.confidence);
   const strongest = sorted[0] || null;
   const runnerUp = sorted[1] || null;
-  const divergence = rows.filter(r => r.direction !== "WAIT" && r.direction !== weightedDirection).map(r => ({
-    botId: r.botId,
-    direction: r.direction,
-    councilScore: r.councilScore
-  }));
+  const weightedDirection = buyScore === sellScore ? "WAIT" : buyScore > sellScore ? "BUY" : "SELL";
+  const directionalAgreement = eligible.length
+    ? Math.max(bullish.length, bearish.length) / eligible.length
+    : 0;
+  const agreementRatio = rows.length
+    ? Math.max(bullish.length, bearish.length) / rows.length
+    : 0;
 
+  const opposing = strongest
+    ? eligible.filter(r => r.direction !== strongest.direction)
+    : [];
+  const strongOpposition = opposing.filter(r => r.confidence >= 70 && r.councilScore >= 55);
   const blockers = Array.isArray(riskBlocks) ? riskBlocks : [];
-  let state = weightedDirection;
-  let reason = "Strategy Council consensus is aligned.";
-  if (!rows.length || !eligible.length) {
+
+  let state = "WAIT";
+  let reason = "No specialist has a valid setup.";
+  if (blockers.length) {
     state = "WAIT";
-    reason = "No strategy has reached its independent signal threshold.";
-  } else if (blockers.length) {
+    reason = "Deterministic risk controls override all AI specialist candidates.";
+  } else if (!strongest) {
     state = "WAIT";
-    reason = "Risk controls override strategy consensus.";
+    reason = "All five AI specialists are waiting for their own strategy conditions.";
+  } else if (upper(multiTimeframe.setupState) === "DATA_INSUFFICIENT") {
+    state = "WAIT";
+    reason = "Required multi-timeframe market evidence is incomplete.";
   } else if (upper(multiTimeframe.setupState) === "CONFLICTED") {
     state = "CONFLICTED";
     reason = "Higher and lower timeframe evidence conflicts.";
-  } else if (agreementRatio < Number(minAgreement) || directionalAgreement < Number(minAgreement)) {
-    state = "CONFLICTED";
-    reason = "Strategy agreement is below the council minimum.";
   } else if (marketDecision !== "BUY" && marketDecision !== "SELL") {
     state = "WAIT";
-    reason = "Market evidence gate does not authorize a directional candidate.";
-  } else if (weightedDirection !== marketDecision) {
+    reason = "Independent market evidence gate is not directional.";
+  } else if (strongest.direction !== marketDecision) {
     state = "CONFLICTED";
-    reason = "Strategy Council direction conflicts with the independent market evidence gate.";
+    reason = "The strongest specialist conflicts with the independent market evidence gate.";
+  } else if (strongOpposition.length >= 2) {
+    state = "CONFLICTED";
+    reason = "Multiple independent specialists strongly contradict the primary setup.";
+  } else {
+    // A specialist may lead without majority voting. WAITING specialists are not treated as dissent.
+    state = strongest.direction;
+    reason = strongOpposition.length
+      ? strongest.name + " has a valid specialist setup; opposing specialists are recorded as dissent."
+      : strongest.name + " has the strongest valid specialist setup.";
   }
 
-  const rawConfidence = totalDirectional > 0
-    ? (Math.max(buyScore, sellScore) / totalDirectional) * 100
+  const totalDirectional = buyScore + sellScore;
+  const primaryShare = strongest && totalDirectional > 0
+    ? strongest.councilScore / (strongest.direction === "BUY" ? buyScore : sellScore)
     : 0;
-  const agreementFactor = clamp(agreementRatio / 0.8, 0, 1);
-  const confidenceCap = blockers.length || upper(multiTimeframe.setupState) === "DATA_INSUFFICIENT"
-    ? 0
-    : upper(multiTimeframe.setupState) === "CONFLICTED" || state === "CONFLICTED"
-      ? 55
-      : 92;
-  const confidence = Number(clamp(rawConfidence * (0.65 + agreementFactor * 0.35), 0, confidenceCap).toFixed(2));
+  let confidence = strongest
+    ? (strongest.confidence * 0.55) + (Math.min(100, strongest.councilScore) * 0.35) + (Math.min(100, directionalAgreement * 100) * 0.10)
+    : 0;
+  if (strongOpposition.length) confidence -= 10;
+  if (state === "CONFLICTED") confidence = Math.min(confidence, 55);
+  if (state === "WAIT" && blockers.length) confidence = 0;
+  confidence = Number(clamp(confidence, 0, state === "BUY" || state === "SELL" ? 92 : 55).toFixed(2));
+
+  const dissent = eligible.filter(r => strongest && r.botId !== strongest.botId && r.direction !== strongest.direction).map(r => ({
+    botId:r.botId, name:r.name, direction:r.direction, confidence:r.confidence, councilScore:r.councilScore,
+    reason:r.reason, contradictions:r.contradictions
+  }));
+  const supporters = eligible.filter(r => strongest && r.botId !== strongest.botId && r.direction === strongest.direction).map(r => ({
+    botId:r.botId, name:r.name, confidence:r.confidence, councilScore:r.councilScore
+  }));
 
   const whatToWait = [];
+  if (blockers.length) whatToWait.push(...blockers.map(x => "Resolve " + x + "."));
   if (state === "WAIT" || state === "CONFLICTED") {
-    if (blockers.length) whatToWait.push(...blockers.map(x => "Resolve " + x + "."));
     if (upper(multiTimeframe.setupState) === "DATA_INSUFFICIENT") whatToWait.push("Restore all required 5m/15m/1h/4h market data.");
     if (upper(multiTimeframe.setupState) === "CONFLICTED") whatToWait.push("Wait for higher/lower timeframe alignment.");
-    if (agreementRatio < Number(minAgreement)) whatToWait.push("Wait for stronger strategy agreement.");
     if (marketDecision !== "BUY" && marketDecision !== "SELL") whatToWait.push("Wait for the independent evidence gate to confirm direction.");
+  }
+  if (strongest) {
+    for (const item of strongest.missingConditions || []) whatToWait.push(item);
+    for (const item of strongest.waitConditions || []) whatToWait.push(item);
   }
 
   return {
     state,
     reason,
     engines: rows,
-    bullishVotes,
-    bearishVotes,
+    primarySpecialist: strongest,
+    supportingSpecialists: supporters,
+    dissentingSpecialists: dissent,
+    bullishVotes: bullish.length,
+    bearishVotes: bearish.length,
     waitVotes,
-    agreementRatio: Number(agreementRatio.toFixed(3)),
-    directionalAgreement: Number(directionalAgreement.toFixed(3)),
-    weightedScores: { buy: Number(buyScore.toFixed(2)), sell: Number(sellScore.toFixed(2)) },
+    agreementRatio:Number(agreementRatio.toFixed(3)),
+    directionalAgreement:Number(directionalAgreement.toFixed(3)),
+    weightedScores:{buy:Number(buyScore.toFixed(2)),sell:Number(sellScore.toFixed(2))},
     weightedDirection,
-    strongestEngine: strongest,
+    strongestEngine:strongest,
     runnerUp,
-    divergence,
+    divergence:dissent.map(x=>({botId:x.botId,direction:x.direction,councilScore:x.councilScore})),
     confidence,
-    confidenceMethod: "weighted strategy evidence + agreement calibration + hard confidence caps",
-    whatToWait: [...new Set(whatToWait)].slice(0, 8),
-    invalidation: state === "BUY" ? "Invalidate if council loses BUY consensus or market evidence flips." :
-      state === "SELL" ? "Invalidate if council loses SELL consensus or market evidence flips." :
-      "No directional trade candidate until the council becomes aligned.",
-    executionAuthorized: false,
-    executionAuthority: "NONE"
+    confidenceMethod:"specialist strategy completion + specialist confidence + independent evidence alignment; no majority-vote requirement",
+    whatToWait:[...new Set(whatToWait)].slice(0,10),
+    invalidation:strongest?.invalidation || "No directional trade candidate until a specialist setup is valid.",
+    executionAuthorized:false,
+    executionAuthority:"NONE",
+    primaryShare:Number(primaryShare.toFixed(3)),
+    minAgreement:Number(minAgreement)
   };
 }
