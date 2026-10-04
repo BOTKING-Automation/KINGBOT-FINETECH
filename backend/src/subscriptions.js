@@ -127,7 +127,7 @@ export function createSubscriptionRouter({pool,broker}) {
     const p=planId(req.body?.planId);
     const amount=Number(req.body?.amountKes);
     const phone=String(req.body?.payerPhone||"").trim();
-    const payerName=String(req.body?.payerName||"").trim().replace(/\\s+/g," ");
+    const payerName=String(req.body?.payerName||"").trim().replace(/\s+/g," ");
     const selectedBot=normalizeBotId(req.body?.selectedBotId);
     if(!PLANS[p])return res.status(400).json({ok:false,error:"Invalid subscription plan."});
     if(PLANS[p].requiresBotSelection && !PLANS[p].selectableBots.includes(selectedBot))return res.status(400).json({ok:false,error:"Basic requires selecting either Strategic or Breakout."});
