@@ -570,63 +570,62 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
         X = current_market_features(market, strategy)
         scaled = item["scaler"].transform(X).astype(np.float32)
 
-    rf_prob = item["rf"].predict_proba(scaled)[0]
-    rf_map = {int(label): float(prob) for label, prob in zip(item["rf"].classes_, rf_prob)}
-    rf_probs = np.asarray([rf_map.get(label, 0.0) for label in LABELS], dtype=np.float32)
+        rf_prob = item["rf"].predict_proba(scaled)[0]
+        rf_map = {int(label): float(prob) for label, prob in zip(item["rf"].classes_, rf_prob)}
+        rf_probs = np.asarray([rf_map.get(label, 0.0) for label in LABELS], dtype=np.float32)
 
-    item["torch"].eval()
-    with torch.no_grad():
-        torch_prob_raw = torch.softmax(item["torch"](torch.from_numpy(scaled)), dim=1).numpy()[0]
-    torch_probs = np.asarray(torch_prob_raw, dtype=np.float32)
+        item["torch"].eval()
+        with torch.no_grad():
+            torch_prob_raw = torch.softmax(item["torch"](torch.from_numpy(scaled)), dim=1).numpy()[0]
+        torch_probs = np.asarray(torch_prob_raw, dtype=np.float32)
 
-    probs = (rf_probs * 0.55 + torch_probs * 0.45)
-    probs = probs / max(float(probs.sum()), 1e-12)
-    best_index = int(np.argmax(probs))
-    direction = int(INDEX_TO_LABEL[best_index])
-    confidence = float(probs[best_index])
-    signed_score = float((probs[2] - probs[0]) * 100.0)
+        probs = (rf_probs * 0.55 + torch_probs * 0.45)
+        probs = probs / max(float(probs.sum()), 1e-12)
+        best_index = int(np.argmax(probs))
+        direction = int(INDEX_TO_LABEL[best_index])
+        confidence = float(probs[best_index])
+        signed_score = float((probs[2] - probs[0]) * 100.0)
 
-    if confidence < 0.55 or abs(signed_score) < 12.0:
-        direction = 0
+        if confidence < 0.55 or abs(signed_score) < 12.0:
+            direction = 0
 
-    focus = STRATEGY_FOCUS.get(strategy, set())
-    focus_note = ",".join(sorted(focus))
+        focus = STRATEGY_FOCUS.get(strategy, set())
+        focus_note = ",".join(sorted(focus))
 
-    return {
-        "ok": True,
-        "ready": True,
-        "status": "LIVE_ML_SIGNAL",
-        "strategy": strategy,
-        "symbol": symbol.upper(),
-        "timeframe": timeframe.lower(),
-        "direction": "BUY" if direction > 0 else "SELL" if direction < 0 else "HOLD",
-        "confidence": round(confidence * 100.0, 2),
-        "score": round(signed_score, 2),
-        "probabilities": {
-            "sell": round(float(probs[0]) * 100.0, 2),
-            "hold": round(float(probs[1]) * 100.0, 2),
-            "buy": round(float(probs[2]) * 100.0, 2),
-        },
-        "models": {
-            "scikitLearn": {
-                "accuracy": round(item["rf_accuracy"] * 100.0, 2),
-                "weight": 0.55,
+        return {
+            "ok": True,
+            "ready": True,
+            "status": "LIVE_ML_SIGNAL",
+            "strategy": strategy,
+            "symbol": symbol.upper(),
+            "timeframe": timeframe.lower(),
+            "direction": "BUY" if direction > 0 else "SELL" if direction < 0 else "HOLD",
+            "confidence": round(confidence * 100.0, 2),
+            "score": round(signed_score, 2),
+            "probabilities": {
+                "sell": round(float(probs[0]) * 100.0, 2),
+                "hold": round(float(probs[1]) * 100.0, 2),
+                "buy": round(float(probs[2]) * 100.0, 2),
             },
-            "pytorch": {
-                "accuracy": round(item["torch_accuracy"] * 100.0, 2),
-                "weight": 0.45,
+            "models": {
+                "scikitLearn": {
+                    "accuracy": round(item["rf_accuracy"] * 100.0, 2),
+                    "weight": 0.55,
+                },
+                "pytorch": {
+                    "accuracy": round(item["torch_accuracy"] * 100.0, 2),
+                    "weight": 0.45,
+                },
             },
-        },
-        "focusFeatures": focus_note,
-        "focusScale": "1.00 focus / 0.25 non-focus",
-        "modelKey": key,
-        "featureVersion": item["feature_version"],
-        "trainedAt": item["trained_at"],
-        "generatedAt": time.time(),
-    }
+            "focusFeatures": focus_note,
+            "focusScale": "1.00 focus / 0.25 non-focus",
+            "modelKey": key,
+            "featureVersion": item["feature_version"],
+            "trainedAt": item["trained_at"],
+            "generatedAt": time.time(),
+        }
     finally:
         PREDICTION_SEMAPHORE.release()
-
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "KINGBOT-ML/1.0"
