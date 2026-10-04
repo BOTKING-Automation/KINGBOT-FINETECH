@@ -33,6 +33,19 @@ const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const bool = v => Boolean(v);
 const upper = v => String(v || "").trim().toUpperCase();
 const lower = v => String(v || "").trim().toLowerCase();
+const signed = (v, fallback = 0) => {
+  const numeric = Number(v);
+  if (Number.isFinite(numeric)) return clamp(numeric, -1, 1);
+  const direction = upper(v);
+  if (["BULLISH", "BUY", "LONG", "UP"].includes(direction)) return 1;
+  if (["BEARISH", "SELL", "SHORT", "DOWN"].includes(direction)) return -1;
+  return fallback;
+};
+const directionalFlag = v => {
+  if (typeof v === "boolean") return v;
+  const value = upper(v);
+  return ["TRUE", "1", "YES", "CONFIRMED", "BULLISH", "BEARISH", "BUY", "SELL"].includes(value);
+};
 
 function freshness(value, maxAgeMs = 5000) {
   const t = value instanceof Date ? value.getTime() : Number.isFinite(Number(value)) && String(value).trim() !== ""
@@ -53,20 +66,20 @@ function normalizeMarket(input = {}) {
     spread: num(input.spread, 0),
     atr: num(input.atr ?? input.atr14, 0),
     volatility: num(input.volatility, 0),
-    trend: clamp(num(input.trend ?? input.trendScore, 0), -1, 1),
+    trend: signed(input.trend ?? input.trendScore, 0),
     rawTrend: input.trend ?? input.trendScore ?? null,
-    momentum: clamp(num(input.momentum, 0), -1, 1),
+    momentum: signed(input.momentum, 0),
     volume: clamp(num(input.volume ?? input.volumeScore, 0), 0, 1),
-    structure: lower(input.structure || "unknown"),
-    rawStructure: input.structure || null,
+    structure: lower(input.structure || input.marketStructure?.direction || "unknown"),
+    rawStructure: input.structure || input.marketStructure?.direction || null,
     rawBos: input.bos || null,
     rawChoch: input.choch || null,
     rawLiquiditySweep: input.liquiditySweep || input.liquidity_sweep || null,
-    liquiditySweep: bool(input.liquiditySweep),
+    liquiditySweep: directionalFlag(input.liquiditySweep || input.liquidity_sweep),
     orderBlock: bool(input.orderBlock),
     fairValueGap: bool(input.fairValueGap ?? input.fvg),
     rawDisplacement: input.displacement || null,
-    displacement: bool(input.displacement),
+    displacement: directionalFlag(input.displacement),
     breakout: bool(input.breakout),
     retest: bool(input.retest),
     adx: num(input.adx ?? input.adx14),
@@ -382,10 +395,22 @@ async function synthesize(payload) {
   const risk = payload?.riskCouncil || {};
   const routing = payload?.routing || {};
   const engines = Array.isArray(payload?.engines) ? payload.engines : [];
+  const analysts = Array.isArray(payload?.analysts) ? payload.analysts : [];
+  const regimeAgent = analysts.find(agent => agent?.id === "regime") || {};
+  const marketEvidence = payload?.market?.evidence || {};
+  const councilState = String(payload?.strategyCouncil?.state || routing?.councilState || "").toUpperCase();
   const blockers = [...(risk.blocks || []), ...(risk.flags || [])];
   const selected = routing.selectedEngine || "";
+  const synthesizedBias = councilState === "BUY"
+    ? "BULLISH"
+    : councilState === "SELL"
+      ? "BEARISH"
+      : String(marketEvidence.directionalBias || debate.direction || "NEUTRAL").toUpperCase();
+  const synthesizedRegime = String(summary.regime || regimeAgent.regime || payload?.market?.regime || "UNKNOWN");
+  const synthesizedConfidence = councilState === "WAIT" && blockers.length
+    ? 0
+    : Number(summary.confidence ?? payload?.market?.evidence?.confidence ?? 0);
   let statusSummary = "KINGBOT CORTEX completed the intelligence pass.";
-  const councilState = String(payload?.strategyCouncil?.state || routing?.councilState || "").toUpperCase();
   if (councilState === "BLOCKED" || blockers.length) {
     statusSummary = "KINGBOT CORTEX is blocked by deterministic controls or incomplete verified evidence.";
   } else if (councilState === "CONFLICTED") {
@@ -399,9 +424,9 @@ async function synthesize(payload) {
     provider: "KINGBOT_NATIVE",
     model: MODEL,
     result: {
-      regime: String(summary.regime || payload?.market?.regime || "UNKNOWN"),
-      bias: String(summary.bias || debate.direction || "NEUTRAL"),
-      confidence: Number(summary.confidence || 0),
+      regime: synthesizedRegime,
+      bias: synthesizedBias,
+      confidence: synthesizedConfidence,
       selectedEngine: selected,
       summary: statusSummary,
       risks: blockers.slice(0, 8),
