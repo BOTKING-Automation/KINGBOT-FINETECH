@@ -5,6 +5,8 @@ import { getDerivMarketFeed } from "./deriv-market-feed.js";
 import { predictPendingOrderZones } from "./pending-order-model.js";
 import { technicalAnalysisBookContext } from "./technical-analysis-book.js";
 import { WebSocketServer, WebSocket } from "ws";
+import { getBotDefinitions } from "./bot-engines.js";
+import { trainMlStrategyModel, mlSignalServiceStatus } from "./ml-signal-client.js";
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
@@ -523,6 +525,52 @@ export async function ensureAiMarketScannerSchema(pool) {
 }
 
 
+const AI_STRATEGY_BOTS = ["strategic","flipper","breakout","smc-pro","ladder-flip"];
+
+async function trainAiStrategyModels(twelveData){
+  const status=mlSignalServiceStatus();
+  if(!status.configured||!twelveData?.enabled||typeof twelveData.historicalBars!=="function")return {configured:status.configured,trained:0};
+  let trained=0;
+  for(const botId of AI_STRATEGY_BOTS){
+    const timeframe=String(getBotDefinitions()[botId]?.timeframeProfile?.execution||"5m").toLowerCase();
+    const markets=[];
+    for(const symbol of DEFAULT_SYMBOLS){
+      try{
+        const bars=await twelveData.historicalBars(symbol,timeframe,{limit:240,maxAgeMs:10*60*1000});
+        if(Array.isArray(bars)&&bars.length>=120)markets.push({symbol,bars});
+      }catch(error){
+        console.warn("[KINGBOT ML TRAIN]",botId,symbol,error?.message||error);
+      }
+    }
+    if(markets.length){
+      const result=await trainMlStrategyModel({botId,timeframe,markets});
+      if(result?.ok)trained++;
+      else console.warn("[KINGBOT ML TRAIN]",botId,result?.error||result?.status||"TRAINING_FAILED");
+    }
+  }
+  return {configured:true,trained};
+}
+
+function startAiStrategyModelTraining(twelveData){
+  if(!twelveData?.enabled||!mlSignalServiceStatus().configured)return;
+  const intervalMs=Math.max(5*60*1000,Number(process.env.KINGBOT_ML_RETRAIN_MS||30*60*1000));
+  let running=false;
+  const run=async()=>{
+    if(running)return;
+    running=true;
+    try{
+      const result=await trainAiStrategyModels(twelveData);
+      console.log("[KINGBOT ML TRAIN] strategy models:",JSON.stringify(result));
+    }catch(error){
+      console.warn("[KINGBOT ML TRAIN] cycle failed:",error?.message||error);
+    }finally{
+      running=false;
+    }
+  };
+  setTimeout(()=>void run(),Number(process.env.KINGBOT_ML_INITIAL_TRAIN_DELAY_MS||12000));
+  setInterval(()=>void run(),intervalMs);
+}
+
 function scannerCanonicalSymbol(value) {
   const raw = String(value || "").trim().toUpperCase();
   return raw.startsWith("FRX") ? raw.slice(3) : raw.replace("/", "");
@@ -876,6 +924,7 @@ class AiMarketScannerStream {
 
 export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server }) {
   const stream = new AiMarketScannerStream({ server, pool, twelveData });
+  startAiStrategyModelTraining(twelveData);
   void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
 
   const limiter = rateLimit({
