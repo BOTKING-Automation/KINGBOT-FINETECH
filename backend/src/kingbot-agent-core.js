@@ -59,7 +59,7 @@ function chooseKnowledge(intent, frame = {}) {
     : [...base];
 }
 
-function buildKingbotAgentPlan({
+export function buildKingbotAgentPlan({
   question = "",
   intent = "PLATFORM_SUPPORT",
   symbol = null,
