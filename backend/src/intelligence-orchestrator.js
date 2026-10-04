@@ -52,9 +52,14 @@ function normalizeMarket(input = {}) {
     atr: num(input.atr ?? input.atr14, 0),
     volatility: num(input.volatility, 0),
     trend: clamp(num(input.trend ?? input.trendScore, 0), -1, 1),
+    rawTrend: input.trend ?? input.trendScore ?? null,
     momentum: clamp(num(input.momentum, 0), -1, 1),
     volume: clamp(num(input.volume ?? input.volumeScore, 0), 0, 1),
     structure: lower(input.structure || "unknown"),
+    rawStructure: input.structure || null,
+    rawBos: input.bos || null,
+    rawChoch: input.choch || null,
+    rawLiquiditySweep: input.liquiditySweep || input.liquidity_sweep || null,
     liquiditySweep: bool(input.liquiditySweep),
     orderBlock: bool(input.orderBlock),
     fairValueGap: bool(input.fairValueGap ?? input.fvg),
@@ -67,6 +72,8 @@ function normalizeMarket(input = {}) {
     emaSlow: num(input.emaSlow ?? input.ema50),
     velocityPoints: num(input.velocityPoints, 0),
     timestamp: input.timestamp || input.time || input.receivedAt || null,
+    quoteTimestamp: input.quoteTimestamp || input.timestamp || input.time || null,
+    barTime: input.barTime || input.time || null,
     multiTimeframe: input.multiTimeframe || null,
     crossMarket: input.crossMarket || null
   };
