@@ -79,6 +79,59 @@ function normalizeMarket(input = {}) {
   };
 }
 
+async function buildMultiTimeframeContext({pool,twelveData,symbol,baseTimeframe="15m"}={}){
+  const levels=[...new Set([String(baseTimeframe).toLowerCase(),"5m","15m","1h","4h"])];
+  const scans=await Promise.all(levels.map(async timeframe=>{
+    try{
+      const scan=await runStandaloneMarketScan({pool,twelveData,symbols:[symbol],timeframe});
+      const item=(scan.technical||[]).find(x=>x.symbol===symbol)||{};
+      const quote=(scan.quotes||[]).find(x=>x.symbol===symbol)||null;
+      return {
+        timeframe,ok:Boolean(scan.ok),price:num(item.price??quote?.price),
+        trend:upper(item.trend||"NEUTRAL"),
+        structure:lower(item.structure||"unknown"),
+        bos:upper(item.bos||"NONE"),choch:upper(item.choch||"NONE"),
+        liquiditySweep:upper(item.liquiditySweep||"NONE"),
+        displacement:upper(item.displacement||"NONE"),
+        fvg:Boolean(item.fvg),orderBlock:item.orderBlock||null,
+        momentum:num(item.momentum,0),volatility:num(item.volatility,0),
+        rsi:num(item.rsi??item.rsi14),atr:num(item.atr??item.atr14),
+        timestamp:quote?.timestamp||item.receivedAt||item.barTime||null,
+        source:scan.source||item.source||"KINGBOT market engine"
+      };
+    }catch(error){
+      return {timeframe,ok:false,error:String(error?.message||"MTF_SCAN_FAILED").slice(0,140)};
+    }
+  }));
+  const usable=scans.filter(x=>x.ok);
+  const direction=x=>x.trend==="BULLISH"?"BULLISH":x.trend==="BEARISH"?"BEARISH":"NEUTRAL";
+  const bull=usable.filter(x=>direction(x)==="BULLISH").length;
+  const bear=usable.filter(x=>direction(x)==="BEARISH").length;
+  const htf=usable.filter(x=>["1h","4h"].includes(x.timeframe));
+  const ltf=usable.filter(x=>["5m","15m"].includes(x.timeframe));
+  const hBull=htf.filter(x=>direction(x)==="BULLISH").length;
+  const hBear=htf.filter(x=>direction(x)==="BEARISH").length;
+  const lBull=ltf.filter(x=>direction(x)==="BULLISH").length;
+  const lBear=ltf.filter(x=>direction(x)==="BEARISH").length;
+  const htfBias=hBull>hBear?"BULLISH":hBear>hBull?"BEARISH":"MIXED";
+  const ltfBias=lBull>lBear?"BULLISH":lBear>lBull?"BEARISH":"MIXED";
+  const conflict=htfBias!=="MIXED"&&ltfBias!=="MIXED"&&htfBias!==ltfBias;
+  const trigger=ltf.some(x=>direction(x)!=="NEUTRAL"&&x.bos===direction(x)&&(x.displacement===direction(x)||x.liquiditySweep===direction(x)||x.choch===direction(x)));
+  const setupState=usable.length<levels.length?"DATA_INSUFFICIENT":conflict?"CONFLICTED":
+    htfBias==="BULLISH"&&ltfBias==="BULLISH"&&trigger?"BUY_CANDIDATE":
+    htfBias==="BEARISH"&&ltfBias==="BEARISH"&&trigger?"SELL_CANDIDATE":
+    htfBias!=="MIXED"&&ltfBias===htfBias?"WAIT_CONFIRMATION":"WAIT";
+  return {
+    timeframes:scans,requiredTimeframes:levels,
+    alignment:{bullish:bull,bearish:bear,total:usable.length,required:levels.length,
+      ratio:usable.length?Number((Math.max(bull,bear)/usable.length).toFixed(2)):0,
+      direction:bull>bear?"BULLISH":bear>bull?"BEARISH":"MIXED",
+      htfBias,ltfBias,conflict},
+    higherTimeframeBias:htfBias,lowerTimeframeBias:ltfBias,triggerPresent:trigger,setupState,
+    staleTimeframes:scans.filter(x=>!x.ok).map(x=>x.timeframe)
+  };
+}
+
 function analyzeTechnical(m) {
   const structureScore = m.structure === "bullish" ? 1 : m.structure === "bearish" ? -1 : 0;
   const smc = (m.liquiditySweep ? 0.25 : 0) + (m.displacement ? 0.2 : 0) + (m.orderBlock ? 0.1 : 0) + (m.fairValueGap ? 0.1 : 0);
@@ -210,6 +263,14 @@ function analyzeMacroAndSentiment(input) {
 function engineFit(botId, market, regime, performance = {}) {
   const result = evaluateBot(botId, market);
   let fit = clamp(Math.abs(Number(result.score || 0)), 0, 100);
+  const mtf = market.multiTimeframe || {};
+  if (mtf.setupState === "CONFLICTED") fit -= 18;
+  if (mtf.higherTimeframeBias && mtf.higherTimeframeBias !== "MIXED") {
+    const engineDirection = result.score > 0 ? "BULLISH" : result.score < 0 ? "BEARISH" : "NEUTRAL";
+    if (engineDirection === mtf.higherTimeframeBias) fit += 10;
+    else if (engineDirection !== "NEUTRAL") fit -= 10;
+  }
+  if (mtf.triggerPresent && (result.score > 0 || result.score < 0)) fit += 6;
   if (botId === "smc-pro") {
     if (market.liquiditySweep) fit += 8;
     if (market.displacement) fit += 7;
@@ -358,6 +419,7 @@ function cacheKey(market, options = {}) {
 
 export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {}, memory = [], adaptivePerformance = {}, thinkingLevel = "EXPERT" } = {}) {
   const market = normalizeMarket(inputMarket);
+  if (!market.multiTimeframe && market.symbol) market.multiTimeframe = await buildMultiTimeframeContext({ pool: options.pool, twelveData: options.twelveData, symbol: market.symbol, baseTimeframe: market.timeframe });
   const marketEvidence = buildMarketEvidence(market, { maxAgeMs: Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000) });
   const level = normalizeThinkingLevel(thinkingLevel || options.thinkingLevel || "EXPERT");
   const cognitivePlan = buildCognitivePlan({ intent: "MARKET_INTELLIGENCE", symbol: market.symbol, conversation: [], thinkingLevel: level });
@@ -417,7 +479,7 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
       minSamples: Number(process.env.KINGBOT_ADAPTIVE_MIN_SAMPLES || 8)
     },
     generatedAt: new Date().toISOString(),
-    market: { ...market, freshness: freshness(market.timestamp, Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)), evidence: marketEvidence },
+    market: { ...market, multiTimeframe: market.multiTimeframe, freshness: freshness(market.timestamp, Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)), evidence: marketEvidence },
     analysts,
     debate,
     engines,
