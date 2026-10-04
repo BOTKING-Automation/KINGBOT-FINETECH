@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { orchestrateKingbotIntelligence } from "../src/intelligence-orchestrator.js";
+import { orchestrateKingbotIntelligence, buildMultiTimeframeContext } from "../src/intelligence-orchestrator.js";
 
 const now=new Date().toISOString();
 const mtf={timeframes:[
@@ -17,6 +17,47 @@ const market={
   rawDisplacement:"BULLISH",displacement:"BULLISH",orderBlock:{direction:"BULLISH"},fairValueGap:true,
   breakout:false,retest:false,adx:25,rsi:58,emaFast:2010,emaSlow:1990,receivedAt:now,quoteTimestamp:now,barTime:now,multiTimeframe:mtf
 };
+
+
+test("CORTEX MTF uses the native scanner across all four decision timeframes",async()=>{
+  const calls=[];
+  const scanRunner=async({timeframe})=>{
+    calls.push(timeframe);
+    return {
+      ok:true,
+      technical:[{
+        symbol:"XAUUSD",
+        source:"KINGBOT native OHLC: Deriv public candles",
+        technicalVerified:true,
+        price:2000,
+        trend:"BULLISH",
+        structure:"bullish",
+        bos:"BULLISH",
+        choch:"NONE",
+        liquiditySweep:"BULLISH",
+        displacement:"BULLISH",
+        fvg:true,
+        orderBlock:{direction:"BULLISH",high:2001,low:1998},
+        momentum:.7,
+        volatility:.4,
+        rsi14:58,
+        atr14:10,
+        ema20:2005,
+        ema50:1995,
+        barTime:now,
+        receivedAt:now
+      }],
+      quotes:[{symbol:"XAUUSD",price:2000,verified:true,timestamp:now}]
+    };
+  };
+  const result=await buildMultiTimeframeContext({symbol:"XAUUSD",baseTimeframe:"15m",twelveData:{enabled:false},scanRunner});
+  assert.deepEqual(calls.sort(),["1h","15m","4h","5m"]);
+  assert.equal(result.policy,"NATIVE_FULL_MTF");
+  assert.equal(result.timeframes.length,4);
+  assert.equal(result.timeframes.every(x=>x.ok && x.technicalReady && x.verification.native),true);
+  assert.equal(result.setupState,"BUY_CANDIDATE");
+  assert.equal(result.limitation,null);
+});
 
 test("orchestrator exposes five specialists and stays fresh with live receivedAt",async()=>{
   const result=await orchestrateKingbotIntelligence({market,riskContext:{executionMode:"DEMO"},options:{botId:null},adaptivePerformance:{}});
