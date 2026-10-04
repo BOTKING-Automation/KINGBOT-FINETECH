@@ -338,6 +338,88 @@ async function derivOauthJson(path,options={}){
   if(!response.ok)throw new Error(body?.error_description||body?.error||body?.message||("DERIV_OAUTH_REQUEST_FAILED_"+response.status));
   return body;
 }
+app.post("/api/broker/deriv/direct/connect",async(req,res)=>{
+  const user=await requireUser(pool,req,res);if(!user)return;
+  const accessToken=String(req.body?.accessToken||"").trim();
+  const appId=String(req.body?.appId||process.env.DERIV_DIRECT_APP_ID||"").trim();
+  const accountId=String(req.body?.accountId||"").trim();
+  const mode=String(req.body?.executionMode||"DEMO").toUpperCase();
+  if(!accessToken)return res.status(400).json({ok:false,error:"DERIV_API_TOKEN_REQUIRED"});
+  if(!appId)return res.status(400).json({ok:false,error:"DERIV_APP_ID_REQUIRED",message:"A Deriv PAT requires the App ID from the same registered PAT application."});
+  if(!accountId)return res.status(400).json({ok:false,error:"DERIV_ACCOUNT_ID_REQUIRED"});
+  if(!["DEMO","LIVE"].includes(mode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+
+  let timer=null;
+  try{
+    const controller=new AbortController();
+    timer=setTimeout(()=>controller.abort(),10000);
+    const response=await fetch("https://api.derivws.com/trading/v1/options/accounts",{
+      headers:{
+        Authorization:"Bearer "+accessToken,
+        "Deriv-App-ID":appId,
+        Accept:"application/json"
+      },
+      signal:controller.signal
+    });
+    const body=await response.json().catch(()=>({}));
+    if(!response.ok){
+      const detail=String(body?.errors?.[0]?.message||body?.error?.message||body?.message||("HTTP "+response.status)).slice(0,220);
+      if(response.status===401&&/Deriv-App-ID.*required|invalid.*token|unauthor/i.test(detail)){
+        throw new Error("DERIV_DIRECT_AUTH_FAILED");
+      }
+      if(response.status===403)throw new Error("DERIV_DIRECT_SCOPE_REQUIRED");
+      throw new Error("DERIV_DIRECT_ACCOUNTS_FAILED:"+detail);
+    }
+    const accounts=Array.isArray(body?.data)?body.data:(body?.data?[body.data]:[]);
+    const account=accounts.find(x=>String(x?.account_id||"").trim()===accountId);
+    if(!account)throw new Error("DERIV_ACCOUNT_NOT_FOUND");
+    const accountType=String(account?.account_type||account?.accountType||"").toLowerCase();
+    if(mode==="DEMO"&&accountType!=="demo")throw new Error("DEMO_REQUIRES_DERIV_DEMO_ACCOUNT");
+    if(mode==="LIVE"&&accountType!=="real")throw new Error("LIVE_REQUIRES_DERIV_REAL_ACCOUNT");
+
+    const mappedToken=JSON.stringify({accessToken,appId,accountType,authMethod:"pat"});
+    const saved=await broker.saveMapping({
+      userId:user.id,
+      provider:"deriv",
+      accountId,
+      accountToken:mappedToken,
+      executionMode:mode,
+      derivAccountType:accountType
+    });
+    if(saved?.ok===false)return res.status(saved.error==="BROKER_ALREADY_CONNECTED"?409:400).json(saved);
+
+    const connected=await broker.connect(user.id,mode);
+    if(!connected?.connected){
+      return res.status(502).json({ok:false,error:"DERIV_DIRECT_CONNECTION_FAILED",reason:String(connected?.reason||"DERIV_CONNECTION_FAILED").slice(0,220)});
+    }
+
+    const accountSnapshot=connected.account||account;
+    return res.json({
+      ok:true,
+      connected:true,
+      provider:"deriv",
+      accountId,
+      accountType,
+      executionMode:mode,
+      account:{
+        balance:accountSnapshot?.balance??account?.balance??null,
+        currency:accountSnapshot?.currency??account?.currency??"USD",
+        loginid:accountSnapshot?.loginid??accountId,
+        status:accountSnapshot?.status??account?.status??"active"
+      },
+      executionArchitecture:"AI_STRATEGIES -> RISK_ENGINE -> DERIV_NATIVE_API",
+      websocket:"wss://api.derivws.com/trading/v1/options/ws/"+(accountType==="real"?"real":"demo")
+    });
+  }catch(error){
+    const message=String(error?.message||"DERIV_DIRECT_CONNECTION_FAILED");
+    const status=/REQUIRED$|NOT_FOUND|SCOPE/.test(message)?400:/AUTH_FAILED/.test(message)?401:503;
+    console.error("[KINGBOT DERIV DIRECT]",message);
+    return res.status(status).json({ok:false,error:message.slice(0,220),message:message==="DERIV_DIRECT_AUTH_FAILED"?"Deriv rejected the token. Check that the PAT, App ID and trade scope belong to the same current Deriv application.":undefined});
+  }finally{
+    if(timer)clearTimeout(timer);
+  }
+});
+
 app.get("/api/broker/deriv/oauth/start",async(req,res)=>{
   try{
     const user=await requireUser(pool,req,res);if(!user)return;
