@@ -3,7 +3,6 @@ import MetaApi from "metaapi.cloud-sdk/esm-node";
 import { ExnessTraderClient } from "./exness-trader-client.js";
 import { OandaTraderClient } from "./oanda-trader-client.js";
 import { DerivTraderClient } from "./deriv-trader-client.js";
-import { Mt5BridgeConnection, mt5BridgeRegistry } from "./mt5-bridge.js";
 import { getGlobalRiskState } from "./global-risk.js";
 
 const ALGORITHM="aes-256-gcm";
@@ -148,7 +147,6 @@ export class UserBrokerManager {
     // account mapping is persistent. Rehydrate the connection after a
     // Render restart, idle wake-up, broker socket close, or worker/page transition.
     const mapping=await this.getMapping(userId);
-    if(mapping?.provider==="deriv")return {connected:false,mode:"NOT_CONNECTED",reason:"DERIV_OPTIONS_DISABLED_USE_DERIV_MT5_CFD"};
     if(!mapping)return false;
 
     try{
@@ -224,7 +222,6 @@ export class UserBrokerManager {
     const mode=requestedMode;
     const id=String(accountId||"").trim();
     const providerName=String(provider).toLowerCase();
-    if(providerName==="deriv")return {ok:false,error:"DERIV_OPTIONS_DISABLED_USE_DERIV_MT5_CFD",message:"KINGBOT CFD execution does not accept Deriv Options accounts. Connect the user Deriv MT5 CFD account through the KINGBOT MT5 Bridge."};
     const isExness=providerName==="exness";
     let secretValue=String(accountToken||"").trim();
     if(isExness){
@@ -345,39 +342,6 @@ export class UserBrokerManager {
     catch(error){return {connected:false,mode:"NOT_CONNECTED",reason:"BROKER_CREDENTIAL_DECRYPTION_FAILED"};}
     const key=userId+":"+mapping.provider+":"+mapping.account_id;
     let entry=this.connections.get(key);
-
-    if(mapping.provider==="mt5-bridge"){
-      try{
-        if(!entry){
-          const connection=new Mt5BridgeConnection({registry:mt5BridgeRegistry,token:credential,userId});
-          if(!await connection.waitConnected(5000))return {connected:false,mode:"NOT_CONNECTED",reason:"MT5_BRIDGE_OFFLINE"};
-          entry={ownerUserId:userId,api:connection,connection,accountId:mapping.account_id,executionMode:mode,provider:"mt5-bridge",connectedAt:Date.now(),accountInfo:null};
-          this.connections.set(key,entry);
-        }
-        if(!entry.connection.connected)return {connected:false,mode:"NOT_CONNECTED",reason:"MT5_BRIDGE_OFFLINE"};
-        const accountInfo=await entry.connection.getAccountInformation();
-        const terminalMode=String(accountInfo.accountType||accountInfo.account_type||"").toUpperCase()||(
-          Number(accountInfo.tradeMode)===4?"REAL":"DEMO"
-        );
-        if(mode==="DEMO"&&terminalMode!=="DEMO"){
-          this.connections.delete(key);
-          return {connected:false,mode:"NOT_CONNECTED",reason:"DEMO_REQUIRES_DEMO_ACCOUNT"};
-        }
-        if(mode==="LIVE"&&terminalMode!=="REAL"){
-          this.connections.delete(key);
-          return {connected:false,mode:"NOT_CONNECTED",reason:"LIVE_REQUIRES_REAL_ACCOUNT"};
-        }
-        entry.accountInfo=accountInfo;
-        entry.accountInfoAt=Date.now();
-        entry.executionMode=mode;
-        this.connectBackoff.delete(backoffKey);
-        return {connected:true,mode,broker:"mt5-bridge",accountId:mapping.account_id,account:accountInfo};
-      }catch(error){
-        this.connections.delete(key);
-        console.error("[KINGBOT MT5 BRIDGE] connect failed:",error?.message||error);
-        return {connected:false,mode:"NOT_CONNECTED",reason:error?.message||"MT5_BRIDGE_CONNECTION_FAILED"};
-      }
-    }
 
     if(mapping.provider==="exness"){
       try{
