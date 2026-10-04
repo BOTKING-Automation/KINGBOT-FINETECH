@@ -6,12 +6,14 @@ import { identitySnapshot, buildCognitivePlan, capabilitySet, normalizeThinkingL
 import { buildMarketEvidence, marketDecisionGate } from "./market-evidence-engine.js";
 import { buildStrategyCouncil } from "./strategy-council.js";
 import { evaluateStrategySpecialists } from "./strategy-specialists.js";
+import { getGoldPriceFeed } from "./gold-price-feed.js";
 
 const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
 const MODEL = "KINGBOT-CORTEX-1";
 const ai = null;
 const CACHE_MS = Math.max(2500, Number(process.env.KINGBOT_INTELLIGENCE_CACHE_MS || 7000));
 const cache = new Map();
+const publicGoldPriceFeed = getGoldPriceFeed();
 
 const SYNTHESIS_SCHEMA = {
   type: "object",
@@ -99,7 +101,9 @@ function normalizeMarket(input = {}) {
 }
 
 async function buildMultiTimeframeContext({pool,twelveData,symbol,baseTimeframe="15m"}={}){
-  const levels=[...new Set([String(baseTimeframe).toLowerCase(),"5m","15m","1h","4h"])];
+  const requestedLevels=[...new Set([String(baseTimeframe).toLowerCase(),"5m","15m","1h","4h"])];
+  const fullMultiTimeframe=Boolean(twelveData?.enabled);
+  const levels=fullMultiTimeframe ? requestedLevels : [String(baseTimeframe).toLowerCase()];
   const scans=await Promise.all(levels.map(async timeframe=>{
     try{
       const scan=await runStandaloneMarketScan({pool,twelveData,symbols:[symbol],timeframe});
@@ -141,7 +145,9 @@ async function buildMultiTimeframeContext({pool,twelveData,symbol,baseTimeframe=
     htfBias==="BEARISH"&&ltfBias==="BEARISH"&&trigger?"SELL_CANDIDATE":
     htfBias!=="MIXED"&&ltfBias===htfBias?"WAIT_CONFIRMATION":"WAIT";
   return {
-    timeframes:scans,requiredTimeframes:levels,
+    timeframes:scans,requiredTimeframes:levels,requestedTimeframes:requestedLevels,
+    policy:fullMultiTimeframe?"FULL_MTF":"BASE_TIMEFRAME_ONLY",
+    limitation:fullMultiTimeframe?null:"Higher-timeframe evidence is unavailable on the current free market-data path; the Council must not infer a directional execution route from the base timeframe alone.",
     alignment:{bullish:bull,bearish:bear,total:usable.length,required:levels.length,
       ratio:usable.length?Number((Math.max(bull,bear)/usable.length).toFixed(2)):0,
       direction:bull>bear?"BULLISH":bear>bull?"BEARISH":"MIXED",
@@ -152,6 +158,8 @@ async function buildMultiTimeframeContext({pool,twelveData,symbol,baseTimeframe=
 }
 
 function analyzeTechnical(m) {
+  const technicalFields = [m.emaFast, m.emaSlow, m.rsi, m.atr].filter(v => Number.isFinite(Number(v))).length;
+  const hasDirectionalFeature = Math.abs(Number(m.trend||0)) > 0 || Math.abs(Number(m.momentum||0)) > 0 || m.structure !== "unknown";
   const structureScore = m.structure === "bullish" ? 1 : m.structure === "bearish" ? -1 : 0;
   const smc = (m.liquiditySweep ? 0.25 : 0) + (m.displacement ? 0.2 : 0) + (m.orderBlock ? 0.1 : 0) + (m.fairValueGap ? 0.1 : 0);
   const breakout = m.breakout ? 0.25 : 0;
@@ -171,11 +179,14 @@ function analyzeTechnical(m) {
       "FVG=" + (m.fairValueGap ? "yes" : "no"),
       "breakout=" + (m.breakout ? "yes" : "no")
     ],
-    status: "VERIFIED_MARKET_FEATURES"
+    status: technicalFields >= 3 || hasDirectionalFeature ? "VERIFIED_MARKET_FEATURES" : "MARKET_TECHNICAL_DATA_INCOMPLETE",
+    dataCompleteness: { technicalFields, requiredForFullSetup: 4 }
   };
 }
 
 function analyzeRegime(m) {
+  const hasRegimeInputs = Number.isFinite(Number(m.emaFast)) || Number.isFinite(Number(m.emaSlow)) || Math.abs(Number(m.trend||0)) > 0 || Math.abs(Number(m.momentum||0)) > 0 || Math.abs(Number(m.volatility||0)) > 0;
+  if (!hasRegimeInputs) return {id:"regime",name:"REGIME ANALYST",score:0,regime:"DATA_INSUFFICIENT",bias:"NEUTRAL",evidence:["Live quote is present, but verified trend/volatility structure is not available yet."],status:"REGIME_WAITING_FOR_TECHNICAL_DATA"};
   const trendMagnitude = Math.abs(m.trend);
   const vol = m.volatility;
   const regime = trendMagnitude >= 0.55
@@ -349,7 +360,8 @@ function buildDebate(analysts, engines, market) {
 function riskCouncil(market, engines, riskContext = {}) {
   const blocks = [];
   const flags = [];
-  if (!(market.price > 0) || !(market.atr > 0)) blocks.push("MARKET_DATA_INCOMPLETE");
+  if (!(market.price > 0)) blocks.push("MARKET_DATA_INCOMPLETE");
+  if (!(market.atr > 0)) flags.push("TECHNICAL_DATA_INCOMPLETE");
   if (Number(market.spread) > 0 && Number(market.atr) > 0 && Number(market.spread) / Number(market.atr) > Number(riskContext.maxSpreadAtrRatio ?? 0.25)) blocks.push("SPREAD_GATE");
   const liveTimestamp = market.quoteTimestamp || market.receivedAt || market.timestamp || null;
   const stale = freshness(liveTimestamp, Number(market.quoteFreshnessMaxAgeMs || market.freshnessMaxAgeMs || riskContext.staleDataMs || process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000));
@@ -543,7 +555,7 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
       multiTimeframe: market.multiTimeframe,
       freshness: freshness(
         market.quoteTimestamp || market.receivedAt || market.timestamp,
-        Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)
+        Number(market.quoteFreshnessMaxAgeMs || market.freshnessMaxAgeMs || process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)
       ),
       freshnessMode: market.quoteTimestamp ? "LIVE_QUOTE" : (market.receivedAt ? "LIVE_DATA_INGESTION" : "BAR_CONTEXT"),
       evidence: marketEvidence
@@ -686,6 +698,31 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
           receivedAt
         };
         market.aiScanner = { provider: scan?.provider || "none", model: scan?.model || null, source: scan?.source || null, aiError: scan?.aiError || null };
+      }
+      if (symbol === "XAUUSD") {
+        try {
+          const goldQuote = await publicGoldPriceFeed.getQuote();
+          if (goldQuote?.verified) {
+            market = {
+              ...market,
+              symbol,
+              price: goldQuote.price,
+              bid: goldQuote.bid ?? market.bid ?? null,
+              ask: goldQuote.ask ?? market.ask ?? null,
+              spread: goldQuote.spread ?? market.spread ?? 0,
+              quoteTimestamp: goldQuote.timestamp,
+              receivedAt: goldQuote.receivedAt,
+              timestamp: goldQuote.timestamp,
+              freshnessMaxAgeMs: goldQuote.freshnessMaxAgeMs,
+              quoteFreshnessMaxAgeMs: goldQuote.freshnessMaxAgeMs,
+              verifiedQuote: true,
+              source: goldQuote.source,
+              directMarketFeed: goldQuote.provider
+            };
+          }
+        } catch (error) {
+          market = { ...market, directGoldFeedError: String(error?.message || "GOLD_API_DIRECT_FEED_UNAVAILABLE").slice(0,140) };
+        }
       }
       const memory = await loadIntelligenceMemory(pool, user.id, symbol);
       const adaptivePerformance = await loadAdaptivePerformance(pool, {userId:user.id, symbol});
