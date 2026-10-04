@@ -4640,7 +4640,25 @@ overscroll-behavior:none;}
       renderMovers();
 
       renderKPI();
+      syncHybridWorkspace();
 
+    }
+
+    function syncHybridWorkspace() {
+      const market = MARKETS.find(m => m.id === state.selected) || MARKETS[0];
+      if (!market) return;
+      const q = state.data[market.id] || {};
+      const symbol = market.id;
+      const price = Number(q.price);
+      const fresh = q.updated ? Math.max(0, Date.now() - q.updated) : Infinity;
+      const live = q.available !== false && Number.isFinite(price) && fresh < 120000;
+      const p = Number.isFinite(price) ? price.toLocaleString(undefined,{maximumFractionDigits:8}) : "—";
+      const set=(id,v)=>{const el=$(id);if(el)el.textContent=v};
+      set("workspaceSymbol",symbol); set("chartInstrument",symbol); set("cortexSymbol",symbol);
+      set("wsPrice",p); set("chartPrice",live ? p : "Quote not verified");
+      set("wsEvidence",live ? "LIVE / FRESH" : "VERIFYING");
+      set("workspaceStatus",live ? "● LIVE FEED" : "FEED WAITING");
+      const badge=$("marketLiveBadge"); if(badge) badge.textContent=live ? "● LIVE MARKET DATA" : "○ DATA VERIFYING";
     }
 
 
