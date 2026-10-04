@@ -310,11 +310,48 @@ function compactCrossMarket(quotes) {
 }
 
 async function refreshSnapshot({ twelveData, includeSynthetics = true } = {}) {
-  const [traditional, crypto, syntheticMarkets] = await Promise.all([
-    fetchTraditionalQuotes(twelveData),
-    fetchBinanceQuotes(),
+  const fabric = new MarketDataFabric({ twelveData });
+  const requested = [
+    ...TRADITIONAL_MARKETS.map(m => m.id),
+    ...CRYPTO_MARKETS.map(m => m.id)
+  ];
+  const [fabricQuotes, syntheticMarkets] = await Promise.all([
+    fabric.getQuotes(requested),
     includeSynthetics ? loadSyntheticUniverse() : Promise.resolve([])
   ]);
+
+  const quoteMap = new Map(fabricQuotes.map(q => [q.symbol, q]));
+  const mapFabricQuote = (market, category) => {
+    const q = quoteMap.get(market.id) || { symbol: market.id, available: false, verified: false, source: "KINGBOT market data fabric" };
+    const parsedTimestamp = q.timestamp ? Date.parse(q.timestamp) : NaN;
+    return {
+      symbol: market.id,
+      name: market.name,
+      category,
+      price: finite(q.price),
+      bid: finite(q.bid),
+      ask: finite(q.ask),
+      spread: finite(q.spread),
+      change: finite(q.change),
+      volume: finite(q.volume),
+      high: finite(q.high),
+      low: finite(q.low),
+      timestamp: Number.isFinite(parsedTimestamp) ? parsedTimestamp : Date.now(),
+      time: q.timestamp || null,
+      ageMs: Number(q.ageMs ?? 0),
+      freshnessMaxAgeMs: finite(q.freshnessMaxAgeMs),
+      quoteVerified: Boolean(q.verified),
+      available: Boolean(q.available && Number.isFinite(Number(q.price))),
+      quoteMode: q.available ? "LIVE" : "UNAVAILABLE",
+      source: q.source || "KINGBOT market data fabric",
+      provider: q.provider || null,
+      fallbackUsed: Boolean(q.fallbackUsed),
+      error: q.available ? null : (q.failures || []).map(x => x.provider + ":" + x.error).join(" | ").slice(0, 220) || null
+    };
+  };
+
+  const traditional = TRADITIONAL_MARKETS.map(m => mapFabricQuote(m, m.category));
+  const crypto = CRYPTO_MARKETS.map(m => mapFabricQuote(m, "crypto"));
 
   const synthetics = includeSynthetics
     ? await fetchSyntheticQuotes(syntheticMarkets)
@@ -344,9 +381,10 @@ async function refreshSnapshot({ twelveData, includeSynthetics = true } = {}) {
     quotes,
     crossMarket: compactCrossMarket(quotes),
     sourcePolicy: {
-      marketPage: "Shared KINGBOT feed",
-      traditional: "Direct free Gold API XAU/USD for gold + Twelve Data/Deriv fallback for other traditional markets",
-      crypto: "Binance public live ticker",
+      marketPage: "KINGBOT Market Data Fabric",
+      traditional: "Gold API XAU/XAG -> Twelve Data -> Massive -> Deriv fallback",
+      crypto: "Binance public spot -> Twelve Data -> Massive fallback",
+      visualization: "TradingView widget only",
       synthetic: "Deriv public live feed",
       executionAuthority: "NONE"
     }
