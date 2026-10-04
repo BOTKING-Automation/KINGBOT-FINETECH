@@ -322,26 +322,47 @@ def train_torch(X: np.ndarray, y: np.ndarray, scaler: StandardScaler, sample_wei
     return model, accuracy
 
 
-def train_model(strategy: str, symbol: str, timeframe: str, bars: list[dict[str, Any]]) -> dict[str, Any]:
-    normalized: list[dict[str, float]] = []
-    for bar in bars[-320:]:
-        try:
-            row = {
-                "open": finite(bar.get("open")),
-                "high": finite(bar.get("high")),
-                "low": finite(bar.get("low")),
-                "close": finite(bar.get("close")),
-                "volume": finite(bar.get("volume")),
-            }
-            if row["high"] >= row["low"] > 0 and row["close"] > 0:
-                normalized.append(row)
-        except AttributeError:
-            continue
+def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) -> dict[str, Any]:
+    combined_x: list[np.ndarray] = []
+    combined_y: list[np.ndarray] = []
+    combined_weights: list[np.ndarray] = []
+    symbols: list[str] = []
 
-    if len(normalized) < MIN_BARS:
+    for market in markets:
+        symbol = str(market.get("symbol") or "").strip().upper()
+        bars = market.get("bars")
+        if not symbol or not isinstance(bars, list):
+            continue
+        normalized: list[dict[str, float]] = []
+        for bar in bars[-320:]:
+            try:
+                row = {
+                    "open": finite(bar.get("open")),
+                    "high": finite(bar.get("high")),
+                    "low": finite(bar.get("low")),
+                    "close": finite(bar.get("close")),
+                    "volume": finite(bar.get("volume")),
+                }
+                if row["high"] >= row["low"] > 0 and row["close"] > 0:
+                    normalized.append(row)
+            except AttributeError:
+                continue
+
+        if len(normalized) < MIN_BARS:
+            continue
+        X_part, y_part, weights_part = bars_to_training_arrays(normalized, strategy)
+        if len(X_part):
+            combined_x.append(X_part)
+            combined_y.append(y_part)
+            combined_weights.append(weights_part)
+            symbols.append(symbol)
+
+    if not combined_x:
         raise ValueError(f"ML_TRAINING_REQUIRES_{MIN_BARS}_BARS")
 
-    X, y, weights = bars_to_training_arrays(normalized, strategy)
+    X = np.concatenate(combined_x, axis=0)
+    y = np.concatenate(combined_y, axis=0)
+    weights = np.concatenate(combined_weights, axis=0)
     if len(X) < 70:
         raise ValueError("ML_TRAINING_FEATURES_INSUFFICIENT")
 
@@ -367,7 +388,7 @@ def train_model(strategy: str, symbol: str, timeframe: str, bars: list[dict[str,
     rf_accuracy = float(accuracy_score(y[cutoff:], rf_pred)) if len(rf_pred) else 0.0
     torch_model, torch_accuracy = train_torch(X, y, scaler, weights)
 
-    key = f"{strategy}:{symbol.upper()}:{timeframe.lower()}"
+    key = f"{strategy}:{timeframe.lower()}"
     with LOCK:
         MODELS[key] = {
             "rf": rf,
@@ -375,7 +396,7 @@ def train_model(strategy: str, symbol: str, timeframe: str, bars: list[dict[str,
             "scaler": scaler,
             "trained_at": time.time(),
             "strategy": strategy,
-            "symbol": symbol.upper(),
+            "symbols": sorted(set(symbols)),
             "timeframe": timeframe.lower(),
             "samples": int(len(X)),
             "rf_accuracy": rf_accuracy,
@@ -399,7 +420,7 @@ def model_status(key: str) -> dict[str, Any]:
         "status": "TRAINED",
         "key": key,
         "strategy": item["strategy"],
-        "symbol": item["symbol"],
+        "symbols": item["symbols"],
         "timeframe": item["timeframe"],
         "trainedAt": item["trained_at"],
         "samples": item["samples"],
@@ -451,7 +472,7 @@ def current_market_features(market: dict[str, Any]) -> np.ndarray:
 
 
 def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, Any]) -> dict[str, Any]:
-    key = f"{strategy}:{symbol.upper()}:{timeframe.lower()}"
+    key = f"{strategy}:{timeframe.lower()}"
     with LOCK:
         item = MODELS.get(key)
     if not item:
@@ -582,16 +603,19 @@ class Handler(BaseHTTPRequestHandler):
             path = self.path.split("?", 1)[0]
             if path == "/train":
                 strategy = str(body.get("botId") or "").strip().lower()
-                symbol = str(body.get("symbol") or "").strip().upper()
                 timeframe = str(body.get("timeframe") or "5m").strip().lower()
-                bars = body.get("bars")
+                markets = body.get("markets")
+                if not isinstance(markets, list):
+                    symbol = str(body.get("symbol") or "").strip().upper()
+                    bars = body.get("bars")
+                    markets = [{"symbol": symbol, "bars": bars}] if symbol and isinstance(bars, list) else []
                 if strategy not in STRATEGY_FOCUS:
                     self._json(400, {"ok": False, "error": "ML_STRATEGY_INVALID"})
                     return
-                if not symbol or not isinstance(bars, list):
+                if not markets:
                     self._json(400, {"ok": False, "error": "ML_TRAIN_PAYLOAD_REQUIRED"})
                     return
-                result = train_model(strategy, symbol, timeframe, bars)
+                result = train_model(strategy, timeframe, markets)
                 self._json(200, {"ok": True, "stage": "AI_STRATEGIES", **result})
                 return
 
