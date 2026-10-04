@@ -289,13 +289,24 @@ export function createBotEngineRouter({ pool }) {
   router.get("/", async (req, res) => {
     const user = await requireUser(pool, req, res);
     if (!user) return;
-    const bots = await Promise.all(Object.values(BOT_DEFINITIONS).map(async bot => ({
-      ...bot,
-      entitled: await hasEntitlement(pool, user.id, bot.id, user.email),
-      runtime: "STOPPED",
-      executionMode: "NOT_CONNECTED"
-    })));
-    res.json({ ok: true, bots });
+    try {
+      const entitlementQuery = await pool.query(
+        "SELECT DISTINCT e.bot_id FROM kingbot_bot_entitlements e JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 AND e.active=TRUE AND s.status='active' AND (s.expires_at IS NULL OR s.expires_at>NOW())",
+        [user.id]
+      );
+      const entitledIds = new Set(entitlementQuery.rows.map(row => String(row.bot_id || "").toLowerCase()));
+      const admin = isAdminEmail(user.email);
+      const bots = Object.values(BOT_DEFINITIONS).map(bot => ({
+        ...bot,
+        entitled: admin || entitledIds.has(bot.id),
+        runtime: "STOPPED",
+        executionMode: "NOT_CONNECTED"
+      }));
+      res.json({ ok: true, bots });
+    } catch (error) {
+      console.error("[KINGBOT BOTS] catalog failed:", error?.message || error);
+      res.status(503).json({ ok: false, error: "BOT_CATALOG_UNAVAILABLE", message: "Bot catalog is temporarily unavailable. Please retry." });
+    }
   });
 
   router.get("/:botId", async (req, res) => {
