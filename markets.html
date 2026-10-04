@@ -4712,8 +4712,11 @@ overscroll-behavior:none;}
             "↻ Refreshing...";
 
 
-          await fetchDerivData().catch(()=>{});
-      await fetchCryptoData();
+          await Promise.all([
+            fetchSharedMarketData().catch(error => console.warn("Shared market refresh failed", error)),
+            fetchCryptoData().catch(error => console.warn("Crypto market refresh failed", error)),
+            fetchDerivData().catch(error => console.warn("Deriv quote refresh failed", error))
+          ]);
 
 
           setTimeout(
@@ -4756,23 +4759,33 @@ overscroll-behavior:none;}
 
 
       /*
-        Load public crypto
-        market statistics.
+        Load the shared KINGBOT market feed first.
+        This is the canonical source for instruments, live prices,
+        changes and synthetic-market quotes shown on this page.
       */
 
-      await fetchCryptoData();
+      await Promise.all([
+        fetchSharedMarketData().catch(error => console.warn("Shared market feed failed", error)),
+        fetchCryptoData().catch(error => console.warn("Crypto market feed failed", error)),
+        fetchDerivData().catch(error => console.warn("Deriv market feed failed", error))
+      ]);
 
 
       /*
-        Start websocket.
+        Start low-latency crypto websocket.
       */
 
       connectWebSocket();
 
 
       /*
-        Keep REST data fresh.
+        Keep the shared market feed and exchange ticker fresh.
       */
+
+      setInterval(
+        fetchSharedMarketData,
+        5000
+      );
 
       setInterval(
         fetchCryptoData,
@@ -4781,7 +4794,7 @@ overscroll-behavior:none;}
 
       setInterval(
         fetchDerivData,
-        5000
+        7000
       );
 
 
