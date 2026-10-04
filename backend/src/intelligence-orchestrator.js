@@ -338,6 +338,8 @@ function riskCouncil(market, engines, riskContext = {}) {
   if (bool(riskContext.globalKillSwitch)) blocks.push("GLOBAL_KILL_SWITCH");
   if (bool(riskContext.globalTradingPaused)) blocks.push("GLOBAL_TRADING_PAUSED");
   if (upper(riskContext.executionMode || "DEMO") === "LIVE" && !bool(riskContext.liveAuthorized)) blocks.push("LIVE_NOT_AUTHORIZED");
+  if (market.multiTimeframe?.setupState === "CONFLICTED") blocks.push("MTF_CONFLICT");
+  if (market.multiTimeframe?.setupState === "DATA_INSUFFICIENT") blocks.push("MTF_DATA_INSUFFICIENT");
   if (!engines.some(e => e.strategyMatch)) flags.push("NO_ENGINE_MEETS_SIGNAL_THRESHOLD");
   const bestFit = Math.max(...engines.map(e => e.fit), 0);
   const advisory = bestFit >= 82 ? "NORMAL" : "ELEVATED";
@@ -604,7 +606,7 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
       const result = await orchestrateKingbotIntelligence({
         market,
         riskContext: req.body?.riskContext || {},
-        options: { botId: req.body?.botId || null },
+        options: { botId: req.body?.botId || null, pool, twelveData },
         memory,
         adaptivePerformance
       });
