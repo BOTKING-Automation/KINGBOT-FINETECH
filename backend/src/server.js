@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import path from "node:path";
+import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import crypto from "node:crypto";
@@ -44,6 +45,7 @@ import { ensureAuditIntegritySchema, verifyAuditChain } from "./audit-integrity.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+const httpServer = createServer(app);
 const PORT = Number(process.env.PORT || 10000);
 const AI_PROVIDER = "kingbot-native";
 const DATABASE_URL = process.env.DATABASE_URL || "";
@@ -395,7 +397,7 @@ function firstFinite(...values){
 }
 
 registerTerminalSnapshot(app, { requireUser, pool, broker, firstFinite });
-registerAiMarketScanner(app, { pool, rateLimit, twelveData });
+registerAiMarketScanner(app, { pool, rateLimit, twelveData, server:httpServer });
 registerAiAgent(app, { requireUser, pool, broker, rateLimit, twelveData, eventBus });
 registerTerminalLive(app, { requireUser, pool, broker, firstFinite });
 registerElevenLabsVoice(app, { requireUser, pool, rateLimit });
@@ -470,7 +472,7 @@ app.use((_req, res) => {
 
 ensureAuthSchema(pool).then(() => ensureAuditIntegritySchema(pool)).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => ensureFintechOpsSchema(pool)).then(() => ensureGlobalRiskSchema(pool)).then(() => ensureGoldSignalsSchema(pool)).then(() => ensureAiMarketScannerSchema(pool)).then(() => ensureIntelligenceOrchestratorSchema(pool)).then(() => partners.ensureSchema()).then(() => eventBus.ensureSchema()).then(() => ensureUserMemorySchema(pool)).then(() => ensureCommercialLedgerSchema(pool)).then(() => {
   eventBus.start().catch(error => console.warn("[KINGBOT EVENT BUS] startup deferred:",error?.message||error));
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
     void startWorker({eventBus}).then(() => {}).catch((error) => console.error("[KINGBOT WORKER]", error?.message || error));
   });
