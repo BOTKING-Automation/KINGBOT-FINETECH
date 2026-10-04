@@ -120,8 +120,8 @@ async function fetchTraditionalQuotes(twelveData) {
       symbol:"XAUUSD",
       available:false,
       verified:false,
-      source:"GoldPrice.dev direct free XAU/USD spot",
-      error:String(error?.message || "GOLDPRICE_DIRECT_FEED_UNAVAILABLE").slice(0,140)
+      source:"Gold API direct free XAU/USD price",
+      error:String(error?.message || "GOLD_API_DIRECT_FEED_UNAVAILABLE").slice(0,140)
     })),
     Promise.resolve()
   ]);
@@ -343,7 +343,7 @@ async function refreshSnapshot({ twelveData, includeSynthetics = true } = {}) {
     crossMarket: compactCrossMarket(quotes),
     sourcePolicy: {
       marketPage: "Shared KINGBOT feed",
-      traditional: "Direct free GoldPrice.dev XAU/USD for gold + Twelve Data/Deriv fallback for other traditional markets",
+      traditional: "Direct free Gold API XAU/USD for gold + Twelve Data/Deriv fallback for other traditional markets",
       crypto: "Binance public live ticker",
       synthetic: "Deriv public live feed",
       executionAuthority: "NONE"
