@@ -36,7 +36,14 @@ LABEL_ATR = float(os.getenv("KINGBOT_ML_LABEL_ATR", "0.35"))
 MAX_MODELS = max(10, int(os.getenv("KINGBOT_ML_MAX_MODELS", "50")))
 MAX_MARKETS = max(1, int(os.getenv("KINGBOT_ML_MAX_MARKETS", "12")))
 MAX_BARS_PER_MARKET = max(MIN_BARS, int(os.getenv("KINGBOT_ML_MAX_BARS_PER_MARKET", "320")))
+MAX_RF_TREES = max(40, min(300, int(os.getenv("KINGBOT_ML_RF_TREES", "120"))))
+TORCH_EPOCHS = max(10, min(150, int(os.getenv("KINGBOT_ML_TORCH_EPOCHS", "40"))))
+TORCH_THREADS = max(1, min(8, int(os.getenv("KINGBOT_ML_TORCH_THREADS", "1"))))
+MAX_PREDICTIONS = max(2, min(64, int(os.getenv("KINGBOT_ML_MAX_PREDICTIONS", "16"))))
+MAX_CONCURRENT_TRAINING = max(1, min(2, int(os.getenv("KINGBOT_ML_MAX_CONCURRENT_TRAINING", "1"))))
 TRAINING_KEYS: set[str] = set()
+TRAINING_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_TRAINING)
+PREDICTION_SEMAPHORE = threading.BoundedSemaphore(MAX_PREDICTIONS)
 
 LABELS = [-1, 0, 1]
 LABEL_TO_INDEX = {-1: 0, 0: 1, 1: 2}
@@ -71,6 +78,8 @@ STRATEGY_FOCUS = {
 
 MODELS: dict[str, dict[str, Any]] = {}
 LOCK = threading.Lock()
+torch.set_num_threads(TORCH_THREADS)
+torch.set_num_interop_threads(max(1, min(4, TORCH_THREADS)))
 
 
 def finite(value: Any, fallback: float = 0.0) -> float:
@@ -324,7 +333,7 @@ def train_torch(X: np.ndarray, y: np.ndarray, scaler: StandardScaler, sample_wei
     tw = torch.from_numpy(train_w)
 
     model.train()
-    for _ in range(70):
+    for _ in range(TORCH_EPOCHS):
         optimizer.zero_grad()
         logits = model(tx)
         losses = loss_fn(logits, ty)
@@ -369,8 +378,11 @@ def normalize_market_bars(bars: Any) -> list[dict[str, float]]:
 
 def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) -> dict[str, Any]:
     key = f"{strategy}:{timeframe.lower()}"
+    if not TRAINING_SEMAPHORE.acquire(blocking=False):
+        raise RuntimeError("ML_TRAINING_CAPACITY_BUSY")
     with LOCK:
         if key in TRAINING_KEYS:
+            TRAINING_SEMAPHORE.release()
             raise RuntimeError("ML_TRAINING_IN_PROGRESS")
         TRAINING_KEYS.add(key)
 
@@ -427,7 +439,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         scaler.fit(X[:cutoff])
 
         rf = RandomForestClassifier(
-            n_estimators=180,
+            n_estimators=MAX_RF_TREES,
             max_depth=7,
             min_samples_leaf=4,
             random_state=42,
@@ -474,6 +486,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
     finally:
         with LOCK:
             TRAINING_KEYS.discard(key)
+        TRAINING_SEMAPHORE.release()
 
 
 def model_status(key: str) -> dict[str, Any]:
@@ -551,8 +564,11 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
     atr_value = finite(market.get("atr") or market.get("atr14"))
     if price <= 0 or atr_value <= 0:
         raise ValueError("ML_PREDICT_MARKET_DATA_INVALID")
-    X = current_market_features(market, strategy)
-    scaled = item["scaler"].transform(X).astype(np.float32)
+    if not PREDICTION_SEMAPHORE.acquire(timeout=0.8):
+        return {"ok": True, "ready": False, "status": "ML_PREDICTION_CAPACITY_BUSY", "modelKey": key}
+    try:
+        X = current_market_features(market, strategy)
+        scaled = item["scaler"].transform(X).astype(np.float32)
 
     rf_prob = item["rf"].predict_proba(scaled)[0]
     rf_map = {int(label): float(prob) for label, prob in zip(item["rf"].classes_, rf_prob)}
@@ -608,6 +624,8 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
         "trainedAt": item["trained_at"],
         "generatedAt": time.time(),
     }
+    finally:
+        PREDICTION_SEMAPHORE.release()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -655,6 +673,11 @@ class Handler(BaseHTTPRequestHandler):
                 "ready": bool(SECRET),
                 "training": len(TRAINING_KEYS),
                 "maxModels": MAX_MODELS,
+                "maxPredictions": MAX_PREDICTIONS,
+                "maxConcurrentTraining": MAX_CONCURRENT_TRAINING,
+                "rfTrees": MAX_RF_TREES,
+                "torchEpochs": TORCH_EPOCHS,
+                "torchThreads": TORCH_THREADS,
             })
             return
         if self.path == "/models":
