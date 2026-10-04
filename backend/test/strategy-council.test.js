@@ -76,3 +76,21 @@ test("hard risk block overrides specialist consensus",()=>{
   assert.ok(r.whatToWait.some(x=>x.includes("SPREAD_GATE")));
   assert.equal(r.executionAuthorized,false);
 });
+
+
+test("base-timeframe-only data never authorizes a directional council route",()=>{
+  const s=card("smc-pro","BUY",95,98);
+  const r=buildStrategyCouncil([engine("smc-pro",s)],{
+    multiTimeframe:{
+      policy:"BASE_TIMEFRAME_ONLY",
+      higherTimeframeBias:"MIXED",
+      setupState:"WAIT",
+      triggerPresent:true,
+      alignment:{direction:"BULLISH"}
+    },
+    marketDecision:"BUY"
+  });
+  assert.equal(r.state,"WAIT");
+  assert.match(r.reason,/higher-timeframe evidence/i);
+  assert.equal(r.executionAuthorized,false);
+});
