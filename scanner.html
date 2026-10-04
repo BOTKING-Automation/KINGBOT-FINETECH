@@ -47,6 +47,295 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
 .toast{position:fixed;right:18px;bottom:18px;z-index:500;max-width:360px;padding:11px 13px;border-radius:10px;background:rgba(4,8,18,.96);font:800 8px "JetBrains Mono";opacity:0;transition:.22s}
 .toast.show{opacity:1}.toast.good{color:var(--green)}.toast.bad{color:var(--red)}
 @media(max-width:900px){.hero,.scan-layout{grid-template-columns:1fr}.symbol-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* =========================================================
+   KINGBOT SCANNER — MODERN COMMAND CENTER UI
+========================================================= */
+:root{
+  --kb-bg:#02050d;
+  --kb-panel:rgba(7,12,28,.78);
+  --kb-panel-2:rgba(9,16,36,.66);
+  --kb-line:rgba(143,171,255,.13);
+  --kb-cyan:#22e6ff;
+  --kb-blue:#4d7cff;
+  --kb-violet:#a66cff;
+  --kb-green:#28efaa;
+  --kb-red:#ff557f;
+  --kb-gold:#ffd166;
+  --kb-text:#f7f9ff;
+  --kb-muted:#7f8ba6;
+  --kb-shadow:0 24px 80px rgba(0,0,0,.38);
+}
+html{scroll-behavior:smooth;background:var(--kb-bg)}
+body{
+  position:relative;
+  overflow-x:hidden;
+  background:
+    radial-gradient(circle at 8% 5%,rgba(34,230,255,.12),transparent 24%),
+    radial-gradient(circle at 92% 6%,rgba(166,108,255,.12),transparent 27%),
+    radial-gradient(circle at 50% 45%,rgba(77,124,255,.05),transparent 34%),
+    linear-gradient(145deg,#02040b 0%,#040918 48%,#02040b 100%);
+}
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  opacity:.42;
+  background-image:
+    linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+  background-size:34px 34px;
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.8),transparent 92%);
+}
+body::after{
+  content:"";
+  position:fixed;
+  left:-10%;
+  top:18%;
+  width:120%;
+  height:1px;
+  pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(34,230,255,.38),transparent);
+  box-shadow:0 0 22px rgba(34,230,255,.16);
+  animation:kb-scanline 8s linear infinite;
+  opacity:.42;
+}
+@keyframes kb-scanline{0%{transform:translateY(-25vh)}100%{transform:translateY(105vh)}}
+@keyframes kb-pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,230,255,.08)}50%{box-shadow:0 0 0 7px rgba(34,230,255,0)}}
+@keyframes kb-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes kb-shimmer{0%{background-position:0 0}100%{background-position:220% 0}}
+.wrap{position:relative;z-index:1;width:min(1580px,calc(100% - 34px));padding:30px 0 86px}
+.glass{
+  position:relative;
+  overflow:hidden;
+  border:1px solid var(--kb-line);
+  border-radius:24px;
+  background:
+    linear-gradient(140deg,rgba(12,20,46,.86),rgba(3,7,18,.76)),
+    radial-gradient(circle at top right,rgba(34,230,255,.06),transparent 40%);
+  box-shadow:var(--kb-shadow),inset 0 1px 0 rgba(255,255,255,.03);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+}
+.glass::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  border-radius:inherit;
+  background:linear-gradient(115deg,transparent 0%,rgba(255,255,255,.025) 38%,transparent 58%);
+  transform:translateX(-110%);
+  transition:transform .8s ease;
+}
+.glass:hover::before{transform:translateX(110%)}
+.hero{gap:16px}
+.hero-main{padding:38px 36px}
+.hero-main::after{
+  content:"CORTEX ONLINE";
+  position:absolute;
+  right:22px;
+  top:18px;
+  color:rgba(34,230,255,.34);
+  font:800 7px "JetBrains Mono";
+  letter-spacing:.18em;
+}
+.eyebrow{
+  padding:8px 11px;
+  border-color:rgba(34,230,255,.24);
+  background:rgba(34,230,255,.035);
+  box-shadow:0 0 26px rgba(34,230,255,.07);
+}
+h1{max-width:900px;letter-spacing:-.055em;text-shadow:0 8px 30px rgba(0,0,0,.26)}
+.grad{
+  background:linear-gradient(90deg,var(--kb-gold) 0%,var(--kb-cyan) 42%,var(--kb-violet) 76%,#e6d8ff 100%);
+  background-size:220% auto;
+  animation:kb-shimmer 9s linear infinite;
+  -webkit-background-clip:text;
+  background-clip:text;
+}
+.hero-copy{max-width:900px;color:#aeb9d2;line-height:1.82}
+.hero-actions{margin-top:24px}
+.btn{
+  position:relative;
+  overflow:hidden;
+  min-height:44px;
+  border-color:rgba(143,171,255,.16);
+  border-radius:12px;
+  padding:10px 15px;
+  background:rgba(255,255,255,.028);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 8px 24px rgba(0,0,0,.18);
+  transition:transform .2s ease,border-color .2s ease,background .2s ease,box-shadow .2s ease;
+}
+.btn:hover{transform:translateY(-2px);border-color:rgba(34,230,255,.28);background:rgba(34,230,255,.05);box-shadow:0 12px 30px rgba(0,0,0,.26),0 0 24px rgba(34,230,255,.06)}
+.btn-primary{
+  border-color:rgba(34,230,255,.34);
+  background:linear-gradient(135deg,rgba(34,230,255,.12),rgba(77,124,255,.1),rgba(166,108,255,.08));
+  box-shadow:0 0 28px rgba(34,230,255,.08),inset 0 1px 0 rgba(255,255,255,.05);
+}
+.btn-primary::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.08),transparent);
+  transform:translateX(-120%);
+}
+.btn-primary:hover::after{animation:kb-shimmer 1s ease}
+.hero-side{padding:24px}
+.core{position:relative;min-height:182px}
+.core::before,.core::after{
+  content:"";
+  position:absolute;
+  border:1px solid rgba(34,230,255,.08);
+  border-radius:50%;
+  width:140px;height:140px;
+  animation:spin 14s linear infinite;
+}
+.core::after{width:190px;height:190px;border-color:rgba(166,108,255,.06);animation-direction:reverse;animation-duration:20s}
+@keyframes spin{to{transform:rotate(360deg)}}
+.core-mark{
+  position:relative;
+  z-index:2;
+  width:96px;height:96px;
+  border-radius:28px;
+  background:linear-gradient(145deg,#ffe39a 0%,#ffae4a 52%,#ff7f43 100%);
+  box-shadow:0 0 42px rgba(255,188,71,.18),inset 0 1px 0 rgba(255,255,255,.5);
+  animation:kb-float 4s ease-in-out infinite;
+}
+.core-label{letter-spacing:.04em}
+.core-sub{font-size:8px;max-width:270px;margin-left:auto;margin-right:auto;line-height:1.6}
+.core-status{grid-template-columns:repeat(2,1fr)}
+.metric{
+  min-height:70px;
+  border-color:rgba(143,171,255,.10);
+  background:linear-gradient(145deg,rgba(255,255,255,.03),rgba(255,255,255,.012));
+  transition:border-color .2s ease,transform .2s ease,background .2s ease;
+}
+.metric:hover{transform:translateY(-2px);border-color:rgba(34,230,255,.20);background:rgba(34,230,255,.035)}
+.metric strong{font-size:11px}
+.section{margin-top:18px}
+.section-title{font-size:13px;letter-spacing:.06em}
+.section-sub{color:#66738f;line-height:1.55}
+.scanner-bar{align-items:center;padding:12px;border-color:rgba(143,171,255,.12);background:linear-gradient(135deg,rgba(10,17,39,.86),rgba(4,8,20,.8))}
+.select,.input{
+  border-color:rgba(143,171,255,.13);
+  background:rgba(4,9,22,.76);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+  transition:border-color .2s ease,box-shadow .2s ease;
+}
+.select:focus,.input:focus{border-color:rgba(34,230,255,.34);box-shadow:0 0 0 3px rgba(34,230,255,.06)}
+#scanState{display:inline-flex;align-items:center;justify-content:center;min-width:112px;color:#8e9ab5}
+#scanState:not(.good):not(.warn):not(.bad){border-color:rgba(255,255,255,.08)}
+.symbol-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.symbol-card{
+  position:relative;
+  overflow:hidden;
+  min-height:112px;
+  padding:15px;
+  border-color:rgba(143,171,255,.10);
+  background:linear-gradient(145deg,rgba(12,20,44,.68),rgba(5,9,21,.72));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025),0 12px 30px rgba(0,0,0,.16);
+  transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;
+}
+.symbol-card::after{
+  content:"LIVE";
+  position:absolute;
+  right:11px;top:10px;
+  color:rgba(40,239,170,.48);
+  font:800 6px "JetBrains Mono";
+  letter-spacing:.12em;
+}
+.symbol-card:hover{transform:translateY(-4px);border-color:rgba(34,230,255,.25);box-shadow:0 18px 38px rgba(0,0,0,.26),0 0 26px rgba(34,230,255,.05)}
+.symbol-name{color:#d9e4fa;letter-spacing:.05em}
+.symbol-price{font-size:18px;color:#fff;text-shadow:0 0 18px rgba(255,255,255,.08)}
+.symbol-change{font-size:7px}
+.scan-layout{gap:16px;grid-template-columns:minmax(0,1.15fr) minmax(360px,.85fr)}
+.scan-layout>article,.scan-layout>aside{min-width:0}
+.matrix-head,.card-head{padding:16px 17px;background:linear-gradient(90deg,rgba(34,230,255,.025),transparent)}
+.matrix-head{display:flex;align-items:center;justify-content:space-between}
+table{min-width:680px}
+th{padding-top:14px;padding-bottom:12px;letter-spacing:.1em;background:rgba(3,7,17,.55)}
+td{padding:13px 12px;color:#c7d1e5;font-size:9px}
+tbody tr{transition:background .2s ease}
+tbody tr:hover{background:rgba(34,230,255,.035)}
+.bias{
+  min-width:64px;
+  justify-content:center;
+  background:rgba(255,255,255,.025);
+  border-color:rgba(255,255,255,.09);
+  box-shadow:inset 0 0 14px rgba(255,255,255,.02);
+}
+.bias.BULLISH{color:var(--kb-green);border-color:rgba(40,239,170,.2);background:rgba(40,239,170,.05);box-shadow:0 0 20px rgba(40,239,170,.05)}
+.bias.BEARISH{color:var(--kb-red);border-color:rgba(255,85,127,.2);background:rgba(255,85,127,.05);box-shadow:0 0 20px rgba(255,85,127,.05)}
+.bias.NEUTRAL,.bias.WAIT{color:var(--kb-gold);border-color:rgba(255,209,102,.18);background:rgba(255,209,102,.045)}
+.scan-body{padding:17px}
+.scan-summary{
+  min-height:150px;
+  border-color:rgba(34,230,255,.13);
+  background:
+    radial-gradient(circle at 95% 0%,rgba(34,230,255,.08),transparent 32%),
+    linear-gradient(145deg,rgba(8,17,38,.74),rgba(3,8,18,.76));
+}
+.summary-text{color:#cfd9ec;font-size:10px;line-height:1.82}
+#signalPanel{background:linear-gradient(145deg,rgba(8,17,38,.76),rgba(2,6,16,.86))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.02),0 16px 40px rgba(0,0,0,.16)}
+.detail{
+  border-color:rgba(143,171,255,.09);
+  background:rgba(255,255,255,.018);
+  transition:border-color .2s ease,background .2s ease;
+}
+.detail:hover{border-color:rgba(34,230,255,.18);background:rgba(34,230,255,.025)}
+.detail strong{color:#eef3ff}
+.pending-card{
+  min-height:78px;
+  border-color:rgba(34,230,255,.10);
+  background:linear-gradient(145deg,rgba(34,230,255,.025),rgba(255,255,255,.012));
+}
+.pending-card strong{color:#f4f7ff}
+.cortex-panel{
+  position:relative;
+  overflow:hidden;
+  border-color:rgba(34,230,255,.18)!important;
+  background:
+    radial-gradient(circle at 0 0,rgba(34,230,255,.10),transparent 28%),
+    radial-gradient(circle at 100% 100%,rgba(166,108,255,.09),transparent 30%),
+    linear-gradient(145deg,rgba(8,17,37,.78),rgba(3,7,18,.84))!important;
+  box-shadow:0 0 32px rgba(34,230,255,.055),inset 0 1px 0 rgba(255,255,255,.03)!important;
+}
+.cortex-panel::after{
+  content:"";
+  position:absolute;
+  top:0;right:0;
+  width:34%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(34,230,255,.7));
+  box-shadow:0 0 14px rgba(34,230,255,.28);
+}
+#cortexPrimary{font-size:10px!important;color:#eff4ff!important}
+#cortexReason{color:#7e8ca9!important}
+#cortexWait{padding:8px 10px;border:1px solid rgba(255,209,102,.10);border-radius:9px;background:rgba(255,209,102,.028)}
+.empty{padding:54px 30px;color:#65718b}
+.toast{border:1px solid rgba(143,171,255,.14);box-shadow:0 18px 44px rgba(0,0,0,.36),0 0 30px rgba(34,230,255,.04);backdrop-filter:blur(14px)}
+@media(max-width:1180px){
+  .symbol-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  .wrap{width:min(100% - 20px,720px);padding-top:18px}
+  .hero-main{padding:28px 22px}
+  .hero-side{padding:20px}
+  .scan-layout{grid-template-columns:1fr}
+  .symbol-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:560px){
+  .wrap{width:calc(100% - 14px)}
+  h1{font-size:30px}
+  .hero-actions .btn{width:100%}
+  .scanner-bar{display:grid;grid-template-columns:1fr}
+  .input{width:100%!important}
+  #scanState{width:100%}
+  .symbol-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .core-status{grid-template-columns:1fr 1fr}
+  .pending-grid{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}}
 </style>
 </head>
 <body>
@@ -132,6 +421,16 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
         <div id="pendingOrderMeta" style="margin-top:5px;color:var(--muted);font-size:8px;line-height:1.5"></div>
         <div id="pendingOrderGrid" class="pending-grid"></div>
       </div>
+      </div>
+      <div class="cortex-panel" id="cortexPanel" style="margin-top:14px;padding:14px;border:1px solid rgba(34,230,255,.16);border-radius:14px;background:linear-gradient(135deg,rgba(34,230,255,.05),rgba(168,85,247,.04));box-shadow:0 0 24px rgba(34,230,255,.05)">
+        <div style="font:900 8px 'JetBrains Mono';letter-spacing:.16em;color:#22e6ff">KINGBOT CORTEX // LIVE DECISION CHAIN</div>
+        <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:8px">
+          <strong id="cortexSymbol" style="font:900 18px Orbitron">—</strong>
+          <span id="cortexState" class="bias WAIT" style="font:900 9px 'JetBrains Mono'">WAIT</span>
+        </div>
+        <div id="cortexPrimary" style="margin-top:8px;color:#dce6fa;font:800 10px 'JetBrains Mono'">Waiting for CORTEX...</div>
+        <div id="cortexReason" style="margin-top:7px;color:#7f8aa3;font-size:9px;line-height:1.6">CORTEX will evaluate the focused symbol through independent evidence, five AI specialists, Strategy Council and deterministic risk gates.</div>
+        <div id="cortexWait" style="margin-top:8px;color:#ffd166;font-size:9px;line-height:1.6"></div>
       </div>
       <div class="detail-grid">
         <div class="detail"><span>SYMBOLS</span><strong id="scannedCount">—</strong></div>
@@ -331,6 +630,10 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
     });
   }
 
+  function cortexErrorMessage(error,fallback){
+    return error ? "CORTEX STATUS · "+String(error) : fallback;
+  }
+
   function renderScan(data){
     qs("scannedCount").textContent=String((data.symbols||[]).length);
     qs("availableCount").textContent=String(data.quoteCount??(data.quotes||[]).filter(q=>q.available).length);
@@ -379,6 +682,22 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
         pendingGrid.innerHTML=cards.map(([label,value,meta])=>'<div class="pending-card"><span>'+label+'</span><strong>'+value+'</strong><small>'+meta+'</small></div>').join("");
       }
     }
+    const cortex=data.cortex||null;
+    const cortexPanel=qs("cortexPanel");
+    if(cortexPanel){
+      const council=cortex.strategyCouncil||{};
+      const decision=cortex.decision||{};
+      const primary=council.primarySpecialist||null;
+      qs("cortexSymbol").textContent=cortex.market?.symbol||data.cortexFocusSymbol||"—";
+      qs("cortexState").textContent=String(council.state||decision.state||"WAIT").toUpperCase();
+      qs("cortexState").className="bias "+String(council.state||decision.state||"WAIT").toUpperCase();
+      qs("cortexPrimary").textContent=primary
+        ? String(primary.name||primary.botId).replace(/^KINGBOT\s*/,"")+" · "+String(primary.direction||"WAIT")+" · "+String(primary.confidence??0)+"/100"
+        : "No specialist has a validated route.";
+      qs("cortexReason").textContent=cortexErrorMessage(data.cortexError,council.reason||decision.waitFor||"CORTEX waiting for stronger evidence.");
+      qs("cortexWait").textContent=decision.waitFor ? "WAIT FOR · "+decision.waitFor : "";
+    }
+
     const body=qs("rankingBody");
     if(!ranked.length){
       body.innerHTML='<tr><td colspan="5"><div class="empty">NO VERIFIED TECHNICAL SNAPSHOTS YET</div></td></tr>';
@@ -462,22 +781,10 @@ th{color:var(--muted);font:800 7px "JetBrains Mono"}
     try{
       state.busy=true; qs("scanState").textContent="SCANNING"; qs("scanNow").disabled=true;
       listFromInput();
-      const path="/ai/market-scanner?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value);
-      const quotePath="/ai/market-scanner/quotes?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value);
+      const focusSymbol=state.symbols[0]||"XAUUSD";
+      const path="/ai/market-scanner?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value)+"&focusSymbol="+encodeURIComponent(focusSymbol);
 
-      const scanPromise=request(path,{method:"GET"});
-      try{
-        const quoteData=await request(quotePath,{method:"GET"});
-        state.quotes=quoteData.quotes||[];
-        renderQuotes();
-        qs("marketState").textContent=(quoteData.quoteCount||0)>0?"LIVE FEED":"TECHNICAL FEED";
-        qs("marketState").className="good";
-        qs("coreSub").textContent=(quoteData.source||"Live market feed")+" · "+(quoteData.quoteCount||0)+" live quotes · "+(quoteData.latencyMs||0)+"ms";
-      }catch(error){
-        console.warn("Fast quote sync failed:",error);
-      }
-
-      const data=await scanPromise;
+      const data=await request(path,{method:"GET"});
       state.quotes=data.quotes||state.quotes;
       renderQuotes(); renderScan(data);
       qs("lastScan").textContent=new Date(data.generatedAt||Date.now()).toLocaleTimeString();

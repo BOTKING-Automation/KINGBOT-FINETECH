@@ -2,6 +2,7 @@ import { isSyntheticSymbol } from "./synthetic-markets.js";
 import "dotenv/config";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getGoldPriceFeed } from "./gold-price-feed.js";
+import { MarketDataFabric } from "./market-data-fabric.js";
 import { getDerivMarketFeed } from "./deriv-market-feed.js";
 import { predictPendingOrderZones } from "./pending-order-model.js";
 import { technicalAnalysisBookContext } from "./technical-analysis-book.js";
@@ -38,10 +39,10 @@ function technicalEngine(snapshot) {
     signal: "DATA_INSUFFICIENT",
     bias: "DATA_INSUFFICIENT",
     score: 0,
-    waitFor: "TradingView snapshot is not available yet.",
-    reason: "KINGBOT requires a verified TradingView market snapshot before technical analysis.",
+    waitFor: "A fresh technical OHLC snapshot is not available yet.",
+    reason: "KINGBOT requires fresh verified OHLC/technical market data before technical analysis. TradingView is optional visualization/context, not a required data source.",
     technicalAnalysis: [],
-    invalidation: "No valid market data.",
+    invalidation: "No valid technical market data.",
   };
 
   const price = finite(snapshot.close ?? snapshot.price);
@@ -341,44 +342,19 @@ async function fetchPublicDerivQuotes(symbols) {
 
 async function getFastStandaloneQuotes({ twelveData, symbols }) {
   const normalized=cleanSymbols(symbols).length ? cleanSymbols(symbols) : DEFAULT_SYMBOLS;
-  const needsGold=normalized.includes("XAUUSD");
-  const [goldResult, tdResult] = await Promise.all([
-    needsGold
-      ? publicGoldPriceFeed.getQuote().catch(error => ({
-          symbol:"XAUUSD",
-          available:false,
-          verified:false,
-          source:"Gold API direct free XAU/USD price",
-          error:String(error?.message || "GOLD_API_DIRECT_FEED_UNAVAILABLE").slice(0,140)
-        }))
-      : Promise.resolve(null),
-    twelveData?.enabled
-      ? twelveData.latestQuotes(normalized,{allowRestFallback:false}).catch(() => [])
-      : Promise.resolve([])
-  ]);
-
-  let quotes = tdResult.length
-    ? tdResult
-    : await fetchPublicDerivQuotes(normalized);
-
-  if (twelveData?.enabled) {
-    const missing=quotes.filter(q=>!q.available).map(q=>q.symbol);
-    if (missing.length) {
-      const deriv=await fetchPublicDerivQuotes(missing);
-      const derivMap=Object.fromEntries(deriv.map(q=>[q.symbol,q]));
-      quotes=quotes.map(q=>q.available?q:(derivMap[q.symbol]||q));
-    }
+  const fabric=new MarketDataFabric({twelveData, goldFeed:publicGoldPriceFeed, derivFeed:publicDerivFeed});
+  try {
+    return await fabric.getQuotes(normalized);
+  } catch {
+    return normalized.map(symbol => ({
+      symbol,
+      available:false,
+      verified:false,
+      source:"KINGBOT market data fabric",
+      provider:"KINGBOT_MARKET_DATA_FABRIC",
+      error:"MARKET_DATA_FABRIC_UNAVAILABLE"
+    }));
   }
-
-  if (goldResult?.available) {
-    const goldMap=new Map(quotes.map(q=>[q.symbol,q]));
-    goldMap.set("XAUUSD",goldResult);
-    quotes=normalized.map(symbol=>goldMap.get(symbol)||{
-      symbol,available:false,source:"KINGBOT market feed"
-    });
-  }
-
-  return quotes;
 }
 
 function overlayLiveQuotes(technical, quotes) {
@@ -436,7 +412,7 @@ async function fetchPublicDerivData(symbols, timeframe) {
   }));
   return rows;
 }
-async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
+async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cortexRunner = null, focusSymbol = null }) {
   const normalizedSymbols = cleanSymbols(symbols).length ? cleanSymbols(symbols) : DEFAULT_SYMBOLS;
   const normalizedTimeframe = cleanTimeframe(timeframe);
 
@@ -463,24 +439,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     tvPromise
   ]);
 
-  const derivQuotes = derivData.map(x => {
-    if(!x.quote) return {symbol:x.symbol,available:false,source:"Deriv public live feed",error:x.quoteError||"DERIV_PUBLIC_QUOTE_UNAVAILABLE"};
-    return {
-      symbol:x.symbol,
-      brokerSymbol:x.quote.brokerSymbol||null,
-      price:x.quote.price,
-      bid:x.quote.bid,
-      ask:x.quote.ask,
-      spread:x.quote.bid!=null&&x.quote.ask!=null?x.quote.ask-x.quote.bid:null,
-      time:x.quote.time||null,
-      timestamp:x.quote.epoch!=null?Number(x.quote.epoch)*1000:Date.now(),
-      available:true,
-      source:"Deriv public live feed"
-    };
-  });
-  const quotes=directQuotes.some(q=>q.available)
-    ? directQuotes
-    : derivQuotes;
+  const quotes=directQuotes;
   const combinedTechnical=[...tdTechnical,...derivData.map(x=>x.technical).filter(Boolean)];
   const technicalBySymbol=new Map();
   for(const item of combinedTechnical) if(!technicalBySymbol.has(item.symbol)) technicalBySymbol.set(item.symbol,item);
@@ -513,6 +472,40 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     : (derivData.some(x=>x.technical)
       ? "Deriv public live OHLC + live quote feed"
       : (tv.length ? "TradingView snapshots" : "live quotes only"));
+
+  let cortex = null;
+  let cortexError = null;
+  const focus = scannerCanonicalSymbol(focusSymbol || normalizedSymbols[0] || "");
+  if (cortexRunner && focus && normalizedSymbols.includes(focus)) {
+    const focusTechnical = technical.find(item => item.symbol === focus && item.source !== "none");
+    const focusQuote = quotes.find(item => item.symbol === focus && item.available);
+    if (focusTechnical || focusQuote) {
+      const quoteTimestamp = focusQuote?.timestamp
+        ? new Date(focusQuote.timestamp).toISOString()
+        : null;
+      const receivedAt = focusTechnical?.receivedAt || focusTechnical?.dataFreshness || focusQuote?.receivedAt || null;
+      const cortexMarket = {
+        ...(focusTechnical || {}),
+        ...(focusQuote || {}),
+        symbol: focus,
+        timeframe: normalizedTimeframe,
+        timestamp: quoteTimestamp || receivedAt || focusTechnical?.barTime || null,
+        quoteTimestamp,
+        receivedAt: receivedAt || quoteTimestamp || null,
+        quoteFreshnessMaxAgeMs: finite(focusQuote?.freshnessMaxAgeMs),
+        freshnessMaxAgeMs: finite(focusQuote?.freshnessMaxAgeMs),
+        verifiedQuote: Boolean(focusQuote?.verified),
+        scannerSource: technicalSource
+      };
+      try {
+        cortex = await cortexRunner(cortexMarket);
+      } catch (error) {
+        cortexError = String(error?.message || "CORTEX_UNAVAILABLE").slice(0, 220);
+      }
+    } else {
+      cortexError = "FOCUS_SYMBOL_TECHNICAL_DATA_UNAVAILABLE";
+    }
+  }
 
   if (!technical.some(x => x.source !== "none") && !directQuotes.some(q => q.available)) {
     return {
@@ -555,14 +548,23 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe }) {
     model:"KINGBOT-CORTEX-1",
     executionAuthority:"NONE",
     source:technicalSource,
-    liveQuoteSource:"Gold API direct free XAU/USD price + Twelve Data/Deriv fallback",
+    liveQuoteSource:"KINGBOT Market Data Fabric: Gold API/Twelve Data/Binance/Massive/Deriv provider routing",
     scannerLatencyHint:"Quotes are served independently from AI analysis.",
-    marketData:twelveData?.status ? twelveData.status() : {configured:false},
+    marketData:{
+      engine:"KINGBOT_MARKET_DATA_FABRIC",
+      model:"KMF-1",
+      executionAuthority:"NONE",
+      providers:new MarketDataFabric({twelveData, goldFeed:publicGoldPriceFeed, derivFeed:publicDerivFeed}).providerStatus(),
+      quoteVerification:"source-aware freshness + explicit provider provenance"
+    },
     symbols:normalizedSymbols,
     timeframe:normalizedTimeframe,
     quotes,
     technical,
     tradingViewSnapshots:tvMap,
+    cortex,
+    cortexFocusSymbol: focus || null,
+    cortexError,
     analysis:ai.analysis || JSON.stringify(fallbackAnalysis),
     aiError:ai.aiError || null,
     generatedAt:new Date().toISOString(),
@@ -595,7 +597,9 @@ async function runMarketScan({ pool, twelveData, req, res }) {
       pool,
       twelveData,
       symbols:req.query?.symbols || req.body?.symbols,
-      timeframe:req.query?.timeframe || req.body?.timeframe
+      timeframe:req.query?.timeframe || req.body?.timeframe,
+      cortexRunner,
+      focusSymbol:req.query?.focusSymbol || req.body?.focusSymbol || null
     });
     if (!result.ok) return res.status(503).json(result);
     return res.json(result);
@@ -669,10 +673,11 @@ function scannerCanonicalSymbol(value) {
 }
 
 class AiMarketScannerStream {
-  constructor({ server, pool, twelveData }) {
+  constructor({ server, pool, twelveData, cortexRunner = null }) {
     this.server = server;
     this.pool = pool;
     this.twelveData = twelveData;
+    this.cortexRunner = typeof cortexRunner === "function" ? cortexRunner : null;
     this.publicDerivFeed = publicDerivFeed;
     this.clients = new Set();
     this.channels = new Map();
@@ -830,7 +835,9 @@ class AiMarketScannerStream {
         pool: this.pool,
         twelveData: this.twelveData,
         symbols: channel.symbols,
-        timeframe: channel.timeframe
+        timeframe: channel.timeframe,
+        cortexRunner: this.cortexRunner,
+        focusSymbol: channel.symbols?.[0] || null
       });
 
       channel.lastScanAt = Date.now();
@@ -1014,8 +1021,8 @@ class AiMarketScannerStream {
   }
 }
 
-export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server }) {
-  const stream = new AiMarketScannerStream({ server, pool, twelveData });
+export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server, cortexRunner = null }) {
+  const stream = new AiMarketScannerStream({ server, pool, twelveData, cortexRunner });
   startAiStrategyModelTraining(twelveData);
   void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
 

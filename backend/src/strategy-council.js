@@ -102,7 +102,7 @@ export function buildStrategyCouncil(engines = [], {
   const opposing = strongest
     ? eligible.filter(r => r.direction !== strongest.direction)
     : [];
-  const strongOpposition = opposing.filter(r => r.confidence >= 70 && r.councilScore >= 55);
+  const strongOpposition = opposing.filter(r => r.confidence >= 70 && Math.abs(Number(r.rawScore || 0)) >= 70);
   const blockers = Array.isArray(riskBlocks) ? riskBlocks : [];
 
   let state = "WAIT";

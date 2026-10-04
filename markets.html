@@ -3451,39 +3451,6 @@ overscroll-behavior:none;}
     }
 
     /* =========================================================
-       KINGBOT DERIV LIVE DATA
-    ========================================================== */
-
-    const DERIV_MARKETS = MARKETS.filter(m => !m.binance);
-
-    async function fetchDerivData() {
-      const markets = MARKETS.filter(m => !m.binance);
-      if (!markets.length) return;
-      try {
-        const symbols = markets.map(m => m.id).join(",");
-        const response = await fetch(
-          "https://kingbot-fintech-api-etfv.onrender.com/api/market-scanner/quotes?symbols=" +
-          encodeURIComponent(symbols),
-          { cache: "no-store" }
-        );
-        if (!response.ok) return;
-        const payload = await response.json().catch(() => ({}));
-        for (const quote of Array.isArray(payload.quotes) ? payload.quotes : []) {
-          if (!quote?.available || !Number.isFinite(Number(quote.price))) continue;
-          state.data[quote.symbol] = {
-            ...(state.data[quote.symbol] || {}),
-            price: Number(quote.price),
-            updated: Date.now(),
-            source: quote.source || "deriv-public-live-feed",
-            feedAgeMs: Number(quote.ageMs || 0)
-          };
-        }
-      } catch {}
-      state.lastUpdate = Date.now();
-      renderAll();
-    }
-
-    /* =========================================================
        BINANCE REST DATA
     ========================================================== */
 
@@ -4817,8 +4784,7 @@ overscroll-behavior:none;}
 
           await Promise.all([
             fetchSharedMarketData().catch(error => console.warn("Shared market refresh failed", error)),
-            fetchCryptoData().catch(error => console.warn("Crypto market refresh failed", error)),
-            fetchDerivData().catch(error => console.warn("Deriv quote refresh failed", error))
+            fetchCryptoData().catch(error => console.warn("Crypto market refresh failed", error))
           ]);
 
 
@@ -4869,8 +4835,7 @@ overscroll-behavior:none;}
 
       await Promise.all([
         fetchSharedMarketData().catch(error => console.warn("Shared market feed failed", error)),
-        fetchCryptoData().catch(error => console.warn("Crypto market feed failed", error)),
-        fetchDerivData().catch(error => console.warn("Deriv market feed failed", error))
+        fetchCryptoData().catch(error => console.warn("Crypto market feed failed", error))
       ]);
 
 
@@ -4893,11 +4858,6 @@ overscroll-behavior:none;}
       setInterval(
         fetchCryptoData,
         15000
-      );
-
-      setInterval(
-        fetchDerivData,
-        7000
       );
 
 
