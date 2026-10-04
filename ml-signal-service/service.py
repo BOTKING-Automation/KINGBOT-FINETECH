@@ -327,6 +327,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
     combined_y: list[np.ndarray] = []
     combined_weights: list[np.ndarray] = []
     symbols: list[str] = []
+    total_bar_count = 0
 
     for market in markets:
         symbol = str(market.get("symbol") or "").strip().upper()
@@ -350,6 +351,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
 
         if len(normalized) < MIN_BARS:
             continue
+        total_bar_count += len(normalized)
         X_part, y_part, weights_part = bars_to_training_arrays(normalized, strategy)
         if len(X_part):
             combined_x.append(X_part)
@@ -401,7 +403,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             "samples": int(len(X)),
             "rf_accuracy": rf_accuracy,
             "torch_accuracy": torch_accuracy,
-            "bar_count": len(normalized),
+            "bar_count": total_bar_count,
             "feature_version": "ai-strategies-v1",
         }
         while len(MODELS) > MAX_MODELS:
