@@ -69,7 +69,7 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 <div id="botHero" class="bot-detail-hero"><div class="detail-image"><img id="detailImage" src="assets/images/hero-bot.png" alt="Selected KINGBOT bot"></div><div class="detail-copy"><span id="detailCode" class="bot-chip">BOT ENGINE / READY</span><h2 id="botTitle">Select a bot</h2><p id="detailRole">Choose an engine to inspect its architecture.</p></div></div>
 <p class="desc" id="botDesc">Choose an entitled bot to configure its independent risk profile.</p><div class="bot-symbol-default"><span>BROKER MARKET</span><strong>LIVE CATALOG</strong><span>· selected from your connected account</span></div>
 <div class="risk-grid">
-<div class="field"><label>Execution mode <em>ENGINE</em></label><select id="executionMode"><option value="DEMO">DEMO · BROKER MT5</option><option value="LIVE">LIVE · REAL</option></select></div><div class="field"><label>Broker market <em>BROKER CATALOG</em></label><div class="market-control"><select id="symbol"><option value="">CONNECT BROKER TO LOAD MARKETS…</option></select><button class="market-refresh" id="marketRefreshBtn" type="button" title="Refresh live broker market catalog" aria-label="Refresh live broker market catalog">↻</button></div></div><div class="field"><label>Timeframe <em>MARKET</em></label><select id="timeframe"><option>1m</option><option>2m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
+<div class="field"><label>Execution mode <em>ENGINE</em></label><select id="executionMode"><option value="DEMO">DEMO · BROKER API</option><option value="LIVE">LIVE · REAL</option></select></div><div class="field"><label>Broker market <em>BROKER CATALOG</em></label><div class="market-control"><select id="symbol"><option value="">CONNECT BROKER TO LOAD MARKETS…</option></select><button class="market-refresh" id="marketRefreshBtn" type="button" title="Refresh live broker market catalog" aria-label="Refresh live broker market catalog">↻</button></div></div><div class="field"><label>Timeframe <em>MARKET</em></label><select id="timeframe"><option>1m</option><option>2m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
 <div class="field"><label>Max risk / trade <em>%</em></label><input id="maxRisk" type="number" min=".1" max="5" step=".05"></div><div class="field"><label>Base lot size <em>VOLUME</em></label><input id="lotSize" type="number" min=".01" max="100" step=".01" value=".01"></div>
 <div class="field"><label>Daily drawdown limit <em>%</em></label><input id="dailyDd" type="number" min=".5" max="20" step=".1"></div>
 <div class="field"><label>Total drawdown limit <em>%</em></label><input id="totalDd" type="number" min="1" max="30" step=".1"></div>
@@ -232,8 +232,8 @@ async function refreshBrokerMarkets(){
  }catch(error){
    brokerMarkets=[]; brokerMarketsLoaded=false; renderBrokerMarkets("");
    $("brokerExecutionTitle").textContent="BROKER MARKET · UNAVAILABLE";
-   $("brokerExecutionNote").textContent="The connected broker did not return a live market catalog. Check the MT5 bridge/connection and refresh this control.";
-   msg(error?.message||"Broker market catalog unavailable. Waiting for the MT5 bridge heartbeat…","error");
+   $("brokerExecutionNote").textContent="The connected broker did not return a live market catalog. Check the native broker API connection and refresh this control.";
+   msg(error?.message||"Broker market catalog unavailable. Waiting for the native broker API heartbeat…","error");
    if(!brokerMarketRetryTimer) brokerMarketRetryTimer=setInterval(async()=>{if(!brokerMarketsLoaded)await refreshBrokerMarkets();},3000);
    return false;
  }finally{
