@@ -128,9 +128,9 @@ function evaluateNativeSignal({botId,market={},analysis={},risk={}}={}){
 }
 
 export function aiExecutionGateEnabled(){
-  // The legacy environment variable is intentionally ignored. KINGBOT Cortex
-  // is advisory and deterministic execution/risk controls remain authoritative.
-  return false;
+  // AI STRATEGIES is the bot decision layer. A bot is never allowed to
+  // submit an order without a fresh strategy-specific ML confirmation.
+  return String(process.env.KINGBOT_AI_STRATEGIES_REQUIRED || "true").toLowerCase() !== "false";
 }
 
 export function getAiStrategySignal({userId,botId,market,analysis}={}){
@@ -152,7 +152,12 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
   const run=(async()=>{
     const native=evaluateNativeSignal({botId,market,analysis,risk})||{};
     const ml=await predictMlStrategySignal({botId,market});
-    let item={...native,fingerprint};
+    let item={
+      ...native,
+      fingerprint,
+      aiStrategyRequired:aiExecutionGateEnabled(),
+      aiStrategyService:mlSignalServiceStatus()
+    };
 
     if(ml?.ready){
       const nativeDirection=candidateDirection(native.direction)||candidateDirection(analysis?.signal);
@@ -192,7 +197,21 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
     }else if(ml?.status==="ML_SERVICE_UNAVAILABLE"){
       item={...item,mlStatus:"SERVICE_UNAVAILABLE",source:"KINGBOT_CORTEX",mlError:ml.error||null};
     }else if(ml?.status==="MODEL_NOT_READY"){
-      item={...item,mlStatus:"MODEL_NOT_READY",source:"KINGBOT_CORTEX",mlModelKey:ml.modelKey||null};
+      item={
+        ...item,
+        mlStatus:"MODEL_NOT_READY",
+        source:"KINGBOT_CORTEX",
+        mlModelKey:ml.modelKey||null,
+        reason:"AI STRATEGIES model is not trained for this bot/timeframe yet; execution remains blocked until the model is ready."
+      };
+    }else if(ml?.status==="ML_SERVICE_TIMEOUT"||ml?.status==="ML_SERVICE_UNAVAILABLE"||ml?.status==="ML_SERVICE_UNAUTHORIZED"){
+      item={
+        ...item,
+        mlStatus:ml.status,
+        source:"KINGBOT_CORTEX",
+        mlError:ml.error||null,
+        reason:"AI STRATEGIES service is unavailable; execution remains blocked rather than falling back to non-AI order submission."
+      };
     }
 
     signalCache.set(key,item);
