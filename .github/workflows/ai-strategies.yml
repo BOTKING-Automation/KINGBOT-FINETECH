@@ -10,12 +10,16 @@ on:
       - "backend/src/bot-engines.js"
       - "backend/src/worker.js"
       - "backend/src/ai-market-scanner.js"
+      - "backend/src/gold-price-feed.js"
+      - "backend/src/market-page-feed.js"
+      - "backend/src/market-evidence-engine.js"
       - "backend/src/strategy-specialists.js"
       - "backend/src/strategy-council.js"
       - "backend/src/intelligence-orchestrator.js"
       - "backend/test/strategy-specialists.test.js"
       - "backend/test/strategy-council.test.js"
       - "backend/test/intelligence-orchestrator.test.js"
+      - "backend/test/gold-price-feed.test.js"
       - "system/intelligence-orchestrator.js"
       - "system/ai-support.js"
       - ".github/workflows/ai-strategies.yml"
@@ -135,6 +139,9 @@ jobs:
           node --check backend/src/bot-engines.js
           node --check backend/src/worker.js
           node --check backend/src/ai-market-scanner.js
+          node --check backend/src/gold-price-feed.js
+          node --check backend/src/market-page-feed.js
+          node --check backend/src/market-evidence-engine.js
           node --check backend/src/strategy-specialists.js
           node --check backend/src/strategy-council.js
           node --check backend/src/intelligence-orchestrator.js
@@ -143,7 +150,7 @@ jobs:
 
       - name: Specialist brain and strategy council tests
         working-directory: backend
-        run: node --test test/strategy-specialists.test.js test/strategy-council.test.js test/intelligence-orchestrator.test.js
+        run: node --test test/strategy-specialists.test.js test/strategy-council.test.js test/intelligence-orchestrator.test.js test/gold-price-feed.test.js
 
       - name: End-to-end Node → ML service gate test
         run: |
