@@ -119,4 +119,4 @@ export function createMt5BridgeRouter({pool,broker}={}){
   router.get("/manifest",(_req,res)=>res.json({ok:true,name:"KINGBOT MT5 EA Bridge",protocol:"HTTP/JSON",endpoint:"/api/mt5/bridge/poll",ackEndpoint:"/api/mt5/bridge/ack",pollIntervalMs:500,telemetryIntervalMs:1000,tokenTtlDays:TOKEN_TTL_DAYS,execution:"native MT5 broker execution",sizeModel:"LOTS",modes:["DEMO","LIVE"],demoMode:"Deriv broker-side MT5 demo account"}));
   return router;
 }
-export async function ensureMt5BridgeSchema(pool){await mt5BridgeRegistry.ensureSchema();}
+export async function ensureMt5BridgeSchema(pool){await mt5BridgeRegistry.ensureSchema(pool);}
