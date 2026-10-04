@@ -5,6 +5,7 @@ import { loadAdaptivePerformance, applyAdaptivePerformance, classifySetup, recor
 import { identitySnapshot, buildCognitivePlan, capabilitySet, normalizeThinkingLevel, thinkingProfile } from "./kingbot-intelligence-core.js";
 import { buildMarketEvidence, marketDecisionGate } from "./market-evidence-engine.js";
 import { buildStrategyCouncil } from "./strategy-council.js";
+import { evaluateStrategySpecialists } from "./strategy-specialists.js";
 
 const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
 const MODEL = "KINGBOT-CORTEX-1";
@@ -439,21 +440,24 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
   const crossMarket = analyzeCrossMarket(inputMarket);
   const analysts = [technical, regime, context, execution, crossMarket];
   const engines = BOT_IDS.map(id => engineFit(id, market, regime, adaptivePerformance));
-  const debate = buildDebate(analysts, engines, market);
+  const specialistCards = evaluateStrategySpecialists({ market, multiTimeframe: market.multiTimeframe || {}, regime });
+  const specialistByBot = new Map(specialistCards.map(card => [card.botId, card]));
+  const enrichedEngines = engines.map(engine => ({ ...engine, specialist: specialistByBot.get(engine.botId) || null }));
+  const debate = buildDebate(analysts, enrichedEngines, market);
   const risk = riskCouncil(market, engines, riskContext);
   const decisionGate = marketDecisionGate(marketEvidence, risk.blocks);
-  const strategyCouncil = buildStrategyCouncil(engines, {
+  const strategyCouncil = buildStrategyCouncil(enrichedEngines, {
     multiTimeframe: market.multiTimeframe,
     riskBlocks: risk.blocks,
     marketDecision: decisionGate.state,
     minAgreement: Number(process.env.KINGBOT_STRATEGY_COUNCIL_MIN_AGREEMENT || 0.6)
   });
   const routing = strategyCouncil.state === "BUY" || strategyCouncil.state === "SELL"
-    ? chooseEngine(engines, debate)
+    ? chooseEngine(enrichedEngines, debate)
     : { selectedEngine: null, reason: "STRATEGY_COUNCIL_" + strategyCouncil.state, candidate: strategyCouncil.strongestEngine };
   if (strategyCouncil.strongestEngine && strategyCouncil.state !== "WAIT" && strategyCouncil.state !== "CONFLICTED") {
     routing.selectedEngine = strategyCouncil.strongestEngine.botId;
-    routing.candidate = engines.find(e => e.botId === strategyCouncil.strongestEngine.botId) || null;
+    routing.candidate = enrichedEngines.find(e => e.botId === strategyCouncil.strongestEngine.botId) || null;
     routing.reason = "STRATEGY_COUNCIL_CONSENSUS";
   }
 
@@ -537,7 +541,7 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
       ? "KINGBOT routed the current market state toward " + routing.selectedEngine + " from deterministic strategy fit and adversarial evidence."
       : "KINGBOT did not route a live candidate because the evidence is not sufficiently aligned.",
     risks: [...risk.blocks, ...risk.flags],
-    watch: engines.filter(e => !e.strategyMatch).slice(0, 3).map(e => e.botId + ": below strategy threshold")
+    watch: enrichedEngines.filter(e => !e.strategyMatch).slice(0, 3).map(e => e.botId + ": below legacy engine threshold")
   };
 
   cache.set(key, { at: Date.now(), result });
