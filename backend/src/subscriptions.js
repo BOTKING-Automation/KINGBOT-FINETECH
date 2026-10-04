@@ -3,6 +3,7 @@ import { Router } from "express";
 import { resolveFirebaseUser } from "./auth.js";
 import { isAdminEmail } from "./admin-access.js";
 import { appendCommercialLedger } from "./commercial-ledger.js";
+import { initiateStkPush, queryStkPush, normalizeMpesaPhone, mpesaStatus, createStkReference } from "./mpesa.js";
 
 const PLANS = {
   starter: { id:"starter", name:"Basic", priceUsd:130, billing:"monthly", botLimit:1, selectableBots:["strategic","breakout"], bots:["strategic","breakout"], requiresBotSelection:true, features:["Choose 1 of 2 entry bots","Strategic or Breakout","Core risk controls","Equity tracking"] },
@@ -64,7 +65,7 @@ async function requireAdmin(pool, req, res) {
 export function createSubscriptionRouter({pool,broker}) {
   const router = Router();
 
-  router.get("/plans",(_req,res)=>res.json({ok:true,plans:Object.values(PLANS).map(p=>({...p,selectableBotDetails:p.selectableBots.map(bot=>({botId:bot,botName:BOT_NAMES[bot]}))})),mpesaReceiver:process.env.MPESA_RECEIVER_PHONE||"0748275015"}));
+  router.get("/plans",(_req,res)=>res.json({ok:true,plans:Object.values(PLANS).map(p=>({...p,selectableBotDetails:p.selectableBots.map(bot=>({botId:bot,botName:BOT_NAMES[bot]}))})),mpesaReceiver:process.env.MPESA_RECEIVER_PHONE||"0748275015",mpesaStatus:mpesaStatus()}));
 
   router.get("/me",async(req,res)=>{
     const u=await requireUser(pool,req,res); if(!u)return;
@@ -72,7 +73,7 @@ export function createSubscriptionRouter({pool,broker}) {
       await expireStaleSubscriptions(pool);
       const s=await pool.query("SELECT id,plan_id,status,started_at,expires_at,approved_at FROM kingbot_subscriptions WHERE user_id=$1 AND status='active' AND expires_at>NOW() ORDER BY expires_at DESC LIMIT 1",[u.id]);
       const e=await pool.query("SELECT e.bot_id FROM kingbot_bot_entitlements e JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 AND e.active=TRUE AND s.status='active' AND s.expires_at>NOW() ORDER BY e.bot_id",[u.id]);
-      const p=await pool.query("SELECT id,plan_id,status,mpesa_code,amount_kes,payer_phone,payer_name,submitted_at,reviewed_at,reviewer_note,selected_bot_id FROM kingbot_payments WHERE user_id=$1 ORDER BY submitted_at DESC LIMIT 20",[u.id]);
+      const p=await pool.query("SELECT id,plan_id,status,payment_method,mpesa_code,mpesa_receipt,amount_kes,payer_phone,payer_name,stk_status,stk_result_code,stk_result_desc,submitted_at,reviewed_at,reviewer_note,selected_bot_id FROM kingbot_payments WHERE user_id=$1 ORDER BY submitted_at DESC LIMIT 20",[u.id]);
       res.json({
         ok:true,
         isAdmin:isAdminEmail(u.email),
@@ -121,6 +122,194 @@ export function createSubscriptionRouter({pool,broker}) {
     }
   });
 
+  router.post("/payments/stk-push",async(req,res)=>{
+    const u=await requireUser(pool,req,res); if(!u)return;
+    const p=planId(req.body?.planId);
+    const amount=Number(req.body?.amountKes);
+    const phone=String(req.body?.payerPhone||"").trim();
+    const payerName=String(req.body?.payerName||"").trim().replace(/\\s+/g," ");
+    const selectedBot=normalizeBotId(req.body?.selectedBotId);
+    if(!PLANS[p])return res.status(400).json({ok:false,error:"Invalid subscription plan."});
+    if(PLANS[p].requiresBotSelection && !PLANS[p].selectableBots.includes(selectedBot))return res.status(400).json({ok:false,error:"Basic requires selecting either Strategic or Breakout."});
+    if(!PLANS[p].requiresBotSelection && selectedBot && !PLANS[p].bots.includes(selectedBot))return res.status(400).json({ok:false,error:"The selected bot is not included in this plan."});
+    if(!Number.isFinite(amount)||amount<=0||amount>100000000)return res.status(400).json({ok:false,error:"Enter the exact amount to charge in KES."});
+    if(!normalizeMpesaPhone(phone))return res.status(400).json({ok:false,error:"Enter a valid Kenyan M-Pesa phone number."});
+    if(!payerName||payerName.length<2)return res.status(400).json({ok:false,error:"Enter the M-Pesa account name used for payment."});
+    if(payerName.length>120)return res.status(400).json({ok:false,error:"M-Pesa account name is too long."});
+    if(!mpesaStatus().configured)return res.status(503).json({ok:false,error:"MPESA_STK_NOT_CONFIGURED",message:"M-Pesa STK Push is not configured on the payment server yet."});
+
+    const client=await pool.connect();
+    let paymentId="";
+    try{
+      await client.query("BEGIN");
+      const placeholder=createStkReference(u.id);
+      const q=await client.query(
+        "INSERT INTO kingbot_payments(user_id,plan_id,amount_kes,mpesa_code,payer_phone,payer_name,selected_bot_id,status,payment_method,stk_status) VALUES($1,$2,$3,$4,$5,$6,$7,'pending','STK_PUSH','INITIATING') RETURNING id,plan_id,amount_kes,payer_phone,payer_name,status,payment_method,stk_status,submitted_at",
+        [u.id,p,Math.floor(amount),placeholder,normalizeMpesaPhone(phone),payerName,selectedBot||null]
+      );
+      paymentId=String(q.rows[0].id);
+      await client.query("COMMIT");
+
+      let stk;
+      try{
+        stk=await initiateStkPush({
+          amount:Math.floor(amount),
+          phone,
+          accountReference:"KB"+paymentId.replace(/[^A-Za-z0-9]/g,"").slice(0,10),
+          transactionDesc:"KINGBOT "+p.toUpperCase()
+        });
+      }catch(error){
+        await pool.query(
+          "UPDATE kingbot_payments SET status='failed',stk_status='FAILED',stk_result_desc=$2,reviewed_at=NOW(),reviewer_note='STK initiation failed' WHERE id=$1",
+          [paymentId,String(error?.message||"STK initiation failed").slice(0,500)]
+        );
+        throw error;
+      }
+
+      if(String(stk.responseCode)!=="0"||!stk.checkoutRequestId){
+        const message=String(stk.responseDescription||"M-Pesa did not accept the STK Push request.").slice(0,500);
+        await pool.query(
+          "UPDATE kingbot_payments SET status='failed',stk_status='FAILED',stk_result_code=$2,stk_result_desc=$3,reviewed_at=NOW(),reviewer_note='STK request rejected' WHERE id=$1",
+          [paymentId,stk.responseCode||null,message]
+        );
+        return res.status(502).json({ok:false,error:"MPESA_STK_REJECTED",message});
+      }
+
+      const updated=await pool.query(
+        "UPDATE kingbot_payments SET merchant_request_id=$2,checkout_request_id=$3,stk_status='PROMPT_SENT',stk_initiated_at=NOW(),stk_result_code=NULL,stk_result_desc=$4 WHERE id=$1 RETURNING id,plan_id,amount_kes,payer_phone,payer_name,status,payment_method,stk_status,merchant_request_id,checkout_request_id,submitted_at",
+        [paymentId,stk.merchantRequestId||null,stk.checkoutRequestId,String(stk.responseDescription||"STK Push sent").slice(0,500)]
+      );
+      await pool.query(
+        "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'MPESA_STK_INITIATED',$2::jsonb)",
+        [u.id,JSON.stringify({paymentId,planId:p,checkoutRequestId:stk.checkoutRequestId,merchantRequestId:stk.merchantRequestId||null,amountKes:Math.floor(amount),phone:normalizeMpesaPhone(phone)})]
+      );
+      res.status(201).json({
+        ok:true,
+        payment:updated.rows[0],
+        checkoutRequestId:stk.checkoutRequestId,
+        merchantRequestId:stk.merchantRequestId||null,
+        customerMessage:stk.customerMessage||"Check your phone and enter your M-Pesa PIN to complete the payment.",
+        message:"M-Pesa payment prompt sent. Complete the prompt on your phone; KINGBOT will update this payment when Safaricom confirms it."
+      });
+    }catch(error){
+      await client.query("ROLLBACK").catch(()=>{});
+      console.error("[KINGBOT MPESA STK]",error?.message||error);
+      const msg=String(error?.message||"M-Pesa STK Push failed").slice(0,260);
+      const status=/NOT_CONFIGURED|INVALID_MPESA_PHONE|INVALID_MPESA_AMOUNT/.test(msg)?400:503;
+      res.status(status).json({ok:false,error:msg});
+    }finally{
+      client.release();
+    }
+  });
+
+  router.get("/payments/:id/stk-status",async(req,res)=>{
+    const u=await requireUser(pool,req,res);if(!u)return;
+    try{
+      const q=await pool.query(
+        "SELECT id,plan_id,amount_kes,payer_phone,payer_name,status,payment_method,mpesa_receipt,stk_status,stk_result_code,stk_result_desc,submitted_at,stk_initiated_at,stk_completed_at,checkout_request_id FROM kingbot_payments WHERE id=$1 AND user_id=$2 LIMIT 1",
+        [String(req.params.id||""),u.id]
+      );
+      if(!q.rowCount)return res.status(404).json({ok:false,error:"Payment not found."});
+      const row=q.rows[0];
+      res.json({ok:true,payment:row,terminalState:String(row.stk_status||"").toUpperCase()});
+    }catch(error){
+      console.error("[KINGBOT MPESA STATUS]",error?.message||error);
+      res.status(503).json({ok:false,error:"M-Pesa payment status unavailable."});
+    }
+  });
+
+  router.post("/payments/:id/stk-reconcile",async(req,res)=>{
+    const u=await requireUser(pool,req,res);if(!u)return;
+    try{
+      const q=await pool.query(
+        "SELECT id,checkout_request_id,status,stk_status FROM kingbot_payments WHERE id=$1 AND user_id=$2 AND payment_method='STK_PUSH' LIMIT 1",
+        [String(req.params.id||""),u.id]
+      );
+      if(!q.rowCount)return res.status(404).json({ok:false,error:"STK payment not found."});
+      const row=q.rows[0];
+      if(!row.checkout_request_id)return res.status(409).json({ok:false,error:"STK checkout request is not available."});
+      if(String(row.status).toLowerCase()==="approved" || String(row.stk_status).toUpperCase()==="COMPLETED"){
+        return res.json({ok:true,alreadyFinal:true,payment:row});
+      }
+      const result=await queryStkPush(row.checkout_request_id);
+      const resultCode=String(result?.ResultCode??"");
+      const resultDesc=String(result?.ResultDesc||result?.ResponseDescription||"").slice(0,500);
+      let status="pending",stkStatus="PROCESSING";
+      if(resultCode && resultCode!=="0"){
+        status="failed";
+        stkStatus="FAILED";
+      }
+      const updated=await pool.query(
+        "UPDATE kingbot_payments SET status=$2,stk_status=$3,stk_result_code=$4,stk_result_desc=$5 WHERE id=$1 RETURNING id,status,stk_status,stk_result_code,stk_result_desc,mpesa_receipt",
+        [row.id,status,stkStatus,resultCode||null,resultDesc||null]
+      );
+      res.json({ok:true,payment:updated.rows[0],message:resultCode==="0"?"M-Pesa reports the transaction completed; awaiting callback reconciliation.":resultDesc||"M-Pesa is still processing the request."});
+    }catch(error){
+      console.error("[KINGBOT MPESA RECONCILE]",error?.message||error);
+      res.status(503).json({ok:false,error:String(error?.message||"M-Pesa reconciliation failed").slice(0,240)});
+    }
+  });
+
+  router.post("/payment-callback",async(req,res)=>{
+    try{
+      const callback=req.body?.Body?.stkCallback;
+      const checkoutId=String(callback?.CheckoutRequestID||"").trim();
+      const merchantId=String(callback?.MerchantRequestID||"").trim();
+      const resultCode=String(callback?.ResultCode??"").trim();
+      const resultDesc=String(callback?.ResultDesc||"").slice(0,500);
+      if(!checkoutId){
+        return res.json({ResultCode:0,ResultDesc:"Accepted"});
+      }
+
+      const items=Array.isArray(callback?.CallbackMetadata?.Item)?callback.CallbackMetadata.Item:[];
+      const valueOf=name=>{
+        const item=items.find(x=>String(x?.Name||"").toLowerCase()===String(name).toLowerCase());
+        return item?.Value??null;
+      };
+      const receipt=valueOf("MpesaReceiptNumber");
+      const callbackAmount=Number(valueOf("Amount"));
+      const callbackPhone=valueOf("PhoneNumber");
+      const q=await pool.query(
+        "SELECT id,user_id,amount_kes,payer_phone,status FROM kingbot_payments WHERE checkout_request_id=$1 LIMIT 1",
+        [checkoutId]
+      );
+      if(!q.rowCount){
+        console.warn("[KINGBOT MPESA CALLBACK] Unknown checkout request",checkoutId);
+        return res.json({ResultCode:0,ResultDesc:"Accepted"});
+      }
+
+      const payment=q.rows[0];
+      if(resultCode==="0"){
+        const expectedPhone=normalizeMpesaPhone(payment.payer_phone);
+        const receivedPhone=normalizeMpesaPhone(callbackPhone);
+        const amountMatches=Number.isFinite(callbackAmount) ? Math.floor(callbackAmount)===Math.floor(Number(payment.amount_kes)) : true;
+        const phoneMatches=expectedPhone&&receivedPhone ? expectedPhone===receivedPhone : true;
+        const mismatch=!amountMatches||!phoneMatches;
+        await pool.query(
+          "UPDATE kingbot_payments SET status='pending',stk_status=$2,stk_result_code='0',stk_result_desc=$3,mpesa_receipt=$4,stk_completed_at=NOW(),merchant_request_id=COALESCE($5,merchant_request_id),reviewer_note=CASE WHEN $2='COMPLETED' THEN NULL ELSE 'STK callback data requires manual review' END WHERE id=$1",
+          [payment.id,mismatch?"MISMATCH":"COMPLETED",resultDesc,receipt?String(receipt).slice(0,40):null,merchantId||null]
+        );
+        await pool.query(
+          "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'MPESA_STK_CALLBACK',$2::jsonb)",
+          [payment.user_id,JSON.stringify({paymentId:payment.id,checkoutRequestId:checkoutId,resultCode,receipt:receipt||null,amount:callbackAmount||null,amountMatches,phoneMatches,mismatch})]
+        );
+      }else{
+        await pool.query(
+          "UPDATE kingbot_payments SET status='failed',stk_status='FAILED',stk_result_code=$2,stk_result_desc=$3,stk_completed_at=NOW(),merchant_request_id=COALESCE($4,merchant_request_id) WHERE id=$1",
+          [payment.id,resultCode,resultDesc,merchantId||null]
+        );
+        await pool.query(
+          "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'MPESA_STK_FAILED',$2::jsonb)",
+          [payment.user_id,JSON.stringify({paymentId:payment.id,checkoutRequestId:checkoutId,resultCode,resultDesc})]
+        );
+      }
+      return res.json({ResultCode:0,ResultDesc:"Accepted"});
+    }catch(error){
+      console.error("[KINGBOT MPESA CALLBACK]",error?.message||error);
+      return res.json({ResultCode:0,ResultDesc:"Accepted"});
+    }
+  });
+
   router.get("/access/:botId",async(req,res)=>{
     const u=await requireUser(pool,req,res); if(!u)return;
     const bot=String(req.params.botId||"").trim().toLowerCase();
@@ -132,7 +321,7 @@ export function createSubscriptionRouter({pool,broker}) {
   router.get("/admin/payments",async(req,res)=>{
     const a=await requireAdmin(pool,req,res);if(!a)return;
     try {
-      const q=await pool.query("SELECT p.id,p.user_id,u.first_name,u.last_name,u.email,u.phone,p.plan_id,p.amount_kes,p.mpesa_code,p.payer_phone,p.payer_name,p.selected_bot_id,p.status,p.submitted_at,p.reviewed_at,p.reviewed_by,p.reviewer_note FROM kingbot_payments p JOIN kingbot_users u ON u.id=p.user_id ORDER BY CASE WHEN p.status='pending' THEN 0 ELSE 1 END,p.submitted_at DESC LIMIT 200");
+      const q=await pool.query("SELECT p.id,p.user_id,u.first_name,u.last_name,u.email,u.phone,p.plan_id,p.amount_kes,p.mpesa_code,p.payer_phone,p.payer_name,p.selected_bot_id,p.status,p.payment_method,p.mpesa_receipt,p.stk_status,p.stk_result_code,p.stk_result_desc,p.checkout_request_id,p.submitted_at,p.reviewed_at,p.reviewed_by,p.reviewer_note FROM kingbot_payments p JOIN kingbot_users u ON u.id=p.user_id ORDER BY CASE WHEN p.status='pending' THEN 0 ELSE 1 END,p.submitted_at DESC LIMIT 200");
       res.json({ok:true,payments:q.rows});
     }catch(err){console.error("[KINGBOT ADMIN]",err?.message||err);res.status(500).json({ok:false,error:"Payment queue unavailable."});}
   });
@@ -444,6 +633,16 @@ export async function ensureSubscriptionSchema(pool){
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS reviewer_note TEXT");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS selected_bot_id TEXT");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS payer_name TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'MANUAL_CODE'");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS mpesa_receipt TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS merchant_request_id TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS checkout_request_id TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS stk_status TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS stk_result_code TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS stk_result_desc TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS stk_initiated_at TIMESTAMPTZ");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS stk_completed_at TIMESTAMPTZ");
+  await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS kingbot_payments_checkout_request_id_uq ON kingbot_payments(checkout_request_id) WHERE checkout_request_id IS NOT NULL");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_subscriptions (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, plan_id TEXT NOT NULL, status TEXT NOT NULL, started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), expires_at TIMESTAMPTZ, approved_at TIMESTAMPTZ, approved_by TEXT, payment_id UUID REFERENCES kingbot_payments(id))");
   await pool.query("ALTER TABLE kingbot_subscriptions ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
   await pool.query("ALTER TABLE kingbot_subscriptions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ");
