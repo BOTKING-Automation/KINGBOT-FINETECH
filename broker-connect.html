@@ -56,7 +56,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
 @media(max-width:1000px){.hero{grid-template-columns:1fr}.network-tools{justify-content:flex-start}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.network-foot{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){main{width:calc(100% - 16px);padding-top:62px}.hero{gap:14px}h1{font-size:34px}.hero-copy p{font-size:9px}.network-head{align-items:flex-start;flex-direction:column}.network-tools{width:100%;display:grid;grid-template-columns:1fr}.search{width:100%}.filters{width:100%}.filter{flex:1}.grid{grid-template-columns:1fr}.broker{min-height:250px}.network-foot{grid-template-columns:1fr}.health-grid{grid-template-columns:1fr 1fr 1fr}.steps{grid-template-columns:repeat(4,minmax(62px,1fr));overflow:auto}.step{min-width:62px}.modal{border-radius:16px}.drawer{padding:8px}.fields{grid-template-columns:1fr}}
 </style>
-</head>
+<style id="kingbot-no-ea-ui">#mt5BridgePanel,#mt5VpsPanel{display:none!important}</style></head>
 <body>
 
 <main>
@@ -403,11 +403,11 @@ function selectBroker(slug){
   $("vpsPort").value="3389";$("vpsProtocol").value="RDP";$("vpsOs").value="WINDOWS";
   $("terminalPath").value="C:\\Program Files\\MetaTrader 5\\terminal64.exe";$("vpsSymbol").value="XAUUSD";$("vpsTimeframe").value="M1";$("vpsBot").value="strategic";$("vpsExecutionMode").value=selectedExecution;$("vpsLiveConfirm").value="";
   $("mt5VpsStatus").textContent="VPS profile not configured.";$("mt5VpsCommand").classList.remove("show");$("vpsAgentCommand").value="";
-  $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=(selected==="exness"||selected==="oanda")?"block":"none";$("bridgeTokenField").style.display="block";$("oandaTokenField").style.display=selected==="oanda"?"block":"none";if(selected==="deriv")$("accountId").placeholder="MetaApi account ID (UUID)";
+  $("apiKeyField").style.display=selected==="exness"?"block":"none";$("secretKeyField").style.display=selected==="exness"?"block":"none";$("hostField").style.display=(selected==="exness"||selected==="oanda")?"block":"none";$("bridgeTokenField").style.display="block";$("oandaTokenField").style.display=selected==="oanda"?"block":"none";if(selected==="deriv")$("accountId").placeholder="Deriv account ID";
   $("verifyBtn").textContent=selected==="exness"?"VERIFY EXNESS CONNECTION":"VERIFY CONNECTION"; $("verifyBtn").style.display=selected==="deriv"?"none":"inline-flex"; $("executionMode").value=selectedExecution;
   if(selected==="exness") $("brokerLogin").textContent="OPEN EXNESS ↗";
   textFor();showDrawer();
-  if(selected==="deriv"){ $("credentials").classList.remove("show"); }
+  if(selected==="deriv"){ $("credentials").classList.remove("show"); $("mt5BridgePanel").style.display="none"; $("mt5VpsPanel").style.display="none"; }
   if(selected==="exness")trackExnessPartner();
   else if(selected==="deriv")trackBrokerPartner("deriv");
   else trackBrokerPartner(selected);
