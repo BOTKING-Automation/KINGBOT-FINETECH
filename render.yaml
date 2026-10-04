@@ -20,6 +20,8 @@ services:
         sync: false
       - key: WORKER_STANDBY
         value: "1"
+      - key: KINGBOT_AI_STRATEGIES_REQUIRED
+        value: "true"
       - key: KINGBOT_ML_SIGNAL_HOST
         fromService:
           name: kingbot-ml-signal
@@ -54,6 +56,8 @@ services:
         sync: false
       - key: WORKER_STANDBY
         value: "1"
+      - key: KINGBOT_AI_STRATEGIES_REQUIRED
+        value: "true"
       - key: KINGBOT_ML_SIGNAL_HOST
         fromService:
           name: kingbot-ml-signal
