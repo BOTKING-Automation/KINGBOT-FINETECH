@@ -249,7 +249,9 @@ export class UserBrokerManager {
         accessToken:parsed.accessToken,
         refreshToken:parsed.refreshToken||undefined,
         expiresAt:parsed.expiresAt||undefined,
-        accountType:String(derivAccountType||parsed.accountType||"").toLowerCase()||undefined
+        accountType:String(derivAccountType||parsed.accountType||"").toLowerCase()||undefined,
+        appId:String(parsed.appId||"").trim()||undefined,
+        authMethod:String(parsed.authMethod||"pat").toLowerCase()
       });
     }
     if(!id)return {ok:false,error:"BROKER_ACCOUNT_ID_REQUIRED"};
@@ -380,7 +382,8 @@ export class UserBrokerManager {
             accessToken:parsed.accessToken,
             accountId:mapping.account_id,
             executionMode:mode,
-            accountType:parsed.accountType
+            accountType:parsed.accountType,
+            appId:parsed.appId
           });
           const result=await api.connect();
           entry={ownerUserId:userId,api,accountId:mapping.account_id,executionMode:mode,provider:"deriv",connectedAt:Date.now(),accountInfo:result.account,accountType:api.accountTypeFromBalance(result.account),accountInfoAt:Date.now()};
