@@ -344,12 +344,17 @@
         const [code, label] = botLabels[botId];
         const rawState = String(bot?.state || "STOPPED").toUpperCase();
         const lastError = String(bot?.lastError || bot?.last_error || "").toUpperCase();
+        const configurationWait = new Set(["DEMO_REQUIRES_DEMO_ACCOUNT","DEMO_REQUIRES_DERIV_DEMO_ACCOUNT","PAPER_REQUIRES_DEMO_ACCOUNT","BROKER_ACCOUNT_NOT_MAPPED_RETRYING","MULTI_TIMEFRAME_DATA_UNAVAILABLE"]);
         const displayState = lastError === "SUBSCRIPTION_NOT_ACTIVE"
           ? "LOCKED"
+          : configurationWait.has(lastError) ? "WAITING"
           : rawState === "ERROR" ? "ERROR" : rawState;
         const reason = lastError === "SUBSCRIPTION_NOT_ACTIVE"
           ? "SUBSCRIPTION REQUIRED"
-          : (bot?.lastError || bot?.last_error ? String(bot.lastError || bot.last_error).replaceAll("_", " ") : "SERVER TELEMETRY");
+          : lastError.startsWith("MULTI_TIMEFRAME_DATA_UNAVAILABLE")
+            ? "MARKET DATA LIMITED"
+            : configurationWait.has(lastError) ? "CONFIGURATION REQUIRED"
+            : (bot?.lastError || bot?.last_error ? String(bot.lastError || bot.last_error).replaceAll("_", " ") : "SERVER TELEMETRY");
         const row = document.createElement("div");
         row.className = "runtime-row";
         const left = document.createElement("div");
