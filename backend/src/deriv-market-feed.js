@@ -341,6 +341,77 @@ export class DerivMarketFeed {
     });
   }
 
+  async getLatestAvailableQuote(symbol,{timeoutMs=5000}={}) {
+    const s = this.normalize(symbol);
+    await this.connect();
+    const reqId = this.nextReqId();
+
+    return new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{
+        this.requestWaiters.delete(reqId);
+        reject(new Error("DERIV_LAST_AVAILABLE_QUOTE_TIMEOUT"));
+      },Math.max(2000,Number(timeoutMs)||5000));
+
+      this.requestWaiters.set(reqId,{
+        resolve:(data)=>{
+          clearTimeout(timer);
+          this.requestWaiters.delete(reqId);
+          if(data?.error){
+            reject(new Error(data.error.message||"DERIV_LAST_AVAILABLE_QUOTE_FAILED"));
+            return;
+          }
+
+          const history=Array.isArray(data?.history?.prices)?data.history.prices:[];
+          const times=Array.isArray(data?.history?.times)?data.history.times:[];
+          const price=finite(history.at(-1));
+          if(price===null){
+            reject(new Error("DERIV_LAST_AVAILABLE_QUOTE_EMPTY"));
+            return;
+          }
+
+          const epoch=finite(times.at(-1));
+          const rawSymbol=String(data?.echo_req?.ticks_history||s).trim();
+          const tick={
+            symbol:this.normalize(rawSymbol),
+            brokerSymbol:rawSymbol,
+            bid:price,
+            ask:price,
+            price,
+            epoch,
+            time:epoch!==null?new Date(epoch*1000).toISOString():null,
+            receivedAt:Date.now(),
+            source:"deriv-last-available-tick"
+          };
+
+          this.ticks.set(this.normalize(rawSymbol),tick);
+          this.ticks.set(rawSymbol,tick);
+          resolve(tick);
+        },
+        reject:(error)=>{
+          clearTimeout(timer);
+          this.requestWaiters.delete(reqId);
+          reject(error);
+        }
+      });
+
+      try{
+        this.send({
+          ticks_history:s,
+          end:"latest",
+          count:1,
+          style:"ticks",
+          adjust_start_time:1,
+          subscribe:0,
+          req_id:reqId
+        });
+      }catch(error){
+        clearTimeout(timer);
+        this.requestWaiters.delete(reqId);
+        reject(error);
+      }
+    });
+  }
+
   async getActiveSymbols({timeoutMs=7000}={}) {
     await this.connect();
     const reqId=this.nextReqId();
