@@ -4,9 +4,9 @@
  *
  * This is not an LLM and does not pretend to be conscious.
  * It provides KINGBOT with a repeatable "thinking mindset":
- * decomposition -> retrieval -> hypothesis -> evidence weighting ->
- * contradiction testing -> confidence calibration -> decision framing ->
- * self-critique -> explanation.
+ * Market loop: perceive -> normalize -> contextualize -> hypothesize ->
+ * test -> cross-check timeframes -> compare strategies -> debate ->
+ * contradiction test -> risk test -> invalidation -> calibrate -> decide -> explain -> learn.
  */
 
 const STOP_WORDS = new Set([
@@ -387,7 +387,7 @@ export function think({ question="", intent="PLATFORM_SUPPORT", reply={}, conver
     passes: cfg.passes,
     evidenceLimit: cfg.evidenceLimit,
     hypothesisLimit: cfg.hypothesisLimit,
-    stages: ["DECOMPOSE","RETRIEVE","HYPOTHESIZE","WEIGH","CHALLENGE","CALIBRATE","SELF_CRITIQUE","SYNTHESIZE"],
+    stages: ["PERCEIVE","NORMALIZE","CONTEXTUALIZE","GENERATE_HYPOTHESES","TEST_HYPOTHESES","CROSS_CHECK_TIMEFRAMES","COMPARE_STRATEGIES","BULL_CASE","BEAR_CASE","CONTRADICTION_TEST","RISK_TEST","INVALIDATION_TEST","CALIBRATE","DECIDE","EXPLAIN","LEARN"],
     ...synthesis
   };
 }
