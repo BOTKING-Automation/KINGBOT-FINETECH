@@ -1466,35 +1466,44 @@ overscroll-behavior:none;}
       overflow: hidden;
     }
 
-    .table-head {
-
-      display: grid;
-
-      grid-template-columns:
-        2fr
-        1.2fr
-        1fr
-        1.2fr
-        1.4fr
-        .9fr
-        .8fr;
-
-      padding:
-        13px 20px;
-
-      color: #626e88;
-
-      font-family: JetBrains Mono, monospace;
-
-      font-size: 8px;
-
-      text-transform: uppercase;
-
-      letter-spacing: .08em;
-
-      border-bottom:
-        1px solid rgba(255,255,255,.06);
-    }
+    .watchlist-shell{position:relative;overflow:hidden}
+    .watchlist-shell::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 4% 0%,rgba(0,229,255,.06),transparent 26%),radial-gradient(circle at 96% 0%,rgba(155,92,255,.07),transparent 26%)}
+    .watchlist-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 18px;border-bottom:1px solid rgba(255,255,255,.07);background:linear-gradient(90deg,rgba(0,229,255,.04),rgba(155,92,255,.035),rgba(247,185,40,.03))}
+    .watchlist-head-main{display:flex;align-items:center;gap:11px;min-width:0}
+    .watchlist-mark{width:36px;height:36px;display:grid;place-items:center;border-radius:10px;color:#061018;background:linear-gradient(135deg,var(--cyan),var(--violet));box-shadow:0 0 22px rgba(0,229,255,.16);font:900 11px Orbitron}
+    .watchlist-title{font:800 12px Orbitron;letter-spacing:.06em}
+    .watchlist-sub{margin-top:3px;color:#687590;font:700 8px "JetBrains Mono";white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .watchlist-stats{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+    .watch-stat{padding:7px 9px;border-radius:8px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025);font:800 7px "JetBrains Mono";color:#91a0bb}
+    .watch-stat b{color:#e9f2ff}
+    .watch-stat.live b{color:var(--green)} .watch-stat.up b{color:var(--green)} .watch-stat.down b{color:var(--red)}
+    .table-head{display:grid;grid-template-columns:2.15fr 1.1fr 1fr 1fr 1.05fr 1fr 1fr 1fr .78fr .7fr;align-items:center;gap:0;padding:11px 18px;color:#5f6d89;font:800 7px "JetBrains Mono";text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.12)}
+    .market-row{display:grid;grid-template-columns:2.15fr 1.1fr 1fr 1fr 1.05fr 1fr 1fr 1fr .78fr .7fr;align-items:center;min-height:70px;padding:7px 18px;border-bottom:1px solid rgba(255,255,255,.045);transition:.22s;cursor:pointer;position:relative}
+    .market-row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--row-accent,var(--cyan));opacity:.15;transition:.22s}
+    .market-row:hover{background:linear-gradient(90deg,rgba(0,229,255,.045),rgba(155,92,255,.025),transparent);box-shadow:inset 2px 0 0 var(--row-accent,var(--cyan))}
+    .market-row.fav-row{background:linear-gradient(90deg,rgba(247,185,40,.025),transparent 40%)}
+    .asset-icon{box-shadow:inset 0 0 18px rgba(255,255,255,.035)}
+    .asset-meta{display:flex;align-items:center;gap:5px;margin-top:4px}
+    .asset-category{padding:3px 5px;border-radius:5px;color:#8492ae;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.05);font:800 6px "JetBrains Mono";letter-spacing:.06em}
+    .quote-cell{font:800 10px "JetBrains Mono";color:#edf3ff}
+    .quote-sub{margin-top:3px;color:#5f6c87;font:700 7px "JetBrains Mono"}
+    .quote-chip{display:inline-flex;padding:4px 6px;border-radius:6px;font:800 6px "JetBrains Mono";letter-spacing:.05em}
+    .quote-chip.live{color:#9fffd4;background:rgba(46,230,168,.06);border:1px solid rgba(46,230,168,.12)}
+    .quote-chip.last{color:#ffe08c;background:rgba(247,185,40,.05);border:1px solid rgba(247,185,40,.12)}
+    .quote-chip.off{color:#ff9baa;background:rgba(255,82,119,.05);border:1px solid rgba(255,82,119,.12)}
+    .metric-bar{width:88px;height:5px;border-radius:999px;background:rgba(255,255,255,.055);overflow:hidden}
+    .metric-bar span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--cyan),var(--violet),var(--pink));box-shadow:0 0 14px rgba(0,229,255,.16)}
+    .momentum{font:900 8px "JetBrains Mono";letter-spacing:.05em}
+    .momentum.up{color:var(--green)} .momentum.down{color:var(--red)} .momentum.flat{color:var(--gold)}
+    .watch-action{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);color:#aeb9ce;text-decoration:none;font:900 10px "JetBrains Mono";transition:.2s}
+    .watch-action:hover{color:#07101b;background:var(--cyan);box-shadow:0 0 18px rgba(0,229,255,.18)}
+    .watch-command{display:flex;align-items:center;gap:6px}
+    .watchlist-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .watch-sort{min-height:34px;padding:8px 10px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.035);color:#c8d2e5;font:800 8px "JetBrains Mono";outline:none}
+    .filter.favorites-active{color:#061018;background:linear-gradient(135deg,var(--gold),#ffeaa2);box-shadow:0 0 18px rgba(247,185,40,.13)}
+    @media(max-width:1100px){.table-head,.market-row{grid-template-columns:2fr 1.1fr 1fr 1fr 1fr 1fr .8fr}.table-head>:nth-child(5),.market-row>:nth-child(5),.table-head>:nth-child(6),.market-row>:nth-child(6),.table-head>:nth-child(7),.market-row>:nth-child(7){display:none}}
+    @media(max-width:800px){.watchlist-head{align-items:flex-start;flex-direction:column}.watchlist-stats{justify-content:flex-start}}
+    @media(max-width:600px){.table-head,.market-row{min-width:920px}.table-head>:nth-child(5),.market-row>:nth-child(5),.table-head>:nth-child(6),.market-row>:nth-child(6),.table-head>:nth-child(7),.market-row>:nth-child(7){display:block}}
 
     .market-row {
 
@@ -2557,6 +2566,7 @@ overscroll-behavior:none;}
     <section class="glow-card market-toolbar">
 
       <div class="filters">
+        <button class="filter" data-filter="favorites">★ FAVORITES</button>
 
         <button
           class="filter active"
@@ -2603,19 +2613,18 @@ overscroll-behavior:none;}
       </div>
 
 
-      <div class="search-box">
-
-        <span>
-          ⌕
-        </span>
-
-        <input
-          id="search"
-          type="search"
-          placeholder="Search markets..."
-          autocomplete="off"
-        >
-
+      <div class="watchlist-tools">
+        <select id="watchSort" class="watch-sort" aria-label="Sort watchlist">
+          <option value="favorites">Priority · Favorites</option>
+          <option value="change">24H Change</option>
+          <option value="price">Price</option>
+          <option value="volume">Volume</option>
+          <option value="name">Name</option>
+        </select>
+        <div class="search-box">
+          <span>⌕</span>
+          <input id="search" type="search" placeholder="Search markets..." autocomplete="off">
+        </div>
       </div>
 
     </section>
@@ -2626,38 +2635,35 @@ overscroll-behavior:none;}
          MARKET TABLE
     ======================================================== -->
 
-    <section class="glow-card table-card">
+    <section class="glow-card table-card watchlist-shell">
+
+      <div class="watchlist-head">
+        <div class="watchlist-head-main">
+          <div class="watchlist-mark">WL</div>
+          <div>
+            <div class="watchlist-title">INSTITUTIONAL MARKET WATCHLIST</div>
+            <div class="watchlist-sub">LIVE QUOTES · CROSS-ASSET MONITORING · MOMENTUM · RANGE · LIQUIDITY · EXECUTION READY</div>
+          </div>
+        </div>
+        <div class="watchlist-stats">
+          <div class="watch-stat live">LIVE <b id="watchLiveCount">0</b></div>
+          <div class="watch-stat up">UP <b id="watchUpCount">0</b></div>
+          <div class="watch-stat down">DOWN <b id="watchDownCount">0</b></div>
+          <div class="watch-stat">FAV <b id="watchFavCount">0</b></div>
+        </div>
+      </div>
 
       <div class="table-head">
-
-        <div>
-          Instrument
-        </div>
-
-        <div>
-          Price
-        </div>
-
-        <div>
-          24H Change
-        </div>
-
-        <div>
-          Range
-        </div>
-
-        <div>
-          Volume
-        </div>
-
-        <div>
-          Live
-        </div>
-
-        <div>
-          Terminal
-        </div>
-
+        <div>Instrument</div>
+        <div>Price</div>
+        <div>24H Change</div>
+        <div>Range Position</div>
+        <div>Volume</div>
+        <div>Momentum</div>
+        <div>Quote Mode</div>
+        <div>Feed Age</div>
+        <div>Star</div>
+        <div>Terminal</div>
       </div>
 
 
@@ -3019,6 +3025,8 @@ overscroll-behavior:none;}
 
       selected:
         "XAUUSD",
+
+      sort: "favorites",
 
       feedMessages: 0,
 
@@ -3880,10 +3888,9 @@ overscroll-behavior:none;}
         market => {
 
           const matchesFilter =
-            state.filter ===
-            "all" ||
-            market.category ===
-            state.filter;
+            state.filter === "all" ||
+            (state.filter === "favorites" && state.favorites.includes(market.id)) ||
+            market.category === state.filter;
 
 
           const q =
@@ -3911,7 +3918,18 @@ overscroll-behavior:none;}
           );
 
         }
-      );
+      ).sort((a,b)=>{
+        const da=state.data[a.id]||{}, db=state.data[b.id]||{};
+        if(state.filter!=="favorites" && state.sort==="favorites"){
+          const af=state.favorites.includes(a.id), bf=state.favorites.includes(b.id);
+          if(af!==bf)return af?-1:1;
+        }
+        if(state.sort==="change")return Number(db.change??-Infinity)-Number(da.change??-Infinity);
+        if(state.sort==="price")return Number(db.price??-Infinity)-Number(da.price??-Infinity);
+        if(state.sort==="volume")return Number(db.volume??-Infinity)-Number(da.volume??-Infinity);
+        if(state.sort==="name")return a.name.localeCompare(b.name);
+        return a.id.localeCompare(b.id);
+      });
 
     }
 
@@ -3950,242 +3968,82 @@ overscroll-behavior:none;}
 
 
       container.innerHTML =
-        markets.map(
-          market => {
-
-            const data =
-              state.data[
-                market.id
-              ] || {};
-
-
-            const price =
-              data.price;
-
-
-            const hasChange =
-              Number.isFinite(Number(data.change));
-
-            const change =
-              hasChange
-                ? Number(data.change)
-                : null;
-
-
-            const high =
-              data.high;
-
-
-            const low =
-              data.low;
-
-
-            let rangePercent =
-              50;
-
-
-            if (
-              Number.isFinite(price) &&
-              Number.isFinite(high) &&
-              Number.isFinite(low) &&
-              high !== low
-            ) {
-
-              rangePercent =
-                (
-                  (price - low)
-                  /
-                  (high - low)
-                ) * 100;
-
-            }
-
-
-            rangePercent =
-              Math.max(
-                3,
-                Math.min(
-                  100,
-                  rangePercent
-                )
-              );
-
-
-            const positive =
-              hasChange ? change >= 0 : true;
-
-
-            const isFavorite =
-              state.favorites
-                .includes(
-                  market.id
-                );
-
-
-            return `
-
-              <div
-                class="market-row"
-                data-market="${market.id}"
-                onclick="
-                  window.kingbotSelect('${market.id}')
-                "
-              >
-
-                <div class="asset">
-
-                  <div class="asset-icon">
-
-                    ${escapeHTML(
-                      market.icon
-                    )}
-
-                  </div>
-
-                  <div>
-
-                    <div class="asset-name">
-
-                      ${escapeHTML(
-                        market.name
-                      )}
-
-                      <button
-                        class="
-                          favorite
-                          ${isFavorite
-                            ? "active"
-                            : ""}
-                        "
-                        onclick="
-                          event.stopPropagation();
-                          window.kingbotFavorite('${market.id}')
-                        "
-                        aria-label="Favorite"
-                      >
-                        ★
-                      </button>
-
-                    </div>
-
-                    <div class="asset-symbol">
-
-                      ${escapeHTML(
-                        market.id
-                      )}
-
-                    </div>
-
-                  </div>
-
-                </div>
-
-
-                <div class="price">
-
-                  ${
-                    price !== undefined
-                      ? formatPrice(price)
-                      : "--"
-                  }
-
-                </div>
-
-
-                <div
-                  class="
-                    change
-                    ${positive
-                      ? "up"
-                      : "down"}
-                  "
-                >
-
-                  ${
-                    price !== undefined && hasChange
-                      ? `${positive ? "+" : ""}${change.toFixed(2)}%`
-                      : (price !== undefined && data.quoteMode === "LAST_AVAILABLE" ? "LAST" : "--")
-                  }
-
-                </div>
-
-
-                <div>
-
-                  <div
-                    class="range"
-                    title="24 hour range"
-                  >
-
-                    <div
-                      class="range-fill"
-                      style="
-                        width:${rangePercent}%
-                      "
-                    ></div>
-
-                  </div>
-
-                </div>
-
-
-                <div class="volume">
-
-                  ${
-                    data.volume
-                      ? formatVolume(
-                          data.volume
-                        )
-                      : "--"
-                  }
-
-                </div>
-
-
-                <div class="spark">
-
-                  ${
-                    data.spark
-                      ? sparkline(
-                          data.spark,
-                          positive
-                        )
-                      : ""
-                  }
-
-                </div>
-
-
-                <div>
-
-                  <a
-                    class="terminal-link"
-                    href="
-                      terminal.html?s=${encodeURIComponent(
-                        market.id
-                      )}
-                    "
-                    onclick="
-                      event.stopPropagation()
-                    "
-                    title="Open terminal"
-                  >
-                    →
-                  </a>
-
-                </div>
-
-              </div>
-
-            `;
-
+        markets.map(market => {
+          const data = state.data[market.id] || {};
+          const price = Number(data.price);
+          const change = Number(data.change);
+          const hasChange = Number.isFinite(change);
+          const high = Number(data.high);
+          const low = Number(data.low);
+          let rangePercent = 50;
+          if(Number.isFinite(price)&&Number.isFinite(high)&&Number.isFinite(low)&&high!==low){
+            rangePercent=((price-low)/(high-low))*100;
           }
-        ).join("");
+          rangePercent=Math.max(3,Math.min(100,rangePercent));
+          const positive=hasChange ? change>=0 : true;
+          const favorite=state.favorites.includes(market.id);
+          const quoteMode=String(data.quoteMode||"UNAVAILABLE").toUpperCase();
+          const age=Number(data.feedAgeMs);
+          const ageText=Number.isFinite(age) ? (age<1000 ? Math.round(age)+"ms" : (age/1000).toFixed(1)+"s") : "—";
+          const momentum=!hasChange ? "WAIT" : Math.abs(change)<0.05 ? "NEUTRAL" : change>0 ? (change>1 ? "STRONG UP" : "UP") : (change<-1 ? "STRONG DOWN" : "DOWN");
+          const momentumClass=!hasChange||Math.abs(change)<0.05 ? "flat" : change>0 ? "up" : "down";
+          const rowAccent=market.category==="metals" ? "var(--gold)" : market.category==="crypto" ? "var(--violet)" : market.category==="forex" ? "var(--cyan)" : market.category==="indices" ? "var(--pink)" : "var(--green)";
+          const feedClass=quoteMode==="LIVE" ? "live" : quoteMode==="LAST_AVAILABLE" ? "last" : "off";
+          return `
+            <div class="market-row ${favorite?"fav-row":""}" data-market="${escapeHTML(market.id)}" style="--row-accent:${rowAccent}" onclick="window.kingbotSelect('${escapeHTML(market.id)}')">
+              <div class="asset">
+                <div class="asset-icon">${escapeHTML(market.icon)}</div>
+                <div>
+                  <div class="asset-name">${escapeHTML(market.name)}</div>
+                  <div class="asset-meta"><span class="asset-symbol">${escapeHTML(market.id)}</span><span class="asset-category">${escapeHTML(String(market.category||"MARKET").toUpperCase())}</span></div>
+                </div>
+              </div>
+              <div class="quote-cell">
+                ${Number.isFinite(price) ? formatPrice(price) : "--"}
+                <div class="quote-sub">${market.source==="deriv" ? "DERIV" : market.binance ? "BINANCE" : "SHARED FEED"}</div>
+              </div>
+              <div class="change ${positive?"up":"down"}">
+                ${Number.isFinite(change) ? (change>=0?"+":"")+change.toFixed(2)+"%" : "--"}
+              </div>
+              <div>
+                <div class="metric-bar" title="Current price position within observed range"><span style="width:${rangePercent}%"></span></div>
+                <div class="quote-sub">${rangePercent.toFixed(0)}% of range</div>
+              </div>
+              <div class="volume">${data.volume ? formatVolume(data.volume) : "--"}</div>
+              <div class="momentum ${momentumClass}">${momentum}</div>
+              <div><span class="quote-chip ${feedClass}">${quoteMode==="LAST_AVAILABLE"?"LAST":quoteMode==="LIVE"?"LIVE":"OFFLINE"}</span></div>
+              <div class="quote-sub">${escapeHTML(ageText)}</div>
+              <div class="watch-command">
+                <button class="favorite ${favorite?"active":""}" onclick="event.stopPropagation();window.kingbotFavorite('${escapeHTML(market.id)}')" aria-label="Toggle favorite">${favorite?"★":"☆"}</button>
+              </div>
+              <div>
+                <a class="watch-action" href="terminal.html?s=${encodeURIComponent(market.id)}" onclick="event.stopPropagation()" title="Open trading terminal">→</a>
+              </div>
+            </div>`;
+        }).join("");
+
+      renderWatchlistStats();
 
     }
 
 
-    function renderMiniMarkets() {
+    function renderWatchlistStats(){
+      const visible=visibleMarkets();
+      let live=0, up=0, down=0;
+      for(const m of visible){
+        const d=state.data[m.id]||{};
+        if(String(d.quoteMode||"").toUpperCase()==="LIVE")live++;
+        const ch=Number(d.change);
+        if(Number.isFinite(ch)){if(ch>0)up++;else if(ch<0)down++;}
+      }
+      const set=(id,v)=>{const el=$(id);if(el)el.textContent=v};
+      set("watchLiveCount",live);
+      set("watchUpCount",up);
+      set("watchDownCount",down);
+      set("watchFavCount",state.favorites.length);
+    }
+
+    function renderMiniMarkets()function renderMiniMarkets() {
 
       const watchIds = [
 
@@ -4737,6 +4595,8 @@ overscroll-behavior:none;}
               state.filter =
                 button.dataset.filter;
 
+              document.querySelectorAll(".filter").forEach(b=>b.classList.remove("favorites-active"));
+              if(state.filter==="favorites")button.classList.add("favorites-active");
 
               renderRows();
 
@@ -4763,6 +4623,12 @@ overscroll-behavior:none;}
 
         }
       );
+
+
+    $("watchSort").addEventListener("change",event=>{
+      state.sort=event.target.value;
+      renderRows();
+    });
 
 
     /* =========================================================
