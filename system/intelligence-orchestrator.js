@@ -103,6 +103,7 @@
     if(bull)bull.innerHTML=(debate.bullCase||[]).slice(0,6).map(x=>'<div>+ '+esc(x)+'</div>').join("")||'<div class="orch-muted">No bullish evidence supplied.</div>';
     if(bear)bear.innerHTML=(debate.bearCase||[]).slice(0,6).map(x=>'<div>− '+esc(x)+'</div>').join("")||'<div class="orch-muted">No bearish evidence supplied.</div>';
 
+    const riskList=$("orchRiskList");
     const riskFlags=[...(risk.blocks||[]),...(risk.flags||[])];
     const councilState=String(data.strategyCouncil?.state||routing.councilState||"").toUpperCase();
     text("orchRiskStatus",risk.status||councilState||"—");
