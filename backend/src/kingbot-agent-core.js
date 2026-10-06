@@ -66,7 +66,9 @@ export function buildKingbotAgentPlan({
   conversation = [],
   frame = {},
   thinkingLevel = "EXPERT",
-  memory = []
+  memory = [],
+  memorySummary = [],
+  originalQuestion = ""
 } = {}) {
   const goals = chooseGoals(frame);
   const responseMode = chooseResponseMode(frame);
@@ -90,7 +92,10 @@ export function buildKingbotAgentPlan({
       topic: frame?.topic || null,
       historyDepth: Number(frame?.historyDepth || conversation.length || 0),
       memoryAvailable,
-      memoryCount: Array.isArray(memory) ? memory.length : 0
+      memoryCount: Array.isArray(memory) ? memory.length : 0,
+      memorySummary: Array.isArray(memorySummary) ? memorySummary : [],
+      effectiveQuestion: normalize(question),
+      originalQuestion: normalize(originalQuestion)
     },
     knowledgeRoute: knowledge,
     toolPlan: agentToolPlan({ intent, goal: goals[0] }),
@@ -179,9 +184,11 @@ export function createKingbotAgent({
   thinkingLevel = "EXPERT",
   verified = {},
   learning = null,
-  memory = []
+  memory = [],
+  memorySummary = [],
+  originalQuestion = ""
 } = {}) {
-  const plan = buildKingbotAgentPlan({ question, intent, symbol, conversation, frame, thinkingLevel, memory });
+  const plan = buildKingbotAgentPlan({ question, originalQuestion, intent, symbol, conversation, frame, thinkingLevel, memory, memorySummary });
   return {
     plan,
     snapshot: buildAgentSnapshot({ plan, verified, learning }),
