@@ -1,7 +1,7 @@
 import { agentToolPlan } from "./kingbot-agent-tools.js";
 
 /*
- * KINGBOT AGENT CORE v1
+ * KINGBOT AGENT CORE v2
  * Native agent controller for KINGBOT FINTECH.
  *
  * This is the orchestration layer that makes the platform behave like one
@@ -107,15 +107,35 @@ export function buildKingbotAgentPlan({
   };
 }
 
+function cleanAgentLanguage(answer) {
+  return normalize(answer)
+    .replace(/^KINGBOT (?:AI|INTELLIGENCE|CORTEX)\s*(?:is|:)?\s*/i, "")
+    .replace(/^Request failed \(HTTP \d+\)\.?\s*/i, "")
+    .trim();
+}
+
+function contextLead(frame = {}) {
+  if (!frame?.contextResolved) return "";
+  const topic = normalize(frame.topic);
+  if (!topic) return "";
+  return "";
+}
+
 function adaptResponseStyle(answer, frame = {}) {
-  const text = normalize(answer);
+  const raw = normalize(answer);
+  if (!raw) return "I’m here. Tell me what you want to work through.";
+
+  const text = cleanAgentLanguage(raw);
   if (!text) return "I’m here. Tell me what you want to work through.";
 
   const mode = chooseResponseMode(frame);
-  if (mode === "ACTIONABLE" || mode === "DIAGNOSTIC") {
-    return text;
-  }
+  const lead = contextLead(frame);
 
+  // The core never invents facts or live values. It only improves presentation
+  // of an already-produced, verified-or-explicitly-qualified answer.
+  if (lead) return \`\${lead}\${text}\`;
+
+  if (mode === "DIAGNOSTIC" && !/[.!?]$/.test(text)) return \`\${text}.\`;
   return text;
 }
 
