@@ -749,6 +749,87 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             TRAINING_KEYS.discard(key)
         TRAINING_SEMAPHORE.release()
 
+
+# Proprietary KINGBOT meta-intelligence layer.
+META_MODEL_VERSION = "KBI-META-V1"
+META_FEATURE_NAMES = [
+    "strategic_buy","strategic_hold","strategic_sell","flipper_buy","flipper_hold","flipper_sell",
+    "breakout_buy","breakout_hold","breakout_sell","smc_buy","smc_hold","smc_sell",
+    "ladder_buy","ladder_hold","ladder_sell","mtf_agreement","trend","momentum","volatility","spread_atr"
+]
+META_MODELS: dict[str, dict[str, Any]] = {}
+META_CHALLENGERS: dict[str, dict[str, Any]] = {}
+
+
+def build_meta_features(specialists: dict[str, Any], market: dict[str, Any] | None = None) -> np.ndarray:
+    market = market or {}
+    values: list[float] = []
+    for strategy in ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"]:
+        item = specialists.get(strategy) or {}
+        probs = item.get("probabilities") if isinstance(item, dict) else None
+        if not isinstance(probs, (list, tuple)) or len(probs) != 3:
+            probs = [0.0, 0.0, 1.0]
+        # Standard order is BUY, HOLD, SELL for the meta layer.
+        values.extend([clamp(finite(probs[0]), 0, 1), clamp(finite(probs[1]), 0, 1), clamp(finite(probs[2]), 0, 1)])
+    agreement = (specialists.get("_meta") or {}).get("mtfAgreement", 0)
+    values.extend([
+        clamp(finite(agreement), 0, 1), clamp(finite(market.get("trend")), -1, 1),
+        clamp(finite(market.get("momentum")), -1, 1), clamp(finite(market.get("volatility")), 0, 1),
+        clamp(finite(market.get("spreadAtr") or market.get("spread")), 0, 5)
+    ])
+    arr = np.asarray([values], dtype=np.float32)
+    if arr.shape != (1, len(META_FEATURE_NAMES)) or not np.isfinite(arr).all():
+        raise ValueError("KBI_META_FEATURE_SCHEMA_INVALID")
+    return arr
+
+
+def train_meta_model(model_key: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    if len(rows) < 120:
+        raise ValueError("KBI_META_TRAINING_REQUIRES_120_ROWS")
+    ordered = sorted(rows, key=lambda r: finite(r.get("createdAt"), 0))
+    X = np.asarray([r.get("features") for r in ordered], dtype=np.float32)
+    y = np.asarray([int(r.get("label")) for r in ordered], dtype=np.int64)
+    if X.ndim != 2 or X.shape[1] != len(META_FEATURE_NAMES):
+        raise ValueError("KBI_META_FEATURE_SCHEMA_INVALID")
+    a, b = int(len(X)*0.70), int(len(X)*0.85)
+    if b-a < 20 or len(X)-b < 20 or len(set(y[:a].tolist())) < 3 or len(set(y[b:].tolist())) < 2:
+        raise ValueError("KBI_META_WALK_FORWARD_SPLIT_INSUFFICIENT")
+    scaler = StandardScaler().fit(X[:a])
+    model = RandomForestClassifier(n_estimators=180, max_depth=6, min_samples_leaf=5, random_state=73, class_weight="balanced_subsample", n_jobs=1)
+    model.fit(scaler.transform(X[:a]), y[:a])
+    cal_raw = model.predict_proba(scaler.transform(X[a:b]))
+    test_raw = model.predict_proba(scaler.transform(X[b:]))
+    def align(raw):
+        out=np.zeros((len(raw),3),dtype=np.float32)
+        for i,row in enumerate(raw):
+            mp={int(k):float(v) for k,v in zip(model.classes_,row)}
+            out[i]=[mp.get(-1,0),mp.get(0,0),mp.get(1,0)]
+        return out
+    cal_probs, test_probs = align(cal_raw), align(test_raw)
+    temperature, _ = fit_temperature(cal_probs, y[a:b])
+    calibrated = apply_temperature(test_probs, temperature)
+    pred=np.asarray([LABELS[int(i)] for i in calibrated.argmax(axis=1)],dtype=np.int64)
+    metrics={"accuracy":float(accuracy_score(y[b:],pred)),"balancedAccuracy":float(balanced_accuracy_score(y[b:],pred)),"macroF1":float(f1_score(y[b:],pred,average="macro",zero_division=0))}
+    prob=probability_metrics(calibrated,y[b:])
+    gate=metrics["balancedAccuracy"]>=0.38 and metrics["macroF1"]>=0.36 and prob["ece"]<=0.20 and prob["brier"]<=0.70
+    score=metrics["balancedAccuracy"]*0.60+metrics["macroF1"]*0.40
+    with LOCK:
+        incumbent=META_MODELS.get(model_key); incumbent_score=float(incumbent.get("selectionScore",0)) if incumbent else 0
+        promote=gate and (incumbent is None or score>=incumbent_score-0.0025)
+        record={"model":model,"scaler":scaler,"temperature":float(temperature),"trainedAt":time.time(),"samples":len(X),"selectionScore":score,"qualityGate":gate,"metrics":metrics,"probability":prob,"modelVersion":META_MODEL_VERSION,"promotion":"CHAMPION" if promote else "CHALLENGER"}
+        (META_MODELS if promote else META_CHALLENGERS)[model_key]=record
+    return {"ok":True,"modelKey":model_key,"modelVersion":META_MODEL_VERSION,"promotion":record["promotion"],"qualityGate":gate,"metrics":metrics,"probability":prob,"samples":len(X),"selectionScore":score}
+
+
+def predict_meta_model(model_key: str, features: np.ndarray) -> dict[str, Any]:
+    with LOCK: item=META_MODELS.get(model_key)
+    if not item or not item.get("qualityGate"): return {"ready":False,"status":"META_MODEL_NOT_READY","modelKey":model_key}
+    raw=item["model"].predict_proba(item["scaler"].transform(features))[0]
+    mp={int(k):float(v) for k,v in zip(item["model"].classes_,raw)}
+    probs=apply_temperature(np.asarray([[mp.get(-1,0),mp.get(0,0),mp.get(1,0)]],dtype=np.float32),float(item["temperature"]))[0]
+    i=int(np.argmax(probs))
+    return {"ready":True,"status":"META_MODEL_LIVE","modelKey":model_key,"modelVersion":META_MODEL_VERSION,"direction":int(LABELS[i]),"probabilities":[float(x) for x in probs],"confidence":float(probs[i]),"metrics":item["metrics"]}
+
 def model_status(key: str) -> dict[str, Any]:
     item = MODELS.get(key)
     if not item:
@@ -1111,7 +1192,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, {"stage": "AI_STRATEGIES", **result})
                 return
 
-            if path == "/predict":
+            if path == "/meta/train":
+            body=json.loads(raw_body.decode("utf-8")); self._json(200,train_meta_model(str(body.get("modelKey") or "global"),body.get("rows") or [])); return
+        if path == "/meta/predict":
+            body=json.loads(raw_body.decode("utf-8")); x=np.asarray(body.get("features") or [],dtype=np.float32).reshape(1,-1); self._json(200,predict_meta_model(str(body.get("modelKey") or "global"),x)); return
+        if path == "/meta/status":
+            with LOCK: status={k:{"ready":bool(v.get("qualityGate")),"promotion":v.get("promotion"),"metrics":v.get("metrics",{})} for k,v in META_MODELS.items()}
+            self._json(200,{"ok":True,"modelVersion":META_MODEL_VERSION,"models":status,"challengers":list(META_CHALLENGERS)}); return
+        if path == "/predict":
                 strategy = str(body.get("botId") or "").strip().lower()
                 symbol = str(body.get("symbol") or "").strip().upper()
                 timeframe = str(body.get("timeframe") or "5m").strip().lower()
