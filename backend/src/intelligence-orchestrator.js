@@ -8,6 +8,7 @@ import { buildStrategyCouncil } from "./strategy-council.js";
 import { evaluateStrategySpecialists } from "./strategy-specialists.js";
 import { getGoldPriceFeed } from "./gold-price-feed.js";
 import { warmAiTradeConfirmation } from "./ai-trade-gate.js";
+import { predictMlMetaModel } from "./ml-signal-client.js";
 
 const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
 const MODEL = "KINGBOT-CORTEX-1";
@@ -600,6 +601,85 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
     }
   }
 
+  // KBI-META-V1: independent five-specialist probabilistic challenge.
+  // This layer never authorizes execution; Risk Council remains the hard veto.
+  let metaModel = {
+    status: "NOT_RUN",
+    ready: false,
+    direction: "HOLD",
+    confidence: 0,
+    probabilities: null,
+    modelKey: "global"
+  };
+  try {
+    const metaFeatures = [];
+    for (const botId of BOT_IDS) {
+      const card = specialistByBot.get(botId);
+      const confidence = clamp(num(card?.confidence, 0) / 100, 0, 1);
+      const direction = upper(card?.direction || "WAIT");
+      metaFeatures.push(direction === "BUY" ? confidence : 0);
+      metaFeatures.push(direction === "WAIT" ? 1 : Math.max(0, 1 - confidence));
+      metaFeatures.push(direction === "SELL" ? confidence : 0);
+    }
+
+    const mtf = market.multiTimeframe || {};
+    const frames = Array.isArray(mtf.timeframes)
+      ? mtf.timeframes
+      : Array.isArray(mtf)
+        ? mtf
+        : [];
+    const directionalFrames = frames.filter(frame => ["BULLISH", "BEARISH"].includes(upper(frame?.trend)));
+    const bullishFrames = directionalFrames.filter(frame => upper(frame?.trend) === "BULLISH").length;
+    const bearishFrames = directionalFrames.filter(frame => upper(frame?.trend) === "BEARISH").length;
+    const mtfAgreement = directionalFrames.length
+      ? Math.max(bullishFrames, bearishFrames) / directionalFrames.length
+      : 0;
+
+    metaFeatures.push(
+      clamp(num(mtfAgreement, 0), 0, 1),
+      clamp(num(market.trend, 0), -1, 1),
+      clamp(num(market.momentum, 0), -1, 1),
+      clamp(num(market.volatility, 0), 0, 1),
+      Math.max(0, num(market.spread, 0))
+    );
+
+    const prediction = await predictMlMetaModel({
+      modelKey: "global",
+      features: metaFeatures
+    });
+    const directionMap = { 1: "BUY", 0: "HOLD", "-1": "SELL" };
+    const numericDirection = Number(prediction?.direction);
+    const direction = directionMap[numericDirection] || "HOLD";
+    const confidence = num(prediction?.confidence, 0);
+    metaModel = {
+      status: prediction?.status || (prediction?.ready ? "READY" : "MODEL_NOT_READY"),
+      ready: Boolean(prediction?.ready),
+      direction,
+      confidence: Number((confidence * 100).toFixed(2)),
+      probabilities: prediction?.probabilities || null,
+      modelKey: "global"
+    };
+
+    if (
+      metaModel.ready &&
+      (strategyCouncil.state === "BUY" || strategyCouncil.state === "SELL") &&
+      metaModel.direction !== strategyCouncil.state
+    ) {
+      strategyCouncil.metaStatus = "META_MODEL_CHALLENGE";
+      strategyCouncil.metaReason = `KBI-META-V1 independently disagrees: ${metaModel.direction} vs Council ${strategyCouncil.state}.`;
+    }
+  } catch (error) {
+    metaModel = {
+      status: "ERROR",
+      ready: false,
+      direction: "HOLD",
+      confidence: 0,
+      probabilities: null,
+      modelKey: "global",
+      reason: String(error?.message || "META_MODEL_FAILED").slice(0, 180)
+    };
+  }
+
   const routing = strategyCouncil.state === "BUY" || strategyCouncil.state === "SELL"
     ? chooseEngine(enrichedEngines, debate)
     : { selectedEngine: null, reason: "STRATEGY_COUNCIL_" + strategyCouncil.state, candidate: strategyCouncil.strongestEngine };
@@ -663,6 +743,7 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
     specialists: specialistCards,
     strategyCouncil,
     metaIntelligence,
+    metaModel,
     routing: { ...routing, direction: routing.candidate ? (routing.candidate.score > 0 ? "BUY" : routing.candidate.score < 0 ? "SELL" : "HOLD") : "HOLD" },
     tradePlan,
     riskCouncil: risk,
