@@ -472,6 +472,190 @@
       @media(prefers-reduced-motion:reduce){
         #kb-compact-nav .kb-nav-trigger::before{animation:none}
       }
+      @media(prefers-reduced-motion:reduce){
+        #kb-ai-float,
+        #kb-ai-float::before,
+        #kb-ai-float::after,
+        #kb-ai-float .kb-ai-orb::before,
+        #kb-ai-float .kb-ai-icon{animation:none!important}
+      }
+
+
+      /* Floating KINGBOT AI assistant — shared across all navigation-enabled pages */
+      #kb-ai-float{
+        position:fixed;
+        right:18px;
+        bottom:18px;
+        z-index:2147482999;
+        width:64px;
+        height:64px;
+        display:grid;
+        place-items:center;
+        border-radius:21px;
+        text-decoration:none;
+        background:rgba(3,8,20,.88);
+        border:1px solid rgba(255,255,255,.16);
+        box-shadow:
+          0 18px 55px rgba(0,0,0,.52),
+          0 0 24px rgba(25,230,255,.18),
+          0 0 42px rgba(155,92,255,.10);
+        backdrop-filter:blur(16px);
+        -webkit-backdrop-filter:blur(16px);
+        isolation:isolate;
+        transition:transform .22s ease,box-shadow .22s ease;
+        animation:kbAiFloat 3.8s ease-in-out infinite;
+      }
+
+      #kb-ai-float::before{
+        content:"";
+        position:absolute;
+        inset:-2px;
+        border-radius:23px;
+        padding:2px;
+        background:conic-gradient(
+          #19e6ff,
+          #4787ff,
+          #9b5cff,
+          #ff4fd8,
+          #ff4d6d,
+          #f6b93b,
+          #23f7a3,
+          #19e6ff
+        );
+        animation:kbAiHueSpin 4.5s linear infinite;
+        -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+        -webkit-mask-composite:xor;
+        mask-composite:exclude;
+        z-index:-1;
+      }
+
+      #kb-ai-float::after{
+        content:"";
+        position:absolute;
+        inset:9px;
+        border-radius:16px;
+        background:conic-gradient(
+          from 20deg,
+          rgba(25,230,255,.16),
+          rgba(155,92,255,.14),
+          rgba(255,79,216,.14),
+          rgba(246,185,59,.14),
+          rgba(35,247,163,.14),
+          rgba(25,230,255,.16)
+        );
+        filter:blur(10px);
+        animation:kbAiGlowCycle 5s ease-in-out infinite;
+        z-index:-1;
+      }
+
+      #kb-ai-float .kb-ai-orb{
+        position:relative;
+        width:43px;
+        height:43px;
+        display:grid;
+        place-items:center;
+        border-radius:15px;
+        background:linear-gradient(145deg,rgba(8,18,38,.98),rgba(10,6,27,.98));
+        border:1px solid rgba(255,255,255,.13);
+        box-shadow:inset 0 0 18px rgba(25,230,255,.08);
+        overflow:hidden;
+      }
+
+      #kb-ai-float .kb-ai-orb::before{
+        content:"";
+        position:absolute;
+        width:75px;
+        height:16px;
+        left:-18px;
+        top:14px;
+        background:linear-gradient(90deg,transparent,rgba(25,230,255,.38),rgba(255,79,216,.40),transparent);
+        transform:rotate(-32deg);
+        animation:kbAiScan 2.3s linear infinite;
+      }
+
+      #kb-ai-float .kb-ai-icon{
+        position:relative;
+        z-index:2;
+        width:27px;
+        height:27px;
+        display:grid;
+        place-items:center;
+        border-radius:9px;
+        color:#fff;
+        font:900 13px Orbitron,sans-serif;
+        background:linear-gradient(135deg,#19e6ff,#9b5cff,#ff4fd8,#f6b93b,#23f7a3);
+        background-size:300% 300%;
+        -webkit-background-clip:text;
+        background-clip:text;
+        -webkit-text-fill-color:transparent;
+        animation:kbAiColorShift 4s ease infinite;
+        filter:drop-shadow(0 0 8px rgba(25,230,255,.55));
+      }
+
+      #kb-ai-float .kb-ai-label{
+        position:absolute;
+        right:0;
+        bottom:-24px;
+        padding:5px 8px;
+        border-radius:8px;
+        color:#dce8ff;
+        background:rgba(3,8,19,.94);
+        border:1px solid rgba(255,255,255,.10);
+        font:800 6px JetBrains Mono,monospace;
+        letter-spacing:.08em;
+        white-space:nowrap;
+        opacity:0;
+        transform:translateY(4px);
+        pointer-events:none;
+        transition:.18s ease;
+        box-shadow:0 8px 24px rgba(0,0,0,.4);
+      }
+
+      #kb-ai-float:hover{
+        transform:translateY(-4px) scale(1.045);
+        box-shadow:
+          0 22px 65px rgba(0,0,0,.56),
+          0 0 30px rgba(25,230,255,.25),
+          0 0 50px rgba(155,92,255,.16);
+        animation-play-state:paused;
+      }
+
+      #kb-ai-float:hover .kb-ai-label{
+        opacity:1;
+        transform:none;
+      }
+
+      #kb-ai-float:focus-visible{
+        outline:2px solid #19e6ff;
+        outline-offset:4px;
+      }
+
+      @keyframes kbAiHueSpin{
+        to{transform:rotate(360deg)}
+      }
+
+      @keyframes kbAiColorShift{
+        0%,100%{background-position:0% 50%;filter:drop-shadow(0 0 8px rgba(25,230,255,.62))}
+        25%{background-position:50% 0%;filter:drop-shadow(0 0 9px rgba(155,92,255,.68))}
+        50%{background-position:100% 50%;filter:drop-shadow(0 0 10px rgba(255,79,216,.68))}
+        75%{background-position:50% 100%;filter:drop-shadow(0 0 9px rgba(35,247,163,.68))}
+      }
+
+      @keyframes kbAiGlowCycle{
+        0%,100%{opacity:.55;transform:scale(.92)}
+        50%{opacity:1;transform:scale(1.08)}
+      }
+
+      @keyframes kbAiScan{
+        from{transform:translateX(-45px) rotate(-32deg)}
+        to{transform:translateX(75px) rotate(-32deg)}
+      }
+
+      @keyframes kbAiFloat{
+        0%,100%{transform:translateY(0)}
+        50%{transform:translateY(-3px)}
+      }
+
     `;
 
     document.head.appendChild(style);
@@ -517,6 +701,14 @@
     live.setAttribute("aria-live","polite");
     live.id="kb-live-region";
     document.body.appendChild(live);
+
+    const aiFloat=document.createElement("a");
+    aiFloat.id="kb-ai-float";
+    aiFloat.href="ai.html#consoleSection";
+    aiFloat.setAttribute("aria-label","Open KINGBOT AI support");
+    aiFloat.setAttribute("title","KINGBOT AI · Ask for help");
+    aiFloat.innerHTML='<span class="kb-ai-orb"><span class="kb-ai-icon" aria-hidden="true">✦</span></span><span class="kb-ai-label">KINGBOT AI · SUPPORT</span>';
+    document.body.appendChild(aiFloat);
 
     const root=document.createElement("div");
     root.id="kb-compact-nav";
