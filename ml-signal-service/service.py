@@ -81,6 +81,7 @@ STRATEGY_FOCUS = {
 }
 
 MODELS: dict[str, dict[str, Any]] = {}
+CHALLENGERS: dict[str, dict[str, Any]] = {}
 LOCK = threading.Lock()
 torch.set_num_threads(TORCH_THREADS)
 torch.set_num_interop_threads(max(1, min(4, TORCH_THREADS)))
@@ -470,6 +471,25 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         X_test = np.concatenate(test_x_parts, axis=0)
         y_test = np.concatenate(test_y_parts, axis=0)
 
+        # Fold settled live-trade feedback into the supervised dataset.
+        # Feedback is only used on a subsequent training cycle, keeping live
+        # execution read-only and making the learning loop auditable.
+        with LOCK:
+            feedback = [
+                row for row in FEEDBACK_ROWS
+                if str(row.get("strategy")) == strategy
+                and str(row.get("timeframe")) == timeframe.lower()
+                and isinstance(row.get("features"), list)
+            ][-MAX_FEEDBACK_ROWS:]
+        if feedback:
+            feedback_x = np.asarray([row["features"] for row in feedback], dtype=np.float32)
+            feedback_y = np.asarray([int(row["label"]) for row in feedback], dtype=np.int64)
+            feedback_w = np.asarray([1.5 if row.get("outcome") in {"WIN","LOSS"} else 1.0 for row in feedback], dtype=np.float32)
+            if feedback_x.ndim == 2 and feedback_x.shape[1] == len(FEATURE_NAMES):
+                X_train = np.concatenate([X_train, feedback_x], axis=0)
+                y_train = np.concatenate([y_train, feedback_y], axis=0)
+                weights_train = np.concatenate([weights_train, feedback_w], axis=0)
+
         if len(X_train) < 70 or len(X_test) < 30:
             raise ValueError("ML_TRAINING_FEATURES_INSUFFICIENT")
 
@@ -569,9 +589,12 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "promotion": "CHAMPION" if promote else "CHALLENGER",
                 "promoted_at": trained_at if promote else None,
                 "feedbackVersion": FEEDBACK_VERSION,
+                "feedbackRowsUsed": len(feedback),
             }
             if promote:
                 MODELS[key] = model_record
+            else:
+                CHALLENGERS[key] = model_record
             while len(MODELS) > MAX_MODELS:
                 oldest = min(MODELS.items(), key=lambda item: item[1]["trained_at"])[0]
                 MODELS.pop(oldest, None)
@@ -639,6 +662,7 @@ def model_status(key: str) -> dict[str, Any]:
         "selectionScore": round(float(item.get("selection_score", 0.0)), 4),
         "promotion": item.get("promotion", "CHAMPION"),
         "feedbackVersion": item.get("feedbackVersion"),
+        "feedbackRowsUsed": item.get("feedbackRowsUsed", 0),
         "featureVersion": item["feature_version"],
         "libraries": ["scikit-learn", "PyTorch"],
     }
@@ -869,6 +893,8 @@ class Handler(BaseHTTPRequestHandler):
                 "training": len(TRAINING_KEYS),
                 "feedbackRows": len(FEEDBACK_ROWS),
                 "feedbackVersion": FEEDBACK_VERSION,
+                "championModels": len(MODELS),
+                "challengerModels": len(CHALLENGERS),
                 "maxModels": MAX_MODELS,
                 "maxPredictions": MAX_PREDICTIONS,
                 "maxConcurrentTraining": MAX_CONCURRENT_TRAINING,
@@ -882,8 +908,20 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(401, {"ok": False, "error": "ML_SERVICE_UNAUTHORIZED"})
                 return
             with LOCK:
-                statuses = [model_status(key) for key in MODELS]
-            self._json(200, {"ok": True, "stage": "AI_STRATEGIES", "models": statuses})
+                statuses = []
+                for key in MODELS:
+                    item = model_status(key)
+                    challenger = CHALLENGERS.get(key)
+                    if challenger:
+                        item["challenger"] = {
+                            "trainedAt": challenger.get("trained_at"),
+                            "selectionScore": round(float(challenger.get("selection_score", 0.0)), 4),
+                            "balancedAccuracy": round(float(challenger.get("ensemble_balanced_accuracy", 0.0)) * 100.0, 2),
+                            "macroF1": round(float(challenger.get("ensemble_macro_f1", 0.0)) * 100.0, 2),
+                            "samples": challenger.get("samples", 0)
+                        }
+                    statuses.append(item)
+            self._json(200, {"ok": True, "stage": "AI_STRATEGIES", "models": statuses, "challengers": len(CHALLENGERS)})
             return
         self._json(404, {"ok": False, "error": "NOT_FOUND"})
 
