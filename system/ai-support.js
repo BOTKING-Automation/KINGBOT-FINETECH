@@ -456,8 +456,17 @@
       return { answer: variants[seed], conversationOnly: true };
     }
 
-    if (/^(ok|okay|alright|right|sure|yes|yep|yeah|got it|understood|i see|cool|nice|exactly)[!.? ]*$/i.test(t)) {
+    if (/^(ok|okay|alright|right|sure|yes|yep|yeah|got it|understood|i see|cool|nice|exactly)\s+(good|nice|great|then|now|bro|man)[!.? ]*$/i.test(t)
+      || /^(ok|okay|alright|sure|yes|yep|yeah|got it|understood|i see|cool|nice|exactly)[!.? ]*$/i.test(t)) {
       return { answer: ["Got it — I'm following you. 🤖", "Understood. I'm with you.", "Yep, I follow. Go ahead."][seed], conversationOnly: true };
+    }
+
+    if (/^(now|so)\s+(what|whats|what's)\b/i.test(t)
+      || /\bwhat do you have (today|now)\b|\bwhat can we do (today|now)\b|\bwhat are we doing today\b/i.test(t)) {
+      return {
+        answer: "Today I can help with KINGBOT market intelligence, verified platform and broker state, strategy and risk logic, technical-analysis learning, coding/debugging, and current research where verified sources are available. I won't invent live data, and chat never authorizes execution. Tell me which area you want to tackle first.",
+        conversationOnly: true
+      };
     }
 
     if (/^(what is|what's|tell me about|explain)\s+(kingbot|kingbot fintech|this platform|the platform)\b/i.test(t)
