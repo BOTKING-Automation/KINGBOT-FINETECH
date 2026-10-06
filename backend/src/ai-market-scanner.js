@@ -662,6 +662,8 @@ export async function ensureAiMarketScannerSchema(pool) {
 const AI_STRATEGY_BOTS = ["strategic","flipper","breakout","smc-pro","ladder-flip"];
 const TRAINING_SYMBOLS = DEFAULT_SYMBOLS;
 const TRAINING_HISTORY_LIMIT = Math.max(360,Math.min(1000,Number(process.env.KINGBOT_ML_HISTORY_LIMIT||1000)));
+const TRAINING_HISTORY_CACHE_MS = Math.max(5*60*1000,Number(process.env.KINGBOT_ML_HISTORY_CACHE_MS||6*60*60*1000));
+const trainingHistoryCache = new Map();
 
 function trainingTimeframes(botId){
   const profile=getBotDefinitions()[botId]?.timeframeProfile||{};
@@ -705,23 +707,39 @@ async function getBinanceTrainingBars(symbol,timeframe,limit=TRAINING_HISTORY_LI
 
 async function getTrainingBars(symbol,timeframe,twelveData){
   const clean=String(symbol||"").trim().toUpperCase();
+  const tf=String(timeframe||"5m").trim().toLowerCase();
+  const cacheKey=clean+":"+tf;
+  const cached=trainingHistoryCache.get(cacheKey);
+  if(cached&&Date.now()-cached.at<TRAINING_HISTORY_CACHE_MS&&Array.isArray(cached.bars)&&cached.bars.length>=120){
+    return cached.bars;
+  }
+
   const errors=[];
   if(clean==="BTCUSD"){
-    try{return await getBinanceTrainingBars(clean,timeframe);}
-    catch(error){errors.push("BINANCE:"+(error?.message||"UNAVAILABLE"));}
+    try{
+      const bars=await getBinanceTrainingBars(clean,tf);
+      trainingHistoryCache.set(cacheKey,{at:Date.now(),bars});
+      return bars;
+    }catch(error){errors.push("BINANCE:"+(error?.message||"UNAVAILABLE"));}
   }
   if(twelveData?.enabled && typeof twelveData.historicalBars==="function"){
     try{
-      const bars=await twelveData.historicalBars(clean,timeframe,{limit:TRAINING_HISTORY_LIMIT,maxAgeMs:10*60*1000});
-      if(Array.isArray(bars)&&bars.length>=120)return bars;
+      const bars=await twelveData.historicalBars(clean,tf,{limit:TRAINING_HISTORY_LIMIT,maxAgeMs:10*60*1000});
+      if(Array.isArray(bars)&&bars.length>=120){
+        trainingHistoryCache.set(cacheKey,{at:Date.now(),bars});
+        return bars;
+      }
       errors.push("TWELVE_DATA:INSUFFICIENT_HISTORY");
     }catch(error){
       errors.push("TWELVE_DATA:"+(error?.message||"UNAVAILABLE"));
     }
   }
   try{
-    const bars=await publicDerivFeed.getHistoricalCandles(clean,{timeframe,limit:TRAINING_HISTORY_LIMIT,timeoutMs:15000});
-    if(Array.isArray(bars)&&bars.length>=120)return bars;
+    const bars=await publicDerivFeed.getHistoricalCandles(clean,{timeframe:tf,limit:TRAINING_HISTORY_LIMIT,timeoutMs:15000});
+    if(Array.isArray(bars)&&bars.length>=120){
+      trainingHistoryCache.set(cacheKey,{at:Date.now(),bars});
+      return bars;
+    }
     errors.push("DERIV:INSUFFICIENT_HISTORY");
   }catch(error){
     errors.push("DERIV:"+(error?.message||"UNAVAILABLE"));
@@ -740,17 +758,22 @@ async function trainAiStrategyModels(twelveData){
     const botReports=[];
     let botTrained=0;
     for(const timeframe of timeframes){
-      const markets=[];
-      for(const symbol of TRAINING_SYMBOLS){
+      const fetched=await Promise.all(TRAINING_SYMBOLS.map(async symbol=>{
         try{
           const bars=await getTrainingBars(symbol,timeframe,twelveData);
-          if(Array.isArray(bars)&&bars.length>=120)markets.push({symbol,bars});
+          return Array.isArray(bars)&&bars.length>=120
+            ? {ok:true,symbol,bars}
+            : {ok:false,symbol,error:"INSUFFICIENT_HISTORY"};
         }catch(error){
-          const failure={botId,symbol,timeframe,ok:false,error:String(error?.message||"HISTORY_UNAVAILABLE").slice(0,500)};
-          reports.push(failure);
-          botReports.push(failure);
-          console.warn("[KINGBOT ML TRAIN]",botId,timeframe,symbol,error?.message||error);
+          return {ok:false,symbol,error:String(error?.message||"HISTORY_UNAVAILABLE").slice(0,500)};
         }
+      }));
+      const markets=fetched.filter(x=>x.ok).map(x=>({symbol:x.symbol,bars:x.bars}));
+      for(const failure of fetched.filter(x=>!x.ok)){
+        const report={botId,symbol:failure.symbol,timeframe,ok:false,error:failure.error};
+        reports.push(report);
+        botReports.push(report);
+        console.warn("[KINGBOT ML TRAIN]",botId,timeframe,failure.symbol,failure.error);
       }
       if(!markets.length){
         const failure={botId,timeframe,ok:false,error:"NO_VALID_TRAINING_MARKETS"};
