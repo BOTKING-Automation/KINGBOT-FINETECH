@@ -345,6 +345,25 @@ export function conversationalReply(question="",conversation=[]) {
     "Continue with the next detail."
   );
 
+  // Natural compound acknowledgements and open-ended daily check-ins should
+  // remain conversational instead of being routed into technical subsystems.
+  const casual = WORDS(question);
+  if(/^(ok|okay|alright|sure|yes|yep|yeah|cool|nice|good|great)\s+(good|nice|great|then|now|bro|man)[!.? ]*$/i.test(casual)
+    || /^(ok|okay|alright|sure|yes|yep|yeah)\s+(i('?m| am)|we('?re| are)|that('?s| is)|all)\b/i.test(casual)) {
+    return respond(
+      ["Good. 🤖 I'm with you. What's the next move?","Perfect — I'm following you. What should we work on next?","Got you. Let's keep going — what's next?"][i],
+      "Continue with the next task."
+    );
+  }
+
+  if(/^(now|so)\s+(what|whats|what's)\b/i.test(casual)
+    || /\bwhat do you have (today|now)\b|\bwhat can we do (today|now)\b|\bwhat are we doing today\b/i.test(casual)) {
+    return respond(
+      "Today I can help you work through KINGBOT's live market intelligence, platform and broker-state verification, strategy/risk logic, technical-analysis learning, software/debugging tasks, and current research where verified sources are available. I won't invent live data, and chat never authorizes execution. Tell me which area you want to tackle first.",
+      "Choose: live market analysis, platform, broker, strategy, risk, coding, or research."
+    );
+  }
+
   return null;
 }
 
