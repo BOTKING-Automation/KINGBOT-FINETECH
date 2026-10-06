@@ -281,51 +281,51 @@ export function conversationalReply(question="",conversation=[]) {
   const mode=routeIntent(question,conversation);
   const i=variantIndex(question,conversation);
 
-  if(mode==="WHAT_IS_UP") return responseBase([
+  const respond=(answer,nextAction,extra={})=>responseBase(answer,nextAction,{...extra,...correctionNote});\n\n  if(mode==="WHAT_IS_UP") return respond([
     "I’m online and working normally. 🤖 What do you want to tackle?",
     "All good here. KINGBOT is active. What are we working on?",
     "Nothing dramatic — I’m online and ready. Give me the next task."
   ][i],"Continue with your next question or task.");
 
-  if(mode==="GREETING") return responseBase([
+  if(mode==="GREETING") return respond([
     "Hey! 👋 I'm here and fully online. What are we working on?",
     "Hello! 🤖 KINGBOT is online and ready. Tell me what you want to work through.",
     "Hey there. KINGBOT is active and listening. What should we tackle?"
   ][i],"Ask a question, describe a problem, or request live market analysis.");
 
-  if(mode==="WELLBEING") return responseBase([
+  if(mode==="WELLBEING") return respond([
     "I'm good on the system side. 🤖 The KINGBOT core is active and ready for the next task.",
     "All good here. KINGBOT is online, and I'm ready to reason through whatever you want to solve.",
     "Yes — I'm operating normally and ready. I don't experience feelings like a person, but the intelligence services are online."
   ][i],"Send the next thing you want me to think through.");
 
-  if(mode==="PRESENCE") return responseBase("Yes — I'm here and online. 🤖 Give me the next instruction and I'll work from there.","Continue the conversation.");
+  if(mode==="PRESENCE") return respond("Yes — I'm here and online. 🤖 Give me the next instruction and I'll work from there.","Continue the conversation.");
 
-  if(mode==="THANKS") return responseBase(["You're welcome. 🤝","Glad to help. 🤖","Absolutely."][i],"Continue with the next question or task.");
+  if(mode==="THANKS") return respond(["You're welcome. 🤝","Glad to help. 🤖","Absolutely."][i],"Continue with the next question or task.");
 
-  if(mode==="GOODBYE") return responseBase(["See you. 👋","Take care. 🤖","Understood. See you next time."][i],"Conversation ended normally.");
+  if(mode==="GOODBYE") return respond(["See you. 👋","Take care. 🤖","Understood. See you next time."][i],"Conversation ended normally.");
 
-  if(mode==="IDENTITY" || mode==="INTELLIGENCE") return responseBase(
+  if(mode==="IDENTITY" || mode==="INTELLIGENCE") return respond(
     "I'm KINGBOT — the platform's native intelligence layer. I understand ordinary language by building a semantic frame from your words and recent conversation, then route the request to the appropriate intelligence subsystem. I can work with verified platform state, supported live markets, strategy logic, risk data and research sources. The core reasoning remains proprietary and deterministic rather than another AI service.",
     "Ask me a normal question, a technical question, or a live market question."
   );
 
-  if(mode==="CAPABILITY") return responseBase(
+  if(mode==="CAPABILITY") return respond(
     "I can converse naturally, follow the recent topic, resolve references like “it”, “that”, and “now”, answer KINGBOT questions, inspect verified broker/account/runtime state, analyze supported live markets, compare strategies, reason through software problems, and research general or current information when the research service is configured. Chat itself does not authorize trades.",
     "Try “what about now?”, “why is my bot stopped?”, “explain this code”, or “analyze XAUUSD”."
   );
 
-  if(mode==="EMOTION_PROBE") return responseBase(
+  if(mode==="EMOTION_PROBE") return respond(
     "I can understand questions about emotions, but I don't experience emotions the way a person does. I can still follow your context, keep the conversation coherent, and help you reason through what you want to solve.",
     "Tell me what's on your mind."
   );
 
-  if(mode==="HELP") return responseBase(
+  if(mode==="HELP") return respond(
     "Yes. Explain the problem in your own words. I’ll identify the subject, inspect the recent context, determine what kind of help you need, and route it to the relevant KINGBOT capability.",
     "Describe the problem naturally — you don't need a technical command."
   );
 
-  if(mode==="TONE_FEEDBACK") return responseBase(
+  if(mode==="TONE_FEEDBACK") return respond(
     [
       "You're right — that came across too blunt. Sorry about that. I'll keep the conversation more natural and respectful.",
       "I hear you. That response was too cold. Sorry. I'll be more conversational and helpful.",
@@ -334,7 +334,7 @@ export function conversationalReply(question="",conversation=[]) {
     "Tell me what you want to work on, and I'll meet you there."
   );
 
-  if(mode==="CASUAL" || mode==="META_FEEDBACK") return responseBase(
+  if(mode==="CASUAL" || mode==="META_FEEDBACK") return respond(
     ["Got it — I'm following you.","Understood. I'm with you.","Yep, I follow. Go ahead."][i],
     "Continue with the next detail."
   );
