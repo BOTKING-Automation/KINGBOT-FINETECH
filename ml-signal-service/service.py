@@ -361,6 +361,82 @@ def train_torch(
     }
     return model, metrics
 
+
+def ensemble_probabilities(
+    rf: RandomForestClassifier,
+    torch_model: MLP,
+    scaler: StandardScaler,
+    X: np.ndarray,
+) -> np.ndarray:
+    if len(X) == 0:
+        return np.empty((0, 3), dtype=np.float32)
+    scaled = scaler.transform(X).astype(np.float32)
+    rf_raw = rf.predict_proba(scaled)
+    rf_probs = np.zeros((len(X), 3), dtype=np.float32)
+    for row_index, row in enumerate(rf_raw):
+        row_map = {int(label): float(prob) for label, prob in zip(rf.classes_, row)}
+        rf_probs[row_index] = [row_map.get(label, 0.0) for label in LABELS]
+    torch_model.eval()
+    with torch.no_grad():
+        torch_probs = torch.softmax(
+            torch_model(torch.from_numpy(scaled)), dim=1
+        ).numpy().astype(np.float32)
+    probs = rf_probs * 0.55 + torch_probs * 0.45
+    return (probs / np.maximum(probs.sum(axis=1, keepdims=True), 1e-12)).astype(np.float32)
+
+
+def fit_temperature(probs: np.ndarray, y_true: np.ndarray) -> tuple[float, float]:
+    if len(probs) < 20:
+        return 1.0, float("inf")
+    targets = np.asarray([LABEL_TO_INDEX[int(value)] for value in y_true], dtype=np.int64)
+    best_temperature = 1.0
+    best_loss = float("inf")
+    for temperature in np.linspace(0.50, 3.00, 51):
+        logits = np.log(np.clip(probs, 1e-6, 1.0)) / float(temperature)
+        logits -= logits.max(axis=1, keepdims=True)
+        calibrated = np.exp(logits)
+        calibrated /= np.maximum(calibrated.sum(axis=1, keepdims=True), 1e-12)
+        loss = -float(np.mean(np.log(np.clip(
+            calibrated[np.arange(len(targets)), targets], 1e-6, 1.0
+        ))))
+        if loss < best_loss:
+            best_loss = loss
+            best_temperature = float(temperature)
+    return best_temperature, best_loss
+
+
+def apply_temperature(probs: np.ndarray, temperature: float) -> np.ndarray:
+    if len(probs) == 0:
+        return probs
+    temperature = max(float(temperature), 0.05)
+    logits = np.log(np.clip(probs, 1e-6, 1.0)) / temperature
+    logits -= logits.max(axis=1, keepdims=True)
+    calibrated = np.exp(logits)
+    calibrated /= np.maximum(calibrated.sum(axis=1, keepdims=True), 1e-12)
+    return calibrated.astype(np.float32)
+
+
+def probability_metrics(probs: np.ndarray, y_true: np.ndarray) -> dict[str, float]:
+    if len(probs) == 0:
+        return {"logLoss": 0.0, "brier": 0.0, "ece": 0.0}
+    targets = np.asarray([LABEL_TO_INDEX[int(value)] for value in y_true], dtype=np.int64)
+    clipped = np.clip(probs, 1e-6, 1.0)
+    log_loss = -float(np.mean(np.log(clipped[np.arange(len(targets)), targets])))
+    one_hot = np.eye(3, dtype=np.float32)[targets]
+    brier = float(np.mean(np.sum((probs - one_hot) ** 2, axis=1)))
+    confidence = probs.max(axis=1)
+    predictions = probs.argmax(axis=1)
+    ece = 0.0
+    edges = np.linspace(0.0, 1.0, 11)
+    for lower, upper in zip(edges[:-1], edges[1:]):
+        mask = (confidence >= lower) & ((confidence < upper) if upper < 1.0 else (confidence <= upper))
+        if not np.any(mask):
+            continue
+        accuracy = float(np.mean(predictions[mask] == targets[mask]))
+        ece += float(np.mean(mask)) * abs(accuracy - float(np.mean(confidence[mask])))
+    return {"logLoss": log_loss, "brier": brier, "ece": ece}
+
+
 def normalize_market_bars(bars: Any) -> list[dict[str, float]]:
     if not isinstance(bars, list):
         raise ValueError("ML_MARKET_BARS_INVALID")
@@ -410,6 +486,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         train_w_parts: list[np.ndarray] = []
         test_x_parts: list[np.ndarray] = []
         test_y_parts: list[np.ndarray] = []
+        calibration_x_parts: list[np.ndarray] = []
+        calibration_y_parts: list[np.ndarray] = []
         validation_markets: list[dict[str, Any]] = []
         total_bar_count = 0
         accepted_markets = 0
@@ -436,12 +514,23 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 })
                 continue
 
-            split = max(40, min(len(X_part) - 20, int(len(X_part) * 0.78)))
-            X_train_part, X_test_part = X_part[:split], X_part[split:]
-            y_train_part, y_test_part = y_part[:split], y_part[split:]
-            w_train_part = weights_part[:split]
+            train_end = max(45, int(len(X_part) * 0.70))
+            calibration_end = max(train_end + 15, int(len(X_part) * 0.85))
+            if calibration_end >= len(X_part):
+                calibration_end = len(X_part) - 15
+            X_train_part = X_part[:train_end]
+            X_calibration_part = X_part[train_end:calibration_end]
+            X_test_part = X_part[calibration_end:]
+            y_train_part = y_part[:train_end]
+            y_calibration_part = y_part[train_end:calibration_end]
+            y_test_part = y_part[calibration_end:]
+            w_train_part = weights_part[:train_end]
 
-            if len(X_test_part) < 20 or len(set(int(v) for v in y_train_part)) < 3:
+            if (
+                len(X_calibration_part) < 15
+                or len(X_test_part) < 15
+                or len(set(int(v) for v in y_train_part)) < 3
+            ):
                 validation_markets.append({
                     "symbol": symbol,
                     "accepted": False,
@@ -452,6 +541,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             train_x_parts.append(X_train_part)
             train_y_parts.append(y_train_part)
             train_w_parts.append(w_train_part)
+            calibration_x_parts.append(X_calibration_part)
+            calibration_y_parts.append(y_calibration_part)
             test_x_parts.append(X_test_part)
             test_y_parts.append(y_test_part)
             validation_markets.append({
@@ -459,6 +550,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "accepted": True,
                 "samples": int(len(X_part)),
                 "trainSamples": int(len(X_train_part)),
+                "calibrationSamples": int(len(X_calibration_part)),
                 "testSamples": int(len(X_test_part))
             })
 
@@ -470,6 +562,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         weights_train = np.concatenate(train_w_parts, axis=0)
         X_test = np.concatenate(test_x_parts, axis=0)
         y_test = np.concatenate(test_y_parts, axis=0)
+        X_calibration = np.concatenate(calibration_x_parts, axis=0)
+        y_calibration = np.concatenate(calibration_y_parts, axis=0)
 
         # Fold settled live-trade feedback into the supervised dataset.
         # Feedback is only used on a subsequent training cycle, keeping live
@@ -490,7 +584,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 y_train = np.concatenate([y_train, feedback_y], axis=0)
                 weights_train = np.concatenate([weights_train, feedback_w], axis=0)
 
-        if len(X_train) < 70 or len(X_test) < 30:
+        if len(X_train) < 70 or len(X_calibration) < 30 or len(X_test) < 30:
             raise ValueError("ML_TRAINING_FEATURES_INSUFFICIENT")
 
         train_classes = sorted(set(int(v) for v in y_train))
@@ -526,15 +620,28 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             X_train, y_train, X_test, y_test, scaler, weights_train
         )
 
+        calibration_raw = ensemble_probabilities(rf, torch_model, scaler, X_calibration)
+        test_raw = ensemble_probabilities(rf, torch_model, scaler, X_test)
+        temperature, calibration_log_loss = fit_temperature(calibration_raw, y_calibration)
+        test_probs = apply_temperature(test_raw, temperature)
+        test_pred = np.asarray(
+            [LABELS[int(index)] for index in test_probs.argmax(axis=1)],
+            dtype=np.int64,
+        )
         ensemble_metrics = {
-            "accuracy": float((rf_metrics["accuracy"] + torch_metrics["accuracy"]) / 2.0),
-            "balancedAccuracy": float((rf_metrics["balancedAccuracy"] + torch_metrics["balancedAccuracy"]) / 2.0),
-            "macroF1": float((rf_metrics["macroF1"] + torch_metrics["macroF1"]) / 2.0),
+            "accuracy": float(accuracy_score(y_test, test_pred)),
+            "balancedAccuracy": float(balanced_accuracy_score(y_test, test_pred)),
+            "macroF1": float(f1_score(y_test, test_pred, average="macro", zero_division=0)),
         }
+        probability_metrics_result = probability_metrics(test_probs, y_test)
+        calibration_metrics = probability_metrics(calibration_raw, y_calibration)
 
         quality_gate = (
             ensemble_metrics["balancedAccuracy"] >= 0.36
             and ensemble_metrics["macroF1"] >= 0.34
+            and probability_metrics_result["brier"] <= 0.70
+            and probability_metrics_result["ece"] <= 0.20
+            and len(X_calibration) >= 30
             and len(X_test) >= 30
         )
         if not quality_gate:
@@ -559,6 +666,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "rf": rf,
                 "torch": torch_model,
                 "scaler": scaler,
+                "temperature": float(temperature),
                 "trained_at": trained_at,
                 "strategy": strategy,
                 "symbols": sorted(
@@ -577,12 +685,21 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "ensemble_accuracy": ensemble_metrics["accuracy"],
                 "ensemble_balanced_accuracy": ensemble_metrics["balancedAccuracy"],
                 "ensemble_macro_f1": ensemble_metrics["macroF1"],
+                "probability_log_loss": probability_metrics_result["logLoss"],
+                "probability_brier": probability_metrics_result["brier"],
+                "probability_ece": probability_metrics_result["ece"],
+                "calibration_log_loss": calibration_log_loss,
+                "calibration_ece": calibration_metrics["ece"],
+                "temperature": float(temperature),
                 "quality_gate": quality_gate,
                 "bar_count": total_bar_count,
                 "feature_version": "ai-strategies-v4-walk-forward",
                 "validation": {
-                    "type": "per-market-temporal-holdout",
-                    "trainFraction": 0.78,
+                    "type": "per-market-temporal-train-calibration-test",
+                    "trainFraction": 0.70,
+                    "calibrationFraction": 0.15,
+                    "testFraction": 0.15,
+                    "probabilityCalibration": "temperature-scaling",
                     "markets": validation_markets,
                 },
                 "selection_score": candidate_score,
@@ -657,6 +774,11 @@ def model_status(key: str) -> dict[str, Any]:
         "ensembleAccuracy": round(item.get("ensemble_accuracy", 0.0) * 100.0, 2),
         "ensembleBalancedAccuracy": round(item.get("ensemble_balanced_accuracy", 0.0) * 100.0, 2),
         "ensembleMacroF1": round(item.get("ensemble_macro_f1", 0.0) * 100.0, 2),
+        "probabilityLogLoss": round(float(item.get("probability_log_loss", 0.0)), 4),
+        "probabilityBrier": round(float(item.get("probability_brier", 0.0)), 4),
+        "probabilityECE": round(float(item.get("probability_ece", 0.0)), 4),
+        "calibrationMethod": "temperature-scaling",
+        "temperature": round(float(item.get("temperature", 1.0)), 4),
         "qualityGate": bool(item.get("quality_gate", False)),
         "validationType": item.get("validation", {}).get("type", "unknown"),
         "selectionScore": round(float(item.get("selection_score", 0.0)), 4),
@@ -797,6 +919,7 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
 
         probs = (rf_probs * 0.55 + torch_probs * 0.45)
         probs = probs / max(float(probs.sum()), 1e-12)
+        probs = apply_temperature(probs.reshape(1, -1), float(item.get("temperature", 1.0)))[0]
         best_index = int(np.argmax(probs))
         direction = int(INDEX_TO_LABEL[best_index])
         confidence = float(probs[best_index])
