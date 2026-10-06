@@ -202,3 +202,13 @@ export async function trainMlStrategyModel({ botId, symbol, timeframe, bars, mar
     };
   }
 }
+
+export async function trainMlMetaModel({ modelKey = "global", rows = [] } = {}) {
+  if (!enabled()) return { ok:false, ready:false, status:"ML_SERVICE_NOT_CONFIGURED" };
+  return request("/meta/train", { modelKey, rows }, TRAIN_TIMEOUT_MS);
+}
+
+export async function predictMlMetaModel({ modelKey = "global", features = [] } = {}) {
+  if (!enabled()) return null;
+  return request("/meta/predict", { modelKey, features });
+}
