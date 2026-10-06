@@ -5,7 +5,6 @@
 (function(window, document){
   /* Shared runtime is loaded by every product surface through the global shell. */
   (function loadKingbotRuntime(){
-    if(document.getElementById("kb-site-performance")) return;
     if(!document.querySelector('link[rel="icon"]')){
       const icon=document.createElement("link");
       icon.rel="icon";
@@ -19,16 +18,20 @@
       css.href="system/platform.css";
       document.head.appendChild(css);
     }
-    const stateScript=document.createElement("script");
-    stateScript.id="kb-client-state";
-    stateScript.src="system/kingbot-client-state.js";
-    stateScript.defer=true;
-    document.head.appendChild(stateScript);
-    const script=document.createElement("script");
-    script.id="kb-site-performance";
-    script.src="system/site-performance.js";
-    script.defer=true;
-    document.head.appendChild(script);
+    if(!document.getElementById("kb-client-state")){
+      const stateScript=document.createElement("script");
+      stateScript.id="kb-client-state";
+      stateScript.src="system/kingbot-client-state.js";
+      stateScript.defer=true;
+      document.head.appendChild(stateScript);
+    }
+    if(!document.getElementById("kb-site-performance")){
+      const script=document.createElement("script");
+      script.id="kb-site-performance";
+      script.src="system/site-performance.js";
+      script.defer=true;
+      document.head.appendChild(script);
+    }
     if(!document.getElementById("kb-ui-runtime")){
       const ui=document.createElement("script");
       ui.id="kb-ui-runtime";
@@ -42,6 +45,7 @@
       manifest.href="manifest.webmanifest";
       document.head.appendChild(manifest);
     }
+  })();
   })();
   "use strict";
 
