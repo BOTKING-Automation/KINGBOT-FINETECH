@@ -546,6 +546,22 @@ async function runNativeKingbotAIBase({question,symbol,twelveData,pool,broker,us
   const memorySummary = summarizeUserMemory(memoryRows);
   const requested=symbolFromText(effectiveQuestion,symbol||"XAUUSD");
   const kind=intent(effectiveQuestion,conversation);
+
+  // Conversation is a first-class native capability. Resolve it before
+  // optional cognitive/agent orchestration so a harmless message can never
+  // become dependent on a downstream intelligence component.
+  const earlyConversation = conversationalReply(question,conversation);
+  if(earlyConversation){
+    return {
+      provider:"KINGBOT_NATIVE",
+      model:"KINGBOT-CORTEX-1",
+      intent:"CONVERSATION",
+      symbol:requested,
+      reply:earlyConversation,
+      verified:{native:true,dialogueCortex:true,conversationFirst:true}
+    };
+  }
+
   const agent=createKingbotAgent({
     question,
     intent:kind,
