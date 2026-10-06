@@ -5,10 +5,43 @@ import { runNativeKingbotAI } from "./kingbot-native-ai.js";
 import { webSearchStatus } from "./kingbot-web-search.js";
 import { identitySnapshot, buildCognitivePlan, capabilitySet, qualityAudit, thinkingProfile, normalizeThinkingLevel } from "./kingbot-intelligence-core.js";
 import { buildKingbotAgentPlan } from "./kingbot-agent-core.js";
+import { conversationalReply } from "./kingbot-dialogue-cortex.js";
 
 const DEFAULT_SYMBOLS=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 const MODEL="KINGBOT-CORTEX-1";
 const EXTERNAL_PROVIDER="none";
+
+function safeConversationFallback(question, symbol="XAUUSD"){
+  const q=String(question||"").trim();
+  const lower=q.toLowerCase();
+  const conversational=conversationalReply(q,[]);
+  if(conversational?.answer) return conversational;
+  if(/^(what is|what's|tell me about|explain)\s+(kingbot|kingbot fintech|this platform|the platform)\b/.test(lower)
+    || /\bwhat does kingbot do\b|\bwhat is kingbot fintech\b|\bwhat can kingbot do\b/.test(lower)){
+    return {
+      answer:"KINGBOT is a proprietary trading-technology platform by GIBSONFX Tech. It brings together verified market data, native KINGBOT intelligence, strategy engines, risk controls, broker connectivity, execution infrastructure and analytics in one environment. The AI support layer can explain the platform, reason over verified data and help users work through trading and technical questions, while execution remains outside conversational AI.",
+      facts:[
+        "Native intelligence: KINGBOT CORTEX / KINGBOT AI.",
+        "Market intelligence: verified live market data only.",
+        "Strategy: specialized KINGBOT strategy engines.",
+        "Risk: server-side controls and verification gates.",
+        "Execution authority: NONE for chat."
+      ],
+      technicalAnalysis:[],
+      setup:{signal:"NOT_APPLICABLE",entry:null,waitFor:"No market setup requested.",invalidation:"Not applicable."},
+      riskFlags:["NO_PROFIT_GUARANTEE","CHAT_HAS_NO_EXECUTION_AUTHORITY"],
+      nextAction:"Ask how KINGBOT works, what its strategy engines do, or ask for a verified live market analysis."
+    };
+  }
+  return {
+    answer:"KINGBOT AI is temporarily operating in resilient native mode. I can still handle normal conversation and verified KINGBOT knowledge, but I won't invent live market or account data.",
+    facts:["External conversational providers are not required.","No unverified market, broker or account state is fabricated."],
+    technicalAnalysis:[],
+    setup:{signal:"DATA_INSUFFICIENT",entry:null,waitFor:"Verified system context where required.",invalidation:"Unverified data cannot support a trading conclusion."},
+    riskFlags:["NATIVE_DEGRADED_MODE"],
+    nextAction:"Ask your question again or ask about KINGBOT, its engines, risk controls or supported market data."
+  };
+}
 
 const SYSTEM=`You are KINGBOT AI, the proprietary intelligence agent for KINGBOT FINTECH.
 You operate as a persistent intelligence core, not a chatbot. Maintain the KINGBOT identity, mission and cognitive discipline supplied in context.
@@ -62,8 +95,22 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     const correlationId=crypto.randomUUID();
     await eventBus?.publish({eventType:"AI_REQUEST_RECEIVED",aggregateType:"AI_AGENT",aggregateId:user.id,userId:user.id,correlationId,source:"ai-agent",payload:{symbol,timeframe,thinkingLevel,messageLength:question.length}}).catch(()=>{});
     const conversation=Array.isArray(req.body?.conversation)?req.body.conversation.slice(-6).map(item=>({role:item?.role==="assistant"?"assistant":"user",content:String(item?.content||"").slice(0,1800)})):[];
-    const native=await runNativeKingbotAI({question,symbol,timeframe,thinkingLevel,twelveData:feed,pool,broker,userId:user.id,conversation,eventBus});
-    await eventBus?.publish({eventType:"AI_RESPONSE_READY",aggregateType:"AI_AGENT",aggregateId:user.id,userId:user.id,correlationId,source:"ai-agent",payload:{intent:native?.intent||null,verified:native?.verified||{},memoryAware:Boolean(native?.cognition?.memory?.available)}}).catch(()=>{});
+    let native;
+    try {
+      native=await runNativeKingbotAI({question,symbol,timeframe,thinkingLevel,twelveData:feed,pool,broker,userId:user.id,conversation,eventBus});
+    } catch (error) {
+      console.error("[KINGBOT AI AGENT] native pipeline recovered:", error?.message || error);
+      native={
+        provider:"KINGBOT_NATIVE",
+        model:MODEL,
+        intent:"NATIVE_DEGRADED",
+        symbol,
+        reply:safeConversationFallback(question,symbol),
+        verified:{native:true,degraded:true},
+        sources:[]
+      };
+    }
+    await eventBus?.publish({eventType:"AI_RESPONSE_READY",aggregateType:"AI_AGENT",aggregateId:user.id,userId:user.id,correlationId,source:"ai-agent",payload:{intent:native?.intent||null,verified:native?.verified||{},memoryAware:Boolean(native?.cognition?.memory?.available),degraded:Boolean(native?.verified?.degraded)}}).catch(()=>{});
     const cognitivePlan=native?.cognition?.plan || buildCognitivePlan({intent:native?.intent || "PLATFORM_SUPPORT",symbol,conversation,thinkingLevel});
 
     // Connection/account/runtime questions must stay on the verified native
@@ -75,6 +122,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
 
     return res.json({
       ok:true,
+      degraded:Boolean(native?.verified?.degraded),
       agent:"KINGBOT",
       model:MODEL,
       provider:"KINGBOT_NATIVE",
