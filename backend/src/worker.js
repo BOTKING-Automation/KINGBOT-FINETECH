@@ -7,6 +7,7 @@ import { UserBrokerManager } from "./user-broker-manager.js";
 import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
 import { monitorBotDecision } from "./ai-bot-supervisor.js";
 import { getAiStrategySignal, warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } from "./ai-trade-gate.js";
+import { recordMlFeedback } from "./ml-signal-client.js";
 import { authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
 import { calculateLadderV8Indicators, ladderRungLot, brokerLadderLots, normalizeLot, ladderLockStepPrice, ladderLockPrice, updateVelocitySamples, velocityPoints, withinLadderSession, ladderBasketRisk, LADDER_V8_DEFAULTS } from "./ladder-v8.js";
 import { ensureAuthSchema } from "./auth.js";
@@ -327,6 +328,36 @@ async function reconcileBrokerState(userId,status,positions){
             const settled=await settleAdaptiveDecision(pool,userId,{decisionId:String(row.decision_id),outcome,pnl:profit});
             if(settled){
               await pool.query("UPDATE kingbot_execution_journal SET status='SETTLED',updated_at=NOW() WHERE user_id=$1 AND client_id=$2",[userId,row.client_id]);
+              try{
+                const decisionQ=await pool.query(
+                  "SELECT decision_json FROM kingbot_ai_adaptive_decisions WHERE decision_id=$1 AND user_id=$2 LIMIT 1",
+                  [String(row.decision_id),userId]
+                );
+                const decision=decisionQ.rows?.[0]?.decision_json||{};
+                const market=decision?.market||{};
+                const direction=String(
+                  decision?.routing?.direction ||
+                  decision?.summary?.bias ||
+                  row?.side ||
+                  ""
+                ).toUpperCase();
+                if(recordMlFeedback){
+                  void recordMlFeedback({
+                    botId:String(row.bot_id||settled.selected_engine||"").toLowerCase(),
+                    symbol:String(settled.symbol||row.symbol||market.symbol||"").toUpperCase(),
+                    timeframe:String(market.timeframe||row.timeframe||"5m").toLowerCase(),
+                    direction:direction==="BULLISH"?"BUY":direction==="BEARISH"?"SELL":direction,
+                    outcome,
+                    market,
+                    pnl:profit,
+                    rMultiple:settled.r_multiple
+                  }).then(result=>{
+                    if(result?.ok)console.log("[KINGBOT ML FEEDBACK]",JSON.stringify({botId:row.bot_id,symbol:settled.symbol,outcome,feedbackRows:result.feedbackRows,retrainRecommended:result.retrainRecommended}));
+                  }).catch(error=>console.warn("[KINGBOT ML FEEDBACK] failed:",error?.message||error));
+                }
+              }catch(error){
+                console.warn("[KINGBOT ML FEEDBACK] decision context unavailable:",error?.message||error);
+              }
             }
           }catch(error){
             console.warn("[KINGBOT ADAPTIVE] settlement skipped",JSON.stringify({decisionId:row.decision_id,error:String(error?.message||"SETTLEMENT_FAILED").slice(0,160)}));
