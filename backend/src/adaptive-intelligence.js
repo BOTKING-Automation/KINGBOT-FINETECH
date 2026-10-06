@@ -260,7 +260,7 @@ export async function settleAdaptiveDecision(pool, userId, payload = {}) {
   if (!decisionId) throw new Error("DECISION_ID_REQUIRED");
 
   const existing = await pool.query(
-    "SELECT decision_id,risk_amount FROM kingbot_ai_adaptive_decisions WHERE decision_id=$1 AND user_id=$2",
+    "SELECT decision_id,risk_amount,direction FROM kingbot_ai_adaptive_decisions WHERE decision_id=$1 AND user_id=$2",
     [decisionId, userId]
   );
   if (!existing.rowCount) throw new Error("ADAPTIVE_DECISION_NOT_FOUND");
@@ -277,7 +277,7 @@ export async function settleAdaptiveDecision(pool, userId, payload = {}) {
   }
   if (outcome !== "UNREALIZED" && rMultiple == null) throw new Error("R_MULTIPLE_REQUIRED");
 
-  const trainingLabel = buildOutcomeLabel({ outcome, rMultiple, direction: payload.direction, mfeR: payload.mfeR, maeR: payload.maeR });
+  const trainingLabel = buildOutcomeLabel({ outcome, rMultiple, direction: payload.direction || existing.rows[0]?.direction, mfeR: payload.mfeR, maeR: payload.maeR });
   const result = await pool.query(
     `
       UPDATE kingbot_ai_adaptive_decisions
