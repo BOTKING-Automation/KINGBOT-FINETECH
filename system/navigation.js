@@ -46,7 +46,6 @@
       document.head.appendChild(manifest);
     }
   })();
-  })();
   "use strict";
 
   const links = [
