@@ -15,27 +15,27 @@
     if(!document.querySelector('link[rel="stylesheet"][href="system/platform.css"]')){
       const css=document.createElement("link");
       css.rel="stylesheet";
-      css.href="system/platform.css";
+      css.href="system/platform.css?v=theme-v5";
       document.head.appendChild(css);
     }
     if(!document.getElementById("kb-client-state")){
       const stateScript=document.createElement("script");
       stateScript.id="kb-client-state";
-      stateScript.src="system/kingbot-client-state.js";
+      stateScript.src="system/kingbot-client-state.js?v=theme-v5";
       stateScript.defer=true;
       document.head.appendChild(stateScript);
     }
     if(!document.getElementById("kb-site-performance")){
       const script=document.createElement("script");
       script.id="kb-site-performance";
-      script.src="system/site-performance.js";
+      script.src="system/site-performance.js?v=theme-v5";
       script.defer=true;
       document.head.appendChild(script);
     }
     if(!document.getElementById("kb-ui-runtime")){
       const ui=document.createElement("script");
       ui.id="kb-ui-runtime";
-      ui.src="system/ui-runtime.js";
+      ui.src="system/ui-runtime.js?v=theme-v5";
       ui.defer=true;
       document.head.appendChild(ui);
     }
