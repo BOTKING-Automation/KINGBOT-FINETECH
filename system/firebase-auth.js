@@ -62,6 +62,9 @@ async function saveUserProfile(user, extra={}, initialize=false) {
   if (Object.prototype.hasOwnProperty.call(extra, "profilePhotoData")) {
     profile.profilePhotoData = String(extra.profilePhotoData || "");
   }
+  if (Object.prototype.hasOwnProperty.call(extra, "theme")) {
+    profile.theme = String(extra.theme || "cyan");
+  }
 
   // Initialize trading/account fields only when the account is first created.
   // Sign-in updates identity metadata without resetting trading state.
@@ -107,7 +110,8 @@ async function getProfile(){
     lastName:data.lastName||"",
     phone:data.phone||"",
     photoURL:user.photoURL||data.photoURL||"",
-    profilePhotoData:data.profilePhotoData||""
+    profilePhotoData:data.profilePhotoData||"",
+    theme:String(data.theme||"cyan")
   };
 }
 function readBlobAsDataUrl(blob){
@@ -169,6 +173,17 @@ async function uploadProfilePhoto(file){
     return {photoURL:dataUrl,stored:"firestore"};
   }
 }
+const PROFILE_THEMES = Object.freeze(["cyan","violet","gold","matrix","aurora"]);
+
+async function updateThemePreference(theme="cyan"){
+  const user=await waitForAuthReady();
+  if(!user)throw new Error("Please sign in first.");
+  const next=PROFILE_THEMES.includes(String(theme))?String(theme):"cyan";
+  await saveUserProfile(user,{theme:next});
+  try{window.KINGBOT_UI?.applyTheme?.(next);}catch{}
+  return {theme:next};
+}
+
 async function updateProfileDetails({firstName="",lastName="",phone=""}={}){
   const user=await waitForAuthReady();
   if(!user)throw new Error("Please sign in first.");
@@ -200,7 +215,7 @@ async function backendSync(extra={}){
 }
 
 window.KINGBOT_FIREBASE={
-  app,auth,db,API_BASE,persist,waitForAuthReady,getProfile,uploadProfilePhoto,updateProfileDetails,
+  app,auth,db,API_BASE,persist,waitForAuthReady,getProfile,uploadProfilePhoto,updateProfileDetails,updateThemePreference,PROFILE_THEMES,
   createAccount:async({email,password,firstName,lastName,phone,remember=true})=>{
     await persist(remember);
     let credential;
