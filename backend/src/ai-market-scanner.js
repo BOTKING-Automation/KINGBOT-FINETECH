@@ -690,17 +690,27 @@ async function trainAiStrategyModels(twelveData){
 function startAiStrategyModelTraining(twelveData){
   if(!mlSignalServiceStatus().configured)return;
   const intervalMs=Math.max(5*60*1000,Number(process.env.KINGBOT_ML_RETRAIN_MS||30*60*1000));
+  const retryMs=Math.max(15*1000,Number(process.env.KINGBOT_ML_RETRY_MS||60*1000));
   let running=false;
+  let lastTrainingResult=null;
   const run=async()=>{
     if(running)return;
     running=true;
     try{
       const result=await trainAiStrategyModels(twelveData);
+      lastTrainingResult=result;
       console.log("[KINGBOT ML TRAIN] strategy models:",JSON.stringify(result));
     }catch(error){
+      lastTrainingResult={configured:true,trained:0,reason:String(error?.message||"TRAINING_CYCLE_FAILED").slice(0,180)};
       console.warn("[KINGBOT ML TRAIN] cycle failed:",error?.message||error);
     }finally{
       running=false;
+    }
+    // A restarted/free-tier ML service can be unavailable during the first
+    // training cycle. Retry quickly when no strategy model was trained instead
+    // of leaving AI execution blocked until the normal 30-minute retrain.
+    if(Number(lastTrainingResult?.trained||0)===0){
+      setTimeout(()=>void run(),retryMs);
     }
   };
   setTimeout(()=>void run(),Number(process.env.KINGBOT_ML_INITIAL_TRAIN_DELAY_MS||12000));
