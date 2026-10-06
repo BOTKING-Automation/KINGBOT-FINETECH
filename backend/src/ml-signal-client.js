@@ -1,9 +1,20 @@
 const EXPLICIT_URL = String(process.env.KINGBOT_ML_SIGNAL_URL || "").trim().replace(/\/$/, "");
 const HOST = String(process.env.KINGBOT_ML_SIGNAL_HOST || "").trim();
 const PORT = String(process.env.KINGBOT_ML_SIGNAL_PORT || "").trim();
-const URL = EXPLICIT_URL || (HOST ? "http://" + HOST + (PORT ? ":" + PORT : "") : "");
+function normalizeServiceUrl() {
+  if (EXPLICIT_URL) return EXPLICIT_URL;
+  if (!HOST) return "";
+  const host = HOST.replace(/^https?:\/\//i, "").replace(/\/$/, "");
+  // Render exposes public web services over HTTPS and maps the internal PORT
+  // automatically. Never append the internal port to a public *.onrender.com URL.
+  if (/\.onrender\.com$/i.test(host)) return "https://" + host;
+  return "http://" + host + (PORT ? ":" + PORT : "");
+}
+const URL = normalizeServiceUrl();
 const SECRET = String(process.env.KINGBOT_ML_SIGNAL_SECRET || "").trim();
-const TIMEOUT_MS = Math.max(800, Number(process.env.KINGBOT_ML_SIGNAL_TIMEOUT_MS || 2200));
+// Allow enough time for Render free-tier wake-up + model inference, while
+// keeping the worker bounded and preserving the mandatory AI execution gate.
+const TIMEOUT_MS = Math.max(2500, Number(process.env.KINGBOT_ML_SIGNAL_TIMEOUT_MS || 6500));
 const TRAIN_TIMEOUT_MS = Math.max(8000, Number(process.env.KINGBOT_ML_TRAIN_TIMEOUT_MS || 30000));
 
 function enabled() {
