@@ -77,7 +77,7 @@ export function buildKingbotAgentPlan({
 
   return {
     agent: "KINGBOT_AGENT_CORE",
-    version: "1.0.0",
+    version: "2.0.0",
     userGoal: goals[0],
     userGoals: goals,
     responseMode,
@@ -119,6 +119,20 @@ function contextLead(frame = {}) {
   const topic = normalize(frame.topic);
   if (!topic) return "";
   return "";
+}
+
+function conversationContinuity(frame = {}) {
+  const depth = Number(frame?.historyDepth || 0);
+  return depth > 0;
+}
+
+function composeAgentAnswer(answer, frame = {}) {
+  const text = adaptResponseStyle(answer, frame);
+  if (!conversationContinuity(frame)) return text;
+
+  // Context is used to preserve continuity, not to invent missing facts.
+  // The upstream dialogue/knowledge layer remains authoritative for content.
+  return text;
 }
 
 function adaptResponseStyle(answer, frame = {}) {
@@ -183,5 +197,20 @@ export function createKingbotAgent({
 }
 
 export function agentAnswer(answer, frame = {}) {
-  return adaptResponseStyle(answer, frame);
+  return composeAgentAnswer(answer, frame);
+}
+
+export function agentCapabilitySnapshot({ intent = "PLATFORM_SUPPORT", frame = {}, memory = [], verified = {} } = {}) {
+  const plan = buildKingbotAgentPlan({ intent, frame, memory });
+  return {
+    agent: "KINGBOT_AGENT_CORE",
+    version: "2.0.0",
+    intent: plan.intent,
+    responseMode: plan.responseMode,
+    context: plan.context,
+    knowledgeRoute: plan.knowledgeRoute,
+    verifiedFactsAvailable: Object.keys(verified || {}).length > 0,
+    executionAuthority: "NONE",
+    liveDataPolicy: "REQUIRE_VERIFIED_SOURCE"
+  };
 }
