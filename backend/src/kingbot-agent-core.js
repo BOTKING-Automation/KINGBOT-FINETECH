@@ -76,10 +76,11 @@ export function buildKingbotAgentPlan({
   const hasContext = Number(frame?.historyDepth || conversation.length || 0) > 0;
   const memoryAvailable = Array.isArray(memory) && memory.length > 0;
   const referenceResolved = Boolean(frame?.contextResolved);
+  const reasoningContext = buildReasoningContext({ frame, memorySummary, verified: {} });
 
   return {
     agent: "KINGBOT_AGENT_CORE",
-    version: "2.0.0",
+    version: "2.1.0",
     userGoal: goals[0],
     userGoals: goals,
     responseMode,
@@ -98,6 +99,7 @@ export function buildKingbotAgentPlan({
       originalQuestion: normalize(originalQuestion)
     },
     knowledgeRoute: knowledge,
+    reasoningContext,
     toolPlan: agentToolPlan({ intent, goal: goals[0] }),
     loop: [
       "UNDERSTAND_USER",
@@ -129,6 +131,38 @@ function contextLead(frame = {}) {
 function conversationContinuity(frame = {}) {
   const depth = Number(frame?.historyDepth || 0);
   return depth > 0;
+}
+
+function buildReasoningContext({ frame = {}, memorySummary = [], verified = {} } = {}) {
+  const memories = Array.isArray(memorySummary) ? memorySummary : [];
+  const relevantMemory = memories
+    .filter(item => item && item.value)
+    .slice(0, 8)
+    .map(item => ({
+      type: normalize(item.type || "MEMORY"),
+      key: normalize(item.key || ""),
+      value: normalize(item.value),
+      confidence: Number(item.confidence ?? 0)
+    }));
+
+  return {
+    priority: [
+      "CURRENT_USER_MESSAGE",
+      "RESOLVED_CONVERSATION_CONTEXT",
+      "EXPLICIT_USER_MEMORY",
+      "VERIFIED_SYSTEM_FACTS",
+      "GENERAL_KNOWLEDGE"
+    ],
+    topic: frame?.topic || null,
+    entities: Array.isArray(frame?.entities) ? frame.entities : [],
+    goals: Array.isArray(frame?.userGoals) ? frame.userGoals : [],
+    responseMode: chooseResponseMode(frame),
+    contextResolved: Boolean(frame?.contextResolved),
+    memory: relevantMemory,
+    verifiedFactsAvailable: Object.keys(verified || {}).length > 0,
+    liveDataRule: "REQUIRE_VERIFIED_SOURCE",
+    executionAuthority: "NONE"
+  };
 }
 
 function composeAgentAnswer(answer, frame = {}) {
@@ -208,7 +242,7 @@ export function agentAnswer(answer, frame = {}) {
 }
 
 export function agentCapabilitySnapshot({ intent = "PLATFORM_SUPPORT", frame = {}, memory = [], verified = {} } = {}) {
-  const plan = buildKingbotAgentPlan({ intent, frame, memory });
+  const plan = buildKingbotAgentPlan({ intent, frame, memory, memorySummary: [] });
   return {
     agent: "KINGBOT_AGENT_CORE",
     version: "2.0.0",
