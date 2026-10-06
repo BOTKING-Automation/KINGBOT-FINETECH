@@ -285,7 +285,9 @@ export function conversationalReply(question="",conversation=[]) {
   const i=variantIndex(question,conversation);
   const correctionNote=understanding.corrected ? {languageUnderstanding:understanding} : {};
 
-  const respond=(answer,nextAction,extra={})=>responseBase(answer,nextAction,{...extra,...correctionNote});\n\n  if(mode==="WHAT_IS_UP") return respond([
+  const respond=(answer,nextAction,extra={})=>responseBase(answer,nextAction,{...extra,...correctionNote});
+
+  if(mode==="WHAT_IS_UP") return respond([
     "I’m online and working normally. 🤖 What do you want to tackle?",
     "All good here. KINGBOT is active. What are we working on?",
     "Nothing dramatic — I’m online and ready. Give me the next task."
