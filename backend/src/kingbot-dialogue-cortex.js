@@ -10,7 +10,7 @@
 
 import { normalizeUserLanguage, languageUnderstanding } from "./kingbot-language-understanding.js";
 
-const NORMALIZE = value => String(value || "").replace(/\s+/g, " ").trim();
+const NORMALIZE = value => normalizeUserLanguage(value).text;
 const WORDS = value => NORMALIZE(value).toLowerCase();
 const TOKENS = value => WORDS(value).match(/[a-z0-9_+-]+/g) || [];
 const unique = xs => [...new Set(xs)];
