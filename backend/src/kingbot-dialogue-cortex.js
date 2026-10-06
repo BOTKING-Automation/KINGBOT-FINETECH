@@ -8,6 +8,8 @@
  * ambiguity and a resolved query for downstream intelligence.
  */
 
+import { normalizeUserLanguage, languageUnderstanding } from "./kingbot-language-understanding.js";
+
 const NORMALIZE = value => String(value || "").replace(/\s+/g, " ").trim();
 const WORDS = value => NORMALIZE(value).toLowerCase();
 const TOKENS = value => WORDS(value).match(/[a-z0-9_+-]+/g) || [];
@@ -277,9 +279,11 @@ function responseBase(answer,nextAction="Tell me what you want to work on.",extr
 }
 
 export function conversationalReply(question="",conversation=[]) {
+  const understanding=languageUnderstanding(question);
   const info=classify(question,conversation);
   const mode=routeIntent(question,conversation);
   const i=variantIndex(question,conversation);
+  const correctionNote=understanding.corrected ? {languageUnderstanding:understanding} : {};
 
   const respond=(answer,nextAction,extra={})=>responseBase(answer,nextAction,{...extra,...correctionNote});\n\n  if(mode==="WHAT_IS_UP") return respond([
     "I’m online and working normally. 🤖 What do you want to tackle?",
@@ -343,6 +347,7 @@ export function conversationalReply(question="",conversation=[]) {
 }
 
 export function conversationSignals(question="",conversation=[]) {
+  const understanding=languageUnderstanding(question);
   const info=classify(question,conversation);
   const route=routeIntent(question,conversation);
   const resolved=resolveReference(question,conversation);
@@ -360,6 +365,7 @@ export function conversationSignals(question="",conversation=[]) {
     recentAssistantMessages:recentAssistantMessages(conversation),
     entities:extractEntities(info.effectiveQuestion,conversation),
     topic:topicFromConversation(info.effectiveQuestion,conversation),
+    languageUnderstanding:understanding,
     contextAnchor:{
       domain:anchor.domain,
       entities:anchor.entities,
