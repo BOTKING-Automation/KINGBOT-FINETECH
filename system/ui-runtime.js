@@ -127,6 +127,60 @@
         background:linear-gradient(145deg,${p.bg2},${p.panel});
         box-shadow:inset 0 0 18px color-mix(in srgb,${p.cyan} 10%, transparent);
       }
+      html[data-kb-theme="${name}"] main,
+      html[data-kb-theme="${name}"] .wrap,
+      html[data-kb-theme="${name}"] .shell,
+      html[data-kb-theme="${name}"] .container,
+      html[data-kb-theme="${name}"] .content,
+      html[data-kb-theme="${name}"] .hero,
+      html[data-kb-theme="${name}"] .panel,
+      html[data-kb-theme="${name}"] .card,
+      html[data-kb-theme="${name}"] .section,
+      html[data-kb-theme="${name}"] .box,
+      html[data-kb-theme="${name}"] .surface,
+      html[data-kb-theme="${name}"] .modal,
+      html[data-kb-theme="${name}"] .table-wrap{
+        --theme-surface:${p.panel};
+      }
+      html[data-kb-theme="${name}"] .panel,
+      html[data-kb-theme="${name}"] .card,
+      html[data-kb-theme="${name}"] .hero,
+      html[data-kb-theme="${name}"] .section,
+      html[data-kb-theme="${name}"] .box,
+      html[data-kb-theme="${name}"] .surface,
+      html[data-kb-theme="${name}"] .modal{
+        background:
+          linear-gradient(145deg,
+            color-mix(in srgb,${p.bg2} 94%, transparent),
+            color-mix(in srgb,${p.bg0} 98%, transparent)) !important;
+        border-color:color-mix(in srgb,${p.cyan} 26%, rgba(255,255,255,.10)) !important;
+      }
+      html[data-kb-theme="${name}"] .hero:after,
+      html[data-kb-theme="${name}"] .card:after,
+      html[data-kb-theme="${name}"] .panel:after{
+        background:linear-gradient(90deg,transparent,${p.cyan},${p.violet},${p.pink},${p.gold},transparent) !important;
+      }
+      html[data-kb-theme="${name}"] .btn,
+      html[data-kb-theme="${name}"] button,
+      html[data-kb-theme="${name}"] .primary-btn,
+      html[data-kb-theme="${name}"] .ghost-btn{
+        border-color:color-mix(in srgb,${p.cyan} 24%, rgba(255,255,255,.10));
+      }
+      html[data-kb-theme="${name}"] .title,
+      html[data-kb-theme="${name}"] h1,
+      html[data-kb-theme="${name}"] h2{
+        --theme-title-color:${p.text};
+      }
+      html[data-kb-theme="${name}"] .theme-card[aria-pressed="true"]{
+        border-color:${p.cyan} !important;
+        box-shadow:0 0 30px color-mix(in srgb,${p.cyan} 16%, transparent),inset 0 0 25px color-mix(in srgb,${p.cyan} 4%, transparent) !important;
+      }
+      html[data-kb-theme="${name}"] .kb-theme-ambient{
+        background:
+          radial-gradient(circle at 15% 10%,color-mix(in srgb,${p.cyan} 16%, transparent),transparent 34%),
+          radial-gradient(circle at 85% 15%,color-mix(in srgb,${p.violet} 14%, transparent),transparent 32%),
+          radial-gradient(circle at 55% 100%,color-mix(in srgb,${p.gold} 8%, transparent),transparent 30%);
+      }
     `).join("\n");
     style.textContent=blocks;
     document.head.appendChild(style);
@@ -325,6 +379,7 @@
     if(document.getElementById("kb-ambient-layer"))return;
     const layer=document.createElement("div");
     layer.id="kb-ambient-layer";
+    layer.className="kb-theme-ambient";
     layer.setAttribute("aria-hidden","true");
     layer.innerHTML='<span class="kb-ambient-beam kb-ambient-beam-a"></span><span class="kb-ambient-beam kb-ambient-beam-b"></span><span class="kb-ambient-beam kb-ambient-beam-c"></span><span class="kb-ambient-grid"></span>';
     document.body.prepend(layer);
@@ -336,6 +391,12 @@
     applySurfaceClass();
     injectAmbientLayer();
     document.body.classList.add("kb-ui-runtime-ready");
+    if(!document.getElementById("kb-theme-runtime-style")){
+      const style=document.createElement("style");
+      style.id="kb-theme-runtime-style";
+      style.textContent=".kb-theme-ambient{position:fixed;inset:0;z-index:-2;pointer-events:none;opacity:.72;transition:background .35s ease}.kb-theme-ambient,.kb-theme-ambient *{pointer-events:none}";
+      document.head.appendChild(style);
+    }
     window.addEventListener("storage",event=>{
       if(event.key===THEME_KEY && THEMES.includes(event.newValue)) applyTheme(event.newValue);
     });
