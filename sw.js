@@ -1,5 +1,5 @@
 /* KINGBOT FINTECH — conservative PWA cache */
-const CACHE="kingbot-static-v2";
+const CACHE="kingbot-static-v3";
 const STATIC=[
   "./",
   "./index.html",
