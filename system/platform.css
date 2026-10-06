@@ -1,3 +1,44 @@
+/* =========================================================
+   KINGBOT USER THEME PROFILES
+   Presentation only — never changes trading logic.
+========================================================= */
+html[data-kb-theme="cyan"]{
+  --kb-bg-0:#02040a;--kb-bg-1:#050a18;--kb-bg-2:#0a1228;
+  --kb-cyan:#19e6ff;--kb-blue:#4787ff;--kb-violet:#9b5cff;--kb-pink:#ff4fd8;
+  --kb-gold:#f6b93b;--kb-gold-2:#ffd977;
+}
+html[data-kb-theme="violet"]{
+  --kb-bg-0:#05020a;--kb-bg-1:#0b0618;--kb-bg-2:#160b2b;
+  --kb-cyan:#b77cff;--kb-blue:#7c6cff;--kb-violet:#9b5cff;--kb-pink:#ff4fd8;
+  --kb-gold:#d5a4ff;--kb-gold-2:#ecd8ff;
+}
+html[data-kb-theme="gold"]{
+  --kb-bg-0:#080602;--kb-bg-1:#110b03;--kb-bg-2:#211405;
+  --kb-cyan:#46e8ff;--kb-blue:#4d9dff;--kb-violet:#b477ff;--kb-pink:#ff70dc;
+  --kb-gold:#f6b93b;--kb-gold-2:#ffe49a;
+}
+html[data-kb-theme="matrix"]{
+  --kb-bg-0:#000804;--kb-bg-1:#01130a;--kb-bg-2:#032115;
+  --kb-cyan:#35ff9a;--kb-blue:#16d66e;--kb-violet:#2dff83;--kb-pink:#70ffbd;
+  --kb-gold:#b6ff4a;--kb-gold-2:#d6ff9b;
+}
+html[data-kb-theme="aurora"]{
+  --kb-bg-0:#02050d;--kb-bg-1:#071128;--kb-bg-2:#102149;
+  --kb-cyan:#2de2ff;--kb-blue:#5d7dff;--kb-violet:#a66bff;--kb-pink:#ff65c7;
+  --kb-gold:#67ffd7;--kb-gold-2:#c1fff0;
+}
+html[data-kb-theme="matrix"] body{
+  background:
+    radial-gradient(circle at 15% 10%,rgba(35,247,163,.10),transparent 30%),
+    radial-gradient(circle at 85% 20%,rgba(22,214,110,.08),transparent 30%),
+    var(--kb-bg-0);
+}
+html[data-kb-theme="matrix"] body::before{
+  background-image:
+    linear-gradient(rgba(35,247,163,.028) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(35,247,163,.022) 1px,transparent 1px);
+}
+
 
 /* =========================================================
    KINGBOT FINTECH — NEON INSTITUTIONAL VISUAL SYSTEM
