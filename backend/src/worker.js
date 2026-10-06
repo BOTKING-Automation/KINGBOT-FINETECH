@@ -350,7 +350,11 @@ async function reconcileBrokerState(userId,status,positions){
                     outcome,
                     market,
                     pnl:profit,
-                    rMultiple:settled.r_multiple
+                    rMultiple:settled.r_multiple,
+                    features:(await pool.query(
+                      "SELECT features FROM kingbot_ai_training_samples WHERE decision_id=$1 LIMIT 1",
+                      [String(row.decision_id)]
+                    )).rows?.[0]?.features || undefined
                   }).then(result=>{
                     if(result?.ok)console.log("[KINGBOT ML FEEDBACK]",JSON.stringify({botId:row.bot_id,symbol:settled.symbol,outcome,feedbackRows:result.feedbackRows,retrainRecommended:result.retrainRecommended}));
                   }).catch(error=>console.warn("[KINGBOT ML FEEDBACK] failed:",error?.message||error));
