@@ -680,7 +680,12 @@
 
     const pageLinks=links.map(([href,name,icon,desc])=>{
       const active=href.toLowerCase()===page;
-      return '<a href="'+href+'"'+(active?' class="kb-active" aria-current="page"':'')+'>'+
+      const adminOnly=href.toLowerCase()==="platform-os.html";
+      const classes=[active?"kb-active":"",adminOnly?"kb-admin-only-link":""] .filter(Boolean).join(" ");
+      return '<a href="'+href+'"'+
+        (classes?' class="'+classes+'"':'')+
+        (active?' aria-current="page"':'')+
+        (adminOnly?' data-kb-admin-only="true" hidden':'')+'>'+
         '<span class="kb-menu-icon">'+icon+'</span>'+
         '<span><span class="kb-menu-name">'+name+'</span><span class="kb-menu-sub">'+desc+'</span></span>'+
       '</a>';
@@ -777,6 +782,16 @@
       }
     });
 
+    function syncAdminNav(detail){
+      const state=detail || window.KINGBOT_CLIENT_STATE?.getState?.() || {};
+      const admin=state?.auth?.user?.admin===true || state?.user?.admin===true;
+      root.querySelectorAll("[data-kb-admin-only]").forEach(el=>{
+        el.hidden=!admin;
+        el.setAttribute("aria-hidden",admin?"false":"true");
+      });
+      return admin;
+    }
+
     function syncAuthUI(detail){
       const authenticated = detail?.authenticated === true ||
         window.KINGBOT_SESSION?.isAuthenticated?.() === true;
@@ -820,6 +835,7 @@
       document.querySelectorAll("[data-kb-guest-only]").forEach(el=>{
         el.hidden=authenticated;
       });
+      syncAdminNav();
     }
 
     window.KINGBOT_NAV={
@@ -859,7 +875,11 @@
     }
 
     bindCoreState();
-    window.addEventListener("kingbot:session-change",event=>{syncAuthUI(event.detail||{});void window.KINGBOT_CLIENT_STATE?.refresh?.({reason:"session-change"});});
+    if(window.KINGBOT_CLIENT_STATE?.subscribe){
+      window.KINGBOT_CLIENT_STATE.subscribe(snapshot=>syncAdminNav(snapshot));
+    }
+    syncAdminNav();
+    window.addEventListener("kingbot:session-change",event=>{syncAuthUI(event.detail||{});syncAdminNav();void window.KINGBOT_CLIENT_STATE?.refresh?.({reason:"session-change"});});
     window.addEventListener("kingbot:event-bus-ready",()=>{
       const state=root.querySelector(".kb-menu-state");
       if(state && (window.KINGBOT_SESSION?.isAuthenticated?.()===true)){
