@@ -967,6 +967,16 @@ export async function runNativeKingbotAI(input = {}) {
   });
   const identity = identitySnapshot();
   const capabilities = capabilitySet(plan);
+  const agent = createKingbotAgent({
+    question: input?.question || "",
+    intent: result?.intent || "PLATFORM_SUPPORT",
+    symbol: result?.symbol || input?.symbol || "XAUUSD",
+    conversation: input?.conversation || [],
+    frame: conversationFrame(input?.question || "", input?.conversation || []),
+    thinkingLevel,
+    verified: result?.verified || {},
+    memory: persistentMemory
+  });
   const agentTools = await executeKingbotAgentTools({
     intent: result?.intent || "PLATFORM_SUPPORT",
     goal: conversationSignals(input?.question || "", input?.conversation || [])?.userGoals?.[0] || "UNDERSTAND",
