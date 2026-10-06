@@ -15,7 +15,7 @@ const DIRECT = Object.freeze({
   u:"you", ur:"your", yr:"your", r:"are", im:"i'm", ive:"i've",
   cant:"can't", dont:"don't", doesnt:"doesn't", isnt:"isn't",
   wont:"won't", didnt:"didn't", idk:"i don't know",
-  conect:"connect", connet:"connect", connct:"connect", conected:"connected",
+  conect:"connect", connet:"connect", connct:"connect", conected:"connected", conection:"connection", conecton:"connection",
   disconect:"disconnect", disconected:"disconnected",
   borker:"broker", brokr:"broker", brker:"broker",
   dashbord:"dashboard", dashboad:"dashboard", dashbordd:"dashboard",
@@ -48,7 +48,7 @@ const DIRECT = Object.freeze({
 
 const VOCABULARY = Object.freeze([
   "hello","please","thanks","what","how","where","when","why","you","your",
-  "connect","connected","disconnect","disconnected","broker","dashboard",
+  "connect","connected","connection","disconnect","disconnected","broker","dashboard",
   "account","password","trading","trade","trades","strategy","strategies",
   "signal","market","analysis","technical","support","problem","error",
   "payment","subscription","connecting","explain","working","running",
