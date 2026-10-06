@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { buildFeatureVector, buildOutcomeLabel, KINGBOT_FEATURE_SCHEMA_VERSION } from "./kingbot-intelligence-training.js";
 
 const DEFAULT_MIN_SAMPLES = Math.max(4, Number(process.env.KINGBOT_ADAPTIVE_MIN_SAMPLES || 8));
 const PERFORMANCE_WINDOW_DAYS = Math.max(7, Number(process.env.KINGBOT_ADAPTIVE_WINDOW_DAYS || 90));
@@ -87,9 +88,26 @@ export async function ensureAdaptiveIntelligenceSchema(pool) {
       settled_at TIMESTAMPTZ
     )
   `);
+    CREATE TABLE IF NOT EXISTS kingbot_ai_training_samples (
+      sample_id UUID PRIMARY KEY,
+      decision_id UUID NOT NULL UNIQUE REFERENCES kingbot_ai_adaptive_decisions(decision_id) ON DELETE CASCADE,
+      user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,
+      symbol TEXT NOT NULL,
+      timeframe TEXT NOT NULL,
+      bot_id TEXT,
+      feature_schema_version TEXT NOT NULL,
+      features JSONB NOT NULL,
+      label JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      settled_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS idx_kb_training_samples_time ON kingbot_ai_training_samples(symbol,timeframe,created_at);
+    CREATE INDEX IF NOT EXISTS idx_kb_training_samples_user ON kingbot_ai_training_samples(user_id,bot_id,created_at);
   await pool.query("ALTER TABLE kingbot_ai_adaptive_decisions ADD COLUMN IF NOT EXISTS risk_amount NUMERIC");
   await pool.query("CREATE INDEX IF NOT EXISTS idx_kb_adaptive_perf ON kingbot_ai_adaptive_decisions(user_id,symbol,selected_engine,regime,setup_type,outcome_status,created_at DESC)");
   await pool.query("CREATE INDEX IF NOT EXISTS idx_kb_adaptive_decision_user ON kingbot_ai_adaptive_decisions(user_id,decision_id)");
+  await pool.query("ALTER TABLE kingbot_ai_training_samples ADD COLUMN IF NOT EXISTS label JSONB");
+  await pool.query("ALTER TABLE kingbot_ai_training_samples ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ");
 }
 
 export async function loadAdaptivePerformance(pool, { userId, symbol } = {}) {
@@ -222,6 +240,17 @@ export async function recordAdaptiveDecision(pool, userId, result) {
       JSON.stringify(result)
     ]
   );
+  try {
+    const features = buildFeatureVector(result.market, engine || {});
+    await pool.query(
+      `INSERT INTO kingbot_ai_training_samples(sample_id,decision_id,user_id,symbol,timeframe,bot_id,feature_schema_version,features)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
+       ON CONFLICT(decision_id) DO NOTHING`,
+      [crypto.randomUUID(), decisionId, userId, upper(result.market.symbol), lower(result.market.timeframe || "15m"), engine?.botId || result.routing?.selectedEngine || null, KINGBOT_FEATURE_SCHEMA_VERSION, JSON.stringify(features.values)]
+    );
+  } catch (error) {
+    console.warn("[KINGBOT AI TRAINING] feature capture skipped:", error?.message || error);
+  }
   return decisionId;
 }
 
@@ -248,6 +277,7 @@ export async function settleAdaptiveDecision(pool, userId, payload = {}) {
   }
   if (outcome !== "UNREALIZED" && rMultiple == null) throw new Error("R_MULTIPLE_REQUIRED");
 
+  const trainingLabel = buildOutcomeLabel({ outcome, rMultiple, direction: payload.direction, mfeR: payload.mfeR, maeR: payload.maeR });
   const result = await pool.query(
     `
       UPDATE kingbot_ai_adaptive_decisions
@@ -275,6 +305,14 @@ export async function settleAdaptiveDecision(pool, userId, payload = {}) {
       payload.latencyMs == null ? null : num(payload.latencyMs, null)
     ]
   );
+  if (trainingLabel) {
+    await pool.query(
+      `UPDATE kingbot_ai_training_samples
+          SET label=$3::jsonb, settled_at=NOW()
+        WHERE decision_id=$1 AND user_id=$2`,
+      [decisionId, userId, JSON.stringify(trainingLabel)]
+    );
+  }
   return result.rows[0];
 }
 
