@@ -693,7 +693,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "temperature": float(temperature),
                 "quality_gate": quality_gate,
                 "bar_count": total_bar_count,
-                "feature_version": "ai-strategies-v4-walk-forward",
+                "feature_version": "ai-strategies-v5-calibrated-walk-forward",
                 "validation": {
                     "type": "per-market-temporal-train-calibration-test",
                     "trainFraction": 0.70,
@@ -902,6 +902,7 @@ def record_feedback(
         "feedbackRows": len(FEEDBACK_ROWS),
         "retrainRecommended": len(FEEDBACK_ROWS) >= MIN_FEEDBACK_RETRAIN,
         "feedbackVersion": FEEDBACK_VERSION,
+        "featureSource": feature_source,
     }
 
 
