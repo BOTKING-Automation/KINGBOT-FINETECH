@@ -17,7 +17,7 @@ const unique = xs => [...new Set(xs)];
 
 const DOMAIN_LEXICON = Object.freeze({
   MARKET: ["xauusd","gold","forex","eurusd","gbpusd","usdjpy","btcusd","bitcoin","crypto","market","price","quote","chart","candle","candles","trend","signal","entry","setup","trade","trading","buy","sell","long","short","spread","volatility","liquidity","fvg","order block","market structure"],
-  BOT: ["bot","bots","strategy","strategies","engine","flipper","breakout","smc","ladder","runtime","algorithm","automation","ea","expert advisor","backtest"],
+  BOT: ["bot","bots","strategy","strategies","engine","flipper","breakout","smc","ladder","runtime","algorithm","automation","backtest"],
   PLATFORM: ["kingbot","platform","dashboard","fintech","page","website","feature","system","app","subscription","pricing","payment","plan","license","api"],
   ACCOUNT: ["account","balance","equity","margin","position","positions","portfolio","broker","connection","connected","mt5","deriv","exness","oanda","wallet"],
   RISK: ["risk","drawdown","exposure","stop","stoploss","sl","take","takeprofit","tp","loss","losses","kill","limit","margin","leverage"],
