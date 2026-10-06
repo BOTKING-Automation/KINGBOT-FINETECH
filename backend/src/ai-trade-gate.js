@@ -44,7 +44,24 @@ function snapshotFingerprint({botId,market,analysis}={}){
     emaSlow:num(market?.emaSlow),velocityPoints:num(market?.velocityPoints),
     deterministicSignal:String(analysis?.signal||"NO_SIGNAL"),
     deterministicScore:num(analysis?.score),
-    reason:String(analysis?.reason||"")
+    reason:String(analysis?.reason||""),
+    multiTimeframe:Object.fromEntries(
+      ["regime","setup","execution"].map(role=>{
+        const x=market?.multiTimeframe?.[role]||{};
+        return [role,{
+          timeframe:String(x.timeframe||""),
+          available:Boolean(x.available),
+          trend:num(x.trend),
+          momentum:num(x.momentum),
+          structure:String(x.structure||""),
+          atr:num(x.atr),
+          emaFast:num(x.emaFast),
+          emaSlow:num(x.emaSlow),
+          adx:num(x.adx),
+          rsi:num(x.rsi)
+        }];
+      })
+    )
   });
 }
 
@@ -141,6 +158,145 @@ export function getAiStrategySignal({userId,botId,market,analysis}={}){
   return item;
 }
 
+function strategyTimeframeRoles(botId,market={}){
+  const profile=market?.timeframeProfile||getBotDefinitions()[botId]?.timeframeProfile||{};
+  return [
+    {role:"regime",timeframe:String(profile.regime||"4h").toLowerCase(),weight:0.25},
+    {role:"setup",timeframe:String(profile.setup||"15m").toLowerCase(),weight:0.35},
+    {role:"execution",timeframe:String(profile.execution||market?.timeframe||"5m").toLowerCase(),weight:0.40}
+  ];
+}
+
+function buildMlTimeframeMarket(baseMarket,frame){
+  const roleSnapshot=baseMarket?.multiTimeframe?.[frame.role]||{};
+  const usable=frame.role==="execution"
+    ? baseMarket
+    : (roleSnapshot?.available ? roleSnapshot : null);
+  if(!usable)return null;
+  return {
+    ...baseMarket,
+    ...usable,
+    symbol:String(baseMarket?.symbol||"").toUpperCase(),
+    timeframe:frame.timeframe,
+    price:num(usable.price, num(baseMarket?.price)),
+    close:num(usable.close, num(baseMarket?.price)),
+    atr:num(usable.atr, num(baseMarket?.atr)),
+    spread:num(baseMarket?.spread),
+    bid:num(baseMarket?.bid),
+    ask:num(baseMarket?.ask),
+    velocityPoints:frame.role==="execution"
+      ? num(baseMarket?.velocityPoints)
+      : num(usable.velocityPoints, 0),
+    multiTimeframe:baseMarket?.multiTimeframe||null
+  };
+}
+
+async function predictMultiTimeframeMl({botId,market}={}){
+  const frames=strategyTimeframeRoles(botId,market);
+  const predictions=await Promise.all(frames.map(async frame=>{
+    const snapshot=buildMlTimeframeMarket(market,frame);
+    if(!snapshot){
+      return {role:frame.role,timeframe:frame.timeframe,weight:frame.weight,ready:false,status:"TIMEFRAME_DATA_UNAVAILABLE"};
+    }
+    try{
+      const result=await predictMlStrategySignal({botId,market:snapshot});
+      return {...result,role:frame.role,timeframe:frame.timeframe,weight:frame.weight};
+    }catch(error){
+      return {ready:false,status:"ML_TIMEFRAME_ERROR",error:String(error?.message||"ML_TIMEFRAME_ERROR").slice(0,160),role:frame.role,timeframe:frame.timeframe,weight:frame.weight};
+    }
+  }));
+
+  const ready=predictions.filter(x=>x?.ready&&x?.probabilities);
+  const execution=ready.find(x=>x.role==="execution")||null;
+  if(!execution){
+    return {
+      ready:false,
+      status:predictions.find(x=>x.role==="execution")?.status||"MODEL_NOT_READY",
+      predictions,
+      requiredTimeframe:frames.find(x=>x.role==="execution")?.timeframe||"5m"
+    };
+  }
+
+  const aggregate={sell:0,hold:0,buy:0};
+  let totalWeight=0;
+  for(const prediction of ready){
+    const weight=Math.max(0.05,Number(prediction.weight)||0);
+    aggregate.sell+=(Number(prediction.probabilities.sell)||0)*weight;
+    aggregate.hold+=(Number(prediction.probabilities.hold)||0)*weight;
+    aggregate.buy+=(Number(prediction.probabilities.buy)||0)*weight;
+    totalWeight+=weight;
+  }
+  if(totalWeight<=0)return {ready:false,status:"ML_MTF_AGGREGATION_EMPTY",predictions};
+
+  aggregate.sell/=totalWeight;
+  aggregate.hold/=totalWeight;
+  aggregate.buy/=totalWeight;
+
+  const ranked=[
+    ["SELL",aggregate.sell],
+    ["HOLD",aggregate.hold],
+    ["BUY",aggregate.buy]
+  ].sort((a,b)=>b[1]-a[1]);
+  const direction=ranked[0][0];
+  const confidence=ranked[0][1];
+  const score=aggregate.buy-aggregate.sell;
+
+  const directional=ready
+    .map(x=>candidateDirection(x.direction))
+    .filter(Boolean);
+  const directionWeight={BUY:0,SELL:0};
+  for(const prediction of ready){
+    const d=candidateDirection(prediction.direction);
+    if(d)directionWeight[d]+=Math.max(0.05,Number(prediction.weight)||0);
+  }
+  const directionalTotal=directionWeight.BUY+directionWeight.SELL;
+  const directionalConsensus=directionalTotal>0
+    ? Math.max(directionWeight.BUY,directionWeight.SELL)/directionalTotal
+    : 0;
+  const modelConsensus=directional.length?(
+    directionWeight.BUY>=directionWeight.SELL?"BUY":"SELL"
+  ):"HOLD";
+
+  return {
+    ok:true,
+    ready:true,
+    status:"LIVE_ML_MTF_CONSENSUS",
+    direction,
+    confidence:Number(confidence.toFixed(2)),
+    score:Number(score.toFixed(2)),
+    probabilities:{
+      sell:Number(aggregate.sell.toFixed(2)),
+      hold:Number(aggregate.hold.toFixed(2)),
+      buy:Number(aggregate.buy.toFixed(2))
+    },
+    execution:{
+      direction:execution.direction||"HOLD",
+      confidence:num(execution.confidence),
+      score:num(execution.score),
+      timeframe:execution.timeframe,
+      modelKey:execution.modelKey||null
+    },
+    consensus:{
+      direction:modelConsensus,
+      agreementPct:Number((directionalConsensus*100).toFixed(2)),
+      readyModels:ready.length,
+      totalModels:predictions.length
+    },
+    predictions:predictions.map(x=>({
+      role:x.role,
+      timeframe:x.timeframe,
+      ready:Boolean(x.ready),
+      status:x.status||null,
+      direction:x.direction||"HOLD",
+      confidence:num(x.confidence),
+      score:num(x.score),
+      probabilities:x.probabilities||null,
+      modelKey:x.modelKey||null,
+      trainedAt:x.trainedAt||null
+    }))
+  };
+}
+
 export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={}){
   if(!userId||!botId||!analysis)return null;
   const fingerprint=snapshotFingerprint({botId,market,analysis});
@@ -151,12 +307,13 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
 
   const run=(async()=>{
     const native=evaluateNativeSignal({botId,market,analysis,risk})||{};
-    const ml=await predictMlStrategySignal({botId,market});
+    const ml=await predictMultiTimeframeMl({botId,market});
     let item={
       ...native,
       fingerprint,
       aiStrategyRequired:aiExecutionGateEnabled(),
-      aiStrategyService:mlSignalServiceStatus()
+      aiStrategyService:mlSignalServiceStatus(),
+      aiTimeframeProfile:strategyTimeframeRoles(botId,market)
     };
 
     if(ml?.ready){
@@ -167,34 +324,41 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
       const combinedScore=Math.round(nativeScore*0.30+mlScore*0.70);
       const directionAgreement=!nativeDirection||!mlDirection||nativeDirection===mlDirection;
       const mlConfidence=num(ml.confidence,0);
-      const modelAligned=Boolean(mlDirection)&&mlDirection!=="HOLD"&&mlConfidence>=60&&directionAgreement;
-      const directionalSignal=modelAligned?mlDirection:"HOLD";
+      const consensusDirection=candidateDirection(ml?.consensus?.direction);
+      const consensusAgreement=num(ml?.consensus?.agreementPct,0);
+      const contextAligned=!consensusDirection||consensusDirection===mlDirection||consensusAgreement<55;
+      const modelAligned=Boolean(mlDirection)&&mlDirection!=="HOLD"&&mlConfidence>=60&&directionAgreement&&contextAligned;
 
       item={
         ...item,
-        direction:directionalSignal,
+        direction:modelAligned?mlDirection:"HOLD",
         strategyMatch:Boolean(native.strategyMatch)&&modelAligned&&Math.abs(combinedScore)>=65,
         trigger:[
           native.trigger||"NATIVE_STRATEGY",
-          "ML="+String(mlDirection||"HOLD"),
-          "ML_CONF="+mlConfidence.toFixed(1)
+          "MTF="+String(mlDirection||"HOLD"),
+          "EXEC="+String(ml.execution?.direction||"HOLD"),
+          "CTX="+String(consensusDirection||"HOLD"),
+          "CONF="+mlConfidence.toFixed(1)
         ].join(" + "),
         score:combinedScore,
         nativeScore,
         mlScore,
         mlConfidence,
         mlProbabilities:ml.probabilities||null,
-        mlModelKey:ml.modelKey||null,
-        mlModels:ml.models||null,
-        mlStatus:ml.status||"LIVE_ML_SIGNAL",
-        source:"KINGBOT_CORTEX+SCIKIT_LEARN+PYTORCH",
-        model:"KINGBOT-CORTEX-1+ML-ENSEMBLE",
+        mlModelKey:ml.execution?.modelKey||null,
+        mlModels:ml.predictions||null,
+        mlConsensus:ml.consensus||null,
+        mlExecution:ml.execution||null,
+        mlTimeframes:ml.predictions||null,
+        mlStatus:ml.status||"LIVE_ML_MTF_CONSENSUS",
+        source:"KINGBOT_CORTEX+SCIKIT_LEARN+PYTORCH+MTF",
+        model:"KINGBOT-CORTEX-1+ML-MTF-ENSEMBLE",
         reason:(modelAligned
-          ? "AI STRATEGIES combined the deterministic strategy engine with the scikit-learn/PyTorch ensemble; both layers support the current direction. "
-          : "AI STRATEGIES kept the candidate on hold because the ML ensemble did not provide sufficient confidence/alignment. ")
-          +"Native context="+nativeScore+"/100; AI model score="+mlScore.toFixed(1)+"/100."
+          ? "AI STRATEGIES confirmed the candidate with deterministic strategy evidence plus regime/setup/execution ML consensus. "
+          : "AI STRATEGIES held the candidate because multi-timeframe model confidence, direction or context agreement was insufficient. ")
+          +"Native context="+nativeScore+"/100; MTF model score="+mlScore.toFixed(1)+"/100; context agreement="+consensusAgreement.toFixed(1)+"%."
       };
-    }else if(aiExecutionGateEnabled() && (!ml || !ml.ready)){
+    }else if(aiExecutionGateEnabled()){
       item={
         ...item,
         direction:"HOLD",
@@ -202,27 +366,10 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
         trigger:"AI_MODEL_REQUIRED",
         engineAccepted:true,
         mlStatus:ml?.status||"ML_SERVICE_NOT_READY",
-        source:"KINGBOT_CORTEX",
         mlError:ml?.error||null,
-        reason:"AI STRATEGIES is mandatory for bot execution; no broker order is permitted until the strategy-specific ML model is ready."
-      };
-    }else if(ml?.status==="ML_SERVICE_UNAVAILABLE"){
-      item={...item,mlStatus:"SERVICE_UNAVAILABLE",source:"KINGBOT_CORTEX",mlError:ml.error||null};
-    }else if(ml?.status==="MODEL_NOT_READY"){
-      item={
-        ...item,
-        mlStatus:"MODEL_NOT_READY",
-        source:"KINGBOT_CORTEX",
-        mlModelKey:ml.modelKey||null,
-        reason:"AI STRATEGIES model is not trained for this bot/timeframe yet; execution remains blocked until the model is ready."
-      };
-    }else if(ml?.status==="ML_SERVICE_TIMEOUT"||ml?.status==="ML_SERVICE_UNAVAILABLE"||ml?.status==="ML_SERVICE_UNAUTHORIZED"){
-      item={
-        ...item,
-        mlStatus:ml.status,
-        source:"KINGBOT_CORTEX",
-        mlError:ml.error||null,
-        reason:"AI STRATEGIES service is unavailable; execution remains blocked rather than falling back to non-AI order submission."
+        mlTimeframes:ml?.predictions||[],
+        source:"KINGBOT_CORTEX+MTF",
+        reason:"AI STRATEGIES is mandatory. The execution-timeframe model must be ready before a broker order is authorized; higher-timeframe context is also monitored when available."
       };
     }
 
