@@ -433,6 +433,11 @@
   }
 
   function localConversationReply(message, conversation = []) {
+    // The browser has a resilient conversation/knowledge floor. Simple
+    // language must remain useful even if the native API is temporarily down.
+    const raw = String(message || "").trim();
+    const t = raw.toLowerCase().replace(/\s+/g, " ");
+
     const t = String(message || "").trim().toLowerCase().replace(/\s+/g, " ");
     const variants = [
       "I'm here and ready. 🤖 What are we working on?",
@@ -451,6 +456,18 @@
         };
       }
       return { answer: variants[seed], conversationOnly: true };
+    }
+
+    if (/^(ok|okay|alright|right|sure|yes|yep|yeah|got it|understood|i see|cool|nice|exactly)[!.? ]*$/i.test(t)) {
+      return { answer: ["Got it — I'm following you. 🤖", "Understood. I'm with you.", "Yep, I follow. Go ahead."][seed], conversationOnly: true };
+    }
+
+    if (/^(what is|what's|tell me about|explain)\s+(kingbot|kingbot fintech|this platform|the platform)\b/i.test(t)
+      || /\bwhat does kingbot do\b|\bwhat is kingbot fintech\b|\bwhat can kingbot do\b/i.test(t)) {
+      return {
+        answer: "KINGBOT is a proprietary trading-technology platform by GIBSONFX Tech. It combines verified market data, native KINGBOT AI intelligence, strategy engines, risk controls, broker connectivity, execution infrastructure and analytics in one environment. I can explain the platform and reason over verified data, but chat itself never authorizes a trade.",
+        conversationOnly: true
+      };
     }
 
     if (/^(how are you|how are u|are you good|are you okay|you good|you okay|all good|what'?s up|whats up|sup)[?! .]*$/i.test(t)) {
@@ -565,10 +582,15 @@
       showToast("KINGBOT response ready.", "good");
     } catch (error) {
       hideTyping();
-      const messageText = error?.message || "KINGBOT AI is temporarily unavailable.";
+      // Never expose raw HTTP/infra failures as the assistant's answer.
+      // Fall back to the same high-quality conversation floor used before
+      // the backend request, then mark the UI as degraded rather than broken.
+      const fallback = localConversationReply(clean, conversation);
+      const messageText = fallback?.answer
+        || "KINGBOT AI is still here, but one intelligence service is temporarily unavailable. I won't guess or fabricate live data. Please try the request again.";
       addHistory("assistant", messageText);
-      setChatState("ERROR");
-      showToast(messageText, "bad");
+      setChatState("KINGBOT CORTEX · DEGRADED");
+      showToast("KINGBOT recovered in native fallback mode.", "warn");
     } finally {
       state.busy = false;
       if (input) input.disabled = false;
