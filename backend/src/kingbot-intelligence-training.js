@@ -177,3 +177,45 @@ export function trainingReadiness(rows = [], {
       : "COLLECT_MORE_SETTLED_OUTCOMES"
   };
 }
+
+export function chronologicalSplit(rows = [], trainRatio = 0.70, validationRatio = 0.15) {
+  const sorted = [...rows].sort((a,b) => Date.parse(a.createdAt || 0) - Date.parse(b.createdAt || 0));
+  const trainEnd = Math.floor(sorted.length * trainRatio);
+  const validationEnd = trainEnd + Math.floor(sorted.length * validationRatio);
+  return { train: sorted.slice(0, trainEnd), validation: sorted.slice(trainEnd, validationEnd), test: sorted.slice(validationEnd) };
+}
+
+export function evaluateOutcomeRows(rows = []) {
+  const labeled = rows.filter(r => Number.isFinite(Number(r.label?.rMultiple)));
+  if (!labeled.length) return { samples: 0, winRate: null, expectancyR: null, profitFactor: null, maxDrawdownR: null };
+  const rs = labeled.map(r => Number(r.label.rMultiple));
+  const wins = rs.filter(r => r > 0);
+  const losses = rs.filter(r => r < 0);
+  const grossWin = wins.reduce((a,b) => a + b, 0);
+  const grossLoss = Math.abs(losses.reduce((a,b) => a + b, 0));
+  let equity = 0, peak = 0, maxDrawdown = 0;
+  for (const r of rs) { equity += r; peak = Math.max(peak, equity); maxDrawdown = Math.max(maxDrawdown, peak - equity); }
+  return {
+    samples: labeled.length,
+    winRate: Number((wins.length / labeled.length * 100).toFixed(2)),
+    expectancyR: Number((rs.reduce((a,b) => a + b, 0) / rs.length).toFixed(4)),
+    profitFactor: grossLoss > 0 ? Number((grossWin / grossLoss).toFixed(3)) : null,
+    maxDrawdownR: Number(maxDrawdown.toFixed(4))
+  };
+}
+
+export function evaluateWalkForward(rows = []) {
+  const prepared = rows.filter(r => Array.isArray(r.features) && r.features.length === FEATURE_NAMES.length && r.label);
+  const split = chronologicalSplit(prepared);
+  return {
+    modelVersion: KINGBOT_MODEL_VERSION,
+    featureSchemaVersion: KINGBOT_FEATURE_SCHEMA_VERSION,
+    split: { train: split.train.length, validation: split.validation.length, test: split.test.length },
+    train: evaluateOutcomeRows(split.train),
+    validation: evaluateOutcomeRows(split.validation),
+    test: evaluateOutcomeRows(split.test),
+    promotionGate: split.test.length >= 50 && evaluateOutcomeRows(split.test).expectancyR > 0
+      ? "ELIGIBLE_FOR_MODEL_VALIDATION"
+      : "COLLECT_MORE_DATA"
+  };
+}
