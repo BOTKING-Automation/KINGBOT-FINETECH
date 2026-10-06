@@ -169,7 +169,7 @@ export class TwelveDataFeed {
     const intervalMap={ "1m":"1min","3m":"3min","5m":"5min","15m":"15min","30m":"30min","1h":"1h","2h":"2h","4h":"4h","1d":"1day","1w":"1week" };
     const interval=intervalMap[String(timeframe).toLowerCase()]||"5min";
     const tdSymbol=normalizeSymbol(symbol);
-    const normalizedLimit=Math.max(120,Math.min(320,Number(limit)||240));
+    const normalizedLimit=Math.max(120,Math.min(1000,Number(limit)||240));
     const key=kingbotSymbol(tdSymbol)+":"+String(timeframe).toLowerCase();
     const cached=this.historyCache.get(key);
     const cacheAge=cached ? Date.now()-Number(cached.cachedAt||0) : Infinity;
