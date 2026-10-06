@@ -459,6 +459,9 @@
       }
 
       @media(max-width:560px){
+        #kb-ai-float{right:12px;bottom:14px;width:58px;height:58px;border-radius:18px}
+        #kb-ai-float .kb-ai-orb{width:39px;height:39px;border-radius:13px}
+        #kb-ai-float .kb-ai-label{display:none}
         #kb-compact-nav{top:10px;right:10px}
         #kb-compact-nav .kb-fintech-logo{top:10px;left:10px;width:46px;height:46px;border-radius:12px}
         #kb-compact-nav .kb-nav-trigger{width:44px;height:44px}
@@ -487,6 +490,7 @@
         right:18px;
         bottom:18px;
         z-index:2147482999;
+        /* Fixed to the viewport so the AI companion stays visible while the page scrolls. */
         width:64px;
         height:64px;
         display:grid;
@@ -504,6 +508,7 @@
         isolation:isolate;
         transition:transform .22s ease,box-shadow .22s ease;
         animation:kbAiFloat 3.8s ease-in-out infinite;
+        will-change:transform;
       }
 
       #kb-ai-float::before{
@@ -652,8 +657,10 @@
       }
 
       @keyframes kbAiFloat{
-        0%,100%{transform:translateY(0)}
-        50%{transform:translateY(-3px)}
+        0%,100%{transform:translate3d(0,0,0) rotate(0deg)}
+        25%{transform:translate3d(2px,-5px,0) rotate(-1deg)}
+        50%{transform:translate3d(0,-8px,0) rotate(0deg)}
+        75%{transform:translate3d(-2px,-5px,0) rotate(1deg)}
       }
 
     `;
