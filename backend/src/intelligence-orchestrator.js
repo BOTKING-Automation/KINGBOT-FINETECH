@@ -829,7 +829,8 @@ export function registerIntelligenceOrchestrator(app, { requireUser, pool, twelv
         riskContext: req.body?.riskContext || {},
         options: { botId: req.body?.botId || null, pool, twelveData },
         memory,
-        adaptivePerformance
+        adaptivePerformance,
+        userId: user.id
       });
       await recordIntelligenceMemory(pool, user.id, result);
       await recordAdaptiveDecision(pool, user.id, result);
