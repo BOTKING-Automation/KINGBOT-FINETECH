@@ -660,31 +660,109 @@ export async function ensureAiMarketScannerSchema(pool) {
 
 
 const AI_STRATEGY_BOTS = ["strategic","flipper","breakout","smc-pro","ladder-flip"];
+const TRAINING_SYMBOLS = DEFAULT_SYMBOLS;
+const TRAINING_HISTORY_LIMIT = Math.max(240,Math.min(1000,Number(process.env.KINGBOT_ML_HISTORY_LIMIT||600)));
+
+function binanceInterval(timeframe){
+  const map={"1m":"1m","3m":"3m","5m":"5m","15m":"15m","30m":"30m","1h":"1h","2h":"2h","4h":"4h","6h":"6h","8h":"8h","12h":"12h","1d":"1d","1w":"1w"};
+  return map[String(timeframe||"5m").toLowerCase()]||"5m";
+}
+
+async function getBinanceTrainingBars(symbol,timeframe,limit=TRAINING_HISTORY_LIMIT){
+  if(String(symbol).toUpperCase()!=="BTCUSD")throw new Error("BINANCE_SYMBOL_NOT_SUPPORTED");
+  const interval=binanceInterval(timeframe);
+  const count=Math.max(120,Math.min(1000,Number(limit)||600));
+  const url="https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval="+encodeURIComponent(interval)+"&limit="+count;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),15000);
+  try{
+    const response=await fetch(url,{signal:controller.signal,headers:{Accept:"application/json"},cache:"no-store"});
+    const rows=await response.json().catch(()=>[]);
+    if(!response.ok||!Array.isArray(rows))throw new Error("BINANCE_HISTORICAL_REQUEST_FAILED");
+    const bars=rows.map(row=>({
+      datetime:new Date(Number(row?.[0])).toISOString(),
+      open:Number(row?.[1]),
+      high:Number(row?.[2]),
+      low:Number(row?.[3]),
+      close:Number(row?.[4]),
+      volume:Number(row?.[5])
+    })).filter(x=>[x.open,x.high,x.low,x.close].every(Number.isFinite)&&x.open>0&&x.high>0&&x.low>0&&x.close>0);
+    if(bars.length<120)throw new Error("BINANCE_HISTORICAL_BARS_INSUFFICIENT");
+    return bars;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
+async function getTrainingBars(symbol,timeframe,twelveData){
+  const clean=String(symbol||"").trim().toUpperCase();
+  const errors=[];
+  // Crypto history is sourced from Binance first because BTCUSD is naturally
+  // represented as BTCUSDT there and avoids provider-specific BTC/USD limits.
+  if(clean==="BTCUSD"){
+    try{return await getBinanceTrainingBars(clean,timeframe);}
+    catch(error){errors.push("BINANCE:"+(error?.message||"UNAVAILABLE"));}
+  }
+  if(twelveData?.enabled && typeof twelveData.historicalBars==="function"){
+    try{
+      const bars=await twelveData.historicalBars(clean,timeframe,{
+        limit:TRAINING_HISTORY_LIMIT,maxAgeMs:10*60*1000
+      });
+      if(Array.isArray(bars)&&bars.length>=120)return bars;
+      errors.push("TWELVE_DATA:INSUFFICIENT_HISTORY");
+    }catch(error){
+      errors.push("TWELVE_DATA:"+(error?.message||"UNAVAILABLE"));
+    }
+  }
+  try{
+    const bars=await publicDerivFeed.getHistoricalCandles(clean,{
+      timeframe,limit:TRAINING_HISTORY_LIMIT,timeoutMs:15000
+    });
+    if(Array.isArray(bars)&&bars.length>=120)return bars;
+    errors.push("DERIV:INSUFFICIENT_HISTORY");
+  }catch(error){
+    errors.push("DERIV:"+(error?.message||"UNAVAILABLE"));
+  }
+  throw new Error(errors.join(" | ").slice(0,500)||"TRAINING_HISTORY_UNAVAILABLE");
+}
 
 async function trainAiStrategyModels(twelveData){
   const status=mlSignalServiceStatus();
   if(!status.configured)return {configured:false,trained:0,reason:"ML_SERVICE_NOT_CONFIGURED"};
   let trained=0;
+  const reports=[];
   for(const botId of AI_STRATEGY_BOTS){
     const timeframe=String(getBotDefinitions()[botId]?.timeframeProfile?.execution||"5m").toLowerCase();
     const markets=[];
-    for(const symbol of DEFAULT_SYMBOLS){
+    for(const symbol of TRAINING_SYMBOLS){
       try{
-        const bars=twelveData?.enabled && typeof twelveData.historicalBars==="function"
-          ? await twelveData.historicalBars(symbol,timeframe,{limit:240,maxAgeMs:10*60*1000})
-          : await publicDerivFeed.getHistoricalCandles(symbol,{timeframe,limit:240,timeoutMs:12000});
+        const bars=await getTrainingBars(symbol,timeframe,twelveData);
         if(Array.isArray(bars)&&bars.length>=120)markets.push({symbol,bars});
       }catch(error){
+        reports.push({botId,symbol,timeframe,ok:false,error:String(error?.message||"HISTORY_UNAVAILABLE").slice(0,500)});
         console.warn("[KINGBOT ML TRAIN]",botId,symbol,error?.message||error);
       }
     }
     if(markets.length){
-      const result=await trainMlStrategyModel({botId,timeframe,markets});
-      if(result?.ok)trained++;
-      else console.warn("[KINGBOT ML TRAIN]",botId,result?.error||result?.status||"TRAINING_FAILED");
+      try{
+        const result=await trainMlStrategyModel({botId,timeframe,markets});
+        if(result?.ok){
+          trained++;
+          reports.push({botId,timeframe,ok:true,markets:markets.map(x=>({symbol:x.symbol,bars:x.bars.length})),model:result});
+          console.log("[KINGBOT ML TRAIN] READY",JSON.stringify({botId,timeframe,markets:markets.length}));
+        }else{
+          reports.push({botId,timeframe,ok:false,error:result?.error||result?.status||"TRAINING_FAILED"});
+          console.warn("[KINGBOT ML TRAIN]",botId,result?.error||result?.status||"TRAINING_FAILED");
+        }
+      }catch(error){
+        reports.push({botId,timeframe,ok:false,error:String(error?.message||"TRAINING_FAILED").slice(0,500)});
+        console.warn("[KINGBOT ML TRAIN]",botId,error?.message||error);
+      }
+    }else{
+      reports.push({botId,timeframe,ok:false,error:"NO_VALID_TRAINING_MARKETS"});
     }
   }
-  return {configured:true,trained};
+  return {configured:true,trained,reports,historyLimit:TRAINING_HISTORY_LIMIT};
 }
 
 function startAiStrategyModelTraining(twelveData){
