@@ -44,6 +44,10 @@ MAX_CONCURRENT_TRAINING = max(1, min(2, int(os.getenv("KINGBOT_ML_MAX_CONCURRENT
 TRAINING_KEYS: set[str] = set()
 TRAINING_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_TRAINING)
 PREDICTION_SEMAPHORE = threading.BoundedSemaphore(MAX_PREDICTIONS)
+MAX_FEEDBACK_ROWS = max(200, min(10000, int(os.getenv("KINGBOT_ML_MAX_FEEDBACK_ROWS", "4000"))))
+MIN_FEEDBACK_RETRAIN = max(20, min(500, int(os.getenv("KINGBOT_ML_MIN_FEEDBACK_RETRAIN", "60"))))
+FEEDBACK_ROWS: list[dict[str, Any]] = []
+FEEDBACK_VERSION = "online-feedback-v1"
 
 LABELS = [-1, 0, 1]
 LABEL_TO_INDEX = {-1: 0, 0: 1, 1: 2}
@@ -521,9 +525,17 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 f"test={len(X_test)}"
             )
 
+        candidate_score = (
+            ensemble_metrics["balancedAccuracy"] * 0.60
+            + ensemble_metrics["macroF1"] * 0.40
+        )
+        with LOCK:
+            incumbent = MODELS.get(key)
+            incumbent_score = float(incumbent.get("selection_score", 0.0)) if incumbent else 0.0
+        promote = incumbent is None or candidate_score >= incumbent_score - 0.0025
         trained_at = time.time()
         with LOCK:
-            MODELS[key] = {
+            model_record = {
                 "rf": rf,
                 "torch": torch_model,
                 "scaler": scaler,
@@ -553,13 +565,24 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                     "trainFraction": 0.78,
                     "markets": validation_markets,
                 },
+                "selection_score": candidate_score,
+                "promotion": "CHAMPION" if promote else "CHALLENGER",
+                "promoted_at": trained_at if promote else None,
+                "feedbackVersion": FEEDBACK_VERSION,
             }
+            if promote:
+                MODELS[key] = model_record
             while len(MODELS) > MAX_MODELS:
                 oldest = min(MODELS.items(), key=lambda item: item[1]["trained_at"])[0]
                 MODELS.pop(oldest, None)
 
         return {
             **model_status(key),
+            "candidate": {
+                "selectionScore": candidate_score,
+                "promotion": "CHAMPION" if promote else "CHALLENGER",
+                "incumbentSelectionScore": incumbent_score,
+            },
             "dataset": {
                 "marketsAccepted": accepted_markets,
                 "symbols": sorted(
@@ -613,6 +636,9 @@ def model_status(key: str) -> dict[str, Any]:
         "ensembleMacroF1": round(item.get("ensemble_macro_f1", 0.0) * 100.0, 2),
         "qualityGate": bool(item.get("quality_gate", False)),
         "validationType": item.get("validation", {}).get("type", "unknown"),
+        "selectionScore": round(float(item.get("selection_score", 0.0)), 4),
+        "promotion": item.get("promotion", "CHAMPION"),
+        "feedbackVersion": item.get("feedbackVersion"),
         "featureVersion": item["feature_version"],
         "libraries": ["scikit-learn", "PyTorch"],
     }
@@ -658,6 +684,63 @@ def current_market_features(market: dict[str, Any], strategy: str) -> np.ndarray
     if not np.isfinite(array).all():
         raise ValueError("ML_PREDICT_FEATURES_INVALID")
     return array
+
+
+def record_feedback(
+    strategy: str,
+    symbol: str,
+    timeframe: str,
+    direction: str,
+    outcome: str,
+    market: dict[str, Any],
+    pnl: float | None = None,
+    r_multiple: float | None = None,
+) -> dict[str, Any]:
+    normalized_direction = str(direction or "").strip().upper()
+    normalized_outcome = str(outcome or "").strip().upper()
+    if normalized_direction not in {"BUY", "SELL"}:
+        raise ValueError("ML_FEEDBACK_DIRECTION_INVALID")
+    if normalized_outcome not in {"WIN", "LOSS", "BREAKEVEN", "INVALIDATED"}:
+        raise ValueError("ML_FEEDBACK_OUTCOME_INVALID")
+    if not isinstance(market, dict):
+        raise ValueError("ML_FEEDBACK_MARKET_REQUIRED")
+
+    features = current_market_features(market, strategy)[0].astype(float).tolist()
+    label = 1 if normalized_direction == "BUY" else -1
+    if normalized_outcome in {"LOSS", "INVALIDATED"}:
+        label *= -1
+    if normalized_outcome == "BREAKEVEN":
+        label = 0
+
+    row = {
+        "strategy": strategy,
+        "symbol": str(symbol or "").upper(),
+        "timeframe": str(timeframe or "5m").lower(),
+        "direction": normalized_direction,
+        "outcome": normalized_outcome,
+        "label": int(label),
+        "features": features,
+        "pnl": None if pnl is None else finite(pnl, 0.0),
+        "rMultiple": None if r_multiple is None else finite(r_multiple, 0.0),
+        "receivedAt": time.time(),
+    }
+    with LOCK:
+        FEEDBACK_ROWS.append(row)
+        if len(FEEDBACK_ROWS) > MAX_FEEDBACK_ROWS:
+            del FEEDBACK_ROWS[:len(FEEDBACK_ROWS) - MAX_FEEDBACK_ROWS]
+
+    return {
+        "ok": True,
+        "status": "ML_FEEDBACK_RECORDED",
+        "strategy": strategy,
+        "symbol": row["symbol"],
+        "timeframe": row["timeframe"],
+        "outcome": normalized_outcome,
+        "label": label,
+        "feedbackRows": len(FEEDBACK_ROWS),
+        "retrainRecommended": len(FEEDBACK_ROWS) >= MIN_FEEDBACK_RETRAIN,
+        "feedbackVersion": FEEDBACK_VERSION,
+    }
 
 
 def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, Any]) -> dict[str, Any]:
@@ -784,6 +867,8 @@ class Handler(BaseHTTPRequestHandler):
                 "configured": bool(SECRET),
                 "ready": bool(SECRET),
                 "training": len(TRAINING_KEYS),
+                "feedbackRows": len(FEEDBACK_ROWS),
+                "feedbackVersion": FEEDBACK_VERSION,
                 "maxModels": MAX_MODELS,
                 "maxPredictions": MAX_PREDICTIONS,
                 "maxConcurrentTraining": MAX_CONCURRENT_TRAINING,
@@ -829,6 +914,23 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 result = train_model(strategy, timeframe, markets)
                 self._json(200, {"ok": True, "stage": "AI_STRATEGIES", **result})
+                return
+
+            if path == "/feedback":
+                strategy = str(body.get("botId") or "").strip().lower()
+                symbol = str(body.get("symbol") or "").strip().upper()
+                timeframe = str(body.get("timeframe") or "5m").strip().lower()
+                direction = str(body.get("direction") or "").strip().upper()
+                outcome = str(body.get("outcome") or "").strip().upper()
+                market = body.get("market")
+                if strategy not in STRATEGY_FOCUS or not symbol or not isinstance(market, dict):
+                    self._json(400, {"ok": False, "error": "ML_FEEDBACK_PAYLOAD_REQUIRED"})
+                    return
+                result = record_feedback(
+                    strategy, symbol, timeframe, direction, outcome, market,
+                    body.get("pnl"), body.get("rMultiple")
+                )
+                self._json(200, {"stage": "AI_STRATEGIES", **result})
                 return
 
             if path == "/predict":
