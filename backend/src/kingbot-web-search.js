@@ -18,7 +18,23 @@ function extractDate(item){
 }
 
 export function webSearchStatus(){
- return {provider:PROVIDER,configured:PROVIDER==="google"&&Boolean(API_KEY&&CX),engineConfigured:Boolean(CX),apiCredentialConfigured:Boolean(API_KEY),country:GOOGLE_COUNTRY,language:GOOGLE_LANGUAGE,safeSearch:GOOGLE_SAFE};
+ const supported=PROVIDER==="google";
+ const missing=[];
+ if(!API_KEY)missing.push("GOOGLE_SEARCH_API_KEY");
+ if(!CX)missing.push("GOOGLE_SEARCH_CX");
+ return {
+  provider:PROVIDER,
+  connector:supported?"GOOGLE_CUSTOM_SEARCH_JSON_API":"UNSUPPORTED",
+  configured:supported&&missing.length===0,
+  available:supported&&missing.length===0,
+  engineConfigured:Boolean(CX),
+  apiCredentialConfigured:Boolean(API_KEY),
+  missing,
+  configurationRequired:missing.length>0,
+  country:GOOGLE_COUNTRY,
+  language:GOOGLE_LANGUAGE,
+  safeSearch:GOOGLE_SAFE
+ };
 }
 
 export async function searchWeb(query,{limit=6,freshnessDays=DEFAULT_DAYS,country=GOOGLE_COUNTRY,language=GOOGLE_LANGUAGE,safe=GOOGLE_SAFE}={}){
