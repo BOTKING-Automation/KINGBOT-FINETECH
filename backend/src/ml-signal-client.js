@@ -147,7 +147,7 @@ export async function predictMlStrategySignal({ botId, market } = {}) {
   }
 }
 
-export async function recordMlFeedback({ botId, symbol, timeframe, direction, outcome, market, pnl, rMultiple } = {}) {
+export async function recordMlFeedback({ botId, symbol, timeframe, direction, outcome, market, pnl, rMultiple, features } = {}) {
   if(!enabled() || !botId || !symbol || !market) return null;
   try{
     return await request("/feedback", {
@@ -158,7 +158,8 @@ export async function recordMlFeedback({ botId, symbol, timeframe, direction, ou
       outcome: String(outcome || "").trim().toUpperCase(),
       market,
       pnl,
-      rMultiple
+      rMultiple,
+      features: Array.isArray(features) ? features : undefined
     });
   }catch(error){
     return {
