@@ -785,7 +785,7 @@ async function executeLadderV8Start({userId,botId,config,s,account,quote,ind,pos
     const sl=ladderPrice(side==="BUY"?entry-stopDistance:entry+stopDistance,ls.point);
     const clientId="kbv8_"+crypto.randomUUID();
     const volume=volumes[i];
-    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,decision_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,adaptiveExecutionDecision?.decisionId||null,s.executionMode,config.symbol,side,volume]);
+    const journal=await pool.query("INSERT INTO kingbot_execution_journal(user_id,bot_id,client_id,decision_id,execution_mode,symbol,side,volume,status,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',NOW()) ON CONFLICT(client_id) DO NOTHING RETURNING id",[userId,botId,clientId,decisionId,s.executionMode,config.symbol,side,volume]);
     if(!journal.rowCount)continue;
     try{
       await broker.assertExecutionAuthorized(userId);
