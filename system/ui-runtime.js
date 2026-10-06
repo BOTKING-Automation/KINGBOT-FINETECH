@@ -7,7 +7,7 @@
   "use strict";
 
   const THEME_KEY = "kingbot_ui_theme";
-  const THEMES = ["cyan","violet","gold"];
+  const THEMES = ["cyan","violet","gold","matrix","aurora"];
 
   function safeText(value, fallback="—"){
     const v=String(value ?? "").trim();
