@@ -437,8 +437,6 @@
     // language must remain useful even if the native API is temporarily down.
     const raw = String(message || "").trim();
     const t = raw.toLowerCase().replace(/\s+/g, " ");
-
-    const t = String(message || "").trim().toLowerCase().replace(/\s+/g, " ");
     const variants = [
       "I'm here and ready. 🤖 What are we working on?",
       "KINGBOT is online and listening. What should we tackle?",
