@@ -186,9 +186,9 @@ function adaptResponseStyle(answer, frame = {}) {
 
   // The core never invents facts or live values. It only improves presentation
   // of an already-produced, verified-or-explicitly-qualified answer.
-  if (lead) return \`\${lead}\${text}\`;
+  if (lead) return `\${lead}\${text}`;
 
-  if (mode === "DIAGNOSTIC" && !/[.!?]$/.test(text)) return \`\${text}.\`;
+  if (mode === "DIAGNOSTIC" && !/[.!?]$/.test(text)) return `\${text}.`;
   return text;
 }
 
@@ -245,7 +245,7 @@ export function agentCapabilitySnapshot({ intent = "PLATFORM_SUPPORT", frame = {
   const plan = buildKingbotAgentPlan({ intent, frame, memory, memorySummary: [] });
   return {
     agent: "KINGBOT_AGENT_CORE",
-    version: "2.0.0",
+    version: "2.1.0",
     intent: plan.intent,
     responseMode: plan.responseMode,
     context: plan.context,
