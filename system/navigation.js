@@ -681,9 +681,7 @@
   function build(){
     if(document.getElementById("kb-compact-nav")) return;
 
-    // Auth/verification screens remain clean and focused.
-    if(document.querySelector(".verify-shell,.auth-shell,.auth-card")) return;
-
+    // Global user shell: logo + navigation remain available across every public/user surface.
     injectStyle();
 
     const page=currentPage();
