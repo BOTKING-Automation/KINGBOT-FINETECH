@@ -147,6 +147,28 @@ export async function predictMlStrategySignal({ botId, market } = {}) {
   }
 }
 
+export async function recordMlFeedback({ botId, symbol, timeframe, direction, outcome, market, pnl, rMultiple } = {}) {
+  if(!enabled() || !botId || !symbol || !market) return null;
+  try{
+    return await request("/feedback", {
+      botId: String(botId).trim().toLowerCase(),
+      symbol: String(symbol).trim().toUpperCase(),
+      timeframe: String(timeframe || "5m").trim().toLowerCase(),
+      direction: String(direction || "").trim().toUpperCase(),
+      outcome: String(outcome || "").trim().toUpperCase(),
+      market,
+      pnl,
+      rMultiple
+    });
+  }catch(error){
+    return {
+      ok:false,
+      status:"ML_FEEDBACK_UNAVAILABLE",
+      error:normalizeError(error,"ML_FEEDBACK_UNAVAILABLE")
+    };
+  }
+}
+
 export async function trainMlStrategyModel({ botId, symbol, timeframe, bars, markets } = {}) {
   if (!enabled() || !botId) return null;
   const datasets = Array.isArray(markets)
