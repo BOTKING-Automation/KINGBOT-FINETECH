@@ -705,6 +705,37 @@ async function getBinanceTrainingBars(symbol,timeframe,limit=TRAINING_HISTORY_LI
   }
 }
 
+async function getKrakenTrainingBars(symbol,timeframe,limit=TRAINING_HISTORY_LIMIT){
+  if(String(symbol).toUpperCase()!=="BTCUSD")throw new Error("KRAKEN_SYMBOL_NOT_SUPPORTED");
+  const intervalMap={"1m":1,"5m":5,"15m":15,"30m":30,"1h":60,"4h":240,"1d":1440,"1w":10080};
+  const interval=intervalMap[String(timeframe||"5m").toLowerCase()];
+  if(!interval)throw new Error("KRAKEN_TIMEFRAME_UNSUPPORTED");
+  const count=Math.max(120,Math.min(720,Number(limit)||720));
+  const since=Math.floor(Date.now()/1000)-interval*60*count;
+  const url="https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval="+interval+"&since="+since;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),15000);
+  try{
+    const response=await fetch(url,{signal:controller.signal,headers:{Accept:"application/json"},cache:"no-store"});
+    const payload=await response.json().catch(()=>null);
+    if(!response.ok||!payload||!Array.isArray(payload?.error)||payload.error.length||!payload?.result)throw new Error("KRAKEN_HISTORICAL_REQUEST_FAILED");
+    const resultKey=Object.keys(payload.result).find(key=>key!=="last");
+    const rows=Array.isArray(payload.result?.[resultKey])?payload.result[resultKey]:[];
+    const bars=rows.map(row=>({
+      datetime:new Date(Number(row?.[0])*1000).toISOString(),
+      open:Number(row?.[1]),
+      high:Number(row?.[2]),
+      low:Number(row?.[3]),
+      close:Number(row?.[4]),
+      volume:Number(row?.[6])
+    })).filter(x=>[x.open,x.high,x.low,x.close].every(Number.isFinite)&&x.open>0&&x.high>0&&x.low>0&&x.close>0);
+    if(bars.length<120)throw new Error("KRAKEN_HISTORICAL_BARS_INSUFFICIENT");
+    return bars.slice(-count);
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
 async function getTrainingBars(symbol,timeframe,twelveData){
   const clean=String(symbol||"").trim().toUpperCase();
   const tf=String(timeframe||"5m").trim().toLowerCase();
@@ -720,7 +751,16 @@ async function getTrainingBars(symbol,timeframe,twelveData){
       const bars=await getBinanceTrainingBars(clean,tf);
       trainingHistoryCache.set(cacheKey,{at:Date.now(),bars});
       return bars;
-    }catch(error){errors.push("BINANCE:"+(error?.message||"UNAVAILABLE"));}
+    }catch(error){
+      errors.push("BINANCE:"+(error?.message||"UNAVAILABLE"));
+    }
+    try{
+      const bars=await getKrakenTrainingBars(clean,tf);
+      trainingHistoryCache.set(cacheKey,{at:Date.now(),bars});
+      return bars;
+    }catch(error){
+      errors.push("KRAKEN:"+(error?.message||"UNAVAILABLE"));
+    }
   }
   if(twelveData?.enabled && typeof twelveData.historicalBars==="function"){
     try{
