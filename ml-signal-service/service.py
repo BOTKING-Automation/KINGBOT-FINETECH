@@ -841,6 +841,7 @@ def record_feedback(
     market: dict[str, Any],
     pnl: float | None = None,
     r_multiple: float | None = None,
+    features: Any = None,
 ) -> dict[str, Any]:
     normalized_direction = str(direction or "").strip().upper()
     normalized_outcome = str(outcome or "").strip().upper()
@@ -851,7 +852,21 @@ def record_feedback(
     if not isinstance(market, dict):
         raise ValueError("ML_FEEDBACK_MARKET_REQUIRED")
 
-    features = current_market_features(market, strategy)[0].astype(float).tolist()
+    feature_source = "decision-time"
+    if isinstance(features, list) and len(features) == len(FEATURE_NAMES):
+        try:
+            features = [finite(value, 0.0) for value in features]
+        except Exception:
+            features = None
+    else:
+        features = None
+    if features is None:
+        # Legacy callers may not have decision-time features. Keep accepting
+        # them, but mark the sample explicitly so it can be excluded later.
+        features = current_market_features(market, strategy)[0].astype(float).tolist()
+        feature_source = "legacy-settlement-time"
+    if not np.isfinite(np.asarray(features, dtype=np.float32)).all():
+        raise ValueError("ML_FEEDBACK_FEATURES_INVALID")
     label = 1 if normalized_direction == "BUY" else -1
     if normalized_outcome in {"LOSS", "INVALIDATED"}:
         label *= -1
@@ -866,6 +881,7 @@ def record_feedback(
         "outcome": normalized_outcome,
         "label": int(label),
         "features": features,
+        "featureSource": feature_source,
         "pnl": None if pnl is None else finite(pnl, 0.0),
         "rMultiple": None if r_multiple is None else finite(r_multiple, 0.0),
         "receivedAt": time.time(),
