@@ -21,7 +21,7 @@ from typing import Any
 import numpy as np
 import torch
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 from sklearn.preprocessing import StandardScaler
 from torch import nn
 
@@ -309,18 +309,23 @@ class MLP(nn.Module):
         return self.net(x)
 
 
-def train_torch(X: np.ndarray, y: np.ndarray, scaler: StandardScaler, sample_weights: np.ndarray) -> tuple[MLP, float]:
+def train_torch(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    scaler: StandardScaler,
+    sample_weights: np.ndarray,
+) -> tuple[MLP, dict[str, float]]:
     np.random.seed(42)
     torch.manual_seed(42)
-    Xs = scaler.transform(X).astype(np.float32)
-    target = np.asarray([LABEL_TO_INDEX[int(value)] for value in y], dtype=np.int64)
+    train_x = scaler.transform(X_train).astype(np.float32)
+    test_x = scaler.transform(X_test).astype(np.float32)
+    train_y = np.asarray([LABEL_TO_INDEX[int(value)] for value in y_train], dtype=np.int64)
+    test_y = np.asarray([LABEL_TO_INDEX[int(value)] for value in y_test], dtype=np.int64)
+    train_w = np.asarray(sample_weights, dtype=np.float32)
 
-    cutoff = max(20, int(len(Xs) * 0.78))
-    train_x, test_x = Xs[:cutoff], Xs[cutoff:]
-    train_y, test_y = target[:cutoff], target[cutoff:]
-    train_w = sample_weights[:cutoff]
-
-    model = MLP(Xs.shape[1], 3)
+    model = MLP(train_x.shape[1], 3)
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.008, weight_decay=0.001)
 
     counts = np.bincount(train_y, minlength=3).astype(np.float32)
@@ -344,9 +349,12 @@ def train_torch(X: np.ndarray, y: np.ndarray, scaler: StandardScaler, sample_wei
     model.eval()
     with torch.no_grad():
         predictions = model(torch.from_numpy(test_x)).argmax(dim=1).numpy() if len(test_x) else np.empty((0,), dtype=np.int64)
-    accuracy = float(accuracy_score(test_y, predictions)) if len(test_y) else 0.0
-    return model, accuracy
-
+    metrics = {
+        "accuracy": float(accuracy_score(test_y, predictions)) if len(test_y) else 0.0,
+        "balancedAccuracy": float(balanced_accuracy_score(test_y, predictions)) if len(test_y) else 0.0,
+        "macroF1": float(f1_score(test_y, predictions, average="macro", zero_division=0)) if len(test_y) else 0.0,
+    }
+    return model, metrics
 
 def normalize_market_bars(bars: Any) -> list[dict[str, float]]:
     if not isinstance(bars, list):
@@ -392,10 +400,12 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         if len(markets) > MAX_MARKETS:
             raise ValueError(f"ML_TRAINING_MAX_MARKETS_{MAX_MARKETS}")
 
-        combined_x: list[np.ndarray] = []
-        combined_y: list[np.ndarray] = []
-        combined_weights: list[np.ndarray] = []
-        symbols: list[str] = []
+        train_x_parts: list[np.ndarray] = []
+        train_y_parts: list[np.ndarray] = []
+        train_w_parts: list[np.ndarray] = []
+        test_x_parts: list[np.ndarray] = []
+        test_y_parts: list[np.ndarray] = []
+        validation_markets: list[dict[str, Any]] = []
         total_bar_count = 0
         accepted_markets = 0
 
@@ -405,6 +415,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             symbol = str(market.get("symbol") or "").strip().upper()
             if not symbol or not isinstance(market.get("bars"), list):
                 continue
+
             normalized = normalize_market_bars(market["bars"])
             if len(normalized) < MIN_BARS:
                 continue
@@ -412,31 +423,63 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             accepted_markets += 1
             total_bar_count += len(normalized)
             X_part, y_part, weights_part = bars_to_training_arrays(normalized, strategy)
-            if len(X_part):
-                combined_x.append(X_part)
-                combined_y.append(y_part)
-                combined_weights.append(weights_part)
-                symbols.append(symbol)
+            if len(X_part) < 90:
+                validation_markets.append({
+                    "symbol": symbol,
+                    "accepted": False,
+                    "reason": "ML_TRAINING_MARKET_SAMPLES_INSUFFICIENT"
+                })
+                continue
 
-        if not combined_x or accepted_markets == 0:
+            split = max(40, min(len(X_part) - 20, int(len(X_part) * 0.78)))
+            X_train_part, X_test_part = X_part[:split], X_part[split:]
+            y_train_part, y_test_part = y_part[:split], y_part[split:]
+            w_train_part = weights_part[:split]
+
+            if len(X_test_part) < 20 or len(set(int(v) for v in y_train_part)) < 3:
+                validation_markets.append({
+                    "symbol": symbol,
+                    "accepted": False,
+                    "reason": "ML_TRAINING_WALK_FORWARD_SPLIT_INSUFFICIENT"
+                })
+                continue
+
+            train_x_parts.append(X_train_part)
+            train_y_parts.append(y_train_part)
+            train_w_parts.append(w_train_part)
+            test_x_parts.append(X_test_part)
+            test_y_parts.append(y_test_part)
+            validation_markets.append({
+                "symbol": symbol,
+                "accepted": True,
+                "samples": int(len(X_part)),
+                "trainSamples": int(len(X_train_part)),
+                "testSamples": int(len(X_test_part))
+            })
+
+        if not train_x_parts or not test_x_parts:
             raise ValueError(f"ML_TRAINING_REQUIRES_{MIN_BARS}_BARS")
 
-        X = np.concatenate(combined_x, axis=0)
-        y = np.concatenate(combined_y, axis=0)
-        weights = np.concatenate(combined_weights, axis=0)
-        if len(X) < 70:
+        X_train = np.concatenate(train_x_parts, axis=0)
+        y_train = np.concatenate(train_y_parts, axis=0)
+        weights_train = np.concatenate(train_w_parts, axis=0)
+        X_test = np.concatenate(test_x_parts, axis=0)
+        y_test = np.concatenate(test_y_parts, axis=0)
+
+        if len(X_train) < 70 or len(X_test) < 30:
             raise ValueError("ML_TRAINING_FEATURES_INSUFFICIENT")
 
-        present = sorted(set(int(v) for v in y))
-        if len(present) < 3:
-            raise ValueError("ML_TRAINING_REQUIRES_BUY_SELL_HOLD_CLASSES")
-
-        cutoff = max(20, min(len(X) - 1, int(len(X) * 0.78)))
-        if cutoff < 40 or len(X) - cutoff < 10:
-            raise ValueError("ML_TRAINING_SPLIT_INSUFFICIENT")
+        train_classes = sorted(set(int(v) for v in y_train))
+        test_classes = sorted(set(int(v) for v in y_test))
+        if len(train_classes) < 3:
+            raise ValueError("ML_TRAINING_REQUIRES_BUY_SELL_HOLD_TRAIN_CLASSES")
+        if len(test_classes) < 2:
+            raise ValueError("ML_TRAINING_REQUIRES_DIRECTIONAL_TEST_CLASSES")
 
         scaler = StandardScaler()
-        scaler.fit(X[:cutoff])
+        scaler.fit(X_train)
+        X_train_scaled = scaler.transform(X_train).astype(np.float32)
+        X_test_scaled = scaler.transform(X_test).astype(np.float32)
 
         rf = RandomForestClassifier(
             n_estimators=MAX_RF_TREES,
@@ -446,26 +489,70 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             class_weight="balanced_subsample",
             n_jobs=1,
         )
-        rf.fit(X[:cutoff], y[:cutoff], sample_weight=weights[:cutoff])
+        rf.fit(X_train_scaled, y_train, sample_weight=weights_train)
 
-        rf_pred = rf.predict(X[cutoff:]) if cutoff < len(X) else np.empty((0,), dtype=np.int64)
-        rf_accuracy = float(accuracy_score(y[cutoff:], rf_pred)) if len(rf_pred) else 0.0
-        torch_model, torch_accuracy = train_torch(X, y, scaler, weights)
+        rf_pred = rf.predict(X_test_scaled)
+        rf_metrics = {
+            "accuracy": float(accuracy_score(y_test, rf_pred)),
+            "balancedAccuracy": float(balanced_accuracy_score(y_test, rf_pred)),
+            "macroF1": float(f1_score(y_test, rf_pred, average="macro", zero_division=0)),
+        }
 
+        torch_model, torch_metrics = train_torch(
+            X_train, y_train, X_test, y_test, scaler, weights_train
+        )
+
+        ensemble_metrics = {
+            "accuracy": float((rf_metrics["accuracy"] + torch_metrics["accuracy"]) / 2.0),
+            "balancedAccuracy": float((rf_metrics["balancedAccuracy"] + torch_metrics["balancedAccuracy"]) / 2.0),
+            "macroF1": float((rf_metrics["macroF1"] + torch_metrics["macroF1"]) / 2.0),
+        }
+
+        quality_gate = (
+            ensemble_metrics["balancedAccuracy"] >= 0.36
+            and ensemble_metrics["macroF1"] >= 0.34
+            and len(X_test) >= 30
+        )
+        if not quality_gate:
+            raise ValueError(
+                "ML_MODEL_QUALITY_GATE_FAILED:"
+                f"balanced={ensemble_metrics['balancedAccuracy']:.3f},"
+                f"f1={ensemble_metrics['macroF1']:.3f},"
+                f"test={len(X_test)}"
+            )
+
+        trained_at = time.time()
         with LOCK:
             MODELS[key] = {
                 "rf": rf,
                 "torch": torch_model,
                 "scaler": scaler,
-                "trained_at": time.time(),
+                "trained_at": trained_at,
                 "strategy": strategy,
-                "symbols": sorted(set(symbols)),
+                "symbols": sorted(
+                    {row["symbol"] for row in validation_markets if row.get("accepted")}
+                ),
                 "timeframe": timeframe.lower(),
-                "samples": int(len(X)),
-                "rf_accuracy": rf_accuracy,
-                "torch_accuracy": torch_accuracy,
+                "samples": int(len(X_train) + len(X_test)),
+                "train_samples": int(len(X_train)),
+                "test_samples": int(len(X_test)),
+                "rf_accuracy": rf_metrics["accuracy"],
+                "rf_balanced_accuracy": rf_metrics["balancedAccuracy"],
+                "rf_macro_f1": rf_metrics["macroF1"],
+                "torch_accuracy": torch_metrics["accuracy"],
+                "torch_balanced_accuracy": torch_metrics["balancedAccuracy"],
+                "torch_macro_f1": torch_metrics["macroF1"],
+                "ensemble_accuracy": ensemble_metrics["accuracy"],
+                "ensemble_balanced_accuracy": ensemble_metrics["balancedAccuracy"],
+                "ensemble_macro_f1": ensemble_metrics["macroF1"],
+                "quality_gate": quality_gate,
                 "bar_count": total_bar_count,
-                "feature_version": "ai-strategies-v3",
+                "feature_version": "ai-strategies-v4-walk-forward",
+                "validation": {
+                    "type": "per-market-temporal-holdout",
+                    "trainFraction": 0.78,
+                    "markets": validation_markets,
+                },
             }
             while len(MODELS) > MAX_MODELS:
                 oldest = min(MODELS.items(), key=lambda item: item[1]["trained_at"])[0]
@@ -475,19 +562,29 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             **model_status(key),
             "dataset": {
                 "marketsAccepted": accepted_markets,
-                "symbols": sorted(set(symbols)),
+                "symbols": sorted(
+                    {row["symbol"] for row in validation_markets if row.get("accepted")}
+                ),
                 "bars": total_bar_count,
-                "samples": int(len(X)),
-                "classes": present,
+                "trainSamples": int(len(X_train)),
+                "testSamples": int(len(X_test)),
+                "classesTrain": train_classes,
+                "classesTest": test_classes,
                 "forwardBars": FORWARD_HORIZON,
                 "labelAtr": LABEL_ATR,
+            },
+            "validation": {
+                "type": "per-market-temporal-holdout",
+                "rf": rf_metrics,
+                "pytorch": torch_metrics,
+                "ensemble": ensemble_metrics,
+                "qualityGate": quality_gate,
             },
         }
     finally:
         with LOCK:
             TRAINING_KEYS.discard(key)
         TRAINING_SEMAPHORE.release()
-
 
 def model_status(key: str) -> dict[str, Any]:
     item = MODELS.get(key)
@@ -502,13 +599,23 @@ def model_status(key: str) -> dict[str, Any]:
         "timeframe": item["timeframe"],
         "trainedAt": item["trained_at"],
         "samples": item["samples"],
+        "trainSamples": item.get("train_samples", 0),
+        "testSamples": item.get("test_samples", 0),
         "barCount": item["bar_count"],
         "rfAccuracy": round(item["rf_accuracy"] * 100.0, 2),
+        "rfBalancedAccuracy": round(item.get("rf_balanced_accuracy", 0.0) * 100.0, 2),
+        "rfMacroF1": round(item.get("rf_macro_f1", 0.0) * 100.0, 2),
         "torchAccuracy": round(item["torch_accuracy"] * 100.0, 2),
+        "torchBalancedAccuracy": round(item.get("torch_balanced_accuracy", 0.0) * 100.0, 2),
+        "torchMacroF1": round(item.get("torch_macro_f1", 0.0) * 100.0, 2),
+        "ensembleAccuracy": round(item.get("ensemble_accuracy", 0.0) * 100.0, 2),
+        "ensembleBalancedAccuracy": round(item.get("ensemble_balanced_accuracy", 0.0) * 100.0, 2),
+        "ensembleMacroF1": round(item.get("ensemble_macro_f1", 0.0) * 100.0, 2),
+        "qualityGate": bool(item.get("quality_gate", False)),
+        "validationType": item.get("validation", {}).get("type", "unknown"),
         "featureVersion": item["feature_version"],
         "libraries": ["scikit-learn", "PyTorch"],
     }
-
 
 def current_market_features(market: dict[str, Any], strategy: str) -> np.ndarray:
     price = finite(market.get("price") or market.get("close"))
@@ -567,6 +674,8 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
     if not PREDICTION_SEMAPHORE.acquire(timeout=0.8):
         return {"ok": True, "ready": False, "status": "ML_PREDICTION_CAPACITY_BUSY", "modelKey": key}
     try:
+        if not bool(item.get("quality_gate", False)):
+            return {"ok": True, "ready": False, "status": "MODEL_QUALITY_GATE_BLOCKED", "modelKey": key}
         X = current_market_features(market, strategy)
         scaled = item["scaler"].transform(X).astype(np.float32)
 
@@ -610,10 +719,14 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
             "models": {
                 "scikitLearn": {
                     "accuracy": round(item["rf_accuracy"] * 100.0, 2),
+                    "balancedAccuracy": round(item.get("rf_balanced_accuracy", 0.0) * 100.0, 2),
+                    "macroF1": round(item.get("rf_macro_f1", 0.0) * 100.0, 2),
                     "weight": 0.55,
                 },
                 "pytorch": {
                     "accuracy": round(item["torch_accuracy"] * 100.0, 2),
+                    "balancedAccuracy": round(item.get("torch_balanced_accuracy", 0.0) * 100.0, 2),
+                    "macroF1": round(item.get("torch_macro_f1", 0.0) * 100.0, 2),
                     "weight": 0.45,
                 },
             },
