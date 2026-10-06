@@ -29,6 +29,13 @@
     script.src="system/site-performance.js";
     script.defer=true;
     document.head.appendChild(script);
+    if(!document.getElementById("kb-ui-runtime")){
+      const ui=document.createElement("script");
+      ui.id="kb-ui-runtime";
+      ui.src="system/ui-runtime.js";
+      ui.defer=true;
+      document.head.appendChild(ui);
+    }
     if(!document.querySelector('link[rel="manifest"]')){
       const manifest=document.createElement("link");
       manifest.rel="manifest";
