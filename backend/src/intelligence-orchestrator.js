@@ -7,6 +7,7 @@ import { buildMarketEvidence, marketDecisionGate } from "./market-evidence-engin
 import { buildStrategyCouncil } from "./strategy-council.js";
 import { evaluateStrategySpecialists } from "./strategy-specialists.js";
 import { getGoldPriceFeed } from "./gold-price-feed.js";
+import { warmAiTradeConfirmation } from "./ai-trade-gate.js";
 
 const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
 const MODEL = "KINGBOT-CORTEX-1";
@@ -501,7 +502,7 @@ function cacheKey(market, options = {}) {
   });
 }
 
-export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {}, memory = [], adaptivePerformance = {}, thinkingLevel = "EXPERT" } = {}) {
+export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {}, memory = [], adaptivePerformance = {}, thinkingLevel = "EXPERT", userId = null } = {}) {
   const market = normalizeMarket(inputMarket);
   if (!market.multiTimeframe && market.symbol) market.multiTimeframe = await buildMultiTimeframeContext({ pool: options.pool, twelveData: options.twelveData, symbol: market.symbol, baseTimeframe: market.timeframe });
   const marketEvidence = buildMarketEvidence(market, { maxAgeMs: Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000) });
@@ -532,6 +533,73 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
     marketDecision: decisionGate.state,
     minAgreement: Number(process.env.KINGBOT_STRATEGY_COUNCIL_MIN_AGREEMENT || 0.6)
   });
+
+  // Meta-intelligence pass: once the native Council has a candidate, ask the
+  // strategy-specific MTF ML layer for an independent probabilistic challenge.
+  // This is advisory/gating intelligence only; deterministic risk remains final.
+  let metaIntelligence = {
+    status: "NOT_RUN",
+    direction: "HOLD",
+    confidence: 0,
+    agreement: 0,
+    modelReady: false,
+    reason: "No directional specialist route exists yet."
+  };
+  if (
+    userId &&
+    (strategyCouncil.state === "BUY" || strategyCouncil.state === "SELL") &&
+    strategyCouncil.primarySpecialist?.botId
+  ) {
+    try {
+      const botId = strategyCouncil.primarySpecialist.botId;
+      const candidateSignal = strategyCouncil.state;
+      const analysisForMl = {
+        signal: candidateSignal === "BUY" ? "LONG_CANDIDATE" : "SHORT_CANDIDATE",
+        score: Number(strategyCouncil.primarySpecialist.rawScore || 0)
+      };
+      const mlConfirmation = await warmAiTradeConfirmation({
+        userId,
+        botId,
+        signal: candidateSignal,
+        market,
+        analysis: analysisForMl,
+        risk
+      });
+      const modelConfidence = num(mlConfirmation?.mlConfidence, 0);
+      const modelDirection = upper(mlConfirmation?.direction || "HOLD");
+      const agreement = num(mlConfirmation?.mlConsensus?.agreementPct, 0);
+      const modelReady = Boolean(mlConfirmation?.mlStatus === "LIVE_ML_MTF_CONSENSUS");
+      const agrees = modelReady && modelDirection === candidateSignal && modelConfidence >= 60 && agreement >= 55;
+      metaIntelligence = {
+        status: agrees ? "CONFIRMED" : modelReady ? "CHALLENGED" : String(mlConfirmation?.mlStatus || "MODEL_NOT_READY"),
+        direction: modelDirection,
+        confidence: Number(modelConfidence.toFixed(2)),
+        agreement: Number(agreement.toFixed(2)),
+        modelReady,
+        modelKey: mlConfirmation?.mlModelKey || null,
+        probabilities: mlConfirmation?.mlProbabilities || null,
+        timeframes: mlConfirmation?.mlTimeframes || [],
+        agreesWithCouncil: agrees,
+        reason: agrees
+          ? "Strategy Council and independent MTF ML ensemble agree."
+          : "ML ensemble did not provide sufficient independent confirmation for the Council route."
+      };
+      if (!agrees) {
+        strategyCouncil.metaStatus = "ML_CHALLENGE";
+        strategyCouncil.metaReason = metaIntelligence.reason;
+      }
+    } catch (error) {
+      metaIntelligence = {
+        status: "ERROR",
+        direction: "HOLD",
+        confidence: 0,
+        agreement: 0,
+        modelReady: false,
+        reason: String(error?.message || "META_INTELLIGENCE_FAILED").slice(0, 180)
+      };
+    }
+  }
+
   const routing = strategyCouncil.state === "BUY" || strategyCouncil.state === "SELL"
     ? chooseEngine(enrichedEngines, debate)
     : { selectedEngine: null, reason: "STRATEGY_COUNCIL_" + strategyCouncil.state, candidate: strategyCouncil.strongestEngine };
@@ -594,6 +662,7 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
     engines,
     specialists: specialistCards,
     strategyCouncil,
+    metaIntelligence,
     routing: { ...routing, direction: routing.candidate ? (routing.candidate.score > 0 ? "BUY" : routing.candidate.score < 0 ? "SELL" : "HOLD") : "HOLD" },
     tradePlan,
     riskCouncil: risk,
