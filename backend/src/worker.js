@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { createServer } from "node:http";
 import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1296,6 +1297,22 @@ const invokedDirectly = process.argv[1]
   : false;
 
 if(invokedDirectly){
+  // Render currently hosts this worker as a Web Service. Expose a minimal
+  // health endpoint so its port check can pass while the execution loop runs.
+  // This endpoint exposes no credentials, account data, or trading controls.
+  const port = Math.max(1, Number(process.env.PORT || 10000));
+  const healthServer = createServer((req, res) => {
+    if (req.url === "/health" || req.url === "/api/health") {
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(JSON.stringify({ ok: true, service: "kingbot-fintech-worker", status: stopping ? "stopping" : "running" }));
+      return;
+    }
+    res.writeHead(404, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify({ ok: false, error: "NOT_FOUND" }));
+  });
+  healthServer.listen(port, "0.0.0.0", () => {
+    console.log("[KINGBOT WORKER] health listener ready", JSON.stringify({ port }));
+  });
   startWorker().catch(error=>{
     console.error("[KINGBOT WORKER] startup failed",error?.message||error);
     process.exit(1);
