@@ -912,7 +912,25 @@ body.kb-terminal-page > .toast{position:fixed!important}
   </section>
 
   <section class="section">
-    <div class="section-head"><div><div class="section-title">ACCOUNT OVERVIEW</div><div class="section-sub">Your latest broker balance, equity, P&amp;L and margin. These values are refreshed from the connected account.</div></div><div class="section-code">ACCOUNT</div></div>
+    <section class="section" id="botFleetSection">
+  <div class="section-head"><div><div class="section-title">FIVE-BOT LIVE FLEET</div><div class="section-sub">Authenticated server runtime and entitlements for every KINGBOT bot — never inferred from browser state.</div></div><div class="section-code" id="fleetUpdated">WAITING FOR SERVER</div></div>
+  <div class="grid-4" id="botFleetGrid" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+    <div class="metric"><div class="metric-label">RUNTIME TELEMETRY</div><div class="metric-value">—</div><div class="metric-note">CONNECTING TO API</div></div>
+  </div>
+</section>
+<style>
+#botFleetGrid .metric{min-width:0;padding:13px}
+#botFleetGrid .metric-value{font-size:14px;overflow-wrap:anywhere}
+#botFleetGrid .fleet-name{font:800 8px "JetBrains Mono";color:var(--cyan);letter-spacing:.05em}
+#botFleetGrid .fleet-meta{margin-top:7px;color:#78869d;font:700 7px/1.6 "JetBrains Mono";overflow-wrap:anywhere}
+#botFleetGrid .fleet-state{display:inline-block;margin-top:9px;padding:5px 7px;border-radius:7px;border:1px solid rgba(255,255,255,.09);font:900 7px "JetBrains Mono";color:#94a3b8}
+#botFleetGrid .fleet-state.running{color:var(--green);border-color:rgba(49,255,134,.2);background:rgba(49,255,134,.045)}
+#botFleetGrid .fleet-state.error{color:var(--red);border-color:rgba(255,91,115,.2)}
+#botFleetGrid .fleet-state.paused{color:var(--orange);border-color:rgba(255,156,66,.2)}
+@media(max-width:1050px){#botFleetGrid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:650px){#botFleetGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+</style>
+<div class="section-head"><div><div class="section-title">ACCOUNT OVERVIEW</div><div class="section-sub">Your latest broker balance, equity, P&amp;L and margin. These values are refreshed from the connected account.</div></div><div class="section-code">ACCOUNT</div></div>
     <div class="grid-4">
       <div class="metric"><div class="metric-top"><span class="metric-label">Balance</span><span class="metric-icon">$</span></div><div class="metric-value gold" id="balance">—</div><div class="metric-note">BROKER AUTHORITATIVE</div></div>
       <div class="metric"><div class="metric-top"><span class="metric-label">Equity</span><span class="metric-icon">EQ</span></div><div class="metric-value cyan" id="equity">—</div><div class="metric-note">CURRENT ACCOUNT EQUITY</div></div>
@@ -1688,6 +1706,65 @@ body.kb-terminal-page > .toast{position:fixed!important}
     }
   }
 
+  async function loadBotFleet(){
+    const grid=$("botFleetGrid");
+    if(!grid)return;
+    try{
+      const payload=await api("/runtime",{timeoutMs:7000});
+      const bots=Array.isArray(payload?.bots)?payload.bots:[];
+      const names={
+        strategic:"KINGBOT STRATEGIC",
+        flipper:"KINGBOT FLIPPER",
+        breakout:"KINGBOT BREAKOUT",
+        "smc-pro":"KINGBOT SMC PRO",
+        "ladder-flip":"KINGBOT LADDER FLIP V8"
+      };
+      grid.innerHTML="";
+      if(!bots.length){
+        const empty=document.createElement("div");
+        empty.className="metric";
+        empty.innerHTML='<div class="metric-label">FLEET TELEMETRY</div><div class="metric-value">UNAVAILABLE</div><div class="metric-note">NO SERVER BOT RECORDS RETURNED</div>';
+        grid.appendChild(empty);
+      }else{
+        bots.forEach(bot=>{
+          const id=String(bot.botId||bot.bot_id||"unknown");
+          const runtime=String(bot.runtime||bot.state||"STOPPED").toUpperCase();
+          const entitlement=bot.entitled===true?"ENTITLED":bot.entitled===false?"NOT INCLUDED":"UNKNOWN ACCESS";
+          const mode=String(bot.executionMode||bot.execution_mode||"—").toUpperCase();
+          const symbol=String(bot.symbol||"NO SYMBOL");
+          const timeframe=String(bot.timeframe||"—");
+          const lastError=String(bot.lastError||bot.last_error||"");
+          const card=document.createElement("article");
+          card.className="metric";
+          const label=document.createElement("div");
+          label.className="fleet-name";
+          label.textContent=names[id]||String(bot.name||id).toUpperCase();
+          const stateEl=document.createElement("div");
+          stateEl.className="fleet-state "+(runtime==="RUNNING"?"running":runtime==="ERROR"?"error":runtime==="PAUSED"?"paused":"");
+          stateEl.textContent=runtime;
+          const meta=document.createElement("div");
+          meta.className="fleet-meta";
+          meta.textContent=entitlement+" · "+mode+"\n"+symbol+" · "+timeframe+(lastError?"\nSTATUS: "+lastError.replaceAll("_"," "):"");
+          card.append(label,stateEl,meta);
+          grid.appendChild(card);
+        });
+      }
+      const updated=$("fleetUpdated");
+      if(updated)updated.textContent="SERVER SYNC · "+new Date().toLocaleTimeString();
+    }catch(error){
+      const updated=$("fleetUpdated");
+      if(updated)updated.textContent="SYNC ERROR";
+      const grid=$("botFleetGrid");
+      if(grid && !grid.children.length){
+        const empty=document.createElement("div");
+        empty.className="metric";
+        empty.textContent="Bot runtime unavailable: "+String(error?.message||"API error");
+        grid.appendChild(empty);
+      }
+      addActivity("Bot fleet telemetry: "+String(error?.message||"API error"));
+    }
+  }
+
   async function refreshAll(manual=false){
     if(refreshRunning)return;
     refreshRunning=true;
@@ -1698,7 +1775,7 @@ body.kb-terminal-page > .toast{position:fixed!important}
       let selectionOk=false;
       try{await loadSelection();selectionOk=true}catch{}
       if(cycle!==state.cycle)return;
-      await Promise.allSettled([loadRuntime(),loadTerminalSnapshot()]);
+      await Promise.allSettled([loadRuntime(),loadTerminalSnapshot(),loadBotFleet()]);
       if(cycle!==state.cycle)return;
       state.lastSyncAt=new Date().toISOString();
       $("lastSystemSync").textContent=fmtTime(state.lastSyncAt);
@@ -1737,8 +1814,10 @@ body.kb-terminal-page > .toast{position:fixed!important}
   window.addEventListener("resize",drawTickChart);
   $("clock").textContent=new Date().toLocaleTimeString([], {hour12:false});
   refreshAll(true);
+  loadBotFleet();
   refreshHistory(true);
   setInterval(()=>{if(!document.hidden)refreshHistory(false)},10000);
+  setInterval(()=>{if(!document.hidden)loadBotFleet()},10000);
   itPush("SYSTEM","Professional IT telemetry layer initialized.");
   renderItHeartbeat();
   window.setTimeout(startLiveStream,900);
