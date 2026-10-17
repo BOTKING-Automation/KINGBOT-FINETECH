@@ -14,7 +14,7 @@ const URL = normalizeServiceUrl();
 const SECRET = String(process.env.KINGBOT_ML_SIGNAL_SECRET || "").trim();
 // Allow enough time for Render free-tier wake-up + model inference, while
 // keeping the worker bounded and preserving the mandatory AI execution gate.
-const TIMEOUT_MS = Math.max(2500, Number(process.env.KINGBOT_ML_SIGNAL_TIMEOUT_MS || 6500));
+const TIMEOUT_MS = Math.max(2500, Number(process.env.KINGBOT_ML_SIGNAL_TIMEOUT_MS || 20000));
 const TRAIN_TIMEOUT_MS = Math.max(8000, Number(process.env.KINGBOT_ML_TRAIN_TIMEOUT_MS || 30000));
 
 function enabled() {

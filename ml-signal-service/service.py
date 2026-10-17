@@ -15,6 +15,7 @@ import math
 import os
 import threading
 import time
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -989,6 +990,9 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError as error:
             self._json(422, {"ok": False, "error": str(error)[:180]})
         except Exception as error:
+            # Keep detailed diagnostics in service logs; never log request bodies or secrets.
+            print("[KINGBOT ML] request failed:", type(error).__name__, str(error)[:300])
+            traceback.print_exc()
             self._json(500, {"ok": False, "error": "ML_INTERNAL_ERROR", "reason": str(error)[:180]})
 
     def log_message(self, format: str, *args: Any) -> None:

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { createServer } from "node:http";
 import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1269,13 +1270,13 @@ async function cycle(){
 
 export async function startWorker(options={}){
   activeEventBus = options?.eventBus || null;
-  if(!pool){
-    if(String(process.env.WORKER_STANDBY||"").trim()==="1"){
-      console.log("[KINGBOT WORKER] standby mode: database is owned by the primary API service");
-      return;
-    }
-    throw new Error("DATABASE_URL_REQUIRED");
+  // Respect standby mode before touching the database so the API never starts a
+  // second execution loop when the dedicated worker owns trade processing.
+  if(String(process.env.WORKER_STANDBY||"").trim()==="1"){
+    console.log("[KINGBOT WORKER] standby mode: WORKER_STANDBY=1; execution is delegated to the dedicated worker service");
+    return;
   }
+  if(!pool) throw new Error("DATABASE_URL_REQUIRED");
   await ensureWorkerSchema();
   await heartbeat({startup:true});
   await activeEventBus?.upsertState({
@@ -1296,6 +1297,22 @@ const invokedDirectly = process.argv[1]
   : false;
 
 if(invokedDirectly){
+  // Render currently hosts this worker as a Web Service. Expose a minimal
+  // health endpoint so its port check can pass while the execution loop runs.
+  // This endpoint exposes no credentials, account data, or trading controls.
+  const port = Math.max(1, Number(process.env.PORT || 10000));
+  const healthServer = createServer((req, res) => {
+    if (req.url === "/health" || req.url === "/api/health") {
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(JSON.stringify({ ok: true, service: "kingbot-fintech-worker", status: stopping ? "stopping" : "running" }));
+      return;
+    }
+    res.writeHead(404, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify({ ok: false, error: "NOT_FOUND" }));
+  });
+  healthServer.listen(port, "0.0.0.0", () => {
+    console.log("[KINGBOT WORKER] health listener ready", JSON.stringify({ port }));
+  });
   startWorker().catch(error=>{
     console.error("[KINGBOT WORKER] startup failed",error?.message||error);
     process.exit(1);
