@@ -85,7 +85,7 @@ async function saveUserProfile(user, extra={}, initialize=false) {
   return { ...profile, uid: user.uid, email: user.email || "" };
 }
 
-const API_BASE = window.KINGBOT_API?.baseUrl || "https://kingbot-fintech-api-etfv.onrender.com/api";
+const API_BASE = window.KINGBOT_API?.baseUrl || "https://api.gibsonfx.online/api";
 
 async function persist(remember=true){
   await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
