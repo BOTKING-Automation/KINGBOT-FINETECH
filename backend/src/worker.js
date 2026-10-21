@@ -19,7 +19,7 @@ import { ensureGlobalRiskSchema, getGlobalRiskState, globalExecutionGate, record
 import { ensureAdaptiveIntelligenceSchema, recordAdaptiveDecision, settleAdaptiveDecision } from "./adaptive-intelligence.js";
 
 const { Pool } = pg;
-const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined }) : null;
+const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: String(process.env.DATABASE_SSL || "").trim().toLowerCase() === "disable" ? false : (process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined) }) : null;
 const broker = new UserBrokerManager({pool});
 let stopping = false;
 let timer = null;
