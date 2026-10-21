@@ -4,6 +4,8 @@ This directory prepares a single-VM Docker Compose deployment. It is a migration
 
 ## Migration safety gates
 
+**Do not merge this branch to `main` or cut over the frontend until the Oracle VM is running, `https://api.gibsonfx.online/api/health` succeeds, the database restore is verified, and the demo checks are complete.** This branch also prepares frontend and MT5 API references for the new domain. Merging early would point users at a hostname that may not yet resolve or serve the API.
+
 1. The existing Render PostgreSQL database is currently suspended and its dashboard reported an expiry date of 2026-10-29. Restore access and make a verified export before treating migration as complete.
 2. Do not delete the Render database or any existing service while the backup is unverified.
 3. The first Oracle worker startup is intentionally halted by default. Keep KINGBOT_EXECUTION_HALT=1 and KINGBOT_LIVE_EXECUTION_ENABLED=0 until the data and demo flow are verified.
@@ -81,7 +83,11 @@ DATABASE_SSL=disable is valid only because PostgreSQL is reachable on a private 
 
 Create an A record for the API domain configured in .env (the example uses api.gibsonfx.online), pointing to the VM public IPv4 address. Wait until DNS resolution points to that address before starting the Caddy service. Ensure inbound ports 80 and 443 are allowed. Caddy will request and renew HTTPS certificates automatically.
 
-The frontend's configured API base URL must then be changed to https://api.gibsonfx.online after the health checks pass. Keep the prior API URL available until the new one is verified.
+The frontend and MT5 references in this branch are already prepared to use `https://api.gibsonfx.online`; do not merge or publish those changes until the DNS, TLS certificate, and API health check all succeed. Once the new API passes health checks, review the complete branch diff and merge the frontend cutover deliberately.
+
+For Deriv OAuth, update the redirect URI registered in the Deriv application settings to exactly `https://api.gibsonfx.online/api/broker/deriv/oauth/callback` after DNS and HTTPS are working, and set `DERIV_OAUTH_REDIRECT_URI` to the same value in the private `.env`. Keep `DERIV_FRONTEND_RETURN_URL` pointed at the existing hosted broker-connect page unless that page's URL is also changing. Re-test the OAuth callback before relying on broker connectivity.
+
+For users of the MT5 bridge, allow `https://api.gibsonfx.online` in MT5 under **Tools → Options → Expert Advisors → Allow WebRequest for listed URL**, then compile and deploy the branch's updated bridge EA when cutover is approved.
 
 ## 6. Back up and migrate Render PostgreSQL
 
