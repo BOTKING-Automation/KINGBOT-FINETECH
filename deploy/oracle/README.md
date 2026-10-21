@@ -97,7 +97,9 @@ chmod 700 backups
 Export a custom-format backup using the PostgreSQL 18 client image. In the SSH shell, set RENDER_EXTERNAL_DATABASE_URL to the external connection string copied from the Render database dashboard, then run:
 
 ~~~sh
-docker run --rm -e RENDER_EXTERNAL_DATABASE_URL="$RENDER_EXTERNAL_DATABASE_URL" postgres:18-alpine sh -lc 'pg_dump "$RENDER_EXTERNAL_DATABASE_URL" --format=custom --no-owner --no-privileges' > backups/render-before-migration.dump
+export RENDER_EXTERNAL_DATABASE_URL='PASTE_THE_RENDER_EXTERNAL_CONNECTION_STRING_IN_THIS_PRIVATE_SHELL_ONLY'
+docker run --rm -e RENDER_EXTERNAL_DATABASE_URL postgres:18-alpine sh -lc 'pg_dump "$RENDER_EXTERNAL_DATABASE_URL" --format=custom --no-owner --no-privileges' > backups/render-before-migration.dump
+unset RENDER_EXTERNAL_DATABASE_URL
 ~~~
 
 Verify that the dump is not empty and record its checksum:
