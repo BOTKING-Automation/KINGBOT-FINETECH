@@ -1,0 +1,145 @@
+name: kingbot-fintech
+
+x-node-app: &node-app
+  image: kingbot-fintech-app:oracle
+  build:
+    context: ../..
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  init: true
+  env_file:
+    - .env
+  environment:
+    NODE_ENV: production
+    DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in deploy/oracle/.env}
+    DATABASE_SSL: ${DATABASE_SSL:-disable}
+    BROKER_CREDENTIALS_KEY: ${BROKER_CREDENTIALS_KEY:?Reuse the current key when migrating existing encrypted credentials}
+    KINGBOT_ML_SIGNAL_URL: http://ml-signal:10001
+    KINGBOT_ML_SIGNAL_SECRET: ${KINGBOT_ML_SIGNAL_SECRET:?Set KINGBOT_ML_SIGNAL_SECRET}
+  networks:
+    - kingbot
+  depends_on:
+    db:
+      condition: service_healthy
+    ml-signal:
+      condition: service_healthy
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in deploy/oracle/.env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in deploy/oracle/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/oracle/.env}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./backups:/backups
+    networks:
+      - kingbot
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    mem_limit: 1536m
+    stop_grace_period: 1m
+
+  ml-signal:
+    image: kingbot-ml-signal:oracle
+    build:
+      context: ../..
+      dockerfile: deploy/oracle/Dockerfile.ml
+    restart: unless-stopped
+    init: true
+    environment:
+      PORT: "10001"
+      KINGBOT_ML_SIGNAL_SECRET: ${KINGBOT_ML_SIGNAL_SECRET:?Set KINGBOT_ML_SIGNAL_SECRET}
+      KINGBOT_ML_MIN_BARS: ${KINGBOT_ML_MIN_BARS:-150}
+      KINGBOT_ML_FORWARD_BARS: ${KINGBOT_ML_FORWARD_BARS:-3}
+      KINGBOT_ML_LABEL_ATR: ${KINGBOT_ML_LABEL_ATR:-0.35}
+      KINGBOT_ML_MAX_MODELS: ${KINGBOT_ML_MAX_MODELS:-50}
+      KINGBOT_ML_MAX_MARKETS: ${KINGBOT_ML_MAX_MARKETS:-12}
+      KINGBOT_ML_MAX_BARS_PER_MARKET: ${KINGBOT_ML_MAX_BARS_PER_MARKET:-320}
+      KINGBOT_ML_MAX_BODY_BYTES: ${KINGBOT_ML_MAX_BODY_BYTES:-1500000}
+    expose:
+      - "10001"
+    networks:
+      - kingbot
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:10001/health', timeout=4)"]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
+    mem_limit: 3g
+    stop_grace_period: 30s
+
+  api:
+    <<: *node-app
+    environment:
+      NODE_ENV: production
+      PORT: "10000"
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in deploy/oracle/.env}
+      DATABASE_SSL: ${DATABASE_SSL:-disable}
+      BROKER_CREDENTIALS_KEY: ${BROKER_CREDENTIALS_KEY:?Reuse the current key when migrating existing encrypted credentials}
+      WORKER_STANDBY: "1"
+      KINGBOT_LIVE_EXECUTION_ENABLED: ${KINGBOT_LIVE_EXECUTION_ENABLED:-0}
+      KINGBOT_EXECUTION_HALT: ${KINGBOT_EXECUTION_HALT:-1}
+      KINGBOT_ML_SIGNAL_URL: http://ml-signal:10001
+      KINGBOT_ML_SIGNAL_SECRET: ${KINGBOT_ML_SIGNAL_SECRET:?Set KINGBOT_ML_SIGNAL_SECRET}
+    expose:
+      - "10000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:10000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+    mem_limit: 1536m
+    stop_grace_period: 1m
+
+  worker:
+    <<: *node-app
+    command: ["npm", "run", "worker"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in deploy/oracle/.env}
+      DATABASE_SSL: ${DATABASE_SSL:-disable}
+      BROKER_CREDENTIALS_KEY: ${BROKER_CREDENTIALS_KEY:?Reuse the current key when migrating existing encrypted credentials}
+      KINGBOT_WORKER_ID: ${KINGBOT_WORKER_ID:-oracle-worker-1}
+      KINGBOT_EXECUTION_HALT: ${KINGBOT_EXECUTION_HALT:-1}
+      KINGBOT_LIVE_EXECUTION_ENABLED: ${KINGBOT_LIVE_EXECUTION_ENABLED:-0}
+      KINGBOT_ML_SIGNAL_URL: http://ml-signal:10001
+      KINGBOT_ML_SIGNAL_SECRET: ${KINGBOT_ML_SIGNAL_SECRET:?Set KINGBOT_ML_SIGNAL_SECRET}
+    mem_limit: 2g
+    stop_grace_period: 1m
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN and point its DNS A record at the VM's public IPv4}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - kingbot
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 128m
+
+networks:
+  kingbot:
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
