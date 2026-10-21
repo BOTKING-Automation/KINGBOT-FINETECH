@@ -2982,7 +2982,7 @@ overscroll-behavior:none;}
       if (SYNTHETICS_LOADED) return;
       try {
         const response = await fetch(
-          "https://kingbot-fintech-api-etfv.onrender.com/api/markets/synthetics",
+          "https://api.gibsonfx.online/api/markets/synthetics",
           { cache: "no-store" }
         );
         if (!response.ok) return;
@@ -3416,7 +3416,7 @@ overscroll-behavior:none;}
     async function fetchSharedMarketData() {
       try {
         const response = await fetch(
-          "https://kingbot-fintech-api-etfv.onrender.com/api/markets/live?synthetics=true",
+          "https://api.gibsonfx.online/api/markets/live?synthetics=true",
           { cache: "no-store" }
         );
         if (!response.ok) throw new Error("SHARED_MARKET_FEED_HTTP_" + response.status);
