@@ -41,7 +41,7 @@ Requirements:
 Environment:
 
 ```text
-KINGBOT_API_ORIGIN=https://kingbot-fintech-api-etfv.onrender.com
+KINGBOT_API_ORIGIN=https://api.gibsonfx.online
 KINGBOT_HOSTING_BOOTSTRAP_TOKEN=<backend secret>
 KINGBOT_HOST_NODE_ID=<unique node id>
 KINGBOT_HOST_NODE_NAME=<human readable node name>
