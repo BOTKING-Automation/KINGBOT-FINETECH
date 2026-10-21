@@ -205,14 +205,14 @@ jobs:
             const trainResponse = await fetch("http://127.0.0.1:19090/train", {
               method: "POST",
               headers: { "content-type": "application/json", "x-kingbot-ml-secret": "ci-secret" },
-              body: JSON.stringify({ botId: "strategic", timeframe: "5m", markets: [{ symbol: "XAUUSD", bars }] })
+              body: JSON.stringify({ botId: "strategic", timeframe: "15m", markets: [{ symbol: "XAUUSD", bars }] })
             });
             const train = await trainResponse.json();
             if (!trainResponse.ok || !train.ok || !train.ready) throw new Error("ML train failed: " + JSON.stringify(train));
 
             const { warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } = await import("./backend/src/ai-trade-gate.js");
             const market = {
-              symbol: "XAUUSD", timeframe: "5m", price: base, spread: 0.2, atr: 1.5,
+              symbol: "XAUUSD", timeframe: "15m", price: base, spread: 0.2, atr: 1.5,
               volatility: 0.45, trend: 0.7, momentum: 0.6, structure: "bullish",
               adx: 24, rsi: 58, emaFast: 101, emaSlow: 99.5, velocityPoints: 0.8
             };
