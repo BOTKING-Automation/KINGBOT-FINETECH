@@ -7,8 +7,8 @@
 
 #include <Trade/Trade.mqh>
 
-input string BridgeURL="https://kingbot-fintech-api-etfv.onrender.com/api/mt5/bridge/poll";
-input string AckURL="https://kingbot-fintech-api-etfv.onrender.com/api/mt5/bridge/ack";
+input string BridgeURL="https://api.gibsonfx.online/api/mt5/bridge/poll";
+input string AckURL="https://api.gibsonfx.online/api/mt5/bridge/ack";
 input string BridgeToken="";
 input string WatchSymbolsCSV="XAUUSD,EURUSD,GBPUSD,BTCUSD";
 input int PollMilliseconds=500;
@@ -187,7 +187,7 @@ bool HttpPost(string url,string body,string &response,int &code)
       int err=GetLastError();
       if(TimeCurrent()-LastLogTime>=10)
       {
-         PrintFormat("[KINGBOT BRIDGE] WebRequest error=%d. Add %s to MT5 allowed WebRequest URLs.",err,"https://kingbot-fintech-api-etfv.onrender.com");
+         PrintFormat("[KINGBOT BRIDGE] WebRequest error=%d. Add %s to MT5 allowed WebRequest URLs.",err,"https://api.gibsonfx.online");
          LastLogTime=TimeCurrent();
       }
       return false;
