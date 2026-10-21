@@ -109,6 +109,7 @@ services:
       DATABASE_SSL: ${DATABASE_SSL:-disable}
       BROKER_CREDENTIALS_KEY: ${BROKER_CREDENTIALS_KEY:?Reuse the current key when migrating existing encrypted credentials}
       KINGBOT_WORKER_ID: ${KINGBOT_WORKER_ID:-oracle-worker-1}
+      WORKER_STANDBY: "0"
       KINGBOT_EXECUTION_HALT: ${KINGBOT_EXECUTION_HALT:-1}
       KINGBOT_LIVE_EXECUTION_ENABLED: ${KINGBOT_LIVE_EXECUTION_ENABLED:-0}
       KINGBOT_ML_SIGNAL_URL: http://ml-signal:10001
