@@ -6,7 +6,7 @@
 */
 (function(window){
 "use strict";
-const API_BASE="https://kingbot-fintech-api-etfv.onrender.com/api";
+const API_BASE="https://api.gibsonfx.online/api";
 const API_ORIGIN=API_BASE.replace(/\/api\/?$/i,"");
 const state={checked:false,checking:false,authenticated:false,user:null,error:null,checkedAt:0};
 let activeCheck=null;
