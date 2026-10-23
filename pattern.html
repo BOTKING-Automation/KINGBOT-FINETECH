@@ -130,7 +130,7 @@ h1{margin:18px 0 12px;font:900 clamp(28px,4vw,52px)/1.05 Orbitron;letter-spacing
 <script>
 (function(){
   "use strict";
-  const API=window.KINGBOT_API?.baseUrl||"https://kingbot-fintech-api-etfv.onrender.com/api";
+  const API=window.KINGBOT_API?.baseUrl||"https://api.gibsonfx.online/api";
   const q=id=>document.getElementById(id);
   const fmt=v=>{const n=Number(v);return Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:5}):"—";};
   function toast(msg){const el=q("toast");el.textContent=msg;el.className="toast show";clearTimeout(toast.t);toast.t=setTimeout(()=>el.className="toast",3000);}

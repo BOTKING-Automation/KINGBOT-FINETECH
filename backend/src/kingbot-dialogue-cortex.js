@@ -48,7 +48,7 @@ const ENTITY_PATTERNS = Object.freeze([
 ]);
 
 const SPEECH_ACTS = Object.freeze({
-  GREETING: /^(hi|hello|hey|hey there|yo|hiya|howdy|greetings|good morning|good afternoon|good evening)[!. ,]*$/i,
+  GREETING: /^(hi|hello|hey|hey there|yo|hiya|howdy|greetings|good morning|good afternoon|good evening)(?:\s+(?:bro|man))?[!. ,]*$/i,
   WELLBEING: /^(how are you|how are u|how are things|how is it going|how's it going|are you good|are you okay|are you ok|you good|you okay|you ok|everything good|doing good|doing well|you doing good|you doing well|are things good|all good|u good)[?! .]*$/i,
   PRESENCE: /^(you there|are you there|you online|are you online|are you awake|you awake|can you hear me|can you see me|are you active|still there|still online)[?! .]*$/i,
   THANKS: /^(thanks|thank you|thank u|much appreciated|appreciate it)[!. ,]*$/i,

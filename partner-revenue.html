@@ -64,7 +64,7 @@ main{width:min(1450px,calc(100% - 28px));margin:auto;padding:34px 0 60px}.hero,.
 <script>
 (function(){
 "use strict";
-const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://kingbot-fintech-api-etfv.onrender.com/api";
+const API_BASE=(window.KINGBOT_API&&window.KINGBOT_API.baseUrl)||"https://api.gibsonfx.online/api";
 const $=id=>document.getElementById(id);
 async function token(){
   if(!window.KINGBOT_FIREBASE) await import("./system/firebase-auth.js");

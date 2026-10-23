@@ -19,7 +19,7 @@ import { ensureGlobalRiskSchema, getGlobalRiskState, globalExecutionGate, record
 import { ensureAdaptiveIntelligenceSchema, recordAdaptiveDecision, settleAdaptiveDecision } from "./adaptive-intelligence.js";
 
 const { Pool } = pg;
-const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined }) : null;
+const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: String(process.env.DATABASE_SSL || "").trim().toLowerCase() === "disable" ? false : (process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined) }) : null;
 const broker = new UserBrokerManager({pool});
 let stopping = false;
 let timer = null;
@@ -28,6 +28,7 @@ const WORKER_POLL_MS = 750;
 const MAX_PARALLEL_BOTS = 8;
 const activeExecutionKeys = new Set();
 let lastWorkerHeartbeat = 0;
+let lastExecutionHaltNotice = 0;
 
 const num=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
 const timeframeMinutes={"1m":1,"2m":2,"3m":3,"4m":4,"5m":5,"6m":6,"10m":10,"12m":12,"15m":15,"20m":20,"30m":30,"1h":60,"2h":120,"3h":180,"4h":240,"6h":360,"8h":480,"12h":720,"1d":1440,"1w":10080,"1mn":43200};
@@ -1233,6 +1234,17 @@ async function execute(row){
 
 async function cycle(){
   if(stopping||!pool)return;
+  // Safe-by-default deployment halt. The worker still starts and reports health,
+  // but does not scan bots or reach any broker order-submission path while halted.
+  if(String(process.env.KINGBOT_EXECUTION_HALT||"").trim()==="1"){
+    const now=Date.now();
+    if(now-lastExecutionHaltNotice>15000){
+      lastExecutionHaltNotice=now;
+      console.warn("[KINGBOT WORKER] execution halted by KINGBOT_EXECUTION_HALT=1; no orders will be submitted");
+    }
+    await heartbeat({executionHalted:true,reason:"KINGBOT_EXECUTION_HALT"});
+    return;
+  }
   await heartbeat();
   await getGlobalRisk();
   if(Date.now()-lastSubscriptionSweep>30000){

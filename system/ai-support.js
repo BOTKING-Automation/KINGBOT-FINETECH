@@ -8,7 +8,7 @@
 (function (window) {
   "use strict";
 
-  const API_BASE = "https://kingbot-fintech-api-etfv.onrender.com/api";
+  const API_BASE = "https://api.gibsonfx.online/api";
   const state = {
     context: null,
     health: null,

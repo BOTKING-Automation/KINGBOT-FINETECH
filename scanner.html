@@ -450,7 +450,7 @@ tbody tr:hover{background:rgba(34,230,255,.035)}
 <script>
 (function(){
   "use strict";
-  const API=window.KINGBOT_API?.baseUrl||"https://kingbot-fintech-api-etfv.onrender.com/api";
+  const API=window.KINGBOT_API?.baseUrl||"https://api.gibsonfx.online/api";
   const qs=id=>document.getElementById(id);
   const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false,streamSocket:null,streamReconnectTimer:null,streamBackoffMs:1000,lastStreamMessageAt:0,streamGeneration:0};
 

@@ -6,7 +6,7 @@
   "use strict";
 
   const state={busy:false,last:null,timer:null};
-  const API_BASE=(window.KINGBOT_FIREBASE?.API_BASE||"https://kingbot-fintech-api-etfv.onrender.com/api");
+  const API_BASE=(window.KINGBOT_FIREBASE?.API_BASE||"https://api.gibsonfx.online/api");
 
   const $=id=>document.getElementById(id);
   const text=(id,value)=>{const el=$(id);if(el)el.textContent=String(value??"—");};

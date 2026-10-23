@@ -52,7 +52,7 @@ const AI_PROVIDER = "kingbot-native";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const pool = DATABASE_URL ? new pg.Pool({
   connectionString: DATABASE_URL,
-  ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
+  ssl: String(process.env.DATABASE_SSL || "").trim().toLowerCase() === "disable" ? false : (DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false }),
   max: Number(process.env.PG_POOL_MAX || 10),
   connectionTimeoutMillis: Number(process.env.PG_CONNECTION_TIMEOUT_MS || 8000),
   idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 30000)
@@ -777,6 +777,10 @@ ensureAuthSchema(pool).then(() => ensureAuditIntegritySchema(pool)).then(() => e
   eventBus.start().catch(error => console.warn("[KINGBOT EVENT BUS] startup deferred:",error?.message||error));
   httpServer.listen(PORT, () => {
     console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);
+    if (String(process.env.WORKER_STANDBY || "").trim() === "1") {
+      console.log("[KINGBOT WORKER] standby mode: dedicated worker service owns execution");
+      return;
+    }
     void startWorker({eventBus}).then(() => {}).catch((error) => console.error("[KINGBOT WORKER]", error?.message || error));
   });
 }).catch((error) => {

@@ -322,6 +322,11 @@ export class UserBrokerManager {
     const mode=String(mapping.execution_mode||"DEMO").toUpperCase();
     if(!["DEMO","LIVE"].includes(mode))throw new Error("INVALID_EXECUTION_MODE");
     if(mode==="DEMO")return {authorized:true,mode,liveAuthorized:false,provider:mapping.provider,accountId:mapping.account_id};
+    // Deployment-level hard gate: LIVE remains unavailable unless an operator
+    // explicitly enables it in the server environment in addition to account authorization.
+    if(String(process.env.KINGBOT_LIVE_EXECUTION_ENABLED||"").trim()!=="1"){
+      throw new Error("LIVE_EXECUTION_DISABLED_BY_DEPLOYMENT");
+    }
     if(String(process.env.KINGBOT_LIVE_AUTH_REQUIRED||"true").toLowerCase()!=="false"){
       if(!Boolean(mapping.live_execution_authorized))throw new Error("LIVE_EXECUTION_NOT_AUTHORIZED");
     }

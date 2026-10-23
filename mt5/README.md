@@ -9,7 +9,7 @@ The EA runs inside the user's MT5 terminal. KINGBOT sends controlled commands to
 1. Log into the exact Deriv MT5 DEMO or REAL account that KINGBOT should control.
 2. In MT5 open Tools -> Options -> Expert Advisors.
 3. Add this allowed WebRequest URL:
-   https://kingbot-fintech-api-etfv.onrender.com
+   https://api.gibsonfx.online
 4. Copy KINGBOT_MT5_BRIDGE.mq5 into MQL5/Experts/KINGBOT/.
 5. Open the file in MetaEditor and compile it.
 6. Open KINGBOT Broker Connect and choose KINGBOT MT5 BRIDGE.
