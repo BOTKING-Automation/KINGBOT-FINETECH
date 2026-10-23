@@ -12,6 +12,8 @@ import {
   browserSessionPersistence,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
   sendEmailVerification,
   sendPasswordResetEmail,
   signOut,
@@ -254,6 +256,36 @@ window.KINGBOT_FIREBASE={
       console.warn("[KINGBOT AUTH] Backend sync deferred after signup:",error?.message||error);
     }
     return {user,backendSynced,syncError};
+  },
+  signInWithGoogle:async({remember=true}={})=>{
+    await persist(remember);
+    const provider=new GoogleAuthProvider();
+    provider.setCustomParameters({prompt:"select_account"});
+    const credential=await signInWithPopup(auth,provider);
+    const user=credential.user;
+    if(!user) throw new Error("Google sign-in did not return an authenticated user.");
+    const displayName=String(user.displayName||"").trim();
+    const parts=displayName.split(/\s+/).filter(Boolean);
+    const profileRef=doc(db,"users",user.uid);
+    const profileSnap=await getDoc(profileRef);
+    const firstName=parts[0]||"";
+    const lastName=parts.slice(1).join(" ");
+    await saveUserProfile(user,{
+      displayName,
+      firstName,
+      lastName,
+      ...(user.photoURL?{photoURL:user.photoURL}:{})
+    },!profileSnap.exists());
+    let backendSynced=false;
+    let syncError=null;
+    try{
+      await backendSync({firstName,lastName,displayName,authProvider:"google"});
+      backendSynced=true;
+    }catch(error){
+      syncError=error;
+      console.warn("[KINGBOT AUTH] Backend sync deferred after Google sign-in:",error?.message||error);
+    }
+    return {user,verified:user.emailVerified===true,backendSynced,syncError};
   },
   signIn:async({email,password,remember=true})=>{
     await persist(remember);
