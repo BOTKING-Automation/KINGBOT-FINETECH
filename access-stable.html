@@ -37,6 +37,8 @@ input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(25,2
 .phone{display:grid;grid-template-columns:100px 1fr;gap:7px}
 .checkline{display:flex;align-items:flex-start;gap:8px;margin:14px 0;color:#7f8ba4;font-size:9px;line-height:1.5}.checkline input{width:15px;height:15px;margin:0}
 .action{width:100%;height:48px;border:0;border-radius:10px;background:linear-gradient(90deg,var(--gold),#ffe29a,var(--cyan));color:#05070d;font-size:11px;font-weight:900;cursor:pointer}.action:disabled{opacity:.55;cursor:not-allowed}
+.oauth-divider{display:flex;align-items:center;gap:10px;margin:18px 0 12px;color:#71809b;font-size:8px;font-weight:800;letter-spacing:1.4px}.oauth-divider:before,.oauth-divider:after{content:"";height:1px;flex:1;background:rgba(255,255,255,.1)}
+.google-action{width:100%;min-height:46px;display:flex;align-items:center;justify-content:center;gap:11px;border:1px solid rgba(255,255,255,.18);border-radius:10px;background:#f8fafc;color:#111827;font-size:10px;font-weight:900;letter-spacing:.6px;cursor:pointer}.google-action:hover{background:#fff}.google-action:disabled{opacity:.6;cursor:wait}.google-mark{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#fff;color:#4285f4;font-size:17px;font-weight:900;font-family:Arial,sans-serif}.google-logo{width:22px;height:22px;flex:0 0 22px}.oauth-note{margin-top:9px;color:#64718b;font-size:8px;line-height:1.5;text-align:center}
 .helper{margin-top:12px;color:#71809b;font-size:9px}.helper a,.bottom a{color:var(--cyan);text-decoration:none;font-weight:800}
 .message{display:none;margin-top:12px;padding:11px;border-radius:10px;font-size:10px;line-height:1.5}.message.show{display:block}.message.error{color:#ffc1ca;background:rgba(255,92,122,.08);border:1px solid rgba(255,92,122,.18)}.message.success{color:#b8ffe1;background:rgba(35,247,163,.07);border:1px solid rgba(35,247,163,.16)}
 .bottom{text-align:center;margin-top:18px;color:#71809b;font-size:9px}.secure{text-align:center;margin-top:17px;color:#536078;font-size:7px;letter-spacing:1.3px}
@@ -71,6 +73,10 @@ input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(25,2
 <button id="signUpTab" class="tab" type="button">CREATE ACCOUNT</button>
 </div>
 
+<div class="oauth-divider"><span>OR CONTINUE WITH</span></div>
+<button id="googleSignInBtn" class="google-action" type="button"><svg class="google-logo" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M43.6 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.7c3.9-3.6 6-8.9 6-15.3z"/><path fill="#34A853" d="M24 44c5.5 0 10.1-1.8 13.5-4.9l-6.7-5.1c-1.8 1.2-4.1 2-6.8 2-5.2 0-9.6-3.5-11.2-8.2H5.9v5.2C9.3 39.5 16.1 44 24 44z"/><path fill="#FBBC05" d="M12.8 27.8a12 12 0 0 1 0-7.6V15H5.9a20 20 0 0 0 0 18z"/><path fill="#EA4335" d="M24 11.9c3 0 5.7 1 7.8 3.1l5.9-5.9C34.1 5.8 29.5 4 24 4 16.1 4 9.3 8.5 5.9 15l6.9 5.2c1.6-4.8 6-8.3 11.2-8.3z"/></svg><span>CONTINUE WITH GOOGLE</span></button>
+<div class="oauth-note">Google verifies your email. Platform permissions and subscriptions are checked separately.</div>
+
 <form id="signInForm" class="form-active" novalidate>
 <div class="field"><label for="loginEmail">EMAIL ADDRESS</label><input id="loginEmail" type="email" inputmode="email" autocomplete="email" required></div>
 <div class="field"><label for="loginPassword">PASSWORD</label><input id="loginPassword" type="password" autocomplete="current-password" required></div>
@@ -104,6 +110,7 @@ input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(25,2
   "use strict";
   const $=id=>document.getElementById(id);
   const signInTab=$("signInTab"),signUpTab=$("signUpTab"),signInForm=$("signInForm"),signUpForm=$("signUpForm"),message=$("message"),switchText=$("switchText");
+  const googleSignInBtn=$("googleSignInBtn");
 
   function showMessage(text,type){message.textContent=text;message.className="message show "+type}
   function switchMode(mode){
@@ -141,6 +148,39 @@ input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(25,2
       return u.pathname+u.search+u.hash;
     }catch{return "index.html"}
   }
+
+  googleSignInBtn.addEventListener("click",async()=>{
+    googleSignInBtn.disabled=true;
+    googleSignInBtn.innerHTML='<svg class="google-logo" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M43.6 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.7c3.9-3.6 6-8.9 6-15.3z"/><path fill="#34A853" d="M24 44c5.5 0 10.1-1.8 13.5-4.9l-6.7-5.1c-1.8 1.2-4.1 2-6.8 2-5.2 0-9.6-3.5-11.2-8.2H5.9v5.2C9.3 39.5 16.1 44 24 44z"/><path fill="#FBBC05" d="M12.8 27.8a12 12 0 0 1 0-7.6V15H5.9a20 20 0 0 0 0 18z"/><path fill="#EA4335" d="M24 11.9c3 0 5.7 1 7.8 3.1l5.9-5.9C34.1 5.8 29.5 4 24 4 16.1 4 9.3 8.5 5.9 15l6.9 5.2c1.6-4.8 6-8.3 11.2-8.3z"/></svg><span>CONNECTING TO GOOGLE…</span>';
+    try{
+      const fb=await firebase();
+      const result=await fb.signInWithGoogle({remember:$("remember")?.checked!==false});
+      if(!result.verified){
+        try{sessionStorage.setItem("verification_email",result.user?.email||"")}catch{}
+        location.replace("verify.html?return="+encodeURIComponent(destination()));
+        return;
+      }
+      await fb.waitForAuthReady(10000);
+      await fb.getToken(true);
+      try{sessionStorage.setItem("KINGBOT_AUTH_HANDOFF","1")}catch{}
+      showMessage("Google sign-in successful. Opening KINGBOT…","success");
+      location.replace(destination());
+    }catch(error){
+      const code=String(error&&error.code||"");
+      const map={
+        "auth/popup-closed-by-user":"Google sign-in was cancelled. Try again when ready.",
+        "auth/popup-blocked":"Your browser blocked the Google sign-in window. Allow pop-ups for this site and retry.",
+        "auth/unauthorized-domain":"This website domain is not authorized in Firebase Authentication settings.",
+        "auth/account-exists-with-different-credential":"An account already exists with this email using another sign-in method. Sign in with that method first.",
+        "auth/network-request-failed":"Network error. Check your connection and try again.",
+        "auth/operation-not-allowed":"Google sign-in is not enabled in Firebase Authentication yet. Enable the Google provider in Firebase Console."
+      };
+      showMessage(map[code]||(error&&error.message)||"Google sign-in failed. Please try again.","error");
+    }finally{
+      googleSignInBtn.disabled=false;
+      googleSignInBtn.innerHTML='<svg class="google-logo" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M43.6 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.7c3.9-3.6 6-8.9 6-15.3z"/><path fill="#34A853" d="M24 44c5.5 0 10.1-1.8 13.5-4.9l-6.7-5.1c-1.8 1.2-4.1 2-6.8 2-5.2 0-9.6-3.5-11.2-8.2H5.9v5.2C9.3 39.5 16.1 44 24 44z"/><path fill="#FBBC05" d="M12.8 27.8a12 12 0 0 1 0-7.6V15H5.9a20 20 0 0 0 0 18z"/><path fill="#EA4335" d="M24 11.9c3 0 5.7 1 7.8 3.1l5.9-5.9C34.1 5.8 29.5 4 24 4 16.1 4 9.3 8.5 5.9 15l6.9 5.2c1.6-4.8 6-8.3 11.2-8.3z"/></svg><span>CONTINUE WITH GOOGLE</span>';
+    }
+  });
 
   signInForm.addEventListener("submit",async e=>{
     e.preventDefault();
