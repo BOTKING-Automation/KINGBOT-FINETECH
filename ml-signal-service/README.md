@@ -39,3 +39,33 @@ Required cost object fields:
 The ledger enters on the next bar's open and exits at the close after the configured forward horizon. The same flat spread and per-side slippage assumptions are applied adversely on entry and exit. Swap is pro-rated by elapsed calendar time; this deliberately does **not** model broker rollover cutoffs, holidays, financing-specific formulas, or triple-swap weekdays. Stop-loss/take-profit orders, market gaps within candles, broker margin, volume constraints and partial fills are not modeled by this research endpoint. The reported trade-level Sharpe is not annualized.
 
 Every source is reported as caller-asserted and **not independently verified**; timestamp completeness and chronology are validated, but that does not authenticate the historical provider or prove bars are free from survivorship or vendor errors. One run does not change global model health or assert profitability. \`profitabilityValidated\` remains false. Use real historical bars from a named source and realistic broker cost settings; CI-generated fixtures only validate code paths and are not performance evidence.
+
+
+## Authenticated KINGBOT API
+
+Signed-in users can request a server-fetched history evaluation through \`POST /api/ai/market-scanner/backtest\`. The endpoint is rate-limited (default 2 requests/minute), rejects synthetic symbols, and obtains timestamped OHLC history through KINGBOT's configured historical feed chain (Binance/Kraken proxy history for BTCUSD, Twelve Data when enabled, then Deriv fallback). The response includes the provider claim when known, but \`sourceIndependentlyVerified\` stays false because the service cannot authenticate the upstream data itself. The ML secret and raw historical bars remain server-side for this flow.
+
+The request body is:
+\`\`\`json
+{
+  "botId": "strategic",
+  "symbol": "XAUUSD",
+  "timeframe": "15m",
+  "folds": 3,
+  "costs": {
+    "spread_price": 0.25,
+    "slippage_price_per_side": 0.05,
+    "commission_per_lot_round_turn": 7.0,
+    "swap_long_per_lot_per_day": -3.0,
+    "swap_short_per_lot_per_day": -1.0,
+    "units_per_lot": 100,
+    "volume_lots": 0.01,
+    "quote_to_account_rate": 1.0,
+    "starting_equity": 1000,
+    "account_currency": "USD",
+    "quote_currency": "USD"
+  }
+}
+\`\`\`
+
+The numerical cost values above are illustrative schema values only, **not broker quotes**; replace every value with the user's actual instrument/broker contract assumptions. \`spread_price\` and \`slippage_price_per_side\` are in instrument price units; commission and swap are in account currency; \`quote_to_account_rate\` converts price P&L into account currency. The endpoint requires sign-in, does not use broker account credentials, does not store the report, and cannot place orders.
