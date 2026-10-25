@@ -1,6 +1,7 @@
 import { isSyntheticSymbol } from "./synthetic-markets.js";
 import { isAllowedBacktestSymbol, AI_STRATEGY_BOTS, BACKTEST_TIMEFRAME_SECONDS } from "./backtest-validation.js";
 import { normalizeClientExecutionProfile } from "./execution-profile.js";
+import { normalizeBrokerHistoricalBars } from "./broker-history-contract.js";
 import "dotenv/config";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getGoldPriceFeed } from "./gold-price-feed.js";
@@ -1241,7 +1242,7 @@ class AiMarketScannerStream {
   }
 }
 
-export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server, requireUser, cortexRunner = null }) {
+export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server, requireUser, broker = null, cortexRunner = null }) {
   const stream = new AiMarketScannerStream({ server, pool, twelveData, cortexRunner });
   startAiStrategyModelTraining(twelveData);
   void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
@@ -1363,9 +1364,45 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
         return res.status(400).json({ok:false,error:"ML_BACKTEST_COSTS_INCOMPLETE",missingCostFields:missingCosts});
       }
 
-      const cacheKey=symbol+":"+timeframe;
-      const bars=await getTrainingBars(symbol,timeframe,twelveData);
-      const source=trainingHistoryCache.get(cacheKey)?.source||"KINGBOT historical provider chain (exact provider metadata unavailable)";
+      const allowExternalDataFallback=req.body?.allowExternalDataFallback===true;
+      let bars=null;
+      let source="";
+      let historicalFeedMode="CONNECTED_BROKER_HISTORY";
+      let brokerAdapter="unavailable";
+      let brokerHistoryError=null;
+
+      if(broker && typeof broker.getHistoricalCandles==="function"){
+        try{
+          const brokerStatus=typeof broker.getStatus==="function"
+            ? await broker.getStatus(user.id)
+            : null;
+          brokerAdapter=String(brokerStatus?.broker||"unknown").trim().toLowerCase();
+          if(!brokerStatus?.configured){
+            throw new Error("BROKER_ACCOUNT_NOT_CONFIGURED");
+          }
+          const historicalResult=await broker.getHistoricalCandles(
+            executionProfile.brokerSymbol,timeframe,user.id,1000
+          );
+          bars=normalizeBrokerHistoricalBars(historicalResult,{minBars:260,maxBars:1000});
+          source="Connected account historical candles via "+brokerAdapter+" adapter; broker symbol "+executionProfile.brokerSymbol;
+        }catch(error){
+          brokerHistoryError=String(error?.message||"BROKER_HISTORICAL_DATA_UNAVAILABLE").slice(0,180);
+          bars=null;
+        }
+      }else{
+        brokerHistoryError="BROKER_HISTORICAL_ADAPTER_UNAVAILABLE";
+      }
+
+      if(!bars){
+        if(!allowExternalDataFallback){
+          throw new Error("BROKER_NATIVE_HISTORICAL_DATA_UNAVAILABLE:"+String(brokerHistoryError||"NO_CONNECTED_BROKER_HISTORY"));
+        }
+        const cacheKey=symbol+":"+timeframe;
+        bars=await getTrainingBars(symbol,timeframe,twelveData);
+        source=trainingHistoryCache.get(cacheKey)?.source||"KINGBOT historical provider chain (exact provider metadata unavailable)";
+        historicalFeedMode="EXTERNAL_PROVIDER_FALLBACK";
+      }
+
       const result=await runMlStrategyBacktest({
         botId,symbol,timeframe,bars,costs,folds,dataSource:source
       });
@@ -1381,18 +1418,24 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
         executionProfile:{
           ...executionProfile,
           providedBy:"CLIENT",
+          brokerAdapter,
+          historicalFeedMode,
+          connectedBrokerHistoryUsed:historicalFeedMode==="CONNECTED_BROKER_HISTORY",
+          brokerHistoryFallbackReason:brokerHistoryError,
           brokerIdentityVerified:false,
           costsIndependentlyVerified:false,
           brokerSymbolMappingVerified:false,
-          historicalFeedBrokerMatchVerified:false,
-          historicalFeedNote:"Historical OHLC bars come from KINGBOT's configured data-provider chain; they are not guaranteed to match the selected broker's candles, bid/ask prices, spread, or fills. Client-supplied broker symbol and cost assumptions are reported for auditability but are not independently verified."
+          historicalFeedBrokerMatchVerified:historicalFeedMode==="CONNECTED_BROKER_HISTORY",
+          historicalFeedNote:historicalFeedMode==="CONNECTED_BROKER_HISTORY"
+            ? "Historical candles were requested from the connected account adapter using the supplied broker symbol. The client's broker label, economic symbol mapping, and cost assumptions are not independently verified."
+            : "Historical candles came from KINGBOT's external provider chain, not the connected execution account. Candles, bid/ask, spread, and fills may differ from the selected broker."
         },
         elapsedMs:Date.now()-startedAt
       });
     }catch(error){
       const message=String(error?.message||"ML_BACKTEST_FAILED").slice(0,240);
       console.warn("[KINGBOT ML BACKTEST]",message);
-      const unavailable=/UNAVAILABLE|HISTORY|TIMEOUT|NOT_CONFIGURED/i.test(message);
+      const unavailable=/UNAVAILABLE|HISTOR|TIMEOUT|NOT_CONFIGURED|NOT_CONNECTED/i.test(message);
       return res.status(unavailable?503:422).json({
         ok:false,
         error:unavailable?"ML_BACKTEST_HISTORICAL_DATA_UNAVAILABLE":"ML_BACKTEST_REQUEST_FAILED",
