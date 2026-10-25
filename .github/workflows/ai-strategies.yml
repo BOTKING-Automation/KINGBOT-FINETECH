@@ -196,7 +196,7 @@ jobs:
 
       - name: Specialist brain and strategy council tests
         working-directory: backend
-        run: node --test test/strategy-specialists.test.js test/strategy-council.test.js test/intelligence-orchestrator.test.js test/gold-price-feed.test.js test/market-data-fabric.test.js test/broker-market-contract.test.js test/ml-signal-client.test.js test/backtest-validation.test.js test/execution-profile.test.js
+        run: node --test test/strategy-specialists.test.js test/strategy-council.test.js test/intelligence-orchestrator.test.js test/gold-price-feed.test.js test/market-data-fabric.test.js test/broker-market-contract.test.js test/broker-history-contract.test.js test/ml-signal-client.test.js test/backtest-validation.test.js test/execution-profile.test.js
 
       - name: End-to-end Node → ML service gate test
         run: |
