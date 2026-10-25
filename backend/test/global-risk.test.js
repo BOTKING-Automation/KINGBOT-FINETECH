@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getGlobalRiskState, globalExecutionGate } from "../src/global-risk.js";
+import { getGlobalRiskState, globalExecutionGate, getWorkerHealth } from "../src/global-risk.js";
 
 test("database unavailable fails closed", async () => {
   const state = await getGlobalRiskState(null);
@@ -72,4 +72,58 @@ test("complete healthy risk state allows the global gate", () => {
     reason: null,
     level: "NORMAL"
   });
+});
+
+
+test("fresh running worker heartbeat is healthy", async () => {
+  const now = new Date().toISOString();
+  const health = await getWorkerHealth({
+    query: async () => ({
+      rows: [{
+        worker_id: "test-worker",
+        worker_role: "execution",
+        status: "RUNNING",
+        process_id: 1,
+        host: "test-host",
+        started_at: now,
+        last_seen_at: now,
+        details: {}
+      }]
+    })
+  }, 15000);
+  assert.equal(health.healthy, true);
+  assert.equal(health.workers.length, 1);
+  assert.equal(health.workers[0].healthy, true);
+});
+
+test("stale worker heartbeat cannot report healthy", async () => {
+  const stale = new Date(Date.now() - 60000).toISOString();
+  const health = await getWorkerHealth({
+    query: async () => ({
+      rows: [{
+        worker_id: "stale-worker",
+        worker_role: "execution",
+        status: "RUNNING",
+        process_id: 1,
+        host: "test-host",
+        started_at: stale,
+        last_seen_at: stale,
+        details: {}
+      }]
+    })
+  }, 15000);
+  assert.equal(health.healthy, false);
+  assert.equal(health.workers[0].healthy, false);
+});
+
+test("missing worker heartbeat is unhealthy", async () => {
+  const health = await getWorkerHealth({ query: async () => ({ rows: [] }) }, 15000);
+  assert.equal(health.healthy, false);
+  assert.deepEqual(health.workers, []);
+});
+
+test("worker health query failure returns unhealthy status", async () => {
+  const health = await getWorkerHealth({ query: async () => { throw new Error("database offline"); } });
+  assert.equal(health.healthy, false);
+  assert.ok(health.error);
 });
