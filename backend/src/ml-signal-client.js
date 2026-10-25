@@ -105,9 +105,9 @@ export async function probeMlSignalService() {
   try {
     const remote = await health();
     return {
-      ok: true,
-      ready: Boolean(remote?.ready || remote?.configured),
-      status: remote?.ready ? "ML_SERVICE_READY" : "ML_SERVICE_DEGRADED",
+      ok: remote?.ok !== false,
+      ready: Boolean(remote?.ready),
+      status: remote?.ready ? "ML_SERVICE_READY" : remote?.configured ? "ML_SERVICE_DEGRADED" : "ML_SERVICE_NOT_CONFIGURED",
       ...mlSignalServiceStatus(),
       remote
     };
