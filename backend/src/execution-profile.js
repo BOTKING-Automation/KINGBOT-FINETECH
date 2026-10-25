@@ -8,7 +8,7 @@ const ALLOWED_COST_SOURCES = new Set([
 
 function cleanLabel(value, maxLength = MAX_LABEL_LENGTH) {
   if (typeof value !== "string") return "";
-  return value.trim().replace(/[\\u0000-\\u001F\\u007F]/g, "").slice(0, maxLength);
+  return value.trim().replace(/[\x00-\x1F\x7F]/g, "").slice(0, maxLength);
 }
 
 /**
