@@ -1332,9 +1332,6 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
           error:"ML_BACKTEST_SYMBOL_INVALID_OR_SYNTHETIC"
         });
       }
-      if(isSyntheticSymbol({symbol})){
-        return res.status(400).json({ok:false,error:"ML_BACKTEST_REQUIRES_REAL_MARKET_SYMBOL"});
-      }
       if(!Object.prototype.hasOwnProperty.call(BACKTEST_TIMEFRAME_SECONDS,timeframe)){
         return res.status(400).json({ok:false,error:"ML_BACKTEST_TIMEFRAME_INVALID"});
       }
