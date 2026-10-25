@@ -55,7 +55,7 @@ test("research backtest helper posts caller-supplied costs and bars to the prote
   assert.equal(sent.url, "http://ml-service.test/backtest");
   assert.equal(sent.body.botId, "strategic");
   assert.equal(sent.body.symbol, "XAUUSD");
-  assert.equal(sent.body.costs, costs);
-  assert.equal(sent.body.bars, bars);
+  assert.deepEqual(sent.body.costs, costs);
+  assert.deepEqual(sent.body.bars, bars);
   assert.equal(result.profitabilityValidated, false);
 });
