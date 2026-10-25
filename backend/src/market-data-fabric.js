@@ -82,8 +82,8 @@ function timestampMs(value) {
   }
   const n = finite(candidate);
   if (n === null || n <= 0) return null;
-  if (n > 1e17) return n / 1e9; // nanoseconds -> milliseconds
-  if (n > 1e14) return n / 1e6; // microseconds -> milliseconds
+  if (n > 1e17) return n / 1e6; // nanoseconds -> milliseconds
+  if (n > 1e14) return n / 1e3; // microseconds -> milliseconds
   if (n < 1e11) return n * 1000; // seconds -> milliseconds
   return n; // already milliseconds
 }
