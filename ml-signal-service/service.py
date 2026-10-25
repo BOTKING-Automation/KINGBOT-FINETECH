@@ -544,7 +544,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             ][-MAX_FEEDBACK_ROWS:]
         if feedback:
             feedback_x = np.asarray([row["features"] for row in feedback], dtype=np.float32)
-            feedback_y = np.asarray([int(row["label")] for row in feedback], dtype=np.int64)
+            feedback_y = np.asarray([int(row["label"]) for row in feedback], dtype=np.int64)
             feedback_w = np.asarray([1.5 if row.get("outcome") in {"WIN", "LOSS"} else 1.0 for row in feedback], dtype=np.float32)
             if feedback_x.ndim == 2 and feedback_x.shape[1] == len(FEATURE_NAMES):
                 X_train = np.concatenate([X_train, feedback_x], axis=0)
