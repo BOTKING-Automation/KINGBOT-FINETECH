@@ -280,9 +280,10 @@ function responseBase(answer,nextAction="Tell me what you want to work on.",extr
 
 export function conversationalReply(question="",conversation=[]) {
   const understanding=languageUnderstanding(question);
-  const info=classify(question,conversation);
-  const mode=routeIntent(question,conversation);
-  const i=variantIndex(question,conversation);
+  const normalizedQuestion=understanding.understoodText;
+  const info=classify(normalizedQuestion,conversation);
+  const mode=routeIntent(normalizedQuestion,conversation);
+  const i=variantIndex(normalizedQuestion,conversation);
   const correctionNote=understanding.corrected ? {languageUnderstanding:understanding} : {};
 
   const respond=(answer,nextAction,extra={})=>responseBase(answer,nextAction,{...extra,...correctionNote});
