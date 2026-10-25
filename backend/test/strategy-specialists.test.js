@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { evaluateStrategySpecialists } from "../src/strategy-specialists.js";
+import { getBotDefinitions } from "../src/bot-engines.js";
 
 const mtf={higherTimeframeBias:"BULLISH",lowerTimeframeBias:"BULLISH",setupState:"BUY_CANDIDATE",triggerPresent:true,alignment:{direction:"BULLISH"}};
 const base={
@@ -52,4 +53,18 @@ test("all specialists can independently wait when their conditions are absent",(
   const market={...base,trend:.1,momentum:.05,structure:"range",emaFast:2490,emaSlow:2500,adx:10,rsi:50,breakout:false,retest:false};
   const cards=evaluateStrategySpecialists({market,multiTimeframe:{...mtf,setupState:"WAIT",higherTimeframeBias:"MIXED"}});
   assert.ok(cards.every(x=>x.direction==="WAIT"));
+});
+
+
+test("all five AI strategy models declare valid regime, setup, and execution timeframes",()=>{
+  const definitions=getBotDefinitions();
+  const ids=["strategic","flipper","breakout","smc-pro","ladder-flip"];
+  const valid=new Set(["1m","3m","5m","15m","30m","1h","2h","4h","1d","1w"]);
+  for(const id of ids){
+    const profile=definitions[id]?.timeframeProfile;
+    assert.ok(profile,`${id} must declare its model timeframe profile`);
+    for(const role of ["regime","setup","execution"]){
+      assert.ok(valid.has(profile[role]),`${id}.${role} must use a supported timeframe`);
+    }
+  }
 });
