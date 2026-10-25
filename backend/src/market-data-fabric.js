@@ -72,16 +72,28 @@ export function classifyMarketSymbol(symbol) {
 }
 
 function timestampMs(value) {
-  const n = finite(value);
-  if (n === null) return null;
-  return n > 1e15 ? n / 1e6 : n;
+  if (value === null || value === undefined || value === "") return null;
+  let candidate = value;
+  if (typeof candidate === "string") {
+    const text = candidate.trim();
+    if (!text) return null;
+    const numeric = Number(text);
+    candidate = Number.isFinite(numeric) ? numeric : Date.parse(text);
+  }
+  const n = finite(candidate);
+  if (n === null || n <= 0) return null;
+  if (n > 1e17) return n / 1e9; // nanoseconds -> milliseconds
+  if (n > 1e14) return n / 1e6; // microseconds -> milliseconds
+  if (n < 1e11) return n * 1000; // seconds -> milliseconds
+  return n; // already milliseconds
 }
 
 function normalizeQuote({ symbol, category, price, bid = null, ask = null, change = null, volume = null, high = null, low = null, timestamp = null, source, provider, freshnessMaxAgeMs = DEFAULT_FRESHNESS_MS, raw = null }) {
   const normalized = normalizeMarketSymbol(symbol);
-  const ts = timestampMs(timestamp) || Date.now();
-  const age = Math.max(0, Date.now() - ts);
-  const fresh = age <= freshnessMaxAgeMs && Number.isFinite(Number(price)) && Number(price) > 0;
+  const ts = timestampMs(timestamp);
+  const age = ts === null ? null : Math.max(0, Date.now() - ts);
+  const fresh = ts !== null && age <= freshnessMaxAgeMs
+    && Number.isFinite(Number(price)) && Number(price) > 0;
 
   return {
     symbol: normalized,
@@ -94,14 +106,15 @@ function normalizeQuote({ symbol, category, price, bid = null, ask = null, chang
     volume: finite(volume),
     high: finite(high),
     low: finite(low),
-    timestamp: new Date(ts).toISOString(),
+    timestamp: ts === null ? null : new Date(ts).toISOString(),
     ageMs: age,
+    timestampStatus: ts === null ? "MISSING_OR_INVALID" : age <= freshnessMaxAgeMs ? "FRESH" : "STALE",
     freshnessMaxAgeMs,
     available: fresh,
     verified: fresh,
     source,
     provider,
-    quality: fresh ? "VERIFIED" : "STALE",
+    quality: fresh ? "VERIFIED" : ts === null ? "TIMESTAMP_UNVERIFIABLE" : "STALE",
     executionAuthorized: false,
     executionAuthority: "NONE",
     raw: raw || undefined
@@ -155,7 +168,7 @@ async function readGoldApi(symbol, goldFeed) {
 async function readBinance(symbol) {
   const ticker = cryptoTicker(symbol);
   const payload = await fetchJson("https://api.binance.com/api/v3/ticker/24hr?symbol=" + encodeURIComponent(ticker), { timeoutMs: REQUEST_TIMEOUT_MS });
-  const timestamp = finite(payload?.closeTime) || Date.now();
+  const timestamp = finite(payload?.closeTime);
   const price = finite(payload?.lastPrice);
   if (!(price > 0)) throw new Error("BINANCE_QUOTE_EMPTY");
   return {
@@ -179,7 +192,7 @@ async function readTwelveData(symbol, twelveData) {
   return {
     ...quote,
     symbol,
-    timestamp: quote.timestamp || Date.now(),
+    timestamp: quote.timestamp || quote.updatedAt || quote.datetime || null,
     provider: "twelve-data"
   };
 }
@@ -248,7 +261,7 @@ async function readDeriv(symbol, derivFeed) {
     price: quote.price,
     bid: quote.bid,
     ask: quote.ask,
-    timestamp: finite(quote.epoch) !== null ? Number(quote.epoch) * 1000 : Date.now(),
+    timestamp: finite(quote.epoch) !== null ? Number(quote.epoch) * 1000 : quote.timestamp || null,
     source: quote.source || "Deriv public live feed",
     provider: "deriv"
   };
