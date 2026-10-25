@@ -695,6 +695,7 @@ registerAiMarketScanner(app, {
   rateLimit,
   twelveData,
   requireUser,
+  broker,
   server:httpServer,
   cortexRunner:(market)=>orchestrateKingbotIntelligence({
     market,
