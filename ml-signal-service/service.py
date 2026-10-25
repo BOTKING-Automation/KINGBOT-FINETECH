@@ -1178,7 +1178,10 @@ def _parse_bar_timestamp(bar: dict[str, Any]) -> float:
         if not math.isfinite(number):
             raise ValueError("ML_BACKTEST_BAR_TIMESTAMP_INVALID")
         # Numeric epochs above this magnitude are conventionally milliseconds.
-        return number / 1000.0 if abs(number) >= 100_000_000_000 else number
+        stamp = number / 1000.0 if abs(number) >= 100_000_000_000 else number
+        if not 0 <= stamp <= 7_258_118_400:  # 1970 through 2200; avoid platform timestamp overflow
+            raise ValueError("ML_BACKTEST_BAR_TIMESTAMP_INVALID")
+        return stamp
     except (ValueError, TypeError):
         pass
     try:
@@ -1188,7 +1191,7 @@ def _parse_bar_timestamp(bar: dict[str, Any]) -> float:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     stamp = parsed.timestamp()
-    if not math.isfinite(stamp):
+    if not math.isfinite(stamp) or not 0 <= stamp <= 7_258_118_400:
         raise ValueError("ML_BACKTEST_BAR_TIMESTAMP_INVALID")
     return stamp
 
@@ -1325,6 +1328,8 @@ def _costed_backtest_trade(
     friction_per_side = costs["spread_price"] / 2.0 + costs["slippage_price_per_side"]
     entry_fill = entry_mid + direction * friction_per_side
     exit_fill = exit_mid - direction * friction_per_side
+    if entry_fill <= 0 or exit_fill <= 0:
+        raise ValueError("ML_BACKTEST_EXECUTION_COST_EXCEEDS_PRICE")
     gross_quote = direction * (exit_mid - entry_mid) * units
     gross_account = gross_quote * conversion
     spread_cost = costs["spread_price"] * units * conversion
