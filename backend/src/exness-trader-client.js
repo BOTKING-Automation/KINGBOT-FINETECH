@@ -208,7 +208,7 @@ export class ExnessTraderClient{
         if(message?.error_message)return finish(new Error(String(message.error_message)));
         if(String(message?.instrument||"").toUpperCase()===symbol && Number.isFinite(Number(message?.bid)) && Number.isFinite(Number(message?.ask))){
           clearTimeout(timeout);
-          finish(null,{instrument:symbol,bid:Number(message.bid),ask:Number(message.ask),timestamp:message.timestamp||new Date().toISOString()});
+          finish(null,{instrument:symbol,bid:Number(message.bid),ask:Number(message.ask),timestamp:message.timestamp||null});
         }
       });
       ws.on("error",error=>{
