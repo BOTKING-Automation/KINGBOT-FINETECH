@@ -43,7 +43,9 @@ Every source is reported as caller-asserted and **not independently verified**; 
 
 ## Authenticated KINGBOT API
 
-Signed-in users can request a server-fetched history evaluation through \`POST /api/ai/market-scanner/backtest\`. The endpoint is rate-limited (default 2 requests/minute), rejects synthetic symbols, and obtains timestamped OHLC history through KINGBOT's configured historical feed chain (Binance/Kraken proxy history for BTCUSD, Twelve Data when enabled, then Deriv fallback). The response includes the provider claim when known, but \`sourceIndependentlyVerified\` stays false because the service cannot authenticate the upstream data itself. The ML secret and raw historical bars remain server-side for this flow.
+Signed-in users can request a server-fetched history evaluation through `POST /api/ai/market-scanner/backtest`. The endpoint is rate-limited (default 2 requests/minute), rejects synthetic symbols, and **tries the client's connected broker-account history first** using `executionProfile.brokerSymbol`. Broker candles are normalized and rejected if timestamps are missing, duplicated/out of order, OHLC values are invalid/inconsistent, or fewer than 260 bars are available. Where an adapter does not support historical candles (currently Exness reports `EXNESS_CANDLES_ADAPTER_PENDING`), the endpoint returns an unavailable result by default. A client must explicitly set `allowExternalDataFallback: true` to use KINGBOT's configured external provider chain (Binance/Kraken proxy history for BTCUSD, Twelve Data when enabled, then Deriv fallback). Such a report is explicitly labeled `EXTERNAL_PROVIDER_FALLBACK`; it must not be treated as broker-native execution validation.
+
+Each request must include the client's selected broker label, account type, broker-specific symbol, and a label describing how the client obtained the execution-cost values. The supported cost-source labels are `broker_published_specification`, `client_confirmed`, and `estimate`. There is no fixed broker allow-list in the report metadata, but history is only available through broker adapters KINGBOT actually supports. These fields identify assumptions; they do not independently authenticate the client's broker identity or cost inputs. The response reports which adapter supplied the history, whether external fallback was used, and whether symbol mapping or costs remain unverified. The ML secret and raw historical bars remain server-side for this flow.
 
 The request body is:
 \`\`\`json
@@ -52,6 +54,7 @@ The request body is:
   "symbol": "XAUUSD",
   "timeframe": "15m",
   "folds": 3,
+  "allowExternalDataFallback": false,
   "executionProfile": {
     "broker": "Client-selected broker",
     "accountType": "Client-selected account type",
@@ -74,4 +77,4 @@ The request body is:
 }
 \`\`\`
 
-The numerical cost values above are illustrative schema values only, **not broker quotes**; replace every value with the user's actual instrument/broker contract assumptions. \`spread_price\` and \`slippage_price_per_side\` are in instrument price units; commission and swap are in account currency; \`quote_to_account_rate\` converts price P&L into account currency. The endpoint requires sign-in, does not use broker account credentials, does not store the report, and cannot place orders.
+The broker/account labels and numerical cost values above are illustrative schema values only, **not broker quotes**. Clients choose their own broker and account type and provide the actual symbol mapping and contract/cost assumptions for that account. `symbol` is the canonical market symbol used in the report; `executionProfile.brokerSymbol` is the symbol requested from the connected broker-history adapter. If `allowExternalDataFallback` is true after broker-native history fails, the response labels that fact and warns that external prices may differ from the execution broker.
