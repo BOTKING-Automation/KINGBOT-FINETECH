@@ -1372,7 +1372,6 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
       }
       return res.json({
         ...result,
-        requestedByUserId:user.id||null,
         elapsedMs:Date.now()-startedAt
       });
     }catch(error){
