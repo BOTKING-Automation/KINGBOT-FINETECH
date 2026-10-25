@@ -1425,7 +1425,8 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
           brokerIdentityVerified:false,
           costsIndependentlyVerified:false,
           brokerSymbolMappingVerified:false,
-          historicalFeedBrokerMatchVerified:historicalFeedMode==="CONNECTED_BROKER_HISTORY",
+          historyRequestedFromConnectedAccount:historicalFeedMode==="CONNECTED_BROKER_HISTORY",
+          historicalFeedBrokerMatchVerified:false,
           historicalFeedNote:historicalFeedMode==="CONNECTED_BROKER_HISTORY"
             ? "Historical candles were requested from the connected account adapter using the supplied broker symbol. The client's broker label, economic symbol mapping, and cost assumptions are not independently verified."
             : "Historical candles came from KINGBOT's external provider chain, not the connected execution account. Candles, bid/ask, spread, and fills may differ from the selected broker."
