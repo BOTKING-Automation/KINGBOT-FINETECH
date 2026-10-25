@@ -45,6 +45,7 @@ on:
       - "backend/test/intelligence-orchestrator.test.js"
       - "system/intelligence-orchestrator.js"
       - "system/ai-support.js"
+      - ".github/workflows/ai-strategies.yml"
 
 jobs:
   ai-strategies:
@@ -92,7 +93,7 @@ jobs:
           for strategy in ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"]:
               result = service.train_model(strategy, "5m", [market])
               assert result["ready"], result
-              assert result["featureVersion"] == "ai-strategies-v3", result
+              assert result["featureVersion"] == "ai-strategies-v4-walk-forward", result
               trained.append(result["key"])
               prediction = service.predict_model(
                   strategy,
@@ -213,6 +214,7 @@ jobs:
             const { warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } = await import("./backend/src/ai-trade-gate.js");
             const market = {
               symbol: "XAUUSD", timeframe: "5m", price: base, spread: 0.2, atr: 1.5,
+              timeframeProfile: { regime: "4h", setup: "1h", execution: "5m" },
               volatility: 0.45, trend: 0.7, momentum: 0.6, structure: "bullish",
               adx: 24, rsi: 58, emaFast: 101, emaSlow: 99.5, velocityPoints: 0.8
             };
