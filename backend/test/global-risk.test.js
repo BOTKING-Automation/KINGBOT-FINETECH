@@ -127,3 +127,24 @@ test("worker health query failure returns unhealthy status", async () => {
   assert.equal(health.healthy, false);
   assert.ok(health.error);
 });
+
+
+test("stopping worker heartbeat is not healthy", async () => {
+  const now = new Date().toISOString();
+  const health = await getWorkerHealth({
+    query: async () => ({
+      rows: [{
+        worker_id: "stopping-worker",
+        worker_role: "execution",
+        status: "STOPPING",
+        process_id: 1,
+        host: "test-host",
+        started_at: now,
+        last_seen_at: now,
+        details: {}
+      }]
+    })
+  }, 15000);
+  assert.equal(health.healthy, false);
+  assert.equal(health.workers[0].healthy, false);
+});
