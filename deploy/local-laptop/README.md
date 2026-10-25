@@ -50,7 +50,15 @@ Use this as a clean local database. Do not paste your Render database URL, broke
 
 ## 2. Start the local backend
 
-Still inside `deploy\local-laptop`:
+After saving the completed `.env`, run this from `deploy\local-laptop`:
+
+```powershell
+.\start-laptop.ps1
+```
+
+The first run creates `.env` and opens it in Notepad if secrets are still placeholders. The script verifies Docker is running, checks the safety flags and Compose configuration, starts PostgreSQL + ML + API + halted worker, then opens the local health URL when it responds. If PowerShell blocks scripts, run `powershell -ExecutionPolicy Bypass -File .\start-laptop.ps1`.
+
+Manual alternative:
 
 ```powershell
 docker compose -f docker-compose.yml -f docker-compose.local.yml config -q
@@ -78,9 +86,11 @@ The worker starts in halted mode. It can report heartbeat/diagnostic state, but 
 Stop containers without deleting the database volume:
 
 ```powershell
-docker compose -f docker-compose.yml -f docker-compose.local.yml down
+.\stop-laptop.ps1
 ```
 
-Start again with the `up` command above. Do **not** add `-v` to `down` unless you intentionally want to delete the local PostgreSQL volume.
+Manual alternative: `docker compose -f docker-compose.yml -f docker-compose.local.yml down`.
+
+Start again with `start-laptop.ps1`. Do **not** add `-v` to `down` unless you intentionally want to delete the local PostgreSQL volume.
 
 The API is bound to `127.0.0.1` only. This local service is not publicly available and stops being available when the laptop or Docker Desktop is off.
