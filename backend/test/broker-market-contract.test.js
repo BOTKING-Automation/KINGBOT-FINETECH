@@ -17,7 +17,7 @@ test("normalizes broker-native bid/ask and ISO timestamps", () => {
   }, { requestedSymbol: "EURUSD", provider: "oanda", nowMs });
   assert.equal(quote.symbol, "EURUSD");
   assert.equal(quote.brokerSymbol, "EUR_USD");
-  assert.equal(quote.spread, 0.00012);
+  assert.ok(Math.abs(quote.spread - 0.00012) < 1e-9);
   assert.equal(quote.time, "2026-10-25T09:59:59.500Z");
   assert.equal(quote.fresh, true);
   assert.equal(quote.quoteQuality, "BROKER_NATIVE_BID_ASK");
