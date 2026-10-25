@@ -201,6 +201,17 @@ class CostAwareBacktestTests(ModelReadinessTests):
                 "strategic", "XAUUSD", "5m", bars, self._costs(), 2, "fixture"
             )
 
+    def test_backtest_rejects_execution_costs_that_create_nonpositive_fill(self):
+        bars = service.normalize_market_bars(self._historical_bars(10))
+        timestamps = [service._parse_bar_timestamp(row) for row in self._historical_bars(10)]
+        costs = self._costs()
+        costs["spread_price"] = 1_000_000.0
+        with self.assertRaisesRegex(ValueError, "ML_BACKTEST_EXECUTION_COST_EXCEEDS_PRICE"):
+            service._costed_backtest_trade(
+                direction=1, signal_index=1, entry_index=2, exit_index=4,
+                bars=bars, timestamps=timestamps, timeframe_seconds=300, costs=costs
+            )
+
 
 class patcher_for_backtest_globals:
     """Context manager that keeps the CI fixture fast while exercising real fold training."""
