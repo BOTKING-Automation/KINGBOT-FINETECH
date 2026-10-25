@@ -33,7 +33,8 @@ import { MarketDataFabric } from "./market-data-fabric.js";
 import { evaluateKingbotBrain } from "./kingbot-brain.js";
 import { createMt5HostingRouter, ensureMt5HostingSchema } from "./mt5-hosting.js";
 import { createFintechOpsRouter, ensureFintechOpsSchema } from "./fintech-operations.js";
-import { ensureGlobalRiskSchema, getGlobalRiskState } from "./global-risk.js";
+import { ensureGlobalRiskSchema, getGlobalRiskState, getWorkerHealth } from "./global-risk.js";
+import { mlSignalServiceStatus } from "./ml-signal-client.js";
 import { registerGoldSignals, ensureGoldSignalsSchema } from "./gold-signals.js";
 import { syntheticCatalog, CORE_SYNTHETIC_FAMILIES } from "./synthetic-markets.js";
 import { registerIntelligenceOrchestrator, ensureIntelligenceOrchestratorSchema } from "./intelligence-orchestrator.js";
@@ -721,9 +722,61 @@ app.get("/api/admin/security/audit-integrity", async (req,res)=>{
   }
 });
 
-app.get("/api/health", (_req, res) => {
+async function boundedHealthCheck(check, fallback, timeoutMs = 1500) {
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(check),
+      new Promise(resolve => {
+        timer = setTimeout(() => resolve(fallback), timeoutMs);
+      })
+    ]);
+  } catch {
+    return fallback;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+app.get("/api/health", async (_req, res) => {
+  const workerFallback = {
+    healthy: false,
+    workers: [],
+    staleMs: Math.max(5000, Number(process.env.KINGBOT_WORKER_STALE_MS || 15000)),
+    error: "HEALTH_CHECK_UNAVAILABLE"
+  };
+  const riskFallback = {
+    tradingPaused: true,
+    globalKillSwitch: true,
+    reason: "HEALTH_CHECK_UNAVAILABLE"
+  };
+  const [databaseReady, workerHealth, riskState] = await Promise.all([
+    boundedHealthCheck(async () => {
+      if (!pool) return false;
+      await pool.query("SELECT 1");
+      return true;
+    }, false),
+    boundedHealthCheck(() => getWorkerHealth(pool), workerFallback),
+    boundedHealthCheck(() => getGlobalRiskState(pool), riskFallback)
+  ]);
+
+  const riskUnavailableReasons = new Set([
+    "DATABASE_UNAVAILABLE",
+    "GLOBAL_RISK_STATE_UNAVAILABLE",
+    "GLOBAL_RISK_STATE_MISSING",
+    "HEALTH_CHECK_UNAVAILABLE"
+  ]);
+  const riskControlStoreAvailable = !riskUnavailableReasons.has(String(riskState?.reason || ""));
+  const workerHealthy = Boolean(workerHealth?.healthy);
+  const healthyWorkerCount = Array.isArray(workerHealth?.workers)
+    ? workerHealth.workers.filter(worker => worker.healthy).length
+    : 0;
+  const ready = Boolean(databaseReady && workerHealthy && riskControlStoreAvailable);
+
   res.json({
     ok: true,
+    status: ready ? "ready" : "degraded",
+    ready,
     service: "KINGBOT Intelligence",
     aiReady: true,
     eventBus: eventBus.status(),
@@ -733,8 +786,8 @@ app.get("/api/health", (_req, res) => {
     deepReasoningReady: true,
     deepReasoningModel: "KINGBOT-CORTEX-1",
     deepReasoningLevel: "PROPRIETARY_MULTI_PASS",
-    accountServiceReady: true,
-    passwordRecoveryEmailReady: true,
+    accountServiceReady: Boolean(databaseReady),
+    passwordRecoveryEmailReady: Boolean(process.env.BREVO_API_KEY && process.env.MAIL_FROM_EMAIL),
     voiceReady: Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID),
     voiceProvider: "elevenlabs",
     voiceModel: process.env.ELEVENLABS_MODEL || "eleven_flash_v2_5",
@@ -744,11 +797,21 @@ app.get("/api/health", (_req, res) => {
     internalLedger: true,
     centralizedRiskControl: true,
     workerHeartbeatMonitoring: true,
+    workerReady: workerHealthy,
+    workerHealthyCount: healthyWorkerCount,
+    workerStaleThresholdMs: workerHealth?.staleMs ?? workerFallback.staleMs,
+    riskControlStoreAvailable,
+    aiStrategyServiceConfigured: Boolean(mlSignalServiceStatus().configured),
     brokerReconciliation: true,
     adaptiveIntelligence: true,
     adaptiveOutcomeLearning: true,
     unifiedCommandPlane: true,
-    commercialRevenueLedger: true
+    commercialRevenueLedger: true,
+    checks: {
+      database: Boolean(databaseReady),
+      workerHeartbeat: workerHealthy,
+      riskControlStore: riskControlStoreAvailable
+    }
   });
 });
 

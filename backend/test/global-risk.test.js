@@ -1,0 +1,150 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { getGlobalRiskState, globalExecutionGate, getWorkerHealth } from "../src/global-risk.js";
+
+test("database unavailable fails closed", async () => {
+  const state = await getGlobalRiskState(null);
+  assert.equal(state.tradingPaused, true);
+  assert.equal(state.globalKillSwitch, true);
+  assert.deepEqual(globalExecutionGate(state), {
+    allowed: false,
+    reason: "DATABASE_UNAVAILABLE",
+    level: "CRITICAL"
+  });
+});
+
+test("missing singleton risk row fails closed", async () => {
+  const state = await getGlobalRiskState({ query: async () => ({ rows: [] }) });
+  assert.equal(state.tradingPaused, true);
+  assert.equal(state.globalKillSwitch, true);
+  assert.equal(globalExecutionGate(state).allowed, false);
+  assert.equal(globalExecutionGate(state).reason, "GLOBAL_RISK_STATE_MISSING");
+});
+
+test("risk-store query failure fails closed", async () => {
+  const state = await getGlobalRiskState({ query: async () => { throw new Error("database offline"); } });
+  assert.equal(state.tradingPaused, true);
+  assert.equal(state.globalKillSwitch, true);
+  assert.equal(globalExecutionGate(state).allowed, false);
+  assert.equal(globalExecutionGate(state).reason, "GLOBAL_RISK_STATE_UNAVAILABLE");
+});
+
+test("incomplete risk state cannot authorize execution", () => {
+  assert.deepEqual(globalExecutionGate({}), {
+    allowed: false,
+    reason: "GLOBAL_RISK_STATE_UNAVAILABLE",
+    level: "CRITICAL"
+  });
+  assert.equal(globalExecutionGate(null).allowed, false);
+});
+
+test("global kill switch blocks execution", () => {
+  assert.deepEqual(globalExecutionGate({
+    tradingPaused: false,
+    globalKillSwitch: true,
+    reason: "operator emergency stop"
+  }), {
+    allowed: false,
+    reason: "GLOBAL_KILL_SWITCH_ACTIVE",
+    level: "CRITICAL"
+  });
+});
+
+test("trading pause blocks execution", () => {
+  assert.deepEqual(globalExecutionGate({
+    tradingPaused: true,
+    globalKillSwitch: false,
+    reason: "maintenance"
+  }), {
+    allowed: false,
+    reason: "GLOBAL_TRADING_PAUSED",
+    level: "HIGH"
+  });
+});
+
+test("complete healthy risk state allows the global gate", () => {
+  assert.deepEqual(globalExecutionGate({
+    tradingPaused: false,
+    globalKillSwitch: false,
+    reason: "SYSTEM_INITIALIZED"
+  }), {
+    allowed: true,
+    reason: null,
+    level: "NORMAL"
+  });
+});
+
+
+test("fresh running worker heartbeat is healthy", async () => {
+  const now = new Date().toISOString();
+  const health = await getWorkerHealth({
+    query: async () => ({
+      rows: [{
+        worker_id: "test-worker",
+        worker_role: "execution",
+        status: "RUNNING",
+        process_id: 1,
+        host: "test-host",
+        started_at: now,
+        last_seen_at: now,
+        details: {}
+      }]
+    })
+  }, 15000);
+  assert.equal(health.healthy, true);
+  assert.equal(health.workers.length, 1);
+  assert.equal(health.workers[0].healthy, true);
+});
+
+test("stale worker heartbeat cannot report healthy", async () => {
+  const stale = new Date(Date.now() - 60000).toISOString();
+  const health = await getWorkerHealth({
+    query: async () => ({
+      rows: [{
+        worker_id: "stale-worker",
+        worker_role: "execution",
+        status: "RUNNING",
+        process_id: 1,
+        host: "test-host",
+        started_at: stale,
+        last_seen_at: stale,
+        details: {}
+      }]
+    })
+  }, 15000);
+  assert.equal(health.healthy, false);
+  assert.equal(health.workers[0].healthy, false);
+});
+
+test("missing worker heartbeat is unhealthy", async () => {
+  const health = await getWorkerHealth({ query: async () => ({ rows: [] }) }, 15000);
+  assert.equal(health.healthy, false);
+  assert.deepEqual(health.workers, []);
+});
+
+test("worker health query failure returns unhealthy status", async () => {
+  const health = await getWorkerHealth({ query: async () => { throw new Error("database offline"); } });
+  assert.equal(health.healthy, false);
+  assert.ok(health.error);
+});
+
+
+test("stopping worker heartbeat is not healthy", async () => {
+  const now = new Date().toISOString();
+  const health = await getWorkerHealth({
+    query: async () => ({
+      rows: [{
+        worker_id: "stopping-worker",
+        worker_role: "execution",
+        status: "STOPPING",
+        process_id: 1,
+        host: "test-host",
+        started_at: now,
+        last_seen_at: now,
+        details: {}
+      }]
+    })
+  }, 15000);
+  assert.equal(health.healthy, false);
+  assert.equal(health.workers[0].healthy, false);
+});
