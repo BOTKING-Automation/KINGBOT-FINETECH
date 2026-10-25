@@ -4,6 +4,7 @@ import { ExnessTraderClient } from "./exness-trader-client.js";
 import { OandaTraderClient } from "./oanda-trader-client.js";
 import { DerivTraderClient } from "./deriv-trader-client.js";
 import { getGlobalRiskState } from "./global-risk.js";
+import { normalizeExecutionQuote } from "./broker-market-contract.js";
 
 const ALGORITHM="aes-256-gcm";
 
@@ -795,38 +796,49 @@ export class UserBrokerManager {
   }
 
   async getQuote(symbol,userId){
-    const requested=String(symbol).trim().toUpperCase();
+    const requested=String(symbol||"").trim().toUpperCase();
+    if(!requested)throw new Error("BROKER_SYMBOL_REQUIRED");
+    const normalize=(raw,provider)=>({
+      connected:true,
+      data:normalizeExecutionQuote(raw,{
+        requestedSymbol:requested,
+        provider,
+        freshnessMaxAgeMs:Math.max(1000,Math.min(120000,Number(process.env.KINGBOT_BROKER_QUOTE_FRESHNESS_MS||30000)))
+      })
+    });
     let entry=null;
-    try{entry=await this.connectionFor(userId);}catch(error){
+    try{
+      entry=await this.connectionFor(userId);
+    }catch(error){
       const mapping=await this.getMapping(userId);
       if(mapping?.provider==="deriv"){
-        // Deriv market data is public and must remain available even when the
-        // authenticated trading socket is temporarily rate-limited.
+        // Public mid-price data may be shown for analysis, but execution requires
+        // broker-native bid/ask and a real quote timestamp. Never invent either.
         const publicApi=new DerivTraderClient();
-        return await publicApi.getQuote(requested);
+        return normalize(await publicApi.getQuote(requested),"deriv-public-fallback");
       }
       throw error;
     }
     if(String(entry.provider).toLowerCase()==="mt5-bridge"){
-      return await entry.connection.getQuote(requested);
+      return normalize(await entry.connection.getQuote(requested),entry.provider);
     }
     if(entry.provider==="exness"){
       const quote=await entry.api.getQuote(requested);
-      return {connected:true,data:{...quote,time:quote.timestamp||quote.time||new Date().toISOString(),lossTickValue:quote.lossTickValue}};
+      return normalize({...quote,lossTickValue:quote.lossTickValue},entry.provider);
     }
     if(entry.provider==="deriv"){
-      return await entry.api.getQuote(requested);
+      return normalize(await entry.api.getQuote(requested),entry.provider);
     }
     if(entry.provider==="oanda"){
       const quote=await entry.api.getQuote(requested);
-      return {connected:true,data:{...quote,lossTickValue:1}};
+      return normalize({...quote,lossTickValue:1},entry.provider);
     }
     if(String(entry.provider).toLowerCase()==="deriv-mt5"){
       const price=entry.connection.terminalState.price(requested);
       if(!price)throw new Error("MT5_QUOTE_UNAVAILABLE:"+requested);
-      return {connected:true,data:{...price,source:"deriv-mt5-stream"}};
+      return normalize({...price,source:"deriv-mt5-stream"},entry.provider);
     }
-    return {connected:true,data:await entry.connection.getSymbolPrice(requested)};
+    return normalize(await entry.connection.getSymbolPrice(requested),entry.provider);
   }
 
   async closePosition({userId,positionId}={}){
