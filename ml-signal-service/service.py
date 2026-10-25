@@ -1413,7 +1413,8 @@ def walk_forward_cost_aware_backtest(
         # Training labels are generated only from the strict prefix; bars_to_training_arrays
         # excludes its final FORWARD_HORIZON rows, preventing labels from crossing the fold edge.
         X_train, y_train, weights_train = bars_to_training_arrays(bars[:start], strategy)
-        test_indices = list(range(start, end))
+        # Exclude tail signals whose forward labels would cross into the next fold.
+        test_indices = list(range(start, end - horizon))
         X_rows: list[list[float]] = []
         y_rows: list[int] = []
         valid_indices: list[int] = []
