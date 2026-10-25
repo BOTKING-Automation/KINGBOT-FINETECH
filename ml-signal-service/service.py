@@ -80,6 +80,15 @@ STRATEGY_FOCUS = {
     "ladder-flip": {"ema_gap", "adx_norm", "rsi_norm", "velocity", "spread_atr"},
 }
 
+REGIME_ORDER = ["trend", "range", "breakout", "reversal", "volatile"]
+REGIME_RISK_MODE = {
+    "trend": "aggressive",
+    "breakout": "aggressive",
+    "range": "neutral",
+    "reversal": "cautious",
+    "volatile": "defensive",
+}
+
 MODELS: dict[str, dict[str, Any]] = {}
 CHALLENGERS: dict[str, dict[str, Any]] = {}
 LOCK = threading.Lock()
@@ -219,8 +228,6 @@ def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list
     trend = 1.0 if ema20 > ema50 and price > ema20 else -1.0 if ema20 < ema50 and price < ema20 else 0.0
     recent_high = max(highs[-20:-1])
     recent_low = min(lows[-20:-1])
-    prior_high = max(highs[-40:-20])
-    prior_low = min(lows[-40:-20])
     structure_bull = 1.0 if price > ema50 else 0.0
     structure_bear = 1.0 if price < ema50 else 0.0
     liquidity = 1.0 if (lows[-1] < recent_low and price > recent_low) or (highs[-1] > recent_high and price < recent_high) else 0.0
@@ -252,17 +259,13 @@ def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list
     ]
 
 
-
 def apply_strategy_focus(features: list[float], strategy: str) -> list[float]:
     focus = STRATEGY_FOCUS.get(strategy, set())
-    # Each bot gets the same stable feature schema, but its own model is
-    # explicitly weighted toward strategy-relevant evidence. Non-focus
-    # features remain available at reduced strength so models can still learn
-    # cross-factor interactions without becoming identical clones.
     return [
         float(value) if name in focus else float(value) * 0.25
         for name, value in zip(FEATURE_NAMES, features)
     ]
+
 
 def bars_to_training_arrays(bars: list[dict[str, float]], strategy: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     rows: list[list[float]] = []
@@ -283,10 +286,8 @@ def bars_to_training_arrays(bars: list[dict[str, float]], strategy: str) -> tupl
         move_in_atr = (future - current) / current_atr
         label = 1 if move_in_atr >= LABEL_ATR else -1 if move_in_atr <= -LABEL_ATR else 0
 
-        # Slightly emphasize rows containing evidence relevant to the strategy.
         focus_strength = 0.0
-        names = FEATURE_NAMES
-        for name, value in zip(names, features):
+        for name, value in zip(FEATURE_NAMES, features):
             if name in focus and abs(value) > 0.15:
                 focus_strength += 0.12
         rows.append(features)
@@ -361,6 +362,7 @@ def train_torch(
     }
     return model, metrics
 
+
 def normalize_market_bars(bars: Any) -> list[dict[str, float]]:
     if not isinstance(bars, list):
         raise ValueError("ML_MARKET_BARS_INVALID")
@@ -387,6 +389,68 @@ def normalize_market_bars(bars: Any) -> list[dict[str, float]]:
     if len(rows) > MAX_BARS_PER_MARKET:
         rows = rows[-MAX_BARS_PER_MARKET:]
     return rows
+
+
+def detect_market_regime(market: dict[str, Any], strategy: str) -> str:
+    if not isinstance(market, dict):
+        return "range"
+
+    explicit = str(market.get("regime") or "").strip().lower()
+    if explicit in REGIME_ORDER:
+        return explicit
+
+    price = finite(market.get("price") or market.get("close"))
+    atr_value = max(finite(market.get("atr") or market.get("atr14")), 1e-12)
+    ema_fast = finite(market.get("emaFast") or market.get("ema20"))
+    ema_slow = finite(market.get("emaSlow") or market.get("ema50"))
+    momentum = clamp(finite(market.get("momentum")), -1.0, 1.0)
+    volatility = clamp(finite(market.get("volatility")), 0.0, 1.0)
+    adx_value = finite(market.get("adx") or market.get("adx14"), 0.0)
+    velocity = clamp(finite(market.get("velocityPoints")) / max(atr_value / max(price, 1e-12), 1e-12), -2.0, 2.0)
+    trend_bias = 1.0 if ema_fast > ema_slow else -1.0 if ema_fast < ema_slow else 0.0
+    breakout_signal = bool_feature(market.get("breakout")) or bool_feature(market.get("breakoutScan"))
+    range_signal = bool_feature(market.get("range")) or bool_feature(market.get("isRange"))
+    structure = str(market.get("structure") or "").lower()
+
+    if volatility > 0.8 and abs(momentum) < 0.35:
+        return "volatile"
+    if range_signal and adx_value < 22.5:
+        return "range"
+    if breakout_signal and abs(velocity) > 0.6:
+        return "breakout"
+    if adx_value >= 25.0 and abs(trend_bias) > 0.0:
+        return "trend" if trend_bias > 0 else "reversal"
+    if abs(momentum) < 0.22 and adx_value < 25.0:
+        return "range"
+    if momentum < -0.35:
+        return "reversal"
+    if structure in {"bullish", "bearish"} and abs(momentum) > 0.4:
+        return "trend"
+    return "trend" if trend_bias > 0 else "reversal" if trend_bias < 0 else "range"
+
+
+def decide_action(probabilities: np.ndarray, regime: str, direction: int, confidence: float) -> tuple[str, str]:
+    sell = float(probabilities[0])
+    hold = float(probabilities[1])
+    buy = float(probabilities[2])
+    signed = buy - sell
+
+    if confidence < 0.58:
+        return "ABSTAIN", "low confidence"
+    if regime == "volatile" and abs(signed) < 0.18:
+        return "ABSTAIN", "volatile regime too unstable"
+    if regime == "range" and abs(signed) < 0.16:
+        return "HOLD", "range compression without conviction"
+    if regime == "reversal" and abs(signed) < 0.14:
+        return "HOLD", "reversal not confirmed"
+    if regime == "breakout" and abs(signed) < 0.12:
+        return "REDUCE", "breakout lacks follow-through"
+
+    if direction > 0 and buy >= max(sell, hold) and buy > 0.36:
+        return "BUY", "directional conviction in active regime"
+    if direction < 0 and sell >= max(buy, hold) and sell > 0.36:
+        return "SELL", "negative conviction in active regime"
+    return "HOLD", "probability spread is not strong enough"
 
 
 def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) -> dict[str, Any]:
@@ -471,9 +535,6 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         X_test = np.concatenate(test_x_parts, axis=0)
         y_test = np.concatenate(test_y_parts, axis=0)
 
-        # Fold settled live-trade feedback into the supervised dataset.
-        # Feedback is only used on a subsequent training cycle, keeping live
-        # execution read-only and making the learning loop auditable.
         with LOCK:
             feedback = [
                 row for row in FEEDBACK_ROWS
@@ -483,8 +544,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             ][-MAX_FEEDBACK_ROWS:]
         if feedback:
             feedback_x = np.asarray([row["features"] for row in feedback], dtype=np.float32)
-            feedback_y = np.asarray([int(row["label"]) for row in feedback], dtype=np.int64)
-            feedback_w = np.asarray([1.5 if row.get("outcome") in {"WIN","LOSS"} else 1.0 for row in feedback], dtype=np.float32)
+            feedback_y = np.asarray([int(row["label")] for row in feedback], dtype=np.int64)
+            feedback_w = np.asarray([1.5 if row.get("outcome") in {"WIN", "LOSS"} else 1.0 for row in feedback], dtype=np.float32)
             if feedback_x.ndim == 2 and feedback_x.shape[1] == len(FEATURE_NAMES):
                 X_train = np.concatenate([X_train, feedback_x], axis=0)
                 y_train = np.concatenate([y_train, feedback_y], axis=0)
@@ -590,6 +651,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "promoted_at": trained_at if promote else None,
                 "feedbackVersion": FEEDBACK_VERSION,
                 "feedbackRowsUsed": len(feedback),
+                "regimeAware": True,
+                "supportedRegimes": REGIME_ORDER,
             }
             if promote:
                 MODELS[key] = model_record
@@ -626,11 +689,14 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "ensemble": ensemble_metrics,
                 "qualityGate": quality_gate,
             },
+            "regimeAware": True,
+            "supportedRegimes": REGIME_ORDER,
         }
     finally:
         with LOCK:
             TRAINING_KEYS.discard(key)
         TRAINING_SEMAPHORE.release()
+
 
 def model_status(key: str) -> dict[str, Any]:
     item = MODELS.get(key)
@@ -665,7 +731,10 @@ def model_status(key: str) -> dict[str, Any]:
         "feedbackRowsUsed": item.get("feedbackRowsUsed", 0),
         "featureVersion": item["feature_version"],
         "libraries": ["scikit-learn", "PyTorch"],
+        "regimeAware": bool(item.get("regimeAware", False)),
+        "supportedRegimes": item.get("supportedRegimes", REGIME_ORDER),
     }
+
 
 def current_market_features(market: dict[str, Any], strategy: str) -> np.ndarray:
     price = finite(market.get("price") or market.get("close"))
@@ -805,6 +874,13 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
         if confidence < 0.55 or abs(signed_score) < 12.0:
             direction = 0
 
+        regime = detect_market_regime(market, strategy)
+        action, action_reason = decide_action(probs, regime, direction, confidence)
+        action_is_trade = action in {"BUY", "SELL"}
+        if not action_is_trade:
+            direction = 0
+        risk_mode = REGIME_RISK_MODE.get(regime, "neutral")
+
         focus = STRATEGY_FOCUS.get(strategy, set())
         focus_note = ",".join(sorted(focus))
 
@@ -818,6 +894,10 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
             "direction": "BUY" if direction > 0 else "SELL" if direction < 0 else "HOLD",
             "confidence": round(confidence * 100.0, 2),
             "score": round(signed_score, 2),
+            "regime": regime,
+            "riskMode": risk_mode,
+            "decision": action,
+            "decisionReason": action_reason,
             "probabilities": {
                 "sell": round(float(probs[0]) * 100.0, 2),
                 "hold": round(float(probs[1]) * 100.0, 2),
@@ -843,9 +923,12 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
             "featureVersion": item["feature_version"],
             "trainedAt": item["trained_at"],
             "generatedAt": time.time(),
+            "regimeAware": True,
+            "supportedRegimes": REGIME_ORDER,
         }
     finally:
         PREDICTION_SEMAPHORE.release()
+
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "KINGBOT-ML/1.0"
@@ -901,6 +984,8 @@ class Handler(BaseHTTPRequestHandler):
                 "rfTrees": MAX_RF_TREES,
                 "torchEpochs": TORCH_EPOCHS,
                 "torchThreads": TORCH_THREADS,
+                "regimeAware": True,
+                "supportedRegimes": REGIME_ORDER,
             })
             return
         if self.path == "/models":
