@@ -24,7 +24,7 @@ test("uses direct gold provider before fallback providers", async () => {
         return {
           symbol: "XAUUSD",
           price: 4142.25,
-          timestamp: Date.now(),
+          timestamp: new Date().toISOString(),
           available: true,
           verified: true,
           source: "test-gold",
