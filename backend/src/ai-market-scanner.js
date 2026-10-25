@@ -1,4 +1,4 @@
-import { isSyntheticSymbol } from "./synthetic-markets.js";
+import { isAllowedBacktestSymbol, AI_STRATEGY_BOTS, BACKTEST_TIMEFRAME_SECONDS } from "./backtest-validation.js";
 import "dotenv/config";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getGoldPriceFeed } from "./gold-price-feed.js";
@@ -659,11 +659,6 @@ export async function ensureAiMarketScannerSchema(pool) {
 }
 
 
-const AI_STRATEGY_BOTS = ["strategic","flipper","breakout","smc-pro","ladder-flip"];
-const BACKTEST_TIMEFRAME_SECONDS_FOR_API=Object.freeze({
-  "1m":60,"3m":180,"5m":300,"15m":900,"30m":1800,
-  "1h":3600,"2h":7200,"4h":14400,"1d":86400,"1w":604800
-});
 const TRAINING_SYMBOLS = DEFAULT_SYMBOLS;
 const TRAINING_HISTORY_LIMIT = Math.max(360,Math.min(1000,Number(process.env.KINGBOT_ML_HISTORY_LIMIT||1000)));
 const TRAINING_HISTORY_CACHE_MS = Math.max(5*60*1000,Number(process.env.KINGBOT_ML_HISTORY_CACHE_MS||6*60*60*1000));
@@ -1331,13 +1326,16 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
       if(!AI_STRATEGY_BOTS.includes(botId)){
         return res.status(400).json({ok:false,error:"ML_BACKTEST_STRATEGY_INVALID"});
       }
-      if(!/^[A-Z0-9._:-]{3,40}$/.test(symbol)){
-        return res.status(400).json({ok:false,error:"ML_BACKTEST_SYMBOL_INVALID"});
+      if(!isAllowedBacktestSymbol(symbol)){
+        return res.status(400).json({
+          ok:false,
+          error:"ML_BACKTEST_SYMBOL_INVALID_OR_SYNTHETIC"
+        });
       }
-      if(isSyntheticSymbol(symbol)){
+      if(isSyntheticSymbol({symbol})){
         return res.status(400).json({ok:false,error:"ML_BACKTEST_REQUIRES_REAL_MARKET_SYMBOL"});
       }
-      if(!Object.prototype.hasOwnProperty.call(BACKTEST_TIMEFRAME_SECONDS_FOR_API,timeframe)){
+      if(!Object.prototype.hasOwnProperty.call(BACKTEST_TIMEFRAME_SECONDS,timeframe)){
         return res.status(400).json({ok:false,error:"ML_BACKTEST_TIMEFRAME_INVALID"});
       }
       if(!Number.isInteger(folds)||folds<2||folds>5){
