@@ -1,0 +1,12 @@
+.git
+.git/**
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+**/backups/**
+**/caddy-data/**
+**/caddy-config/**
+**/__pycache__
+**/*.pyc
+.DS_Store
