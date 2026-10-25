@@ -46,13 +46,18 @@ export async function ensureGlobalRiskSchema(pool){
 
 export async function getGlobalRiskState(pool){
   if(!pool){
-    return {tradingPaused:false,globalKillSwitch:false,reason:"DATABASE_UNAVAILABLE",changedBy:null,changedAt:null,updatedAt:null};
+    // Execution must fail closed when the authoritative risk store is unavailable.
+    return {tradingPaused:true,globalKillSwitch:true,reason:"DATABASE_UNAVAILABLE",changedBy:null,changedAt:null,updatedAt:null};
   }
   try{
     const q=await pool.query("SELECT trading_paused,global_kill_switch,reason,changed_by,changed_at,updated_at FROM kingbot_global_risk_state WHERE id=1");
     const row=q.rows[0];
+    if(!row){
+      // A missing singleton risk row is not proof that trading is safe.
+      return {tradingPaused:true,globalKillSwitch:true,reason:"GLOBAL_RISK_STATE_MISSING",changedBy:null,changedAt:null,updatedAt:null};
+    }
     return {
-      tradingPaused:Boolean(row?.trading_paused),
+      tradingPaused:Boolean(row.trading_paused),
       globalKillSwitch:Boolean(row?.global_kill_switch),
       reason:row?.reason||null,
       changedBy:row?.changed_by||null,
@@ -95,6 +100,20 @@ export async function setGlobalRiskState(pool,{tradingPaused=false,globalKillSwi
 }
 
 export function globalExecutionGate(state={}){
+  const unavailableReasons = new Set([
+    "DATABASE_UNAVAILABLE",
+    "GLOBAL_RISK_STATE_UNAVAILABLE",
+    "GLOBAL_RISK_STATE_MISSING"
+  ]);
+  const reason = String(state?.reason || "");
+  if(unavailableReasons.has(reason)){
+    return {allowed:false,reason,level:"CRITICAL"};
+  }
+  if(!state || typeof state !== "object"
+    || typeof state.tradingPaused !== "boolean"
+    || typeof state.globalKillSwitch !== "boolean"){
+    return {allowed:false,reason:"GLOBAL_RISK_STATE_UNAVAILABLE",level:"CRITICAL"};
+  }
   if(Boolean(state.globalKillSwitch)){
     return {allowed:false,reason:"GLOBAL_KILL_SWITCH_ACTIVE",level:"CRITICAL"};
   }
