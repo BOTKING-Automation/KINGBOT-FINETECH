@@ -115,3 +115,63 @@ test("snapshot exposes provider and verification counts", async () => {
   assert.equal(snapshot.verifiedCount, 2);
   assert.equal(snapshot.executionAuthority, undefined);
 });
+
+
+test("accepts provider timestamps expressed as ISO strings, seconds, or milliseconds", async () => {
+  const now = Date.now();
+  const fabric = new MarketDataFabric({
+    twelveData: { enabled: false },
+    goldFeed: { async getQuote() { throw new Error("not-gold"); } },
+    derivFeed: {
+      async getQuote(symbol) {
+        return {
+          price: symbol === "EURUSD" ? 1.17 : 1.08,
+          epoch: Math.floor(now / 1000),
+          source: "timestamp-units-test"
+        };
+      }
+    }
+  });
+  const quote = await fabric.getQuote("EURUSD");
+  assert.equal(quote.ok, true);
+  assert.equal(quote.timestampStatus, "FRESH");
+  assert.ok(quote.ageMs < 5000);
+});
+
+test("does not invent a current timestamp for a provider quote with no timestamp", async () => {
+  const fabric = new MarketDataFabric({
+    twelveData: { enabled: false },
+    goldFeed: { async getQuote() { throw new Error("not-gold"); } },
+    massiveApiKey: "",
+    derivFeed: {
+      async getQuote() {
+        return { price: 1.17, source: "timestamp-missing-test" };
+      }
+    }
+  });
+  const quote = await fabric.getQuote("EURUSD");
+  assert.equal(quote.ok, false);
+  assert.equal(quote.available, false);
+  assert.equal(quote.timestamp, null);
+  assert.equal(quote.verified, false);
+  assert.ok(quote.failures.some(item => String(item.error).includes("STALE_QUOTE")));
+});
+
+test("marks an old ISO-string provider timestamp stale rather than replacing it with now", async () => {
+  const oldTimestamp = "2001-01-01T00:00:00.000Z";
+  const fabric = new MarketDataFabric({
+    twelveData: { enabled: false },
+    goldFeed: { async getQuote() { throw new Error("not-gold"); } },
+    massiveApiKey: "",
+    derivFeed: {
+      async getQuote() {
+        return { price: 1.17, timestamp: oldTimestamp, source: "stale-timestamp-test" };
+      }
+    }
+  });
+  const quote = await fabric.getQuote("EURUSD");
+  assert.equal(quote.ok, false);
+  assert.equal(quote.available, false);
+  assert.equal(quote.timestampStatus, undefined); // no quote is authorized from stale provider data
+  assert.ok(quote.failures.some(item => String(item.error).includes("STALE_QUOTE")));
+});
