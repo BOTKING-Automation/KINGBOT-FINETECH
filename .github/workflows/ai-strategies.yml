@@ -93,7 +93,7 @@ jobs:
           for strategy in ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"]:
               result = service.train_model(strategy, "5m", [market])
               assert result["ready"], result
-              assert result["featureVersion"] == "ai-strategies-v3", result
+              assert result["featureVersion"] == "ai-strategies-v4-walk-forward", result
               trained.append(result["key"])
               prediction = service.predict_model(
                   strategy,
