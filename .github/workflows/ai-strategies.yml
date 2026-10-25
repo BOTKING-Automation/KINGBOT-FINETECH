@@ -45,6 +45,7 @@ on:
       - "backend/test/intelligence-orchestrator.test.js"
       - "system/intelligence-orchestrator.js"
       - "system/ai-support.js"
+      - ".github/workflows/ai-strategies.yml"
 
 jobs:
   ai-strategies:
