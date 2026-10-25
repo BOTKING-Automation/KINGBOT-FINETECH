@@ -9,14 +9,21 @@ BUY / SELL / HOLD probabilities from a scikit-learn + PyTorch ensemble.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import hmac
+import io
 import json
 import math
 import os
+import tempfile
 import threading
 import time
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+
+import joblib
 
 import numpy as np
 import torch
@@ -48,6 +55,17 @@ MAX_FEEDBACK_ROWS = max(200, min(10000, int(os.getenv("KINGBOT_ML_MAX_FEEDBACK_R
 MIN_FEEDBACK_RETRAIN = max(20, min(500, int(os.getenv("KINGBOT_ML_MIN_FEEDBACK_RETRAIN", "60"))))
 FEEDBACK_ROWS: list[dict[str, Any]] = []
 FEEDBACK_VERSION = "online-feedback-v1"
+
+# Checkpoint recovery is opt-in and requires an operator-configured durable mount.
+MODEL_STORE_DIR = os.getenv("KINGBOT_ML_MODEL_STORE_DIR", "").strip()
+MODEL_STORE_VERSION = 1
+MAX_MODEL_AGE_SECONDS = max(300, int(os.getenv("KINGBOT_ML_MAX_MODEL_AGE_SECONDS", "604800")))
+FEATURE_VERSION = "ai-strategies-v4-temporal-holdout"
+MODEL_STORE_LOCK = threading.Lock()
+MODEL_STORE_STATUS: dict[str, Any] = {
+    "restoredModels": 0, "rejectedModels": 0, "lastSavedAt": None,
+    "lastFeedbackSavedAt": None, "lastError": None,
+}
 
 LABELS = [-1, 0, 1]
 LABEL_TO_INDEX = {-1: 0, 0: 1, 1: 2}
@@ -361,6 +379,281 @@ def train_torch(
     }
     return model, metrics
 
+
+def _store_path() -> Path | None:
+    return Path(MODEL_STORE_DIR).expanduser() if MODEL_STORE_DIR else None
+
+
+def _artifact_filename(key: str) -> str:
+    return hashlib.sha256(key.encode("utf-8")).hexdigest() + ".model.json"
+
+
+def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd, temporary = tempfile.mkstemp(prefix=".kingbot-tmp-", suffix=".json", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(payload, stream, separators=(",", ":"), allow_nan=False)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+    finally:
+        try:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        except OSError:
+            pass
+
+
+def _signed_envelope(key: str, raw: bytes, saved_at: float) -> dict[str, Any]:
+    if not SECRET:
+        raise ValueError("MODEL_STORE_SIGNING_SECRET_MISSING")
+    signed = b"kingbot-ml-store:" + str(MODEL_STORE_VERSION).encode() + b":" + key.encode() + b":" + raw
+    return {
+        "version": MODEL_STORE_VERSION,
+        "key": key,
+        "savedAt": saved_at,
+        "payload": base64.b64encode(raw).decode("ascii"),
+        "signature": hmac.new(SECRET.encode("utf-8"), signed, hashlib.sha256).hexdigest(),
+    }
+
+
+def _verified_payload(path: Path, expected_key: str) -> bytes:
+    if not SECRET:
+        raise ValueError("MODEL_STORE_SIGNING_SECRET_MISSING")
+    with path.open("r", encoding="utf-8") as stream:
+        envelope = json.load(stream)
+    if not isinstance(envelope, dict) or envelope.get("version") != MODEL_STORE_VERSION or envelope.get("key") != expected_key:
+        raise ValueError("MODEL_ARTIFACT_ENVELOPE_INVALID")
+    raw = base64.b64decode(envelope.get("payload", ""), validate=True)
+    signed = b"kingbot-ml-store:" + str(MODEL_STORE_VERSION).encode() + b":" + expected_key.encode() + b":" + raw
+    expected = hmac.new(SECRET.encode("utf-8"), signed, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(str(envelope.get("signature", "")), expected):
+        raise ValueError("MODEL_ARTIFACT_SIGNATURE_INVALID")
+    return raw
+
+
+def _record_is_valid(key: str, record: Any) -> bool:
+    if not isinstance(record, dict):
+        return False
+    strategy = str(record.get("strategy") or "").strip().lower()
+    timeframe = str(record.get("timeframe") or "").strip().lower()
+    if strategy not in STRATEGY_FOCUS or key != f"{strategy}:{timeframe}":
+        return False
+    if record.get("feature_version") != FEATURE_VERSION or not bool(record.get("quality_gate")):
+        return False
+    if not isinstance(record.get("rf"), RandomForestClassifier) or not isinstance(record.get("torch"), MLP):
+        return False
+    if not isinstance(record.get("scaler"), StandardScaler):
+        return False
+    try:
+        if int(record["rf"].n_features_in_) != len(FEATURE_NAMES):
+            return False
+        if int(record["scaler"].n_features_in_) != len(FEATURE_NAMES):
+            return False
+        if set(int(v) for v in record["rf"].classes_) != set(LABELS):
+            return False
+        trained_at = float(record.get("trained_at", 0))
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return False
+    return math.isfinite(trained_at) and trained_at > 0
+
+
+def model_is_fresh(record: dict[str, Any], now: float | None = None) -> bool:
+    trained_at = finite(record.get("trained_at"), 0.0)
+    age = (time.time() if now is None else float(now)) - trained_at
+    return trained_at > 0 and -60 <= age <= MAX_MODEL_AGE_SECONDS
+
+
+def model_is_usable(record: dict[str, Any], now: float | None = None) -> bool:
+    return bool(record.get("quality_gate")) and model_is_fresh(record, now)
+
+
+def _store_error(error: Any) -> None:
+    message = str(error or "MODEL_STORE_FAILED")[:180]
+    with MODEL_STORE_LOCK:
+        MODEL_STORE_STATUS["lastError"] = message
+
+
+def persist_model_record(key: str, record: dict[str, Any]) -> bool | None:
+    """Returns None when persistence is disabled, True on durable save, False on configured-store failure."""
+    directory = _store_path()
+    if directory is None:
+        return None
+    try:
+        if not _record_is_valid(key, record):
+            raise ValueError("MODEL_ARTIFACT_RECORD_INVALID")
+        buffer = io.BytesIO()
+        joblib.dump(record, buffer, compress=3)
+        saved_at = time.time()
+        _atomic_json(directory / _artifact_filename(key), _signed_envelope(key, buffer.getvalue(), saved_at))
+        with MODEL_STORE_LOCK:
+            MODEL_STORE_STATUS.update({"lastSavedAt": saved_at, "lastError": None})
+        return True
+    except Exception as error:
+        _store_error(error)
+        print("[KINGBOT ML] model checkpoint save failed:", str(error)[:180])
+        return False
+
+
+def load_persisted_models() -> dict[str, Any]:
+    directory = _store_path()
+    if directory is None:
+        return {"enabled": False, "restored": 0, "rejected": 0}
+    if not SECRET:
+        _store_error("MODEL_STORE_SIGNING_SECRET_MISSING")
+        return {"enabled": True, "restored": 0, "rejected": 0, "error": "MODEL_STORE_SIGNING_SECRET_MISSING"}
+    try:
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        candidates: list[tuple[float, str, dict[str, Any]]] = []
+        rejected = 0
+        for path in directory.glob("*.model.json"):
+            try:
+                with path.open("r", encoding="utf-8") as stream:
+                    envelope = json.load(stream)
+                key = str(envelope.get("key") or "") if isinstance(envelope, dict) else ""
+                if not key or path.name != _artifact_filename(key):
+                    raise ValueError("MODEL_ARTIFACT_KEY_INVALID")
+                record = joblib.load(io.BytesIO(_verified_payload(path, key)))
+                if not _record_is_valid(key, record):
+                    raise ValueError("MODEL_ARTIFACT_RECORD_INVALID")
+                if not model_is_fresh(record):
+                    raise ValueError("MODEL_ARTIFACT_STALE")
+                candidates.append((float(record["trained_at"]), key, record))
+            except Exception as error:
+                rejected += 1
+                print("[KINGBOT ML] checkpoint rejected:", path.name, str(error)[:180])
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        accepted = candidates[:MAX_MODELS]
+        with LOCK:
+            MODELS.clear()
+            for _, key, record in accepted:
+                record["torch"].eval()
+                MODELS[key] = record
+        with MODEL_STORE_LOCK:
+            MODEL_STORE_STATUS["restoredModels"] = len(accepted)
+            MODEL_STORE_STATUS["rejectedModels"] = rejected
+            if rejected:
+                MODEL_STORE_STATUS["lastError"] = "ONE_OR_MORE_MODEL_CHECKPOINTS_REJECTED"
+        return {"enabled": True, "restored": len(accepted), "rejected": rejected}
+    except Exception as error:
+        _store_error(error)
+        print("[KINGBOT ML] model checkpoint restore failed:", str(error)[:180])
+        return {"enabled": True, "restored": 0, "rejected": 0, "error": str(error)[:180]}
+
+
+def _valid_feedback_rows(rows: Any) -> list[dict[str, Any]]:
+    valid: list[dict[str, Any]] = []
+    if not isinstance(rows, list):
+        return valid
+    for row in rows[-MAX_FEEDBACK_ROWS:]:
+        if not isinstance(row, dict):
+            continue
+        strategy = str(row.get("strategy") or "").strip().lower()
+        timeframe = str(row.get("timeframe") or "5m").strip().lower()
+        try:
+            label = int(row.get("label"))
+            features = [float(v) for v in row.get("features", [])]
+        except (TypeError, ValueError):
+            continue
+        if strategy not in STRATEGY_FOCUS or label not in LABELS or len(features) != len(FEATURE_NAMES):
+            continue
+        if not all(math.isfinite(v) for v in features):
+            continue
+        cleaned = dict(row)
+        cleaned.update({"strategy": strategy, "timeframe": timeframe, "label": label, "features": features})
+        valid.append(cleaned)
+    return valid
+
+
+def persist_feedback_rows() -> bool | None:
+    directory = _store_path()
+    if directory is None:
+        return None
+    try:
+        with LOCK:
+            rows = [dict(row) for row in FEEDBACK_ROWS[-MAX_FEEDBACK_ROWS:]]
+        raw = json.dumps({"rows": rows}, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        saved_at = time.time()
+        _atomic_json(directory / "feedback.state.json", _signed_envelope("feedback", raw, saved_at))
+        with MODEL_STORE_LOCK:
+            MODEL_STORE_STATUS.update({"lastFeedbackSavedAt": saved_at, "lastError": None})
+        return True
+    except Exception as error:
+        _store_error(error)
+        print("[KINGBOT ML] feedback checkpoint save failed:", str(error)[:180])
+        return False
+
+
+def load_persisted_feedback() -> dict[str, Any]:
+    directory = _store_path()
+    if directory is None:
+        return {"enabled": False, "restored": 0}
+    path = directory / "feedback.state.json"
+    if not path.exists():
+        return {"enabled": True, "restored": 0}
+    try:
+        document = json.loads(_verified_payload(path, "feedback").decode("utf-8"))
+        rows = _valid_feedback_rows(document.get("rows") if isinstance(document, dict) else None)
+        with LOCK:
+            FEEDBACK_ROWS.clear()
+            FEEDBACK_ROWS.extend(rows)
+        return {"enabled": True, "restored": len(rows)}
+    except Exception as error:
+        _store_error(error)
+        print("[KINGBOT ML] feedback checkpoint restore failed:", str(error)[:180])
+        return {"enabled": True, "restored": 0, "error": str(error)[:180]}
+
+
+def health_status() -> dict[str, Any]:
+    with LOCK:
+        loaded = len(MODELS)
+        ready_models = sum(1 for record in MODELS.values() if model_is_usable(record))
+        training = len(TRAINING_KEYS)
+        feedback_count = len(FEEDBACK_ROWS)
+    with MODEL_STORE_LOCK:
+        store = dict(MODEL_STORE_STATUS)
+    configured = bool(SECRET)
+    ready = configured and ready_models > 0
+    return {
+        "ok": True,
+        "service": "KINGBOT ML Signal Service",
+        "stage": "AI_STRATEGIES",
+        "purpose": "ML_SIGNAL_GENERATION",
+        "libraries": ["scikit-learn", "PyTorch"],
+        "configured": configured,
+        "ready": ready,
+        "readinessReason": "READY" if ready else "SECRET_NOT_CONFIGURED" if not configured else "NO_FRESH_QUALITY_GATED_MODEL",
+        "modelsLoaded": loaded,
+        "modelsReady": ready_models,
+        "modelsStaleOrBlocked": max(0, loaded - ready_models),
+        "training": training,
+        "feedbackRows": feedback_count,
+        "feedbackVersion": FEEDBACK_VERSION,
+        "championModels": loaded,
+        "challengerModels": len(CHALLENGERS),
+        "maxModels": MAX_MODELS,
+        "maxPredictions": MAX_PREDICTIONS,
+        "maxConcurrentTraining": MAX_CONCURRENT_TRAINING,
+        "rfTrees": MAX_RF_TREES,
+        "torchEpochs": TORCH_EPOCHS,
+        "torchThreads": TORCH_THREADS,
+        "modelMaxAgeSeconds": MAX_MODEL_AGE_SECONDS,
+        "modelPersistence": {
+            "enabled": bool(MODEL_STORE_DIR),
+            "mode": "SIGNED_DURABLE_CHECKPOINTS" if MODEL_STORE_DIR else "IN_MEMORY_ONLY",
+            **store,
+        },
+        "validation": {
+            "type": "per-market-temporal-holdout",
+            "featureVersion": FEATURE_VERSION,
+            "profitabilityValidated": False,
+            "costAwareBacktest": "NOT_ESTABLISHED",
+        },
+    }
+
+
 def normalize_market_bars(bars: Any) -> list[dict[str, float]]:
     if not isinstance(bars, list):
         raise ValueError("ML_MARKET_BARS_INVALID")
@@ -579,18 +872,28 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "ensemble_macro_f1": ensemble_metrics["macroF1"],
                 "quality_gate": quality_gate,
                 "bar_count": total_bar_count,
-                "feature_version": "ai-strategies-v4-walk-forward",
+                "feature_version": FEATURE_VERSION,
                 "validation": {
                     "type": "per-market-temporal-holdout",
                     "trainFraction": 0.78,
                     "markets": validation_markets,
+                    "profitabilityValidated": False,
+                    "costAwareBacktest": "NOT_ESTABLISHED",
                 },
                 "selection_score": candidate_score,
                 "promotion": "CHAMPION" if promote else "CHALLENGER",
                 "promoted_at": trained_at if promote else None,
                 "feedbackVersion": FEEDBACK_VERSION,
                 "feedbackRowsUsed": len(feedback),
+                "profitability_validated": False,
             }
+        if promote:
+            persisted = persist_model_record(key, model_record)
+            if MODEL_STORE_DIR and not persisted:
+                promote = False
+                model_record["promotion"] = "CHALLENGER_PERSISTENCE_FAILED"
+                model_record["promoted_at"] = None
+        with LOCK:
             if promote:
                 MODELS[key] = model_record
             else:
@@ -636,10 +939,14 @@ def model_status(key: str) -> dict[str, Any]:
     item = MODELS.get(key)
     if not item:
         return {"ready": False, "status": "MODEL_NOT_READY", "key": key}
+    usable = model_is_usable(item)
+    age_seconds = max(0, int(time.time() - float(item.get("trained_at", 0))))
     return {
-        "ready": True,
-        "status": "TRAINED",
+        "ready": usable,
+        "status": "TRAINED" if usable else "MODEL_STALE_OR_QUALITY_BLOCKED",
         "key": key,
+        "ageSeconds": age_seconds,
+        "profitabilityValidated": False,
         "strategy": item["strategy"],
         "symbols": item["symbols"],
         "timeframe": item["timeframe"],
@@ -752,6 +1059,7 @@ def record_feedback(
         FEEDBACK_ROWS.append(row)
         if len(FEEDBACK_ROWS) > MAX_FEEDBACK_ROWS:
             del FEEDBACK_ROWS[:len(FEEDBACK_ROWS) - MAX_FEEDBACK_ROWS]
+    feedback_persisted = persist_feedback_rows()
 
     return {
         "ok": True,
@@ -764,6 +1072,8 @@ def record_feedback(
         "feedbackRows": len(FEEDBACK_ROWS),
         "retrainRecommended": len(FEEDBACK_ROWS) >= MIN_FEEDBACK_RETRAIN,
         "feedbackVersion": FEEDBACK_VERSION,
+        "persistenceStatus": "IN_MEMORY_ONLY" if feedback_persisted is None else "PERSISTED" if feedback_persisted else "PERSISTENCE_FAILED",
+        "durable": feedback_persisted is True,
     }
 
 
@@ -773,6 +1083,8 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
         item = MODELS.get(key)
     if not item:
         return {"ok": True, "ready": False, "status": "MODEL_NOT_READY", "modelKey": key}
+    if not model_is_fresh(item):
+        return {"ok": True, "ready": False, "status": "MODEL_STALE", "modelKey": key, "modelAgeSeconds": max(0, int(time.time() - float(item.get("trained_at", 0))))}
 
     price = finite(market.get("price") or market.get("close"))
     atr_value = finite(market.get("atr") or market.get("atr14"))
@@ -881,27 +1193,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._json(200, {
-                "ok": True,
-                "service": "KINGBOT ML Signal Service",
-                "stage": "AI_STRATEGIES",
-                "purpose": "ML_SIGNAL_GENERATION",
-                "libraries": ["scikit-learn", "PyTorch"],
-                "modelsLoaded": len(MODELS),
-                "configured": bool(SECRET),
-                "ready": bool(SECRET),
-                "training": len(TRAINING_KEYS),
-                "feedbackRows": len(FEEDBACK_ROWS),
-                "feedbackVersion": FEEDBACK_VERSION,
-                "championModels": len(MODELS),
-                "challengerModels": len(CHALLENGERS),
-                "maxModels": MAX_MODELS,
-                "maxPredictions": MAX_PREDICTIONS,
-                "maxConcurrentTraining": MAX_CONCURRENT_TRAINING,
-                "rfTrees": MAX_RF_TREES,
-                "torchEpochs": TORCH_EPOCHS,
-                "torchThreads": TORCH_THREADS,
-            })
+            self._json(200, health_status())
             return
         if self.path == "/models":
             if not self._authorized():
@@ -996,6 +1288,13 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    restored_models = load_persisted_models()
+    restored_feedback = load_persisted_feedback()
+    print("[KINGBOT ML] recovery:", json.dumps({
+        "models": restored_models,
+        "feedback": restored_feedback,
+        "persistenceEnabled": bool(MODEL_STORE_DIR),
+    }, separators=(",", ":")))
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     server.daemon_threads = True
     server.allow_reuse_address = True
