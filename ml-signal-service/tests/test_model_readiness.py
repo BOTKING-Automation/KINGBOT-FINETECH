@@ -100,3 +100,117 @@ class ModelReadinessTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CostAwareBacktestTests(ModelReadinessTests):
+    def _historical_bars(self, count=420):
+        import math
+        from datetime import datetime, timedelta, timezone
+
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        rows = []
+        previous = 100.0
+        for index in range(count):
+            close = 100.0 + index * 0.012 + 3.0 * math.sin(index / 5.0) + 1.5 * math.sin(index / 13.0)
+            opening = previous
+            rows.append({
+                "timestamp": (start + timedelta(minutes=5 * index)).isoformat().replace("+00:00", "Z"),
+                "open": opening,
+                "high": max(opening, close) + 0.7,
+                "low": min(opening, close) - 0.7,
+                "close": close,
+                "volume": 100 + index % 17,
+            })
+            previous = close
+        return rows
+
+    def _costs(self):
+        return {
+            "spread_price": 0.25,
+            "slippage_price_per_side": 0.05,
+            "commission_per_lot_round_turn": 7.0,
+            "swap_long_per_lot_per_day": -3.0,
+            "swap_short_per_lot_per_day": -1.0,
+            "units_per_lot": 100.0,
+            "volume_lots": 0.01,
+            "quote_to_account_rate": 1.0,
+            "starting_equity": 1000.0,
+            "account_currency": "USD",
+            "quote_currency": "USD",
+        }
+
+    def test_costed_trade_accounts_for_spread_slippage_commission_and_swap(self):
+        bars = self._historical_bars(10)
+        timestamps = [service._parse_bar_timestamp(row) for row in bars]
+        costs = self._costs()
+        trade = service._costed_backtest_trade(
+            direction=1,
+            signal_index=1,
+            entry_index=2,
+            exit_index=4,
+            bars=service.normalize_market_bars(bars),
+            timestamps=timestamps,
+            timeframe_seconds=300,
+            costs=costs,
+        )
+        expected_spread = costs["spread_price"] * costs["units_per_lot"] * costs["volume_lots"]
+        expected_slippage = 2 * costs["slippage_price_per_side"] * costs["units_per_lot"] * costs["volume_lots"]
+        expected_commission = costs["commission_per_lot_round_turn"] * costs["volume_lots"]
+        self.assertAlmostEqual(trade["spreadCostAccount"], expected_spread)
+        self.assertAlmostEqual(trade["slippageCostAccount"], expected_slippage)
+        self.assertAlmostEqual(trade["commissionCostAccount"], expected_commission)
+        self.assertLess(trade["swapPnlAccount"], 0)
+        self.assertAlmostEqual(
+            trade["netPnlAccount"],
+            trade["grossPricePnlAccount"] - expected_spread - expected_slippage
+            - expected_commission + trade["swapPnlAccount"],
+        )
+
+    def test_walk_forward_backtest_reports_folds_costs_and_unverified_provenance(self):
+        bars = self._historical_bars()
+        with patcher_for_backtest_globals():
+            result = service.walk_forward_cost_aware_backtest(
+                "strategic", "XAUUSD", "5m", bars, self._costs(), 2, "unit-test historical fixture"
+            )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["evaluation"], "EXPANDING_ROLLING_PURGED_WALK_FORWARD")
+        self.assertEqual(result["foldCount"], 2)
+        self.assertEqual(result["data"]["timestampCoveragePct"], 100.0)
+        self.assertFalse(result["data"]["sourceIndependentlyVerified"])
+        self.assertFalse(result["profitabilityValidated"])
+        self.assertIn("netPnlAccount", result["performance"])
+        self.assertIn("commissionCostAccount", result["performance"])
+        self.assertIn("swapPnlAccount", result["performance"])
+        for fold in result["folds"]:
+            self.assertGreaterEqual(fold["trainingSamples"], 70)
+            self.assertGreater(fold["testSamples"], 0)
+
+    def test_walk_forward_rejects_missing_cost_assumptions(self):
+        costs = self._costs()
+        costs.pop("spread_price")
+        with self.assertRaisesRegex(ValueError, "ML_BACKTEST_COST_REQUIRED_SPREAD_PRICE"):
+            service.walk_forward_cost_aware_backtest(
+                "strategic", "XAUUSD", "5m", self._historical_bars(), costs, 2, "fixture"
+            )
+
+    def test_walk_forward_rejects_nonmonotonic_timestamps(self):
+        bars = self._historical_bars()
+        bars[10]["timestamp"] = bars[9]["timestamp"]
+        with self.assertRaisesRegex(ValueError, "ML_BACKTEST_TIMESTAMPS_MUST_BE_STRICTLY_INCREASING"):
+            service.walk_forward_cost_aware_backtest(
+                "strategic", "XAUUSD", "5m", bars, self._costs(), 2, "fixture"
+            )
+
+
+class patcher_for_backtest_globals:
+    """Context manager that keeps the CI fixture fast while exercising real fold training."""
+    def __enter__(self):
+        self.trees = service.MAX_RF_TREES
+        self.epochs = service.TORCH_EPOCHS
+        service.MAX_RF_TREES = 40
+        service.TORCH_EPOCHS = 10
+        return self
+
+    def __exit__(self, *_):
+        service.MAX_RF_TREES = self.trees
+        service.TORCH_EPOCHS = self.epochs
