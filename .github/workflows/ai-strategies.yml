@@ -35,6 +35,7 @@ on:
       - "backend/src/ai-trade-gate.js"
       - "backend/src/bot-engines.js"
       - "backend/src/worker.js"
+      - "backend/src/global-risk.js"
       - "backend/src/ai-market-scanner.js"
       - "backend/src/gold-price-feed.js"
       - "backend/src/market-page-feed.js"
