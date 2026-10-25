@@ -9,6 +9,7 @@ on:
       - "backend/src/ai-trade-gate.js"
       - "backend/src/bot-engines.js"
       - "backend/src/worker.js"
+      - "backend/src/global-risk.js"
       - "backend/src/ai-market-scanner.js"
       - "backend/src/gold-price-feed.js"
       - "backend/src/market-page-feed.js"
@@ -21,7 +22,6 @@ on:
       - "backend/test/strategy-specialists.test.js"
       - "backend/test/strategy-council.test.js"
       - "backend/test/intelligence-orchestrator.test.js"
-      - "backend/test/global-risk.test.js"
       - "backend/test/gold-price-feed.test.js"
       - "backend/test/market-data-fabric.test.js"
       - "backend/test/global-risk.test.js"
@@ -45,6 +45,7 @@ on:
       - "backend/test/strategy-specialists.test.js"
       - "backend/test/strategy-council.test.js"
       - "backend/test/intelligence-orchestrator.test.js"
+      - "backend/test/global-risk.test.js"
       - "system/intelligence-orchestrator.js"
       - "system/ai-support.js"
 
