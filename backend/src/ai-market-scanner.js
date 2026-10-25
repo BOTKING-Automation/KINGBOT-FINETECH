@@ -1367,7 +1367,7 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
       const allowExternalDataFallback=req.body?.allowExternalDataFallback===true;
       let bars=null;
       let source="";
-      let historicalFeedMode="CONNECTED_BROKER_HISTORY";
+      let historicalFeedMode="BROKER_ADAPTER_HISTORY";
       let brokerAdapter="unavailable";
       let brokerHistoryError=null;
 
@@ -1395,7 +1395,7 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
 
       if(!bars){
         if(!allowExternalDataFallback){
-          throw new Error("BROKER_NATIVE_HISTORICAL_DATA_UNAVAILABLE:"+String(brokerHistoryError||"NO_CONNECTED_BROKER_HISTORY"));
+          throw new Error("BROKER_NATIVE_HISTORICAL_DATA_UNAVAILABLE:"+String(brokerHistoryError||"NO_BROKER_ADAPTER_HISTORY"));
         }
         const cacheKey=symbol+":"+timeframe;
         bars=await getTrainingBars(symbol,timeframe,twelveData);
@@ -1403,6 +1403,9 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
         historicalFeedMode="EXTERNAL_PROVIDER_FALLBACK";
       }
 
+      if(!Array.isArray(bars)||bars.length<260){
+        throw new Error("HISTORICAL_BARS_INSUFFICIENT_FOR_BACKTEST:"+(Array.isArray(bars)?bars.length:0));
+      }
       const result=await runMlStrategyBacktest({
         botId,symbol,timeframe,bars,costs,folds,dataSource:source
       });
@@ -1420,14 +1423,14 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
           providedBy:"CLIENT",
           brokerAdapter,
           historicalFeedMode,
-          connectedBrokerHistoryUsed:historicalFeedMode==="CONNECTED_BROKER_HISTORY",
+          brokerAdapterHistoryUsed:historicalFeedMode==="BROKER_ADAPTER_HISTORY",
           brokerHistoryFallbackReason:brokerHistoryError,
           brokerIdentityVerified:false,
           costsIndependentlyVerified:false,
           brokerSymbolMappingVerified:false,
-          historyRequestedFromConnectedAccount:historicalFeedMode==="CONNECTED_BROKER_HISTORY",
+          historyRequestedViaBrokerAdapter:historicalFeedMode==="BROKER_ADAPTER_HISTORY",
           historicalFeedBrokerMatchVerified:false,
-          historicalFeedNote:historicalFeedMode==="CONNECTED_BROKER_HISTORY"
+          historicalFeedNote:historicalFeedMode==="BROKER_ADAPTER_HISTORY"
             ? "Historical candles were requested from the connected account adapter using the supplied broker symbol. The client's broker label, economic symbol mapping, and cost assumptions are not independently verified."
             : "Historical candles came from KINGBOT's external provider chain, not the connected execution account. Candles, bid/ask, spread, and fills may differ from the selected broker."
         },
