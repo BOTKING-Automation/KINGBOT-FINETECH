@@ -1384,7 +1384,7 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
           brokerIdentityVerified:false,
           costsIndependentlyVerified:false,
           brokerSymbolMappingVerified:false,
-          historicalFeedMatchesSelectedBroker:false,
+          historicalFeedBrokerMatchVerified:false,
           historicalFeedNote:"Historical OHLC bars come from KINGBOT's configured data-provider chain; they are not guaranteed to match the selected broker's candles, bid/ask prices, spread, or fills. Client-supplied broker symbol and cost assumptions are reported for auditability but are not independently verified."
         },
         elapsedMs:Date.now()-startedAt
