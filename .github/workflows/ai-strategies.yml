@@ -213,6 +213,7 @@ jobs:
             const { warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } = await import("./backend/src/ai-trade-gate.js");
             const market = {
               symbol: "XAUUSD", timeframe: "5m", price: base, spread: 0.2, atr: 1.5,
+              timeframeProfile: { regime: "4h", setup: "1h", execution: "5m" },
               volatility: 0.45, trend: 0.7, momentum: 0.6, structure: "bullish",
               adx: 24, rsi: 58, emaFast: 101, emaSlow: 99.5, velocityPoints: 0.8
             };
