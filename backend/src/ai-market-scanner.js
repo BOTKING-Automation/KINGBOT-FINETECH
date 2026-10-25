@@ -1,4 +1,6 @@
+import { isSyntheticSymbol } from "./synthetic-markets.js";
 import { isAllowedBacktestSymbol, AI_STRATEGY_BOTS, BACKTEST_TIMEFRAME_SECONDS } from "./backtest-validation.js";
+import { normalizeClientExecutionProfile } from "./execution-profile.js";
 import "dotenv/config";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getGoldPriceFeed } from "./gold-price-feed.js";
@@ -1323,6 +1325,15 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
       const timeframe=String(req.body?.timeframe||"5m").trim().toLowerCase();
       const folds=req.body?.folds===undefined?3:Number(req.body.folds);
       const costs=req.body?.costs;
+      const executionProfileResult=normalizeClientExecutionProfile(req.body?.executionProfile);
+      if(!executionProfileResult.ok){
+        return res.status(400).json({
+          ok:false,
+          error:executionProfileResult.error,
+          requiredFields:executionProfileResult.requiredFields
+        });
+      }
+      const executionProfile=executionProfileResult.profile;
       if(!AI_STRATEGY_BOTS.includes(botId)){
         return res.status(400).json({ok:false,error:"ML_BACKTEST_STRATEGY_INVALID"});
       }
@@ -1367,6 +1378,15 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
       }
       return res.json({
         ...result,
+        executionProfile:{
+          ...executionProfile,
+          providedBy:"CLIENT",
+          brokerIdentityVerified:false,
+          costsIndependentlyVerified:false,
+          brokerSymbolMappingVerified:false,
+          historicalFeedMatchesSelectedBroker:false,
+          historicalFeedNote:"Historical OHLC bars come from KINGBOT's configured data-provider chain; they are not guaranteed to match the selected broker's candles, bid/ask prices, spread, or fills. Client-supplied broker symbol and cost assumptions are reported for auditability but are not independently verified."
+        },
         elapsedMs:Date.now()-startedAt
       });
     }catch(error){
