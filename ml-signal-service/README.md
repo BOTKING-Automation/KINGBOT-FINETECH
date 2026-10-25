@@ -52,6 +52,12 @@ The request body is:
   "symbol": "XAUUSD",
   "timeframe": "15m",
   "folds": 3,
+  "executionProfile": {
+    "broker": "Client-selected broker",
+    "accountType": "Client-selected account type",
+    "brokerSymbol": "XAUUSDm",
+    "costsSource": "broker_published_specification"
+  },
   "costs": {
     "spread_price": 0.25,
     "slippage_price_per_side": 0.05,
