@@ -966,7 +966,15 @@ async function execute(row){
   if(account.tradeAllowed===false)throw new Error("BROKER_TRADING_NOT_ALLOWED");
 
   const quote=(await broker.getQuote(config.symbol,userId)).data||{};
-  trace("QUOTE_READY",{symbol:config.symbol,quoteFresh:Boolean(quote.fresh),ageMs:Number(quote.ageMs||0)});
+  trace("QUOTE_READY",{
+    symbol:config.symbol,
+    brokerSymbol:quote.brokerSymbol||quote.instrument||config.symbol,
+    quoteProvider:quote.provider||status.broker||"unknown",
+    quoteQuality:quote.quoteQuality||"UNKNOWN",
+    quoteFresh:Boolean(quote.fresh),
+    ageMs:Number(quote.ageMs||0),
+    spread:Number.isFinite(Number(quote.spread))?Number(quote.spread):null
+  });
   const bid=Number(quote.bid),ask=Number(quote.ask),quoteTime=new Date(quote.time||0).getTime();
   if(!Number.isFinite(bid)||!Number.isFinite(ask)||ask<bid)throw new Error("INVALID_BROKER_QUOTE");
   if(!Number.isFinite(quoteTime)||Date.now()-quoteTime>s.staleDataMs)throw new Error("STALE_BROKER_QUOTE");

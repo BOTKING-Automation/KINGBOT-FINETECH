@@ -13,6 +13,14 @@ on:
       - "backend/src/gold-price-feed.js"
       - "backend/src/market-page-feed.js"
       - "backend/src/market-data-fabric.js"
+      - "backend/test/broker-history-contract.test.js"
+      - "backend/src/broker-history-contract.js"
+      - "backend/test/broker-market-contract.test.js"
+      - "backend/src/exness-trader-client.js"
+      - "backend/src/deriv-trader-client.js"
+      - "backend/src/deriv-market-feed.js"
+      - "backend/src/user-broker-manager.js"
+      - "backend/src/broker-market-contract.js"
       - "backend/src/market-evidence-engine.js"
       - "backend/src/ai-intelligence.js"
       - "backend/src/strategy-specialists.js"
@@ -20,6 +28,12 @@ on:
       - "backend/src/intelligence-orchestrator.js"
       - "backend/test/strategy-specialists.test.js"
       - "backend/test/strategy-council.test.js"
+      - "backend/test/ml-signal-client.test.js"
+      - "backend/test/backtest-validation.test.js"
+      - "backend/test/execution-profile.test.js"
+      - "backend/src/backtest-validation.js"
+      - "backend/src/execution-profile.js"
+      - "ml-signal-service/tests/**"
       - "backend/test/intelligence-orchestrator.test.js"
       - "backend/test/gold-price-feed.test.js"
       - "backend/test/market-data-fabric.test.js"
@@ -36,12 +50,26 @@ on:
       - "backend/src/ai-market-scanner.js"
       - "backend/src/gold-price-feed.js"
       - "backend/src/market-page-feed.js"
+      - "backend/test/market-data-fabric.test.js"
+      - "backend/test/broker-market-contract.test.js"
+      - "backend/src/market-data-fabric.js"
+      - "backend/test/broker-history-contract.test.js"
+      - "backend/src/broker-history-contract.js"
+      - "backend/src/exness-trader-client.js"
+      - "backend/src/deriv-trader-client.js"
+      - "backend/src/deriv-market-feed.js"
+      - "backend/src/user-broker-manager.js"
+      - "backend/src/broker-market-contract.js"
       - "backend/src/market-evidence-engine.js"
       - "backend/src/strategy-specialists.js"
       - "backend/src/strategy-council.js"
       - "backend/src/intelligence-orchestrator.js"
       - "backend/test/strategy-specialists.test.js"
       - "backend/test/strategy-council.test.js"
+      - "backend/test/ml-signal-client.test.js"
+      - "backend/test/backtest-validation.test.js"
+      - "backend/src/backtest-validation.js"
+      - "ml-signal-service/tests/**"
       - "backend/test/intelligence-orchestrator.test.js"
       - "system/intelligence-orchestrator.js"
       - "system/ai-support.js"
@@ -64,6 +92,9 @@ jobs:
 
       - name: Python syntax check
         run: python -m py_compile ml-signal-service/service.py
+
+      - name: ML readiness and checkpoint recovery tests
+        run: python -m unittest discover -s ml-signal-service/tests -v
 
       - name: Train all five AI strategy models
         run: |
@@ -92,7 +123,7 @@ jobs:
           for strategy in ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"]:
               result = service.train_model(strategy, "5m", [market])
               assert result["ready"], result
-              assert result["featureVersion"] == "ai-strategies-v3", result
+              assert result["featureVersion"] == "ai-strategies-v4-temporal-holdout", result
               trained.append(result["key"])
               prediction = service.predict_model(
                   strategy,
@@ -140,6 +171,7 @@ jobs:
 
       - name: Node syntax check
         run: |
+          node --check backend/src/execution-profile.js
           node --check backend/src/ml-signal-client.js
           node --check backend/src/ai-trade-gate.js
           node --check backend/src/bot-engines.js
@@ -147,6 +179,12 @@ jobs:
           node --check backend/src/ai-market-scanner.js
           node --check backend/src/gold-price-feed.js
           node --check backend/src/market-page-feed.js
+          node --check backend/src/broker-history-contract.js
+          node --check backend/src/broker-market-contract.js
+          node --check backend/src/user-broker-manager.js
+          node --check backend/src/deriv-market-feed.js
+          node --check backend/src/deriv-trader-client.js
+          node --check backend/src/exness-trader-client.js
           node --check backend/src/market-data-fabric.js
           node --check backend/src/market-evidence-engine.js
           node --check backend/src/strategy-specialists.js
@@ -158,7 +196,7 @@ jobs:
 
       - name: Specialist brain and strategy council tests
         working-directory: backend
-        run: node --test test/strategy-specialists.test.js test/strategy-council.test.js test/intelligence-orchestrator.test.js test/gold-price-feed.test.js test/market-data-fabric.test.js
+        run: node --test test/strategy-specialists.test.js test/strategy-council.test.js test/intelligence-orchestrator.test.js test/gold-price-feed.test.js test/market-data-fabric.test.js test/broker-market-contract.test.js test/broker-history-contract.test.js test/ml-signal-client.test.js test/backtest-validation.test.js test/execution-profile.test.js
 
       - name: End-to-end Node → ML service gate test
         run: |
@@ -205,14 +243,15 @@ jobs:
             const trainResponse = await fetch("http://127.0.0.1:19090/train", {
               method: "POST",
               headers: { "content-type": "application/json", "x-kingbot-ml-secret": "ci-secret" },
-              body: JSON.stringify({ botId: "strategic", timeframe: "5m", markets: [{ symbol: "XAUUSD", bars }] })
+              body: JSON.stringify({ botId: "strategic", timeframe: "15m", markets: [{ symbol: "XAUUSD", bars }] })
             });
             const train = await trainResponse.json();
             if (!trainResponse.ok || !train.ok || !train.ready) throw new Error("ML train failed: " + JSON.stringify(train));
 
             const { warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } = await import("./backend/src/ai-trade-gate.js");
             const market = {
-              symbol: "XAUUSD", timeframe: "5m", price: base, spread: 0.2, atr: 1.5,
+              symbol: "XAUUSD", timeframe: "15m", price: base, spread: 0.2, atr: 1.5,
+              timeframeProfile: { regime: "4h", setup: "1h", execution: "15m" },
               volatility: 0.45, trend: 0.7, momentum: 0.6, structure: "bullish",
               adx: 24, rsi: 58, emaFast: 101, emaSlow: 99.5, velocityPoints: 0.8
             };

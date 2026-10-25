@@ -553,8 +553,8 @@ export class DerivTraderClient {
       data:{
         symbol:s,
         requestedSymbol:requested,
-        bid:finite(tick.bid)??quote,
-        ask:finite(tick.ask)??quote,
+        bid:finite(tick.bid),
+        ask:finite(tick.ask),
         price:quote,
         time:tick.time,
         epoch:tick.epoch,

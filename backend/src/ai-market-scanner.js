@@ -1,4 +1,7 @@
 import { isSyntheticSymbol } from "./synthetic-markets.js";
+import { isAllowedBacktestSymbol, AI_STRATEGY_BOTS, BACKTEST_TIMEFRAME_SECONDS } from "./backtest-validation.js";
+import { normalizeClientExecutionProfile } from "./execution-profile.js";
+import { normalizeBrokerHistoricalBars } from "./broker-history-contract.js";
 import "dotenv/config";
 import { TwelveDataFeed } from "./twelve-data-feed.js";
 import { getGoldPriceFeed } from "./gold-price-feed.js";
@@ -8,7 +11,7 @@ import { predictPendingOrderZones } from "./pending-order-model.js";
 import { technicalAnalysisBookContext } from "./technical-analysis-book.js";
 import { WebSocketServer, WebSocket } from "ws";
 import { getBotDefinitions } from "./bot-engines.js";
-import { trainMlStrategyModel, mlSignalServiceStatus, probeMlSignalService } from "./ml-signal-client.js";
+import { trainMlStrategyModel, mlSignalServiceStatus, probeMlSignalService, runMlStrategyBacktest } from "./ml-signal-client.js";
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
@@ -659,7 +662,6 @@ export async function ensureAiMarketScannerSchema(pool) {
 }
 
 
-const AI_STRATEGY_BOTS = ["strategic","flipper","breakout","smc-pro","ladder-flip"];
 const TRAINING_SYMBOLS = DEFAULT_SYMBOLS;
 const TRAINING_HISTORY_LIMIT = Math.max(360,Math.min(1000,Number(process.env.KINGBOT_ML_HISTORY_LIMIT||1000)));
 const TRAINING_HISTORY_CACHE_MS = Math.max(5*60*1000,Number(process.env.KINGBOT_ML_HISTORY_CACHE_MS||6*60*60*1000));
@@ -749,14 +751,14 @@ async function getTrainingBars(symbol,timeframe,twelveData){
   if(clean==="BTCUSD"){
     try{
       const bars=await getBinanceTrainingBars(clean,tf);
-      trainingHistoryCache.set(cacheKey,{at:Date.now(),bars});
+      trainingHistoryCache.set(cacheKey,{at:Date.now(),bars,source:"Binance public klines (BTCUSDT proxy for BTCUSD)"});
       return bars;
     }catch(error){
       errors.push("BINANCE:"+(error?.message||"UNAVAILABLE"));
     }
     try{
       const bars=await getKrakenTrainingBars(clean,tf);
-      trainingHistoryCache.set(cacheKey,{at:Date.now(),bars});
+      trainingHistoryCache.set(cacheKey,{at:Date.now(),bars,source:"Kraken public OHLC (XBTUSD proxy for BTCUSD)"});
       return bars;
     }catch(error){
       errors.push("KRAKEN:"+(error?.message||"UNAVAILABLE"));
@@ -766,7 +768,7 @@ async function getTrainingBars(symbol,timeframe,twelveData){
     try{
       const bars=await twelveData.historicalBars(clean,tf,{limit:TRAINING_HISTORY_LIMIT,maxAgeMs:10*60*1000});
       if(Array.isArray(bars)&&bars.length>=120){
-        trainingHistoryCache.set(cacheKey,{at:Date.now(),bars});
+        trainingHistoryCache.set(cacheKey,{at:Date.now(),bars,source:"Twelve Data historical OHLC"});
         return bars;
       }
       errors.push("TWELVE_DATA:INSUFFICIENT_HISTORY");
@@ -777,7 +779,7 @@ async function getTrainingBars(symbol,timeframe,twelveData){
   try{
     const bars=await publicDerivFeed.getHistoricalCandles(clean,{timeframe:tf,limit:TRAINING_HISTORY_LIMIT,timeoutMs:15000});
     if(Array.isArray(bars)&&bars.length>=120){
-      trainingHistoryCache.set(cacheKey,{at:Date.now(),bars});
+      trainingHistoryCache.set(cacheKey,{at:Date.now(),bars,source:"Deriv public historical candles"});
       return bars;
     }
     errors.push("DERIV:INSUFFICIENT_HISTORY");
@@ -1240,7 +1242,7 @@ class AiMarketScannerStream {
   }
 }
 
-export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server, cortexRunner = null }) {
+export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server, requireUser, broker = null, cortexRunner = null }) {
   const stream = new AiMarketScannerStream({ server, pool, twelveData, cortexRunner });
   startAiStrategyModelTraining(twelveData);
   void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
@@ -1300,6 +1302,152 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
 
   app.get("/api/ai/market-scanner/quotes",quoteLimiter,quoteHandler);
   app.get("/api/market-scanner/quotes",quoteLimiter,quoteHandler);
+
+
+  const backtestLimiter=rateLimit({
+    windowMs:60*1000,
+    limit:Math.max(1,Math.min(3,Number(process.env.AI_BACKTEST_MAX_REQUESTS_PER_MINUTE||2))),
+    standardHeaders:"draft-8",
+    legacyHeaders:false,
+    message:{ok:false,error:"AI backtest rate limit reached. Wait before starting another evaluation."}
+  });
+
+  app.post("/api/ai/market-scanner/backtest",backtestLimiter,async(req,res)=>{
+    const startedAt=Date.now();
+    try{
+      if(typeof requireUser!=="function"){
+        return res.status(503).json({ok:false,error:"BACKTEST_AUTH_UNAVAILABLE"});
+      }
+      const user=await requireUser(pool,req,res);
+      if(!user)return;
+
+      const botId=String(req.body?.botId||"").trim().toLowerCase();
+      const symbol=String(req.body?.symbol||"").trim().toUpperCase();
+      const timeframe=String(req.body?.timeframe||"5m").trim().toLowerCase();
+      const folds=req.body?.folds===undefined?3:Number(req.body.folds);
+      const costs=req.body?.costs;
+      const executionProfileResult=normalizeClientExecutionProfile(req.body?.executionProfile);
+      if(!executionProfileResult.ok){
+        return res.status(400).json({
+          ok:false,
+          error:executionProfileResult.error,
+          requiredFields:executionProfileResult.requiredFields
+        });
+      }
+      const executionProfile=executionProfileResult.profile;
+      if(!AI_STRATEGY_BOTS.includes(botId)){
+        return res.status(400).json({ok:false,error:"ML_BACKTEST_STRATEGY_INVALID"});
+      }
+      if(!isAllowedBacktestSymbol(symbol)){
+        return res.status(400).json({
+          ok:false,
+          error:"ML_BACKTEST_SYMBOL_INVALID_OR_SYNTHETIC"
+        });
+      }
+      if(!Object.prototype.hasOwnProperty.call(BACKTEST_TIMEFRAME_SECONDS,timeframe)){
+        return res.status(400).json({ok:false,error:"ML_BACKTEST_TIMEFRAME_INVALID"});
+      }
+      if(!Number.isInteger(folds)||folds<2||folds>5){
+        return res.status(400).json({ok:false,error:"ML_BACKTEST_FOLDS_MUST_BE_2_TO_5"});
+      }
+      const requiredCostFields=[
+        "spread_price","slippage_price_per_side","commission_per_lot_round_turn",
+        "swap_long_per_lot_per_day","swap_short_per_lot_per_day",
+        "units_per_lot","volume_lots","quote_to_account_rate","starting_equity",
+        "account_currency","quote_currency"
+      ];
+      if(!costs||typeof costs!=="object"||Array.isArray(costs)){
+        return res.status(400).json({ok:false,error:"ML_BACKTEST_COSTS_REQUIRED",requiredCostFields});
+      }
+      const missingCosts=requiredCostFields.filter(key=>costs[key]===undefined||costs[key]===null||costs[key]==="");
+      if(missingCosts.length){
+        return res.status(400).json({ok:false,error:"ML_BACKTEST_COSTS_INCOMPLETE",missingCostFields:missingCosts});
+      }
+
+      const allowExternalDataFallback=req.body?.allowExternalDataFallback===true;
+      let bars=null;
+      let source="";
+      let historicalFeedMode="BROKER_ADAPTER_HISTORY";
+      let brokerAdapter="unavailable";
+      let brokerHistoryError=null;
+
+      if(broker && typeof broker.getHistoricalCandles==="function"){
+        try{
+          const brokerStatus=typeof broker.getStatus==="function"
+            ? await broker.getStatus(user.id)
+            : null;
+          brokerAdapter=String(brokerStatus?.broker||"unknown").trim().toLowerCase();
+          if(!brokerStatus?.configured){
+            throw new Error("BROKER_ACCOUNT_NOT_CONFIGURED");
+          }
+          const historicalResult=await broker.getHistoricalCandles(
+            executionProfile.brokerSymbol,timeframe,user.id,1000
+          );
+          bars=normalizeBrokerHistoricalBars(historicalResult,{minBars:260,maxBars:1000});
+          source="Connected account historical candles via "+brokerAdapter+" adapter; broker symbol "+executionProfile.brokerSymbol;
+        }catch(error){
+          brokerHistoryError=String(error?.message||"BROKER_HISTORICAL_DATA_UNAVAILABLE").slice(0,180);
+          bars=null;
+        }
+      }else{
+        brokerHistoryError="BROKER_HISTORICAL_ADAPTER_UNAVAILABLE";
+      }
+
+      if(!bars){
+        if(!allowExternalDataFallback){
+          throw new Error("BROKER_NATIVE_HISTORICAL_DATA_UNAVAILABLE:"+String(brokerHistoryError||"NO_BROKER_ADAPTER_HISTORY"));
+        }
+        const cacheKey=symbol+":"+timeframe;
+        bars=await getTrainingBars(symbol,timeframe,twelveData);
+        source=trainingHistoryCache.get(cacheKey)?.source||"KINGBOT historical provider chain (exact provider metadata unavailable)";
+        historicalFeedMode="EXTERNAL_PROVIDER_FALLBACK";
+      }
+
+      if(!Array.isArray(bars)||bars.length<260){
+        throw new Error("HISTORICAL_BARS_INSUFFICIENT_FOR_BACKTEST:"+(Array.isArray(bars)?bars.length:0));
+      }
+      const result=await runMlStrategyBacktest({
+        botId,symbol,timeframe,bars,costs,folds,dataSource:source
+      });
+      if(!result?.ok){
+        const unavailable=/UNAVAILABLE|NOT_CONFIGURED|TIMEOUT|UNAUTHORIZED/.test(String(result?.status||""));
+        return res.status(unavailable?503:422).json({
+          ...result,
+          elapsedMs:Date.now()-startedAt
+        });
+      }
+      return res.json({
+        ...result,
+        executionProfile:{
+          ...executionProfile,
+          providedBy:"CLIENT",
+          brokerAdapter,
+          historicalFeedMode,
+          brokerAdapterHistoryUsed:historicalFeedMode==="BROKER_ADAPTER_HISTORY",
+          brokerHistoryFallbackReason:brokerHistoryError,
+          brokerIdentityVerified:false,
+          costsIndependentlyVerified:false,
+          brokerSymbolMappingVerified:false,
+          historyRequestedViaBrokerAdapter:historicalFeedMode==="BROKER_ADAPTER_HISTORY",
+          historicalFeedBrokerMatchVerified:false,
+          historicalFeedNote:historicalFeedMode==="BROKER_ADAPTER_HISTORY"
+            ? "Historical candles were requested from the connected account adapter using the supplied broker symbol. The client's broker label, economic symbol mapping, and cost assumptions are not independently verified."
+            : "Historical candles came from KINGBOT's external provider chain, not the connected execution account. Candles, bid/ask, spread, and fills may differ from the selected broker."
+        },
+        elapsedMs:Date.now()-startedAt
+      });
+    }catch(error){
+      const message=String(error?.message||"ML_BACKTEST_FAILED").slice(0,240);
+      console.warn("[KINGBOT ML BACKTEST]",message);
+      const unavailable=/UNAVAILABLE|HISTOR|TIMEOUT|NOT_CONFIGURED|NOT_CONNECTED/i.test(message);
+      return res.status(unavailable?503:422).json({
+        ok:false,
+        error:unavailable?"ML_BACKTEST_HISTORICAL_DATA_UNAVAILABLE":"ML_BACKTEST_REQUEST_FAILED",
+        reason:message,
+        elapsedMs:Date.now()-startedAt
+      });
+    }
+  });
 
   app.get("/api/ai/market-scanner/status", async (_req,res) => {
     let tvCount=0;

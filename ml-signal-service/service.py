@@ -9,14 +9,23 @@ BUY / SELL / HOLD probabilities from a scikit-learn + PyTorch ensemble.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import hmac
+import io
 import json
 import math
 import os
+import re
+import tempfile
 import threading
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+
+import joblib
 
 import numpy as np
 import torch
@@ -44,10 +53,22 @@ MAX_CONCURRENT_TRAINING = max(1, min(2, int(os.getenv("KINGBOT_ML_MAX_CONCURRENT
 TRAINING_KEYS: set[str] = set()
 TRAINING_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_TRAINING)
 PREDICTION_SEMAPHORE = threading.BoundedSemaphore(MAX_PREDICTIONS)
+BACKTEST_SEMAPHORE = threading.BoundedSemaphore(1)
 MAX_FEEDBACK_ROWS = max(200, min(10000, int(os.getenv("KINGBOT_ML_MAX_FEEDBACK_ROWS", "4000"))))
 MIN_FEEDBACK_RETRAIN = max(20, min(500, int(os.getenv("KINGBOT_ML_MIN_FEEDBACK_RETRAIN", "60"))))
 FEEDBACK_ROWS: list[dict[str, Any]] = []
 FEEDBACK_VERSION = "online-feedback-v1"
+
+# Checkpoint recovery is opt-in and requires an operator-configured durable mount.
+MODEL_STORE_DIR = os.getenv("KINGBOT_ML_MODEL_STORE_DIR", "").strip()
+MODEL_STORE_VERSION = 1
+MAX_MODEL_AGE_SECONDS = max(300, int(os.getenv("KINGBOT_ML_MAX_MODEL_AGE_SECONDS", "604800")))
+FEATURE_VERSION = "ai-strategies-v4-temporal-holdout"
+MODEL_STORE_LOCK = threading.Lock()
+MODEL_STORE_STATUS: dict[str, Any] = {
+    "restoredModels": 0, "rejectedModels": 0, "lastSavedAt": None,
+    "lastFeedbackSavedAt": None, "lastError": None,
+}
 
 LABELS = [-1, 0, 1]
 LABEL_TO_INDEX = {-1: 0, 0: 1, 1: 2}
@@ -361,6 +382,281 @@ def train_torch(
     }
     return model, metrics
 
+
+def _store_path() -> Path | None:
+    return Path(MODEL_STORE_DIR).expanduser() if MODEL_STORE_DIR else None
+
+
+def _artifact_filename(key: str) -> str:
+    return hashlib.sha256(key.encode("utf-8")).hexdigest() + ".model.json"
+
+
+def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd, temporary = tempfile.mkstemp(prefix=".kingbot-tmp-", suffix=".json", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(payload, stream, separators=(",", ":"), allow_nan=False)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+    finally:
+        try:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        except OSError:
+            pass
+
+
+def _signed_envelope(key: str, raw: bytes, saved_at: float) -> dict[str, Any]:
+    if not SECRET:
+        raise ValueError("MODEL_STORE_SIGNING_SECRET_MISSING")
+    signed = b"kingbot-ml-store:" + str(MODEL_STORE_VERSION).encode() + b":" + key.encode() + b":" + raw
+    return {
+        "version": MODEL_STORE_VERSION,
+        "key": key,
+        "savedAt": saved_at,
+        "payload": base64.b64encode(raw).decode("ascii"),
+        "signature": hmac.new(SECRET.encode("utf-8"), signed, hashlib.sha256).hexdigest(),
+    }
+
+
+def _verified_payload(path: Path, expected_key: str) -> bytes:
+    if not SECRET:
+        raise ValueError("MODEL_STORE_SIGNING_SECRET_MISSING")
+    with path.open("r", encoding="utf-8") as stream:
+        envelope = json.load(stream)
+    if not isinstance(envelope, dict) or envelope.get("version") != MODEL_STORE_VERSION or envelope.get("key") != expected_key:
+        raise ValueError("MODEL_ARTIFACT_ENVELOPE_INVALID")
+    raw = base64.b64decode(envelope.get("payload", ""), validate=True)
+    signed = b"kingbot-ml-store:" + str(MODEL_STORE_VERSION).encode() + b":" + expected_key.encode() + b":" + raw
+    expected = hmac.new(SECRET.encode("utf-8"), signed, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(str(envelope.get("signature", "")), expected):
+        raise ValueError("MODEL_ARTIFACT_SIGNATURE_INVALID")
+    return raw
+
+
+def _record_is_valid(key: str, record: Any) -> bool:
+    if not isinstance(record, dict):
+        return False
+    strategy = str(record.get("strategy") or "").strip().lower()
+    timeframe = str(record.get("timeframe") or "").strip().lower()
+    if strategy not in STRATEGY_FOCUS or key != f"{strategy}:{timeframe}":
+        return False
+    if record.get("feature_version") != FEATURE_VERSION or not bool(record.get("quality_gate")):
+        return False
+    if not isinstance(record.get("rf"), RandomForestClassifier) or not isinstance(record.get("torch"), MLP):
+        return False
+    if not isinstance(record.get("scaler"), StandardScaler):
+        return False
+    try:
+        if int(record["rf"].n_features_in_) != len(FEATURE_NAMES):
+            return False
+        if int(record["scaler"].n_features_in_) != len(FEATURE_NAMES):
+            return False
+        if set(int(v) for v in record["rf"].classes_) != set(LABELS):
+            return False
+        trained_at = float(record.get("trained_at", 0))
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return False
+    return math.isfinite(trained_at) and trained_at > 0
+
+
+def model_is_fresh(record: dict[str, Any], now: float | None = None) -> bool:
+    trained_at = finite(record.get("trained_at"), 0.0)
+    age = (time.time() if now is None else float(now)) - trained_at
+    return trained_at > 0 and -60 <= age <= MAX_MODEL_AGE_SECONDS
+
+
+def model_is_usable(record: dict[str, Any], now: float | None = None) -> bool:
+    return bool(record.get("quality_gate")) and model_is_fresh(record, now)
+
+
+def _store_error(error: Any) -> None:
+    message = str(error or "MODEL_STORE_FAILED")[:180]
+    with MODEL_STORE_LOCK:
+        MODEL_STORE_STATUS["lastError"] = message
+
+
+def persist_model_record(key: str, record: dict[str, Any]) -> bool | None:
+    """Returns None when persistence is disabled, True on durable save, False on configured-store failure."""
+    directory = _store_path()
+    if directory is None:
+        return None
+    try:
+        if not _record_is_valid(key, record):
+            raise ValueError("MODEL_ARTIFACT_RECORD_INVALID")
+        buffer = io.BytesIO()
+        joblib.dump(record, buffer, compress=3)
+        saved_at = time.time()
+        _atomic_json(directory / _artifact_filename(key), _signed_envelope(key, buffer.getvalue(), saved_at))
+        with MODEL_STORE_LOCK:
+            MODEL_STORE_STATUS.update({"lastSavedAt": saved_at, "lastError": None})
+        return True
+    except Exception as error:
+        _store_error(error)
+        print("[KINGBOT ML] model checkpoint save failed:", str(error)[:180])
+        return False
+
+
+def load_persisted_models() -> dict[str, Any]:
+    directory = _store_path()
+    if directory is None:
+        return {"enabled": False, "restored": 0, "rejected": 0}
+    if not SECRET:
+        _store_error("MODEL_STORE_SIGNING_SECRET_MISSING")
+        return {"enabled": True, "restored": 0, "rejected": 0, "error": "MODEL_STORE_SIGNING_SECRET_MISSING"}
+    try:
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        candidates: list[tuple[float, str, dict[str, Any]]] = []
+        rejected = 0
+        for path in directory.glob("*.model.json"):
+            try:
+                with path.open("r", encoding="utf-8") as stream:
+                    envelope = json.load(stream)
+                key = str(envelope.get("key") or "") if isinstance(envelope, dict) else ""
+                if not key or path.name != _artifact_filename(key):
+                    raise ValueError("MODEL_ARTIFACT_KEY_INVALID")
+                record = joblib.load(io.BytesIO(_verified_payload(path, key)))
+                if not _record_is_valid(key, record):
+                    raise ValueError("MODEL_ARTIFACT_RECORD_INVALID")
+                if not model_is_fresh(record):
+                    raise ValueError("MODEL_ARTIFACT_STALE")
+                candidates.append((float(record["trained_at"]), key, record))
+            except Exception as error:
+                rejected += 1
+                print("[KINGBOT ML] checkpoint rejected:", path.name, str(error)[:180])
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        accepted = candidates[:MAX_MODELS]
+        with LOCK:
+            MODELS.clear()
+            for _, key, record in accepted:
+                record["torch"].eval()
+                MODELS[key] = record
+        with MODEL_STORE_LOCK:
+            MODEL_STORE_STATUS["restoredModels"] = len(accepted)
+            MODEL_STORE_STATUS["rejectedModels"] = rejected
+            if rejected:
+                MODEL_STORE_STATUS["lastError"] = "ONE_OR_MORE_MODEL_CHECKPOINTS_REJECTED"
+        return {"enabled": True, "restored": len(accepted), "rejected": rejected}
+    except Exception as error:
+        _store_error(error)
+        print("[KINGBOT ML] model checkpoint restore failed:", str(error)[:180])
+        return {"enabled": True, "restored": 0, "rejected": 0, "error": str(error)[:180]}
+
+
+def _valid_feedback_rows(rows: Any) -> list[dict[str, Any]]:
+    valid: list[dict[str, Any]] = []
+    if not isinstance(rows, list):
+        return valid
+    for row in rows[-MAX_FEEDBACK_ROWS:]:
+        if not isinstance(row, dict):
+            continue
+        strategy = str(row.get("strategy") or "").strip().lower()
+        timeframe = str(row.get("timeframe") or "5m").strip().lower()
+        try:
+            label = int(row.get("label"))
+            features = [float(v) for v in row.get("features", [])]
+        except (TypeError, ValueError):
+            continue
+        if strategy not in STRATEGY_FOCUS or label not in LABELS or len(features) != len(FEATURE_NAMES):
+            continue
+        if not all(math.isfinite(v) for v in features):
+            continue
+        cleaned = dict(row)
+        cleaned.update({"strategy": strategy, "timeframe": timeframe, "label": label, "features": features})
+        valid.append(cleaned)
+    return valid
+
+
+def persist_feedback_rows() -> bool | None:
+    directory = _store_path()
+    if directory is None:
+        return None
+    try:
+        with LOCK:
+            rows = [dict(row) for row in FEEDBACK_ROWS[-MAX_FEEDBACK_ROWS:]]
+        raw = json.dumps({"rows": rows}, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        saved_at = time.time()
+        _atomic_json(directory / "feedback.state.json", _signed_envelope("feedback", raw, saved_at))
+        with MODEL_STORE_LOCK:
+            MODEL_STORE_STATUS.update({"lastFeedbackSavedAt": saved_at, "lastError": None})
+        return True
+    except Exception as error:
+        _store_error(error)
+        print("[KINGBOT ML] feedback checkpoint save failed:", str(error)[:180])
+        return False
+
+
+def load_persisted_feedback() -> dict[str, Any]:
+    directory = _store_path()
+    if directory is None:
+        return {"enabled": False, "restored": 0}
+    path = directory / "feedback.state.json"
+    if not path.exists():
+        return {"enabled": True, "restored": 0}
+    try:
+        document = json.loads(_verified_payload(path, "feedback").decode("utf-8"))
+        rows = _valid_feedback_rows(document.get("rows") if isinstance(document, dict) else None)
+        with LOCK:
+            FEEDBACK_ROWS.clear()
+            FEEDBACK_ROWS.extend(rows)
+        return {"enabled": True, "restored": len(rows)}
+    except Exception as error:
+        _store_error(error)
+        print("[KINGBOT ML] feedback checkpoint restore failed:", str(error)[:180])
+        return {"enabled": True, "restored": 0, "error": str(error)[:180]}
+
+
+def health_status() -> dict[str, Any]:
+    with LOCK:
+        loaded = len(MODELS)
+        ready_models = sum(1 for record in MODELS.values() if model_is_usable(record))
+        training = len(TRAINING_KEYS)
+        feedback_count = len(FEEDBACK_ROWS)
+    with MODEL_STORE_LOCK:
+        store = dict(MODEL_STORE_STATUS)
+    configured = bool(SECRET)
+    ready = configured and ready_models > 0
+    return {
+        "ok": True,
+        "service": "KINGBOT ML Signal Service",
+        "stage": "AI_STRATEGIES",
+        "purpose": "ML_SIGNAL_GENERATION",
+        "libraries": ["scikit-learn", "PyTorch"],
+        "configured": configured,
+        "ready": ready,
+        "readinessReason": "READY" if ready else "SECRET_NOT_CONFIGURED" if not configured else "NO_FRESH_QUALITY_GATED_MODEL",
+        "modelsLoaded": loaded,
+        "modelsReady": ready_models,
+        "modelsStaleOrBlocked": max(0, loaded - ready_models),
+        "training": training,
+        "feedbackRows": feedback_count,
+        "feedbackVersion": FEEDBACK_VERSION,
+        "championModels": loaded,
+        "challengerModels": len(CHALLENGERS),
+        "maxModels": MAX_MODELS,
+        "maxPredictions": MAX_PREDICTIONS,
+        "maxConcurrentTraining": MAX_CONCURRENT_TRAINING,
+        "rfTrees": MAX_RF_TREES,
+        "torchEpochs": TORCH_EPOCHS,
+        "torchThreads": TORCH_THREADS,
+        "modelMaxAgeSeconds": MAX_MODEL_AGE_SECONDS,
+        "modelPersistence": {
+            "enabled": bool(MODEL_STORE_DIR),
+            "mode": "SIGNED_DURABLE_CHECKPOINTS" if MODEL_STORE_DIR else "IN_MEMORY_ONLY",
+            **store,
+        },
+        "validation": {
+            "type": "per-market-temporal-holdout",
+            "featureVersion": FEATURE_VERSION,
+            "profitabilityValidated": False,
+            "costAwareBacktest": "NOT_ESTABLISHED",
+        },
+    }
+
+
 def normalize_market_bars(bars: Any) -> list[dict[str, float]]:
     if not isinstance(bars, list):
         raise ValueError("ML_MARKET_BARS_INVALID")
@@ -579,18 +875,28 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "ensemble_macro_f1": ensemble_metrics["macroF1"],
                 "quality_gate": quality_gate,
                 "bar_count": total_bar_count,
-                "feature_version": "ai-strategies-v4-walk-forward",
+                "feature_version": FEATURE_VERSION,
                 "validation": {
                     "type": "per-market-temporal-holdout",
                     "trainFraction": 0.78,
                     "markets": validation_markets,
+                    "profitabilityValidated": False,
+                    "costAwareBacktest": "NOT_ESTABLISHED",
                 },
                 "selection_score": candidate_score,
                 "promotion": "CHAMPION" if promote else "CHALLENGER",
                 "promoted_at": trained_at if promote else None,
                 "feedbackVersion": FEEDBACK_VERSION,
                 "feedbackRowsUsed": len(feedback),
+                "profitability_validated": False,
             }
+        if promote:
+            persisted = persist_model_record(key, model_record)
+            if MODEL_STORE_DIR and not persisted:
+                promote = False
+                model_record["promotion"] = "CHALLENGER_PERSISTENCE_FAILED"
+                model_record["promoted_at"] = None
+        with LOCK:
             if promote:
                 MODELS[key] = model_record
             else:
@@ -636,10 +942,14 @@ def model_status(key: str) -> dict[str, Any]:
     item = MODELS.get(key)
     if not item:
         return {"ready": False, "status": "MODEL_NOT_READY", "key": key}
+    usable = model_is_usable(item)
+    age_seconds = max(0, int(time.time() - float(item.get("trained_at", 0))))
     return {
-        "ready": True,
-        "status": "TRAINED",
+        "ready": usable,
+        "status": "TRAINED" if usable else "MODEL_STALE_OR_QUALITY_BLOCKED",
         "key": key,
+        "ageSeconds": age_seconds,
+        "profitabilityValidated": False,
         "strategy": item["strategy"],
         "symbols": item["symbols"],
         "timeframe": item["timeframe"],
@@ -752,6 +1062,7 @@ def record_feedback(
         FEEDBACK_ROWS.append(row)
         if len(FEEDBACK_ROWS) > MAX_FEEDBACK_ROWS:
             del FEEDBACK_ROWS[:len(FEEDBACK_ROWS) - MAX_FEEDBACK_ROWS]
+    feedback_persisted = persist_feedback_rows()
 
     return {
         "ok": True,
@@ -764,6 +1075,8 @@ def record_feedback(
         "feedbackRows": len(FEEDBACK_ROWS),
         "retrainRecommended": len(FEEDBACK_ROWS) >= MIN_FEEDBACK_RETRAIN,
         "feedbackVersion": FEEDBACK_VERSION,
+        "persistenceStatus": "IN_MEMORY_ONLY" if feedback_persisted is None else "PERSISTED" if feedback_persisted else "PERSISTENCE_FAILED",
+        "durable": feedback_persisted is True,
     }
 
 
@@ -773,6 +1086,8 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
         item = MODELS.get(key)
     if not item:
         return {"ok": True, "ready": False, "status": "MODEL_NOT_READY", "modelKey": key}
+    if not model_is_fresh(item):
+        return {"ok": True, "ready": False, "status": "MODEL_STALE", "modelKey": key, "modelAgeSeconds": max(0, int(time.time() - float(item.get("trained_at", 0))))}
 
     price = finite(market.get("price") or market.get("close"))
     atr_value = finite(market.get("atr") or market.get("atr14"))
@@ -847,6 +1162,406 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
     finally:
         PREDICTION_SEMAPHORE.release()
 
+
+BACKTEST_TIMEFRAME_SECONDS = {
+    "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800,
+    "1h": 3600, "2h": 7200, "4h": 14400, "1d": 86400, "1w": 604800,
+}
+
+
+def _parse_bar_timestamp(bar: dict[str, Any]) -> float:
+    raw = bar.get("timestamp") or bar.get("datetime") or bar.get("time")
+    if raw is None or isinstance(raw, bool):
+        raise ValueError("ML_BACKTEST_BAR_TIMESTAMP_REQUIRED")
+    try:
+        number = float(raw)
+        if not math.isfinite(number):
+            raise ValueError("ML_BACKTEST_BAR_TIMESTAMP_INVALID")
+        # Numeric epochs above this magnitude are conventionally milliseconds.
+        stamp = number / 1000.0 if abs(number) >= 100_000_000_000 else number
+        if not 0 <= stamp <= 7_258_118_400:  # 1970 through 2200; avoid platform timestamp overflow
+            raise ValueError("ML_BACKTEST_BAR_TIMESTAMP_INVALID")
+        return stamp
+    except (ValueError, TypeError):
+        pass
+    try:
+        parsed = datetime.fromisoformat(str(raw).strip().replace("Z", "+00:00"))
+    except (TypeError, ValueError) as error:
+        raise ValueError("ML_BACKTEST_BAR_TIMESTAMP_INVALID") from error
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    stamp = parsed.timestamp()
+    if not math.isfinite(stamp) or not 0 <= stamp <= 7_258_118_400:
+        raise ValueError("ML_BACKTEST_BAR_TIMESTAMP_INVALID")
+    return stamp
+
+
+def _backtest_costs(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise ValueError("ML_BACKTEST_COSTS_REQUIRED")
+    required_numeric = (
+        "spread_price", "slippage_price_per_side", "commission_per_lot_round_turn",
+        "swap_long_per_lot_per_day", "swap_short_per_lot_per_day",
+        "units_per_lot", "volume_lots", "quote_to_account_rate", "starting_equity",
+    )
+    result: dict[str, Any] = {}
+    for name in required_numeric:
+        value = raw.get(name)
+        if value is None or isinstance(value, bool):
+            raise ValueError(f"ML_BACKTEST_COST_REQUIRED_{name.upper()}")
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"ML_BACKTEST_COST_INVALID_{name.upper()}") from error
+        if not math.isfinite(number):
+            raise ValueError(f"ML_BACKTEST_COST_INVALID_{name.upper()}")
+        result[name] = number
+
+    for name in ("spread_price", "slippage_price_per_side", "commission_per_lot_round_turn"):
+        if result[name] < 0:
+            raise ValueError(f"ML_BACKTEST_COST_NEGATIVE_{name.upper()}")
+    for name in ("units_per_lot", "volume_lots", "quote_to_account_rate", "starting_equity"):
+        if result[name] <= 0:
+            raise ValueError(f"ML_BACKTEST_COST_MUST_BE_POSITIVE_{name.upper()}")
+
+    for name in ("account_currency", "quote_currency"):
+        value = str(raw.get(name) or "").strip().upper()
+        if not value or len(value) > 12:
+            raise ValueError(f"ML_BACKTEST_COST_REQUIRED_{name.upper()}")
+        result[name] = value
+    return result
+
+
+def _true_label_at(bars: list[dict[str, float]], index: int) -> int:
+    current = bars[index]["close"]
+    future = bars[index + FORWARD_HORIZON]["close"]
+    current_atr = atr(bars[:index + 1], 14)
+    if current <= 0 or not current_atr or current_atr <= 0:
+        raise ValueError("ML_BACKTEST_ATR_UNAVAILABLE")
+    move_in_atr = (future - current) / current_atr
+    return 1 if move_in_atr >= LABEL_ATR else -1 if move_in_atr <= -LABEL_ATR else 0
+
+
+def _ensemble_fold_predictions(
+    strategy: str,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    weights_train: np.ndarray,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+) -> tuple[np.ndarray, dict[str, float]]:
+    train_classes = set(int(value) for value in y_train)
+    if train_classes != set(LABELS):
+        raise ValueError("ML_BACKTEST_FOLD_REQUIRES_BUY_SELL_HOLD_TRAIN_CLASSES")
+    if len(X_train) < 70:
+        raise ValueError("ML_BACKTEST_TRAIN_SAMPLES_INSUFFICIENT")
+    if len(X_test) < 1:
+        raise ValueError("ML_BACKTEST_TEST_SAMPLES_INSUFFICIENT")
+
+    scaler = StandardScaler()
+    scaler.fit(X_train)
+    X_train_scaled = scaler.transform(X_train).astype(np.float32)
+    X_test_scaled = scaler.transform(X_test).astype(np.float32)
+
+    rf = RandomForestClassifier(
+        n_estimators=MAX_RF_TREES,
+        max_depth=7,
+        min_samples_leaf=4,
+        random_state=42,
+        class_weight="balanced_subsample",
+        n_jobs=1,
+    )
+    rf.fit(X_train_scaled, y_train, sample_weight=weights_train)
+    torch_model, _ = train_torch(X_train, y_train, X_test, y_test, scaler, weights_train)
+    torch_model.eval()
+
+    predicted_labels: list[int] = []
+    with torch.no_grad():
+        torch_probabilities = torch.softmax(torch_model(torch.from_numpy(X_test_scaled)), dim=1).numpy()
+
+    rf_probabilities = rf.predict_proba(X_test_scaled)
+    for row_index in range(len(X_test)):
+        rf_map = {
+            int(label): float(prob)
+            for label, prob in zip(rf.classes_, rf_probabilities[row_index])
+        }
+        rf_probs = np.asarray([rf_map.get(label, 0.0) for label in LABELS], dtype=np.float64)
+        torch_probs = np.asarray(torch_probabilities[row_index], dtype=np.float64)
+        probabilities = rf_probs * 0.55 + torch_probs * 0.45
+        probabilities = probabilities / max(float(probabilities.sum()), 1e-12)
+        best_index = int(np.argmax(probabilities))
+        confidence = float(probabilities[best_index])
+        signed_score = float((probabilities[2] - probabilities[0]) * 100.0)
+        direction = int(LABELS[best_index])
+        if confidence < 0.55 or abs(signed_score) < 12.0:
+            direction = 0
+        predicted_labels.append(direction)
+
+    pred = np.asarray(predicted_labels, dtype=np.int64)
+    actual = np.asarray(y_test, dtype=np.int64)
+    return pred, {
+        "accuracy": float(accuracy_score(actual, pred)),
+        "balancedAccuracy": float(balanced_accuracy_score(actual, pred)),
+        "macroF1": float(f1_score(actual, pred, average="macro", zero_division=0)),
+        "samples": int(len(actual)),
+    }
+
+
+def _costed_backtest_trade(
+    *,
+    direction: int,
+    signal_index: int,
+    entry_index: int,
+    exit_index: int,
+    bars: list[dict[str, float]],
+    timestamps: list[float],
+    timeframe_seconds: int,
+    costs: dict[str, Any],
+) -> dict[str, Any]:
+    if direction not in (-1, 1):
+        raise ValueError("ML_BACKTEST_TRADE_DIRECTION_INVALID")
+    entry_mid = bars[entry_index]["open"]
+    exit_mid = bars[exit_index]["close"]
+    lots = costs["volume_lots"]
+    units = costs["units_per_lot"] * lots
+    conversion = costs["quote_to_account_rate"]
+    friction_per_side = costs["spread_price"] / 2.0 + costs["slippage_price_per_side"]
+    entry_fill = entry_mid + direction * friction_per_side
+    exit_fill = exit_mid - direction * friction_per_side
+    if entry_fill <= 0 or exit_fill <= 0:
+        raise ValueError("ML_BACKTEST_EXECUTION_COST_EXCEEDS_PRICE")
+    gross_quote = direction * (exit_mid - entry_mid) * units
+    gross_account = gross_quote * conversion
+    spread_cost = costs["spread_price"] * units * conversion
+    slippage_cost = 2.0 * costs["slippage_price_per_side"] * units * conversion
+    commission_cost = costs["commission_per_lot_round_turn"] * lots
+    entry_time = timestamps[entry_index]
+    exit_time = timestamps[exit_index] + timeframe_seconds
+    held_seconds = max(0.0, exit_time - entry_time)
+    held_days = held_seconds / 86400.0
+    swap_rate = costs["swap_long_per_lot_per_day"] if direction > 0 else costs["swap_short_per_lot_per_day"]
+    swap_pnl = swap_rate * lots * held_days
+    net_pnl = gross_account - spread_cost - slippage_cost - commission_cost + swap_pnl
+    stamp = lambda value: datetime.fromtimestamp(value, timezone.utc).isoformat().replace("+00:00", "Z")
+    return {
+        "signalTime": stamp(timestamps[signal_index]),
+        "entryTime": stamp(entry_time),
+        "exitTime": stamp(exit_time),
+        "direction": "BUY" if direction > 0 else "SELL",
+        "entryIndex": entry_index,
+        "exitIndex": exit_index,
+        "entryMidPrice": round(entry_mid, 8),
+        "entryFillPrice": round(entry_fill, 8),
+        "exitMidPrice": round(exit_mid, 8),
+        "exitFillPrice": round(exit_fill, 8),
+        "holdingHours": round(held_seconds / 3600.0, 4),
+        "grossPricePnlAccount": round(gross_account, 8),
+        "spreadCostAccount": round(spread_cost, 8),
+        "slippageCostAccount": round(slippage_cost, 8),
+        "commissionCostAccount": round(commission_cost, 8),
+        "swapPnlAccount": round(swap_pnl, 8),
+        "netPnlAccount": round(net_pnl, 8),
+    }
+
+
+def walk_forward_cost_aware_backtest(
+    strategy: str,
+    symbol: str,
+    timeframe: str,
+    raw_bars: Any,
+    raw_costs: Any,
+    folds: int = 3,
+    data_source: str = "",
+) -> dict[str, Any]:
+    strategy = str(strategy or "").strip().lower()
+    symbol = str(symbol or "").strip().upper()
+    timeframe = str(timeframe or "").strip().lower()
+    source = str(data_source or "").strip()[:120]
+    if strategy not in STRATEGY_FOCUS:
+        raise ValueError("ML_BACKTEST_STRATEGY_INVALID")
+    if not symbol or not re.fullmatch(r"[A-Z0-9._:-]{3,40}", symbol):
+        raise ValueError("ML_BACKTEST_SYMBOL_INVALID")
+    if timeframe not in BACKTEST_TIMEFRAME_SECONDS:
+        raise ValueError("ML_BACKTEST_TIMEFRAME_INVALID")
+    if not source:
+        raise ValueError("ML_BACKTEST_DATA_SOURCE_REQUIRED")
+    if not isinstance(raw_bars, list) or len(raw_bars) < 260:
+        raise ValueError("ML_BACKTEST_REQUIRES_AT_LEAST_260_BARS")
+    if len(raw_bars) > MAX_BARS_PER_MARKET:
+        raise ValueError(f"ML_BACKTEST_MAX_BARS_{MAX_BARS_PER_MARKET}")
+    if isinstance(folds, bool) or not isinstance(folds, int) or not 2 <= folds <= 5:
+        raise ValueError("ML_BACKTEST_FOLDS_MUST_BE_2_TO_5")
+    costs = _backtest_costs(raw_costs)
+    bars = normalize_market_bars(raw_bars)
+    if len(bars) != len(raw_bars):
+        raise ValueError("ML_BACKTEST_BAR_DATA_INVALID_OR_INCOMPLETE")
+    timestamps = [_parse_bar_timestamp(bar) for bar in raw_bars]
+    if any(right <= left for left, right in zip(timestamps, timestamps[1:])):
+        raise ValueError("ML_BACKTEST_TIMESTAMPS_MUST_BE_STRICTLY_INCREASING")
+
+    horizon = FORWARD_HORIZON
+    signal_stop = len(bars) - horizon
+    first_test_start = max(120, int(len(bars) * 0.55))
+    usable_signals = signal_stop - first_test_start
+    if usable_signals < folds * max(20, horizon + 10):
+        raise ValueError("ML_BACKTEST_HISTORY_INSUFFICIENT_FOR_REQUESTED_FOLDS")
+
+    aggregate_actual: list[int] = []
+    aggregate_predicted: list[int] = []
+    trades: list[dict[str, Any]] = []
+    fold_reports: list[dict[str, Any]] = []
+    total_training_samples = 0
+
+    for fold_index in range(folds):
+        start = first_test_start + (usable_signals * fold_index // folds)
+        end = first_test_start + (usable_signals * (fold_index + 1) // folds)
+        # Training labels are generated only from the strict prefix; bars_to_training_arrays
+        # excludes its final FORWARD_HORIZON rows, preventing labels from crossing the fold edge.
+        X_train, y_train, weights_train = bars_to_training_arrays(bars[:start], strategy)
+        # Exclude tail signals whose forward labels would cross into the next fold.
+        test_indices = list(range(start, end - horizon))
+        X_rows: list[list[float]] = []
+        y_rows: list[int] = []
+        valid_indices: list[int] = []
+        for index in test_indices:
+            features = extract_features_from_bars(bars, index)
+            if features is None:
+                continue
+            X_rows.append(apply_strategy_focus(features, strategy))
+            y_rows.append(_true_label_at(bars, index))
+            valid_indices.append(index)
+        if len(X_rows) < 10:
+            raise ValueError("ML_BACKTEST_TEST_FEATURES_INSUFFICIENT")
+        X_test = np.asarray(X_rows, dtype=np.float32)
+        y_test = np.asarray(y_rows, dtype=np.int64)
+        predicted, fold_classification = _ensemble_fold_predictions(
+            strategy, X_train, y_train, weights_train, X_test, y_test
+        )
+        aggregate_actual.extend(int(v) for v in y_test)
+        aggregate_predicted.extend(int(v) for v in predicted)
+        total_training_samples += int(len(y_train))
+        direction_by_index = dict(zip(valid_indices, (int(v) for v in predicted)))
+
+        fold_trades: list[dict[str, Any]] = []
+        cursor = start
+        # One position at a time. Signals enter next bar open, then exit after the
+        # forward horizon. No trade can bleed into the next evaluation fold.
+        while cursor + horizon < end:
+            direction = direction_by_index.get(cursor, 0)
+            if direction not in (-1, 1):
+                cursor += 1
+                continue
+            trade = _costed_backtest_trade(
+                direction=direction,
+                signal_index=cursor,
+                entry_index=cursor + 1,
+                exit_index=cursor + horizon,
+                bars=bars,
+                timestamps=timestamps,
+                timeframe_seconds=BACKTEST_TIMEFRAME_SECONDS[timeframe],
+                costs=costs,
+            )
+            trade["fold"] = fold_index + 1
+            trades.append(trade)
+            fold_trades.append(trade)
+            cursor += horizon
+
+        fold_net = sum(float(trade["netPnlAccount"]) for trade in fold_trades)
+        fold_reports.append({
+            "fold": fold_index + 1,
+            "trainingEndUtc": datetime.fromtimestamp(timestamps[start - 1], timezone.utc).isoformat().replace("+00:00", "Z"),
+            "testStartUtc": datetime.fromtimestamp(timestamps[start], timezone.utc).isoformat().replace("+00:00", "Z"),
+            "testEndUtc": datetime.fromtimestamp(timestamps[end - 1], timezone.utc).isoformat().replace("+00:00", "Z"),
+            "trainingSamples": int(len(y_train)),
+            "testSamples": int(len(y_test)),
+            "classification": fold_classification,
+            "tradeCount": len(fold_trades),
+            "netPnlAccount": round(fold_net, 8),
+        })
+
+    net_values = [float(trade["netPnlAccount"]) for trade in trades]
+    gross_values = [float(trade["grossPricePnlAccount"]) for trade in trades]
+    spread_total = sum(float(trade["spreadCostAccount"]) for trade in trades)
+    slippage_total = sum(float(trade["slippageCostAccount"]) for trade in trades)
+    commission_total = sum(float(trade["commissionCostAccount"]) for trade in trades)
+    swap_total = sum(float(trade["swapPnlAccount"]) for trade in trades)
+    gross_total = sum(gross_values)
+    net_total = sum(net_values)
+    positive = sum(value for value in net_values if value > 0)
+    negative = -sum(value for value in net_values if value < 0)
+    mean_pnl = float(np.mean(net_values)) if net_values else None
+    pnl_std = float(np.std(net_values, ddof=1)) if len(net_values) > 1 else None
+    cumulative = 0.0
+    peak = 0.0
+    max_drawdown = 0.0
+    for value in net_values:
+        cumulative += value
+        peak = max(peak, cumulative)
+        max_drawdown = max(max_drawdown, peak - cumulative)
+    actual = np.asarray(aggregate_actual, dtype=np.int64)
+    predicted = np.asarray(aggregate_predicted, dtype=np.int64)
+    classification = {
+        "accuracy": float(accuracy_score(actual, predicted)),
+        "balancedAccuracy": float(balanced_accuracy_score(actual, predicted)),
+        "macroF1": float(f1_score(actual, predicted, average="macro", zero_division=0)),
+        "samples": int(len(actual)),
+    }
+    trade_count = len(trades)
+    result_status = "INSUFFICIENT_TRADES" if trade_count < 30 else "COMPLETED"
+    return {
+        "ok": True,
+        "status": result_status,
+        "evaluation": "EXPANDING_ROLLING_PURGED_WALK_FORWARD",
+        "strategy": strategy,
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "folds": fold_reports,
+        "foldCount": len(fold_reports),
+        "forwardHorizonBars": horizon,
+        "purgeBars": horizon,
+        "data": {
+            "sourceClaim": source,
+            "sourceIndependentlyVerified": False,
+            "barCount": len(bars),
+            "firstBarUtc": datetime.fromtimestamp(timestamps[0], timezone.utc).isoformat().replace("+00:00", "Z"),
+            "lastBarUtc": datetime.fromtimestamp(timestamps[-1], timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestampCoveragePct": 100.0,
+            "trainingSamplesAcrossFolds": total_training_samples,
+            "heldOutClassificationSamples": len(actual),
+        },
+        "classification": classification,
+        "costs": {
+            **costs,
+            "spreadApplication": "flat full spread charged across entry and exit",
+            "slippageApplication": "per-side adverse slippage at entry and exit",
+            "swapConvention": "prorated elapsed calendar time; broker rollover cutoffs, holidays, and triple-swap schedules are not modeled",
+            "positionSizing": "fixed volume per trade; no compounding",
+            "stopTakeProfit": "not modeled; positions exit at the configured forward horizon",
+        },
+        "performance": {
+            "accountCurrency": costs["account_currency"],
+            "tradeCount": trade_count,
+            "winRatePct": round(sum(1 for value in net_values if value > 0) / trade_count * 100.0, 4) if trade_count else None,
+            "grossPnlAccount": round(gross_total, 8),
+            "spreadCostAccount": round(spread_total, 8),
+            "slippageCostAccount": round(slippage_total, 8),
+            "commissionCostAccount": round(commission_total, 8),
+            "swapPnlAccount": round(swap_total, 8),
+            "netPnlAccount": round(net_total, 8),
+            "netReturnPctStartingEquity": round(net_total / costs["starting_equity"] * 100.0, 6),
+            "maxDrawdownAccount": round(max_drawdown, 8),
+            "maxDrawdownPctStartingEquity": round(max_drawdown / costs["starting_equity"] * 100.0, 6),
+            "expectancyPerTradeAccount": round(mean_pnl, 8) if mean_pnl is not None else None,
+            "netProfitFactor": round(positive / negative, 6) if negative > 0 else None,
+            "tradeLevelSharpeUnannualized": round(mean_pnl / pnl_std, 6) if mean_pnl is not None and pnl_std and pnl_std > 0 else None,
+            "positiveNetPnl": net_total > 0 if trade_count else None,
+        },
+        "profitabilityValidated": False,
+        "interpretation": "Historical out-of-sample result for caller-supplied OHLC and cost assumptions only; the data-source claim is not independently verified, broker rollover conventions are approximated, and one run is not proof of future or live profitability.",
+        "trades": trades,
+    }
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "KINGBOT-ML/1.0"
 
@@ -881,27 +1596,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._json(200, {
-                "ok": True,
-                "service": "KINGBOT ML Signal Service",
-                "stage": "AI_STRATEGIES",
-                "purpose": "ML_SIGNAL_GENERATION",
-                "libraries": ["scikit-learn", "PyTorch"],
-                "modelsLoaded": len(MODELS),
-                "configured": bool(SECRET),
-                "ready": bool(SECRET),
-                "training": len(TRAINING_KEYS),
-                "feedbackRows": len(FEEDBACK_ROWS),
-                "feedbackVersion": FEEDBACK_VERSION,
-                "championModels": len(MODELS),
-                "challengerModels": len(CHALLENGERS),
-                "maxModels": MAX_MODELS,
-                "maxPredictions": MAX_PREDICTIONS,
-                "maxConcurrentTraining": MAX_CONCURRENT_TRAINING,
-                "rfTrees": MAX_RF_TREES,
-                "torchEpochs": TORCH_EPOCHS,
-                "torchThreads": TORCH_THREADS,
-            })
+            self._json(200, health_status())
             return
         if self.path == "/models":
             if not self._authorized():
@@ -971,6 +1666,25 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, {"stage": "AI_STRATEGIES", **result})
                 return
 
+            if path == "/backtest":
+                strategy = str(body.get("botId") or "").strip().lower()
+                symbol = str(body.get("symbol") or "").strip().upper()
+                timeframe = str(body.get("timeframe") or "5m").strip().lower()
+                costs = body.get("costs")
+                bars = body.get("bars")
+                data_source = str(body.get("dataSource") or "").strip()
+                folds = body.get("folds", 3)
+                if not BACKTEST_SEMAPHORE.acquire(blocking=False):
+                    raise RuntimeError("ML_BACKTEST_CAPACITY_BUSY")
+                try:
+                    result = walk_forward_cost_aware_backtest(
+                        strategy, symbol, timeframe, bars, costs, folds, data_source
+                    )
+                finally:
+                    BACKTEST_SEMAPHORE.release()
+                self._json(200, result)
+                return
+
             if path == "/predict":
                 strategy = str(body.get("botId") or "").strip().lower()
                 symbol = str(body.get("symbol") or "").strip().upper()
@@ -996,6 +1710,13 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    restored_models = load_persisted_models()
+    restored_feedback = load_persisted_feedback()
+    print("[KINGBOT ML] recovery:", json.dumps({
+        "models": restored_models,
+        "feedback": restored_feedback,
+        "persistenceEnabled": bool(MODEL_STORE_DIR),
+    }, separators=(",", ":")))
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     server.daemon_threads = True
     server.allow_reuse_address = True

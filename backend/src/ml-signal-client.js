@@ -16,6 +16,7 @@ const SECRET = String(process.env.KINGBOT_ML_SIGNAL_SECRET || "").trim();
 // keeping the worker bounded and preserving the mandatory AI execution gate.
 const TIMEOUT_MS = Math.max(2500, Number(process.env.KINGBOT_ML_SIGNAL_TIMEOUT_MS || 6500));
 const TRAIN_TIMEOUT_MS = Math.max(8000, Number(process.env.KINGBOT_ML_TRAIN_TIMEOUT_MS || 30000));
+const BACKTEST_TIMEOUT_MS = Math.max(15000, Number(process.env.KINGBOT_ML_BACKTEST_TIMEOUT_MS || 120000));
 
 function enabled() {
   return Boolean(URL && SECRET);
@@ -105,9 +106,9 @@ export async function probeMlSignalService() {
   try {
     const remote = await health();
     return {
-      ok: true,
-      ready: Boolean(remote?.ready || remote?.configured),
-      status: remote?.ready ? "ML_SERVICE_READY" : "ML_SERVICE_DEGRADED",
+      ok: remote?.ok !== false,
+      ready: Boolean(remote?.ready),
+      status: remote?.ready ? "ML_SERVICE_READY" : remote?.configured ? "ML_SERVICE_DEGRADED" : "ML_SERVICE_NOT_CONFIGURED",
       ...mlSignalServiceStatus(),
       remote
     };
@@ -197,6 +198,42 @@ export async function trainMlStrategyModel({ botId, symbol, timeframe, bars, mar
       status: code === "ML_TRAINING_IN_PROGRESS" ? "ML_TRAINING_IN_PROGRESS" :
         code === "ML_SIGNAL_REQUEST_TIMEOUT" ? "ML_TRAINING_TIMEOUT" :
         code === "ML_SERVICE_UNAUTHORIZED" ? "ML_SERVICE_UNAUTHORIZED" : "ML_TRAINING_SERVICE_UNAVAILABLE",
+      error: code
+    };
+  }
+}
+
+/**
+ * Run a research-only rolling walk-forward backtest. This endpoint never routes
+ * orders; callers must supply timestamped historical bars and explicit cost assumptions.
+ */
+export async function runMlStrategyBacktest({
+  botId, symbol, timeframe, bars, costs, folds = 3, dataSource
+} = {}) {
+  if (!enabled()) {
+    return { ok: false, status: "ML_SERVICE_NOT_CONFIGURED" };
+  }
+  if (!botId || !symbol || !Array.isArray(bars) || !costs || !dataSource) {
+    return { ok: false, status: "ML_BACKTEST_PAYLOAD_INVALID" };
+  }
+  try {
+    return await request("/backtest", {
+      botId: String(botId).trim().toLowerCase(),
+      symbol: String(symbol).trim().toUpperCase(),
+      timeframe: String(timeframe || "5m").trim().toLowerCase(),
+      bars,
+      costs,
+      folds,
+      dataSource: String(dataSource).slice(0, 120)
+    }, BACKTEST_TIMEOUT_MS);
+  } catch (error) {
+    const code = normalizeError(error, "ML_BACKTEST_UNAVAILABLE");
+    return {
+      ok: false,
+      ready: false,
+      status: code === "ML_SIGNAL_REQUEST_TIMEOUT" ? "ML_BACKTEST_TIMEOUT" :
+        code === "ML_SERVICE_UNAUTHORIZED" ? "ML_SERVICE_UNAUTHORIZED" :
+        code.startsWith("ML_BACKTEST_") ? code : "ML_BACKTEST_UNAVAILABLE",
       error: code
     };
   }
