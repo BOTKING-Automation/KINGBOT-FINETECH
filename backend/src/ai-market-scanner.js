@@ -1250,7 +1250,6 @@ class AiMarketScannerStream {
     // A reconnect or added subscriber should not wait for the next scheduled cycle.
     if (channel.timer) clearTimeout(channel.timer);
     channel.timer = null;
-    await this.scanChannel(channel);
 
     this.send(client.ws, {
       type: "subscribed",
