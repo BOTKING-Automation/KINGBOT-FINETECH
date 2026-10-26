@@ -26,6 +26,7 @@ on:
       - "backend/test/global-risk.test.js"
       - "backend/test/gold-price-feed.test.js"
       - "backend/test/market-data-fabric.test.js"
+      - "backend/test/scanner-frequency.test.js"
       - "system/intelligence-orchestrator.js"
       - "system/ai-support.js"
       - ".github/workflows/ai-strategies.yml"
@@ -49,6 +50,7 @@ on:
       - "backend/test/strategy-council.test.js"
       - "backend/test/intelligence-orchestrator.test.js"
       - "backend/test/global-risk.test.js"
+      - "backend/test/scanner-frequency.test.js"
       - "system/intelligence-orchestrator.js"
       - "system/ai-support.js"
 
@@ -164,7 +166,7 @@ jobs:
 
       - name: Specialist brain and strategy council tests
         working-directory: backend
-        run: node --test test/strategy-specialists.test.js test/strategy-council.test.js test/intelligence-orchestrator.test.js test/gold-price-feed.test.js test/market-data-fabric.test.js test/global-risk.test.js
+        run: node --test test/strategy-specialists.test.js test/strategy-council.test.js test/intelligence-orchestrator.test.js test/gold-price-feed.test.js test/market-data-fabric.test.js test/global-risk.test.js test/scanner-frequency.test.js
 
       - name: End-to-end Node → ML service gate test
         run: |
