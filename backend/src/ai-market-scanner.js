@@ -1099,6 +1099,10 @@ class AiMarketScannerStream {
         consecutiveFailures: 0,
         nextScanAt: null,
         dataState: "IDLE",
+        staleQuoteCount: 0,
+        staleTechnicalCount: 0,
+        quoteCoverage: "0/0",
+        technicalCoverage: "0/0",
         scanError: null
       };
       this.channels.set(key, channel);
@@ -1145,6 +1149,10 @@ class AiMarketScannerStream {
         : channel.averageScanDurationMs + (durationMs - channel.averageScanDurationMs) / channel.scanCount;
       channel.lastScan = result;
       channel.dataState = state;
+      channel.staleQuoteCount = staleQuoteCount;
+      channel.staleTechnicalCount = staleTechnicalCount;
+      channel.quoteCoverage = coverage.quoteCoverage;
+      channel.technicalCoverage = coverage.technicalCoverage;
 
       if (state === "LIVE") {
         channel.liveScans += 1;
@@ -1245,6 +1253,10 @@ class AiMarketScannerStream {
       timeframe: channel.timeframe,
       clients: channel.clients.size,
       state: channel.dataState,
+      quoteCoverage: channel.quoteCoverage,
+      technicalCoverage: channel.technicalCoverage,
+      staleQuoteCount: channel.staleQuoteCount,
+      staleTechnicalCount: channel.staleTechnicalCount,
       scanCount: channel.scanCount,
       liveScans: channel.liveScans,
       degradedScans: channel.degradedScans,
