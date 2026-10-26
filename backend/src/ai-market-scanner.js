@@ -20,6 +20,54 @@ export function resolveScannerIntervalMs(value) {
   if (!Number.isFinite(parsed) || parsed <= 0) return 2500;
   return Math.max(2500, Math.min(30000, Math.floor(parsed)));
 }
+
+export function evaluateScannerCoverage(result, expectedSymbols, scanIntervalMs = 2500) {
+  const quotesData = Array.isArray(result?.quotes) ? result.quotes : [];
+  const technicalData = Array.isArray(result?.technical) ? result.technical : [];
+  const expected = Math.max(0, Number(expectedSymbols) || 0);
+  const quotes = Math.max(0, finite(result?.quoteCount) ?? quotesData.filter(item => item?.available).length);
+  const technical = Math.max(0, finite(result?.technicalCount) ?? technicalData.filter(item => item?.technicalVerified).length);
+  const maxTechnicalCacheAgeMs = Math.max(15000, Number(scanIntervalMs) * 6);
+
+  const staleQuoteCount = quotesData.filter(item => {
+    if (!item?.available) return false;
+    const ageValue = item.ageMs ?? item.quoteAgeMs;
+    const maxAgeValue = item.freshnessMaxAgeMs ?? item.quoteFreshnessMaxAgeMs;
+    if (ageValue == null || maxAgeValue == null) return false;
+    const ageMs = finite(ageValue);
+    const maxAgeMs = finite(maxAgeValue);
+    return ageMs !== null && maxAgeMs !== null && ageMs > maxAgeMs;
+  }).length;
+
+  const staleTechnicalCount = technicalData.filter(item => {
+    if (!item?.technicalVerified || item.technicalCacheAgeMs == null) return false;
+    const ageMs = finite(item.technicalCacheAgeMs);
+    return ageMs !== null && ageMs > maxTechnicalCacheAgeMs;
+  }).length;
+
+  const fullCoverage = Boolean(result?.ok) &&
+    expected > 0 &&
+    quotes >= expected &&
+    technical >= expected &&
+    staleQuoteCount === 0 &&
+    staleTechnicalCount === 0;
+  const state = !result?.ok || quotes <= 0
+    ? "UNAVAILABLE"
+    : fullCoverage
+      ? "LIVE"
+      : "DEGRADED";
+
+  return {
+    state,
+    quotes,
+    technical,
+    expectedSymbols: expected,
+    staleQuoteCount,
+    staleTechnicalCount,
+    quoteCoverage: `${quotes}/${expected}`,
+    technicalCoverage: `${technical}/${expected}`
+  };
+}
 const publicGoldPriceFeed = getGoldPriceFeed();
 const publicDerivFeed = getDerivMarketFeed();
 const publicDerivTechnicalCache = new Map();
@@ -489,7 +537,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
           source: snapshot.source || "KINGBOT native OHLC",
           barTime: snapshot.barTime,
           dataFreshness: snapshot.receivedAt || snapshot.barTime,
-          technicalCacheAgeMs: finite(snapshot.cacheAgeMs),
+          technicalCacheAgeMs: finite(snapshot.cacheAgeMs ?? snapshot.technicalCacheAgeMs),
           technicalVerified: true
         }
       : {
@@ -1083,17 +1131,11 @@ class AiMarketScannerStream {
 
       const finishedAt = Date.now();
       const durationMs = Math.max(0, finishedAt - scanStartedAt);
-      const quotes = Number(result?.quoteCount) || 0;
-      const technical = Number(result?.technicalCount) || 0;
       const expectedSymbols = Array.isArray(result?.symbols) && result.symbols.length
         ? result.symbols.length
         : channel.symbols.length;
-      const completeCoverage = Boolean(result?.ok) && quotes >= expectedSymbols && technical >= expectedSymbols;
-      const state = !result?.ok || quotes <= 0
-        ? "UNAVAILABLE"
-        : completeCoverage
-          ? "LIVE"
-          : "DEGRADED";
+      const coverage = evaluateScannerCoverage(result, expectedSymbols, this.scanIntervalMs);
+      const { quotes, technical, state, staleQuoteCount, staleTechnicalCount } = coverage;
 
       channel.scanCount += 1;
       channel.lastScanAt = finishedAt;
@@ -1134,8 +1176,10 @@ class AiMarketScannerStream {
             failedScans: channel.failedScans,
             consecutiveFailures: channel.consecutiveFailures,
             lastSuccessfulScanAt: channel.lastSuccessfulScanAt ? new Date(channel.lastSuccessfulScanAt).toISOString() : null,
-            quoteCoverage: `${quotes}/${expectedSymbols}`,
-            technicalCoverage: `${technical}/${expectedSymbols}`,
+            quoteCoverage: coverage.quoteCoverage,
+            technicalCoverage: coverage.technicalCoverage,
+            staleQuoteCount,
+            staleTechnicalCount,
             upstream: this.twelveData?.enabled
               ? (this.twelveData.status?.() || { source: "Twelve Data WebSocket" })
               : publicDerivFeed.status()
