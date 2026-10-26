@@ -1253,6 +1253,7 @@ class AiMarketScannerStream {
       timeframe: channel.timeframe,
       clients: channel.clients.size,
       state: channel.dataState,
+      lastAttemptAt: channel.lastAttemptAt ? new Date(channel.lastAttemptAt).toISOString() : null,
       quoteCoverage: channel.quoteCoverage,
       technicalCoverage: channel.technicalCoverage,
       staleQuoteCount: channel.staleQuoteCount,
