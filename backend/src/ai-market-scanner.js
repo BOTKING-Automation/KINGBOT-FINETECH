@@ -12,6 +12,14 @@ import { trainMlStrategyModel, mlSignalServiceStatus, probeMlSignalService } fro
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
+
+// Keep the streaming scanner fast while protecting upstream feeds from accidental tight loops.
+export function resolveScannerIntervalMs(value) {
+  const configured = value ?? process.env.AI_SCANNER_WS_SCAN_INTERVAL_MS;
+  const parsed = Number(configured);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 2500;
+  return Math.max(2500, Math.min(30000, Math.floor(parsed)));
+}
 const publicGoldPriceFeed = getGoldPriceFeed();
 const publicDerivFeed = getDerivMarketFeed();
 const publicDerivTechnicalCache = new Map();
@@ -902,10 +910,7 @@ class AiMarketScannerStream {
     this.channels = new Map();
     this.derivBindings = new Map();
     this.startedAt = Date.now();
-    this.scanIntervalMs = Math.max(
-      2500,
-      Math.min(30000, Number(process.env.AI_SCANNER_WS_SCAN_INTERVAL_MS || 5000))
-    );
+    this.scanIntervalMs = resolveScannerIntervalMs();
     this.maxClients = Math.max(
       10,
       Math.min(500, Number(process.env.AI_SCANNER_WS_MAX_CLIENTS || 100))
@@ -961,7 +966,8 @@ class AiMarketScannerStream {
 
   cleanupChannel(channel) {
     if (!channel || channel.clients.size || channel.running) return;
-    if (channel.timer) clearInterval(channel.timer);
+    if (channel.timer) clearTimeout(channel.timer);
+    channel.timer = null;
     this.channels.delete(channel.key);
   }
 
@@ -1032,21 +1038,37 @@ class AiMarketScannerStream {
         clients: new Set(),
         timer: null,
         running: false,
+        lastAttemptAt: null,
         lastScanAt: null,
+        lastSuccessfulScanAt: null,
         lastScan: null,
+        lastScanDurationMs: null,
+        averageScanDurationMs: null,
+        scanCount: 0,
+        liveScans: 0,
+        degradedScans: 0,
+        failedScans: 0,
+        consecutiveFailures: 0,
+        nextScanAt: null,
+        dataState: "IDLE",
         scanError: null
       };
       this.channels.set(key, channel);
-      channel.timer = setInterval(() => {
-        void this.scanChannel(channel);
-      }, this.scanIntervalMs);
     }
     return channel;
   }
 
   async scanChannel(channel) {
-    if (!channel || channel.running || !channel.clients.size) return;
+    if (!channel || channel.running) return;
+    if (!channel.clients.size) {
+      this.cleanupChannel(channel);
+      return;
+    }
+
+    const scanStartedAt = Date.now();
     channel.running = true;
+    channel.lastAttemptAt = scanStartedAt;
+    channel.timer = null;
 
     try {
       await this.ensureDerivBindings(channel.symbols);
@@ -1059,9 +1081,42 @@ class AiMarketScannerStream {
         focusSymbol: channel.symbols?.[0] || null
       });
 
-      channel.lastScanAt = Date.now();
+      const finishedAt = Date.now();
+      const durationMs = Math.max(0, finishedAt - scanStartedAt);
+      const quotes = Number(result?.quoteCount) || 0;
+      const technical = Number(result?.technicalCount) || 0;
+      const expectedSymbols = Array.isArray(result?.symbols) && result.symbols.length
+        ? result.symbols.length
+        : channel.symbols.length;
+      const completeCoverage = Boolean(result?.ok) && quotes >= expectedSymbols && technical >= expectedSymbols;
+      const state = !result?.ok || quotes <= 0
+        ? "UNAVAILABLE"
+        : completeCoverage
+          ? "LIVE"
+          : "DEGRADED";
+
+      channel.scanCount += 1;
+      channel.lastScanAt = finishedAt;
+      channel.lastScanDurationMs = durationMs;
+      channel.averageScanDurationMs = channel.averageScanDurationMs === null
+        ? durationMs
+        : channel.averageScanDurationMs + (durationMs - channel.averageScanDurationMs) / channel.scanCount;
       channel.lastScan = result;
-      channel.scanError = null;
+      channel.dataState = state;
+
+      if (state === "LIVE") {
+        channel.liveScans += 1;
+        channel.consecutiveFailures = 0;
+        channel.lastSuccessfulScanAt = finishedAt;
+        channel.scanError = null;
+      } else {
+        if (state === "DEGRADED") channel.degradedScans += 1;
+        else channel.failedScans += 1;
+        channel.consecutiveFailures += 1;
+        channel.scanError = String(
+          result?.message || result?.error || (state === "DEGRADED" ? "INCOMPLETE_MARKET_DATA" : "LIVE_MARKET_DATA_UNAVAILABLE")
+        ).slice(0, 220);
+      }
 
       for (const client of [...channel.clients]) {
         if (client.closed) continue;
@@ -1069,8 +1124,18 @@ class AiMarketScannerStream {
           type: "scan",
           data: result,
           stream: {
-            state: "LIVE",
+            state,
             scanIntervalMs: this.scanIntervalMs,
+            scanDurationMs: durationMs,
+            averageScanDurationMs: Math.round(channel.averageScanDurationMs),
+            scanCount: channel.scanCount,
+            liveScans: channel.liveScans,
+            degradedScans: channel.degradedScans,
+            failedScans: channel.failedScans,
+            consecutiveFailures: channel.consecutiveFailures,
+            lastSuccessfulScanAt: channel.lastSuccessfulScanAt ? new Date(channel.lastSuccessfulScanAt).toISOString() : null,
+            quoteCoverage: `${quotes}/${expectedSymbols}`,
+            technicalCoverage: `${technical}/${expectedSymbols}`,
             upstream: this.twelveData?.enabled
               ? (this.twelveData.status?.() || { source: "Twelve Data WebSocket" })
               : publicDerivFeed.status()
@@ -1078,6 +1143,17 @@ class AiMarketScannerStream {
         });
       }
     } catch (error) {
+      const finishedAt = Date.now();
+      const durationMs = Math.max(0, finishedAt - scanStartedAt);
+      channel.scanCount += 1;
+      channel.lastScanAt = finishedAt;
+      channel.lastScanDurationMs = durationMs;
+      channel.averageScanDurationMs = channel.averageScanDurationMs === null
+        ? durationMs
+        : channel.averageScanDurationMs + (durationMs - channel.averageScanDurationMs) / channel.scanCount;
+      channel.dataState = "UNAVAILABLE";
+      channel.failedScans += 1;
+      channel.consecutiveFailures += 1;
       channel.scanError = String(error?.message || "AI_MARKET_SCANNER_STREAM_FAILED").slice(0, 220);
       for (const client of [...channel.clients]) {
         if (client.closed) continue;
@@ -1085,13 +1161,68 @@ class AiMarketScannerStream {
           type: "scanner_error",
           error: "AI_MARKET_SCANNER_STREAM_FAILED",
           reason: channel.scanError,
+          stream: {
+            state: channel.dataState,
+            scanIntervalMs: this.scanIntervalMs,
+            scanDurationMs: durationMs,
+            scanCount: channel.scanCount,
+            consecutiveFailures: channel.consecutiveFailures,
+            lastSuccessfulScanAt: channel.lastSuccessfulScanAt ? new Date(channel.lastSuccessfulScanAt).toISOString() : null
+          },
           at: new Date().toISOString()
         });
       }
     } finally {
       channel.running = false;
-      this.cleanupChannel(channel);
+      if (channel.clients.size) {
+        // Maintain the target start-to-start cadence; never overlap slow scans.
+        // Back off exponentially when data is incomplete or upstream requests fail.
+        const multiplier = channel.consecutiveFailures > 0
+          ? Math.min(16, 2 ** Math.min(channel.consecutiveFailures, 4))
+          : 1;
+        const targetIntervalMs = Math.min(30000, this.scanIntervalMs * multiplier);
+        const elapsedMs = Math.max(0, Date.now() - scanStartedAt);
+        const delayMs = Math.max(0, targetIntervalMs - elapsedMs);
+        channel.nextScanAt = Date.now() + delayMs;
+        channel.timer = setTimeout(() => {
+          channel.timer = null;
+          void this.scanChannel(channel);
+        }, delayMs);
+        channel.timer.unref?.();
+      } else {
+        this.cleanupChannel(channel);
+      }
     }
+  }
+
+  metricsSummary() {
+    const channels = [...this.channels.values()].map(channel => ({
+      symbols: channel.symbols,
+      timeframe: channel.timeframe,
+      clients: channel.clients.size,
+      state: channel.dataState,
+      scanCount: channel.scanCount,
+      liveScans: channel.liveScans,
+      degradedScans: channel.degradedScans,
+      failedScans: channel.failedScans,
+      consecutiveFailures: channel.consecutiveFailures,
+      lastScanAt: channel.lastScanAt ? new Date(channel.lastScanAt).toISOString() : null,
+      lastSuccessfulScanAt: channel.lastSuccessfulScanAt ? new Date(channel.lastSuccessfulScanAt).toISOString() : null,
+      lastScanDurationMs: channel.lastScanDurationMs,
+      averageScanDurationMs: channel.averageScanDurationMs === null ? null : Math.round(channel.averageScanDurationMs),
+      nextScanAt: channel.nextScanAt ? new Date(channel.nextScanAt).toISOString() : null,
+      lastError: channel.scanError
+    }));
+    return {
+      state: channels.length ? (channels.every(channel => channel.state === "LIVE") ? "LIVE" : "DEGRADED") : "IDLE",
+      activeChannels: channels.length,
+      activeClients: channels.reduce((total, channel) => total + channel.clients, 0),
+      totalScans: channels.reduce((total, channel) => total + channel.scanCount, 0),
+      liveScans: channels.reduce((total, channel) => total + channel.liveScans, 0),
+      degradedScans: channels.reduce((total, channel) => total + channel.degradedScans, 0),
+      failedScans: channels.reduce((total, channel) => total + channel.failedScans, 0),
+      channels
+    };
   }
 
   async subscribe(client, symbols, timeframe) {
@@ -1115,6 +1246,11 @@ class AiMarketScannerStream {
     client.timeframe = channel.timeframe;
 
     await this.ensureDerivBindings(channel.symbols);
+
+    // A reconnect or added subscriber should not wait for the next scheduled cycle.
+    if (channel.timer) clearTimeout(channel.timer);
+    channel.timer = null;
+    await this.scanChannel(channel);
 
     this.send(client.ws, {
       type: "subscribed",
@@ -1330,7 +1466,8 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
         path:"/api/ai/market-scanner/ws",
         scanIntervalMs:stream.scanIntervalMs,
         clients:stream.clients.size,
-        channels:stream.channels.size
+        channels:stream.channels.size,
+        scanMetrics:stream.metricsSummary()
       }
     });
   });
