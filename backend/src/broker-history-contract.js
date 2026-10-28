@@ -59,6 +59,9 @@ export function normalizeBrokerHistoricalBars(result, { minBars = 260, maxBars =
     const volume = finite(row.volume ?? row.tickVolume ?? row.tick_volume ?? row.v);
 
     if (timestamp === null) throw new Error("BROKER_HISTORICAL_TIMESTAMP_INVALID");
+    if (timestamp > Date.now() + 60_000) {
+      throw new Error("BROKER_HISTORICAL_TIMESTAMP_IN_FUTURE");
+    }
     if (![open, high, low, close].every(value => value !== null && value > 0)) {
       throw new Error("BROKER_HISTORICAL_OHLC_INVALID");
     }
