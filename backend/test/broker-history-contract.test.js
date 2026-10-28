@@ -59,3 +59,12 @@ test("keeps the most recent 1000 bars without changing their order", () => {
   assert.equal(bars.length, 1000);
   assert.equal(bars[0].datetime, "2025-01-03T02:00:00.000Z");
 });
+
+
+test("rejects broker candles timestamped materially in the future", () => {
+  const bars = makeBars();
+  bars[bars.length - 1].time = new Date(Date.now() + 5 * 60_000).toISOString();
+  assert.throws(() => normalizeBrokerHistoricalBars(bars), {
+    message: "BROKER_HISTORICAL_TIMESTAMP_IN_FUTURE"
+  });
+});
