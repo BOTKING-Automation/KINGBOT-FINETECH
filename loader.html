@@ -60,6 +60,7 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
 .ambient-orb-gold{width:270px;height:270px;right:10%;bottom:-170px;background:radial-gradient(circle,rgba(246,185,59,.13),transparent 72%);animation:orbDrift 15s ease-in-out infinite}
 .ambient-sweep{position:absolute;z-index:2;pointer-events:none;left:-15%;right:-15%;top:50%;height:1px;background:linear-gradient(90deg,transparent,rgba(25,230,255,.55),rgba(255,79,216,.45),rgba(246,185,59,.42),transparent);box-shadow:0 0 22px rgba(25,230,255,.35);transform:rotate(-8deg);opacity:.55;animation:sweep 7s ease-in-out infinite}
 .core{z-index:5}
+.readout,.status,.progress,.foot{position:relative;z-index:5}
 .hud-panel{position:absolute;z-index:3;width:clamp(174px,17vw,228px);padding:16px 17px;border:1px solid rgba(25,230,255,.27);border-radius:14px;background:linear-gradient(145deg,rgba(5,17,37,.78),rgba(11,7,32,.72));box-shadow:0 0 28px rgba(25,230,255,.08),inset 0 0 22px rgba(155,92,255,.05);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);pointer-events:none;overflow:hidden}
 .hud-panel:before{content:"";position:absolute;inset:0 35% auto 0;height:1px;background:linear-gradient(90deg,var(--cyan),var(--violet),transparent);box-shadow:0 0 12px var(--cyan)}
 .hud-left{left:clamp(18px,3vw,48px);top:23%;animation:hudFloat 5s ease-in-out infinite}
@@ -215,28 +216,6 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
 <div class="ambient-orb ambient-orb-violet"></div>
 <div class="ambient-orb ambient-orb-gold"></div>
 <div class="ambient-sweep"></div>
-<div class="hud-panel hud-left" aria-hidden="true">
-  <div class="hud-label"><span class="hud-dot"></span> Neural Intelligence</div>
-  <div class="hud-value">05 <small>SPECIALIZED STRATEGY ENGINES</small></div>
-  <div class="hud-divider"></div>
-  <div class="hud-row"><span>STRATEGIC</span><b>01</b></div>
-  <div class="hud-row"><span>FLIPPER</span><b>02</b></div>
-  <div class="hud-row"><span>BREAKOUT</span><b>03</b></div>
-  <div class="hud-row"><span>SMC PRO</span><b>04</b></div>
-  <div class="hud-row"><span>LADDER FLIP</span><b>05</b></div>
-  <div class="hud-bars"><i style="height:38%"></i><i style="height:64%"></i><i style="height:47%"></i><i style="height:86%"></i><i style="height:58%"></i><i style="height:100%"></i><i style="height:72%"></i><i style="height:91%"></i><i style="height:61%"></i><i style="height:82%"></i><i style="height:53%"></i><i style="height:75%"></i></div>
-  <div class="hud-status"><span class="hud-dot"></span> INITIALIZATION SEQUENCE</div>
-</div>
-<div class="hud-panel hud-right" aria-hidden="true">
-  <div class="hud-label"><span class="hud-dot"></span> Market Intelligence</div>
-  <div class="hud-value">MTF <small>MULTI-TIMEFRAME ANALYSIS</small></div>
-  <div class="hud-signal"><svg viewBox="0 0 220 45" preserveAspectRatio="none"><polyline points="0,36 18,30 34,33 51,18 68,24 85,12 103,21 121,8 140,16 158,6 176,13 196,4 220,8"/></svg></div>
-  <div class="hud-row"><span>REGIME</span><b>ANALYZING</b></div>
-  <div class="hud-row"><span>DATA QUALITY</span><b>CHECKING</b></div>
-  <div class="hud-row"><span>RISK GATES</span><b>INITIALIZING</b></div>
-  <div class="hud-divider"></div>
-  <div class="hud-tagline">INTELLIGENCE WITH DISCIPLINE</div>
-</div>
 <div class="core">
 <div class="brand">KINGBOT FINTECH</div>
 <div class="sub">NEURAL TRADING INFRASTRUCTURE · SECURE INITIALIZATION</div>
