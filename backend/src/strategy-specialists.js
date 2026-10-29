@@ -54,13 +54,14 @@ function evaluateStrategic(m,mtf,regime){
   if((trend>0&&emaBull)||(trend<0&&emaBear)) conditions.push("EMA structure agrees with trend.");
   else missing.push("EMA structure alignment.");
   const d=trend>=0?"BUY":"SELL";
-  if((d==="BUY"&&htf==="BULLISH")||(d==="SELL"&&htf==="BEARISH")) conditions.push("Higher-timeframe bias agrees.");
+  const htfAligned=(d==="BUY"&&htf==="BULLISH")||(d==="SELL"&&htf==="BEARISH");
+  if(htfAligned) conditions.push("Higher-timeframe bias agrees.");
   else if(htf==="MIXED") wait.push("Higher-timeframe directional bias.");
   else contradictions.push("Higher-timeframe bias conflicts with directional trend.");
+  const coreCompletion=conditions.length/4;
   if((d==="BUY"&&local==="bullish")||(d==="SELL"&&local==="bearish")) conditions.push("Local structure agrees.");
-  const completion=conditions.length/4;
-  const score=clamp((trend*48)+(momentum*28)+(d==="BUY"?(emaBull?14:-8):(emaBear?-14:8))+(htf===d.replace("BUY","BULLISH").replace("SELL","BEARISH")?10:0));
-  const direction=completion>=0.75&&!contradictions.length?d:"WAIT";
+  const score=clamp((trend*48)+(momentum*28)+(d==="BUY"?(emaBull?14:-8):(emaBear?-14:8))+(htfAligned?10:0));
+  const direction=coreCompletion>=0.75&&htfAligned&&!contradictions.length?d:"WAIT";
   if(direction!=="WAIT") entry.push("Trend + momentum + EMA structure + higher-timeframe context align.");
   else wait.push("Complete the multi-factor directional confluence.");
   return card({botId:"strategic",strategyIdentity:"Multi-strategy directional confluence",direction,rawScore:direction==="WAIT"?score*0.7:score,confidence:completion*100,conditions,missingConditions:missing,entryConditions:entry,waitConditions:wait,marketRegimes:["TRENDING","TRENDING_VOLATILE"],timeframeRequirements:{regime:"4h",setup:"1h",execution:"15m"},evidenceUsed:["trend","momentum","EMA20/EMA50","market structure","MTF bias","regime"],contradictions,strategyMatch:direction!=="WAIT",invalidation:"Invalidate if trend/EMA structure breaks or higher-timeframe bias reverses."});
