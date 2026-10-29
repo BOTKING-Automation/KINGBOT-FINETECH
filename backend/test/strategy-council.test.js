@@ -11,6 +11,23 @@ const card=(botId,direction,score=85,confidence=85,extra={})=>({
 });
 const engine=(botId,specialist,score=85)=>({botId,name:botId,score,fit:85,strategyMatch:true,signal:specialist.direction==="BUY"?"LONG_CANDIDATE":"SHORT_CANDIDATE",specialist});
 
+test("higher-timeframe alignment raises the specialist council score",()=>{
+  const specialist=card("strategic","BUY",85,80);
+  const alignedResult=buildStrategyCouncil([engine("strategic",specialist)],{
+    multiTimeframe:{...aligned,higherTimeframeBias:"BULLISH"},
+    marketDecision:"BUY"
+  });
+  const opposingResult=buildStrategyCouncil([engine("strategic",specialist)],{
+    multiTimeframe:{...aligned,higherTimeframeBias:"BEARISH"},
+    marketDecision:"BUY"
+  });
+
+  const alignedScore=alignedResult.engines[0].councilScore;
+  const opposingScore=opposingResult.engines[0].councilScore;
+  assert.equal(alignedScore-opposingScore,28);
+  assert.ok(alignedScore>opposingScore);
+});
+
 test("a single valid specialist can lead without majority voting",()=>{
   const cards=[
     card("strategic","WAIT",0,0,{strategyMatch:false}),
