@@ -158,12 +158,66 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
 @media(max-width:760px){.tech-screen{width:46vw;min-height:106px;padding:9px;opacity:.30;filter:saturate(.8)}.tech-screen-a{left:-6%;top:3%}.tech-screen-b{right:-6%;top:3%}.tech-screen-c{left:-6%;bottom:4%}.tech-screen-d{right:-6%;bottom:4%}.tech-screen-head{font-size:6px;letter-spacing:.05em}.tech-screen-head b{font-size:5px}.tech-divider{margin:6px 0}.tech-chart{height:28px}.tech-ticker span{font-size:5px}.tech-ticker b{font-size:6px}.tech-node{font-size:5px}.tech-node i{width:12px;height:12px;margin-bottom:4px}.tech-node i:after{inset:3px}.tech-feature-tags span{font-size:5px;padding:4px 5px}.tech-circuit{opacity:.2}.hud-panel{display:none}}
 @media(prefers-reduced-motion:reduce){.tech-floor,.tech-screen,.tech-screen:after,.tech-chart .curve,.tech-ticker i,.tech-node:after,.tech-node i:after,.tech-circuit path{animation:none!important}}
 
+
+/* EXISTING FINTECH TRADING HUB ARTWORK — immersive background, not a replacement asset.
+   The stored project image fills the whole screen; the original loader stays in front. */
+#kb-tech-environment{background:#02040a}
+.tech-room-photo{
+ position:absolute;inset:-3%;z-index:0;
+ background-image:
+   linear-gradient(180deg,rgba(1,4,14,.22),rgba(1,4,14,.18) 40%,rgba(1,4,14,.66)),
+   url("assets/images/Kingbot%20Fintech%20AI%20Trading%20Hub.png");
+ background-size:cover;background-position:center center;background-repeat:no-repeat;
+ filter:saturate(1.14) contrast(1.08);
+ transform:scale(1.04);
+ animation:hubCameraDrift 28s ease-in-out infinite alternate;
+ will-change:transform;
+}
+.tech-room-photo:after{
+ content:"";position:absolute;inset:0;
+ background:
+  radial-gradient(ellipse at 50% 42%,transparent 20%,rgba(1,3,10,.18) 62%,rgba(1,3,10,.72) 100%),
+  linear-gradient(90deg,rgba(2,4,12,.28),transparent 24%,transparent 76%,rgba(2,4,12,.28));
+}
+.tech-room-glow{
+ z-index:1;opacity:.58;mix-blend-mode:screen;
+ background:
+  radial-gradient(ellipse at 12% 18%,rgba(25,230,255,.16),transparent 33%),
+  radial-gradient(ellipse at 88% 22%,rgba(155,92,255,.18),transparent 34%),
+  radial-gradient(ellipse at 78% 78%,rgba(255,79,216,.08),transparent 30%),
+  linear-gradient(180deg,rgba(2,4,10,.04),rgba(2,4,10,.06) 48%,rgba(2,4,10,.40));
+}
+.tech-floor{z-index:2;opacity:.17;background-size:72px 46px}
+.tech-horizon{z-index:2;opacity:.54}
+.tech-circuit{display:none!important}
+.tech-screen{display:none!important}
+#kb-network{opacity:.23;mix-blend-mode:screen}
+.brain-image{
+ width:100%;height:100%;padding:0;object-fit:cover;object-position:center center;
+ border-radius:50%;display:block;mix-blend-mode:screen;
+ filter:drop-shadow(0 0 14px rgba(25,230,255,.58)) drop-shadow(0 0 34px rgba(25,230,255,.24)) saturate(1.12) brightness(1.06);
+ animation:brainDepth 4s ease-in-out infinite;
+}
+.brain-image-wrap{border-radius:50%;overflow:hidden}
+.brain-image-wrap:before{inset:0;border-radius:50%}
+@keyframes hubCameraDrift{
+ 0%{transform:scale(1.04) translate3d(-.35%,0,0)}
+ 100%{transform:scale(1.11) translate3d(.35%,-.55%,0)}
+}
+@media(max-width:760px){
+ .tech-room-photo{inset:-2%;background-position:center center;animation-duration:34s}
+ .tech-floor{opacity:.11}
+ #kb-network{opacity:.15}
+}
+@media(prefers-reduced-motion:reduce){.tech-room-photo{animation:none;transform:scale(1.05)}}
+
 </style>
 </head>
 <body>
 <div id="kb-loader">
 <canvas id="kb-network" aria-hidden="true"></canvas>
 <div id="kb-tech-environment" aria-hidden="true">
+  <div class="tech-room-photo"></div>
   <div class="tech-room-glow"></div>
   <div class="tech-floor"></div>
   <div class="tech-horizon"></div>
