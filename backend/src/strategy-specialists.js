@@ -64,7 +64,7 @@ function evaluateStrategic(m,mtf,regime){
   const direction=coreCompletion>=0.75&&htfAligned&&!contradictions.length?d:"WAIT";
   if(direction!=="WAIT") entry.push("Trend + momentum + EMA structure + higher-timeframe context align.");
   else wait.push("Complete the multi-factor directional confluence.");
-  return card({botId:"strategic",strategyIdentity:"Multi-strategy directional confluence",direction,rawScore:direction==="WAIT"?score*0.7:score,confidence:completion*100,conditions,missingConditions:missing,entryConditions:entry,waitConditions:wait,marketRegimes:["TRENDING","TRENDING_VOLATILE"],timeframeRequirements:{regime:"4h",setup:"1h",execution:"15m"},evidenceUsed:["trend","momentum","EMA20/EMA50","market structure","MTF bias","regime"],contradictions,strategyMatch:direction!=="WAIT",invalidation:"Invalidate if trend/EMA structure breaks or higher-timeframe bias reverses."});
+  return card({botId:"strategic",strategyIdentity:"Multi-strategy directional confluence",direction,rawScore:direction==="WAIT"?score*0.7:score,confidence:coreCompletion*100,conditions,missingConditions:missing,entryConditions:entry,waitConditions:wait,marketRegimes:["TRENDING","TRENDING_VOLATILE"],timeframeRequirements:{regime:"4h",setup:"1h",execution:"15m"},evidenceUsed:["trend","momentum","EMA20/EMA50","market structure","MTF bias","regime"],contradictions,strategyMatch:direction!=="WAIT",invalidation:"Invalidate if trend/EMA structure breaks or higher-timeframe bias reverses."});
 }
 
 function evaluateFlipper(m,mtf){
