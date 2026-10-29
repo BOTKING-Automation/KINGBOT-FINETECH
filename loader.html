@@ -163,6 +163,8 @@ import "./system/session.js";
     let networkWidth=0,networkHeight=0,networkDpr=1,networkNodes=[],networkFrame=0;
     const palette=["25,230,255","155,92,255","255,79,216","246,185,59","35,247,163"];
     function resizeNetwork(){
+      if(networkFrame)window.cancelAnimationFrame(networkFrame);
+      networkFrame=0;
       networkWidth=window.innerWidth;
       networkHeight=window.innerHeight;
       networkDpr=Math.min(window.devicePixelRatio||1,1.5);
