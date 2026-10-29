@@ -90,11 +90,127 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
 @media(max-width:640px){#kb-network{opacity:.34}.ambient-sweep{opacity:.22}.ambient-orb{opacity:.42}.core{z-index:5}}
 @media(prefers-reduced-motion:reduce){.ambient-orb,.ambient-sweep,.hud-panel,.hud-bars i{animation:none!important}#kb-network{opacity:.35}}
 
+
+/* FULL-SCREEN TECH ENVIRONMENT: designed as a background stage.
+   The original KINGBOT loader remains in the foreground (z-index: 5). */
+#kb-tech-environment{position:absolute;inset:0;z-index:2;overflow:hidden;pointer-events:none;isolation:isolate}
+.tech-room-glow{position:absolute;inset:0;background:
+ radial-gradient(ellipse at 8% 26%,rgba(25,230,255,.10),transparent 29%),
+ radial-gradient(ellipse at 92% 24%,rgba(155,92,255,.12),transparent 30%),
+ radial-gradient(ellipse at 78% 79%,rgba(255,79,216,.07),transparent 27%),
+ linear-gradient(180deg,rgba(2,4,10,.04),rgba(2,4,10,.24) 60%,rgba(2,4,10,.74))}
+.tech-floor{position:absolute;left:-18%;right:-18%;bottom:-23%;height:49%;transform:perspective(520px) rotateX(62deg);transform-origin:center top;background:
+ linear-gradient(rgba(25,230,255,.12) 1px,transparent 1px),
+ linear-gradient(90deg,rgba(155,92,255,.13) 1px,transparent 1px);
+ background-size:54px 34px;mask-image:linear-gradient(to bottom,transparent,black 20%,black 68%,transparent);opacity:.5;animation:floorTravel 10s linear infinite}
+.tech-horizon{position:absolute;left:0;right:0;top:61%;height:1px;background:linear-gradient(90deg,transparent,rgba(25,230,255,.22),rgba(155,92,255,.32),rgba(246,185,59,.27),transparent);box-shadow:0 0 28px rgba(25,230,255,.18)}
+.tech-screen{position:absolute;z-index:1;width:clamp(240px,28vw,430px);min-height:150px;padding:15px 16px;border:1px solid rgba(25,230,255,.20);border-radius:13px;overflow:hidden;background:linear-gradient(140deg,rgba(4,17,36,.60),rgba(8,8,27,.37));box-shadow:inset 0 0 36px rgba(25,230,255,.035),0 0 34px rgba(25,230,255,.035);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);opacity:.86}
+.tech-screen:before{content:"";position:absolute;left:0;right:42%;top:0;height:1px;background:linear-gradient(90deg,var(--cyan),var(--violet),transparent);box-shadow:0 0 12px var(--cyan)}
+.tech-screen:after{content:"";position:absolute;top:-55%;bottom:-55%;left:-45%;width:28%;transform:skewX(-20deg);background:linear-gradient(90deg,transparent,rgba(25,230,255,.06),rgba(255,255,255,.035),transparent);animation:screenSheen 9s ease-in-out infinite}
+.tech-screen-a{left:clamp(14px,3.4vw,58px);top:8.5%;animation:screenBob 8s ease-in-out infinite}
+.tech-screen-b{right:clamp(14px,3.4vw,58px);top:8.5%;border-color:rgba(155,92,255,.26);background:linear-gradient(140deg,rgba(13,9,38,.61),rgba(8,8,27,.38));animation:screenBob 9s ease-in-out infinite reverse}
+.tech-screen-c{left:clamp(14px,3.4vw,58px);bottom:7.5%;border-color:rgba(246,185,59,.23);background:linear-gradient(140deg,rgba(28,17,12,.48),rgba(8,8,27,.38));animation:screenBob 10s ease-in-out infinite}
+.tech-screen-d{right:clamp(14px,3.4vw,58px);bottom:7.5%;border-color:rgba(255,79,216,.20);background:linear-gradient(140deg,rgba(26,7,31,.42),rgba(8,8,27,.38));animation:screenBob 8.5s ease-in-out infinite reverse}
+.tech-screen-head{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:10px;color:#9db1d3;font:800 8px "JetBrains Mono",monospace;letter-spacing:.13em;text-transform:uppercase}
+.tech-screen-head b{color:var(--cyan);font-size:7px;letter-spacing:.08em}
+.tech-screen-b .tech-screen-head b{color:#c3a3ff}
+.tech-screen-c .tech-screen-head b{color:var(--gold)}
+.tech-screen-d .tech-screen-head b{color:#ff9ee9}
+.tech-divider{height:1px;margin:11px 0;background:linear-gradient(90deg,rgba(25,230,255,.18),rgba(155,92,255,.13),transparent)}
+.tech-tickers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;position:relative;z-index:1}
+.tech-ticker{padding:7px 8px;border:1px solid rgba(255,255,255,.07);border-radius:7px;background:rgba(1,4,14,.30)}
+.tech-ticker span{display:block;color:#6f84a9;font:700 7px "JetBrains Mono",monospace;letter-spacing:.05em}
+.tech-ticker b{display:block;margin-top:5px;color:#d8e9ff;font:800 9px Orbitron,Inter,sans-serif}
+.tech-ticker i{display:block;width:100%;height:3px;margin-top:7px;border-radius:9px;background:linear-gradient(90deg,var(--cyan),var(--violet),transparent);transform-origin:left;animation:meterPulse 2.6s ease-in-out infinite alternate}
+.tech-chart{position:relative;z-index:1;width:100%;height:55px;display:block;overflow:visible}
+.tech-chart .axis{stroke:rgba(255,255,255,.08);stroke-width:1;stroke-dasharray:2 5}
+.tech-chart .curve{fill:none;stroke:var(--cyan);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 4px rgba(25,230,255,.45));stroke-dasharray:9 6;animation:trace 4s linear infinite}
+.tech-screen-b .curve{stroke:var(--violet);filter:drop-shadow(0 0 4px rgba(155,92,255,.45))}
+.tech-screen-c .curve{stroke:var(--gold);filter:drop-shadow(0 0 4px rgba(246,185,59,.45))}
+.tech-nodes{position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;align-items:center}
+.tech-node{position:relative;text-align:center;color:#91a4c9;font:700 7px "JetBrains Mono",monospace;letter-spacing:.02em}
+.tech-node:not(:last-child):after{content:"";position:absolute;top:8px;left:calc(50% + 15px);width:calc(100% - 21px);height:1px;background:linear-gradient(90deg,rgba(25,230,255,.52),rgba(155,92,255,.22));background-size:200% 100%;animation:dataFlow 2.5s linear infinite}
+.tech-node i{display:block;width:16px;height:16px;margin:0 auto 7px;border:1px solid rgba(25,230,255,.53);border-radius:50%;background:radial-gradient(circle,rgba(25,230,255,.24),rgba(5,15,35,.4));box-shadow:0 0 13px rgba(25,230,255,.10);position:relative}
+.tech-node i:after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:nodePulse 2s ease-in-out infinite}
+.tech-node:nth-child(2) i{border-color:rgba(155,92,255,.65)}.tech-node:nth-child(2) i:after{background:var(--violet);box-shadow:0 0 8px var(--violet)}
+.tech-node:nth-child(3) i{border-color:rgba(255,79,216,.65)}.tech-node:nth-child(3) i:after{background:var(--pink);box-shadow:0 0 8px var(--pink)}
+.tech-node:nth-child(4) i{border-color:rgba(246,185,59,.65)}.tech-node:nth-child(4) i:after{background:var(--gold);box-shadow:0 0 8px var(--gold)}
+.tech-feature-tags{position:relative;z-index:1;display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.tech-feature-tags span{border:1px solid rgba(25,230,255,.15);border-radius:999px;padding:5px 8px;color:#a9bce0;font:700 7px "JetBrains Mono",monospace;letter-spacing:.025em;background:rgba(2,9,24,.33)}
+.tech-feature-tags span:nth-child(2n){border-color:rgba(155,92,255,.20)}
+.tech-feature-tags span:nth-child(3n){border-color:rgba(246,185,59,.20)}
+.tech-circuit{position:absolute;width:17vw;height:28vh;min-width:140px;min-height:160px;opacity:.38;z-index:0}
+.tech-circuit path{fill:none;stroke:rgba(25,230,255,.5);stroke-width:1;stroke-dasharray:5 7;animation:circuitFlow 6s linear infinite}
+.tech-circuit circle{fill:var(--cyan);filter:drop-shadow(0 0 5px var(--cyan));opacity:.7}
+.tech-circuit-left{left:0;top:35%}.tech-circuit-right{right:0;top:33%;transform:scaleX(-1)}
+@keyframes floorTravel{to{background-position:0 136px,108px 0}}
+@keyframes screenSheen{0%,55%{left:-45%;opacity:0}70%{opacity:.8}100%{left:125%;opacity:0}}
+@keyframes screenBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes meterPulse{from{opacity:.48;transform:scaleX(.56)}to{opacity:1;transform:scaleX(1)}}
+@keyframes dataFlow{to{background-position:-200% 0}}
+@keyframes nodePulse{0%,100%{transform:scale(.78);opacity:.75}50%{transform:scale(1.12);opacity:1}}
+@keyframes circuitFlow{to{stroke-dashoffset:-72}}
+@media(max-width:1100px){.tech-screen{width:clamp(190px,25vw,290px);opacity:.50;padding:12px}.tech-screen-a,.tech-screen-b{top:5%}.tech-screen-c,.tech-screen-d{bottom:4%}.tech-tickers{gap:4px}.tech-ticker{padding:5px}.tech-ticker b{font-size:8px}.tech-nodes{gap:3px}.tech-node{font-size:6px}}
+@media(max-width:760px){.tech-screen{width:46vw;min-height:106px;padding:9px;opacity:.30;filter:saturate(.8)}.tech-screen-a{left:-6%;top:3%}.tech-screen-b{right:-6%;top:3%}.tech-screen-c{left:-6%;bottom:4%}.tech-screen-d{right:-6%;bottom:4%}.tech-screen-head{font-size:6px;letter-spacing:.05em}.tech-screen-head b{font-size:5px}.tech-divider{margin:6px 0}.tech-chart{height:28px}.tech-ticker span{font-size:5px}.tech-ticker b{font-size:6px}.tech-node{font-size:5px}.tech-node i{width:12px;height:12px;margin-bottom:4px}.tech-node i:after{inset:3px}.tech-feature-tags span{font-size:5px;padding:4px 5px}.tech-circuit{opacity:.2}.hud-panel{display:none}}
+@media(prefers-reduced-motion:reduce){.tech-floor,.tech-screen,.tech-screen:after,.tech-chart .curve,.tech-ticker i,.tech-node:after,.tech-node i:after,.tech-circuit path{animation:none!important}}
+
 </style>
 </head>
 <body>
 <div id="kb-loader">
 <canvas id="kb-network" aria-hidden="true"></canvas>
+<div id="kb-tech-environment" aria-hidden="true">
+  <div class="tech-room-glow"></div>
+  <div class="tech-floor"></div>
+  <div class="tech-horizon"></div>
+  <svg class="tech-circuit tech-circuit-left" viewBox="0 0 240 320"><path d="M0 22 H70 V62 H120 V102 H158 V146 H210 V210 H240 M0 248 H60 V220 H110 V182 H150 V144 H184"/><path d="M0 114 H34 V150 H74 V190 H96 V240 H150 V278 H204 V306 H240"/><circle cx="70" cy="62" r="3"/><circle cx="158" cy="146" r="3"/><circle cx="110" cy="182" r="3"/><circle cx="204" cy="306" r="3"/></svg>
+  <svg class="tech-circuit tech-circuit-right" viewBox="0 0 240 320"><path d="M0 22 H70 V62 H120 V102 H158 V146 H210 V210 H240 M0 248 H60 V220 H110 V182 H150 V144 H184"/><path d="M0 114 H34 V150 H74 V190 H96 V240 H150 V278 H204 V306 H240"/><circle cx="70" cy="62" r="3"/><circle cx="158" cy="146" r="3"/><circle cx="110" cy="182" r="3"/><circle cx="204" cy="306" r="3"/></svg>
+  <div class="tech-screen tech-screen-a">
+    <div class="tech-screen-head"><span>Market data fabric</span><b>SCAN MATRIX</b></div>
+    <div class="tech-divider"></div>
+    <div class="tech-tickers">
+      <div class="tech-ticker"><span>METALS</span><b>XAUUSD</b><i></i></div>
+      <div class="tech-ticker"><span>FOREX</span><b>EURUSD</b><i></i></div>
+      <div class="tech-ticker"><span>CRYPTO</span><b>BTCUSD</b><i></i></div>
+    </div>
+    <svg class="tech-chart" viewBox="0 0 330 55" preserveAspectRatio="none"><path class="axis" d="M0 12H330 M0 28H330 M0 44H330"/><polyline class="curve" points="0,44 18,39 32,42 48,24 61,29 77,18 94,30 111,25 127,34 143,16 160,21 175,9 193,23 209,18 226,28 244,14 261,19 280,6 298,12 315,5 330,8"/></svg>
+  </div>
+  <div class="tech-screen tech-screen-b">
+    <div class="tech-screen-head"><span>AI strategy council</span><b>5 ENGINES</b></div>
+    <div class="tech-divider"></div>
+    <div class="tech-nodes">
+      <div class="tech-node"><i></i>STRATEGIC</div>
+      <div class="tech-node"><i></i>FLIPPER</div>
+      <div class="tech-node"><i></i>BREAKOUT</div>
+      <div class="tech-node"><i></i>SMC PRO</div>
+    </div>
+    <div class="tech-feature-tags"><span>LADDER FLIP</span><span>CONFLUENCE</span><span>WAIT WHEN UNCERTAIN</span></div>
+    <svg class="tech-chart" viewBox="0 0 330 55" preserveAspectRatio="none"><path class="axis" d="M0 12H330 M0 28H330 M0 44H330"/><polyline class="curve" points="0,34 20,29 40,36 60,20 80,25 100,15 120,22 140,12 160,28 180,17 200,23 220,7 240,14 260,10 280,18 300,5 330,9"/></svg>
+  </div>
+  <div class="tech-screen tech-screen-c">
+    <div class="tech-screen-head"><span>Decision pipeline</span><b>GUARDED ROUTING</b></div>
+    <div class="tech-divider"></div>
+    <div class="tech-nodes">
+      <div class="tech-node"><i></i>PRICE FEED</div>
+      <div class="tech-node"><i></i>ANALYSIS</div>
+      <div class="tech-node"><i></i>RISK GATE</div>
+      <div class="tech-node"><i></i>DECISION</div>
+    </div>
+    <div class="tech-feature-tags"><span>DATA QUALITY</span><span>MTF 5M · 15M · 1H · 4H</span><span>NO FORCED SIGNALS</span></div>
+  </div>
+  <div class="tech-screen tech-screen-d">
+    <div class="tech-screen-head"><span>Platform infrastructure</span><b>STARTUP MAP</b></div>
+    <div class="tech-divider"></div>
+    <div class="tech-nodes">
+      <div class="tech-node"><i></i>CONNECT</div>
+      <div class="tech-node"><i></i>MONITOR</div>
+      <div class="tech-node"><i></i>VALIDATE</div>
+      <div class="tech-node"><i></i>PROTECT</div>
+    </div>
+    <div class="tech-feature-tags"><span>BROKER FLEXIBILITY</span><span>RISK DISCIPLINE</span><span>SECURE ACCESS</span></div>
+    <svg class="tech-chart" viewBox="0 0 330 55" preserveAspectRatio="none"><path class="axis" d="M0 12H330 M0 28H330 M0 44H330"/><polyline class="curve" points="0,40 20,36 40,39 60,31 80,34 100,21 120,27 140,16 160,23 180,14 200,18 220,8 240,15 260,7 280,12 300,4 330,10"/></svg>
+  </div>
+</div>
 <div class="ambient-orb ambient-orb-cyan"></div>
 <div class="ambient-orb ambient-orb-violet"></div>
 <div class="ambient-orb ambient-orb-gold"></div>
