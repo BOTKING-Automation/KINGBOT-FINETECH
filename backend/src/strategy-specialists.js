@@ -1,7 +1,19 @@
 const clamp=(v,min=-100,max=100)=>Math.min(max,Math.max(min,Number(v)||0));
-const num=(v,fallback=null)=>Number.isFinite(Number(v))?Number(v):fallback;
+const num=(v,fallback=null)=>{
+  if(v===null||v===undefined||(typeof v==="string"&&!v.trim())) return fallback;
+  const n=typeof v==="number"?v:Number(v);
+  return Number.isFinite(n)?n:fallback;
+};
 const upper=v=>String(v??"").trim().toUpperCase();
 const lower=v=>String(v??"").trim().toLowerCase();
+const signedSignal=(v,fallback=0)=>{
+  const numeric=num(v,null);
+  if(numeric!==null) return numeric;
+  const signal=upper(v);
+  if(["BULLISH","BULL","BUY","UP","UPTREND","LONG"].includes(signal)) return 1;
+  if(["BEARISH","BEAR","SELL","DOWN","DOWNTREND","SHORT"].includes(signal)) return -1;
+  return fallback;
+};
 
 const dirFromSigned=v=>Number(v)>0?"BUY":Number(v)<0?"SELL":"WAIT";
 const mtfFrames=(mtf={})=>Array.isArray(mtf.timeframes)?mtf.timeframes.filter(x=>x&&x.ok!==false):[];
@@ -31,7 +43,7 @@ function card(base){
 
 function evaluateStrategic(m,mtf,regime){
   const conditions=[],missing=[],entry=[],wait=[],contradictions=[];
-  const trend=num(m.trend,0), momentum=num(m.momentum,0);
+  const trend=signedSignal(m.trend??m.rawTrend,0), momentum=num(m.momentum,0);
   const emaBull=num(m.emaFast)>num(m.emaSlow), emaBear=num(m.emaFast)<num(m.emaSlow);
   const htf=upper(mtf.higherTimeframeBias);
   const local=lower(m.structure);
@@ -65,12 +77,14 @@ function evaluateFlipper(m,mtf){
   const reversalSell=(sweep==="BEARISH"||choch==="BEARISH")&&displacement==="BEARISH";
   if(reversalBuy||reversalSell) conditions.push("Reversal trigger shows sweep/CHOCH plus directional displacement.");
   else missing.push("Reversal trigger: liquidity event or CHOCH followed by displacement.");
-  if((rsi!==null&&((reversalBuy&&rsi<65)||(reversalSell&&rsi>35)))) conditions.push("RSI is compatible with a reversal transition.");
+  const rsiConfirmsBuy=rsi!==null&&reversalBuy&&rsi<65;
+  const rsiConfirmsSell=rsi!==null&&reversalSell&&rsi>35;
+  if(rsiConfirmsBuy||rsiConfirmsSell) conditions.push("RSI is compatible with a reversal transition.");
   else missing.push("RSI transition/exhaustion confirmation.");
   if(Math.abs(momentum)>=0.35) conditions.push("Momentum transition is measurable.");
   else missing.push("Momentum transition.");
   if(volatility>0.9) contradictions.push("Volatility is too extreme for the fast-flip risk profile.");
-  const direction=reversalBuy&&!contradictions.length?"BUY":reversalSell&&!contradictions.length?"SELL":"WAIT";
+  const direction=reversalBuy&&rsiConfirmsBuy&&!contradictions.length?"BUY":reversalSell&&rsiConfirmsSell&&!contradictions.length?"SELL":"WAIT";
   const score=direction==="BUY"?70+Math.min(20,Math.abs(momentum)*20):direction==="SELL"?-(70+Math.min(20,Math.abs(momentum)*20)):0;
   if(direction!=="WAIT") entry.push("Reversal trigger confirmed without requiring a breakout.");
   else wait.push("Wait for a clean reversal transition; do not infer a flip from trend strength alone.");
@@ -85,13 +99,15 @@ function evaluateBreakout(m,mtf){
   if(vol>=0.2&&vol<=0.9) conditions.push("Volatility is suitable for continuation."); else missing.push("Controlled volatility expansion.");
   if(Math.abs(momentum)>=0.35) conditions.push("Momentum supports continuation."); else missing.push("Post-breakout momentum.");
   const htf=upper(mtf.higherTimeframeBias);
-  const d=m.trend>=0?"BUY":"SELL";
-  if((d==="BUY"&&htf==="BULLISH")||(d==="SELL"&&htf==="BEARISH")) conditions.push("Higher-timeframe bias supports the breakout.");
+  const trend=signedSignal(m.trend??m.rawTrend,0);
+  const d=trend>0?"BUY":trend<0?"SELL":"WAIT";
+  if(d==="WAIT") missing.push("Directional trend is required to resolve the breakout side.");
+  else if((d==="BUY"&&htf==="BULLISH")||(d==="SELL"&&htf==="BEARISH")) conditions.push("Higher-timeframe bias supports the breakout.");
   else if(htf==="MIXED") wait.push("Higher-timeframe confirmation.");
   else contradictions.push("Higher-timeframe bias opposes breakout direction.");
-  const ready=breakout&&retest&&vol>=0.2&&vol<=0.9&&Math.abs(momentum)>=0.35&&!contradictions.length;
+  const ready=d!=="WAIT"&&breakout&&retest&&vol>=0.2&&vol<=0.9&&Math.abs(momentum)>=0.35&&!contradictions.length;
   const direction=ready?d:"WAIT";
-  const score=ready?clamp(65+Math.abs(momentum)*20+(retest?10:0)):breakout?40:0;
+  const score=ready?clamp(65+Math.abs(momentum)*20+(retest?10:0)):breakout&&d!=="WAIT"?40:0;
   if(ready) entry.push("Breakout + retest + momentum + volatility confirmation.");
   else wait.push("Do not classify a breakout as tradable until confirmation/retest is present.");
   return card({botId:"breakout",strategyIdentity:"Range-compression breakout and retest specialist",direction,rawScore:d==="BUY"?score:-score,confidence:(conditions.length/5)*100,conditions,missingConditions:missing,entryConditions:entry,waitConditions:wait,marketRegimes:["LOW_VOLATILITY","EXPANSION"],timeframeRequirements:{regime:"1h",setup:"15m",execution:"5m"},evidenceUsed:["breakout","retest","volatility","momentum","MTF bias"],contradictions,strategyMatch:ready,invalidation:"Invalidate on failed breakout acceptance, failed retest, or return inside the broken range."});
