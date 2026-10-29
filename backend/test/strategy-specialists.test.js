@@ -18,6 +18,25 @@ test("Strategic can qualify from trend/confluence without SMC conditions",()=>{
   assert.equal(cards.find(x=>x.botId==="smc-pro").direction,"WAIT");
 });
 
+
+test("Strategic waits when higher-timeframe bias is mixed",()=>{
+  const cards=evaluateStrategySpecialists({
+    market:base,
+    multiTimeframe:{...mtf,higherTimeframeBias:"MIXED"},
+    regime:{regime:"TRENDING"}
+  });
+  const strategic=cards.find(x=>x.botId==="strategic");
+  assert.equal(strategic.direction,"WAIT");
+  assert.equal(strategic.strategyMatch,false);
+});
+
+test("Breakout does not invent a direction when trend is neutral",()=>{
+  const market={...base,trend:0,rawTrend:"NEUTRAL",breakout:true,retest:true};
+  const breakout=evaluateStrategySpecialists({market,multiTimeframe:mtf}).find(x=>x.botId==="breakout");
+  assert.equal(breakout.direction,"WAIT");
+  assert.ok(breakout.missingConditions.some(x=>/directional trend/i.test(x)));
+});
+
 test("Flipper uses reversal evidence and does not require a breakout",()=>{
   const market={...base,trend:-.2,momentum:.6,structure:"bullish",rsi:40,rawLiquiditySweep:"BULLISH",rawChoch:"BULLISH",rawDisplacement:"BULLISH"};
   const cards=evaluateStrategySpecialists({market,multiTimeframe:{...mtf,lowerTimeframeBias:"BULLISH"}});
