@@ -83,6 +83,9 @@ body{background:radial-gradient(circle at 50% 45%,#08152b 0%,#02040a 48%,#010208
 .hud-signal polyline{fill:none;stroke:var(--gold);stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round;filter:drop-shadow(0 0 4px rgba(246,185,59,.55));stroke-dasharray:6 4;animation:trace 3s linear infinite}
 .hud-tagline{margin-top:12px;color:#f4c861;font:800 7px "JetBrains Mono",monospace;letter-spacing:.075em}
 .progress i{animation-duration:var(--loader-duration,3s)}
+.kb-preview-mode .progress i{width:28%;animation:previewBar 1.8s ease-in-out infinite alternate}
+.kb-preview-mode .foot{color:#8fa1c5}
+@keyframes previewBar{from{transform:translateX(0);opacity:.68}to{transform:translateX(258%);opacity:1}}
 @keyframes orbDrift{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(20px,-18px,0) scale(1.12)}}
 @keyframes sweep{0%,100%{transform:translateY(-65px) rotate(-8deg);opacity:.12}50%{transform:translateY(70px) rotate(-8deg);opacity:.72}}
 @keyframes hudFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
@@ -247,6 +250,8 @@ import "./system/session.js";
   const params=new URLSearchParams(window.location.search);
   const durationRaw=Number(params.get("duration"));
   const duration=(Number.isFinite(durationRaw)&&durationRaw>=800&&durationRaw<=10000)?durationRaw:3000;
+  const previewOnly=params.get("preview")==="1";
+  document.documentElement.classList.toggle("kb-preview-mode",previewOnly);
   document.documentElement.style.setProperty("--loader-duration",duration+"ms");
   const status=document.getElementById("status");
 
@@ -325,8 +330,9 @@ import "./system/session.js";
   let index=0;
   const ticker=window.setInterval(()=>{
     index=(index+1)%states.length;
-    if(status)status.textContent=states[index];
+    if(status)status.textContent=previewOnly?"VISUAL PREVIEW · ROUTING PAUSED":states[index];
   },600);
+  if(previewOnly&&status)status.textContent="VISUAL PREVIEW · ROUTING PAUSED";
 
   function go(path){
     window.location.replace(path);
@@ -360,7 +366,7 @@ import "./system/session.js";
     }
   }
 
-  window.setTimeout(routeAfterStartup,duration);
+  if(!previewOnly)window.setTimeout(routeAfterStartup,duration);
 })();
 </script>
 </body>
