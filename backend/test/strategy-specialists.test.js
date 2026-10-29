@@ -48,6 +48,29 @@ test("Ladder Flip requires its own EMA/ADX/RSI gate",()=>{
   assert.equal(bad.direction,"WAIT");
 });
 
+
+test("labelled directional trends are normalized consistently",()=>{
+  const market={...base,trend:"BULLISH",rawTrend:"BULLISH",breakout:true,retest:true};
+  const cards=evaluateStrategySpecialists({market,multiTimeframe:mtf,regime:{regime:"TRENDING"}});
+  assert.equal(cards.find(x=>x.botId==="strategic").direction,"BUY");
+  assert.equal(cards.find(x=>x.botId==="breakout").direction,"BUY");
+});
+
+test("Flipper does not qualify without an actual RSI confirmation",()=>{
+  const market={...base,rsi:null,rawLiquiditySweep:"BULLISH",rawChoch:"NONE",rawDisplacement:"BULLISH"};
+  const flipper=evaluateStrategySpecialists({market,multiTimeframe:mtf}).find(x=>x.botId==="flipper");
+  assert.equal(flipper.direction,"WAIT");
+  assert.ok(flipper.missingConditions.some(x=>/RSI transition/i.test(x)));
+  assert.equal(flipper.conditions.some(x=>/RSI/i.test(x)),false);
+});
+
+test("explicitly missing ladder indicators stay missing instead of becoming zero",()=>{
+  const market={...base,emaFast:null,emaSlow:null,price:null,adx:null,rsi:null};
+  const ladder=evaluateStrategySpecialists({market,multiTimeframe:mtf}).find(x=>x.botId==="ladder-flip");
+  assert.equal(ladder.direction,"WAIT");
+  assert.ok(ladder.missingConditions.some(x=>/EMA20\/EMA50, ADX14, RSI14 and price/i.test(x)));
+});
+
 test("all specialists can independently wait when their conditions are absent",()=>{
   const market={...base,trend:.1,momentum:.05,structure:"range",emaFast:2490,emaSlow:2500,adx:10,rsi:50,breakout:false,retest:false};
   const cards=evaluateStrategySpecialists({market,multiTimeframe:{...mtf,setupState:"WAIT",higherTimeframeBias:"MIXED"}});
