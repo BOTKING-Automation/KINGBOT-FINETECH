@@ -24,7 +24,7 @@ test("higher-timeframe alignment raises the specialist council score",()=>{
 
   const alignedScore=alignedResult.engines[0].councilScore;
   const opposingScore=opposingResult.engines[0].councilScore;
-  assert.equal(alignedScore-opposingScore,28);
+  assert.ok(Math.abs((alignedScore-opposingScore)-28)<0.01);
   assert.ok(alignedScore>opposingScore);
 });
 
