@@ -30,7 +30,7 @@ function specialistCouncilScore(engine, specialist, mtf = {}, weights = DEFAULT_
   const htf = upper(mtf.higherTimeframeBias);
   if (htf && htf !== "MIXED") {
     const expected = direction === "BUY" ? "BULLISH" : "BEARISH";
-    score += direction === expected ? 100 * weights.htfAlignment : -100 * weights.htfAlignment;
+    score += htf === expected ? 100 * weights.htfAlignment : -100 * weights.htfAlignment;
   }
   if (mtf.triggerPresent) score += 100 * weights.trigger;
   const structure = upper(mtf.alignment?.direction);
@@ -190,7 +190,7 @@ export function buildStrategyCouncil(engines = [], {
     runnerUp,
     divergence:dissent.map(x=>({botId:x.botId,direction:x.direction,councilScore:x.councilScore})),
     confidence,
-    confidenceMethod:"specialist strategy completion + specialist confidence + independent evidence alignment; no majority-vote requirement",
+    confidenceMethod:"specialist strategy completion + confidence + direction-aware higher-timeframe/structure alignment; no majority-vote requirement",
     whatToWait:[...new Set(whatToWait)].slice(0,10),
     invalidation:strongest?.invalidation || "No directional trade candidate until a specialist setup is valid.",
     executionAuthorized:false,
