@@ -2170,6 +2170,378 @@ footer{
   }
 }
 
+
+/* =========================================================
+   FULL TRADING-HUB LANDING REDESIGN
+   Reuses the existing trading-hub artwork and hero-bot asset.
+   No image assets, navigation, anchors, APIs or JS behaviours
+   are replaced by this presentation layer.
+========================================================= */
+:root{
+  --navy0:#02050c;
+  --navy1:#050a17;
+  --navy2:#0a1429;
+  --navy3:#111f3b;
+  --gold:#e9b94e;
+  --gold2:#ffdf91;
+  --cyan:#43d9f2;
+  --txt:#f4f7ff;
+  --dim:#b3bfd5;
+  --line:rgba(233,185,78,.20);
+  --line2:rgba(255,255,255,.085);
+}
+html{background:#02050c;}
+body{
+  background:
+    radial-gradient(ellipse at 50% -10%,rgba(29,89,142,.18),transparent 45%),
+    radial-gradient(ellipse at 92% 28%,rgba(233,185,78,.075),transparent 32%),
+    linear-gradient(180deg,#02050c 0%,#071123 48%,#030711 100%);
+  color:var(--txt);
+}
+body::before{
+  opacity:.48;
+  background-size:64px 64px;
+}
+.wrap{max-width:1400px;padding-left:clamp(18px,3vw,42px);padding-right:clamp(18px,3vw,42px);}
+nav{
+  background:rgba(2,6,15,.91);
+  border-bottom:1px solid rgba(233,185,78,.22);
+  box-shadow:0 12px 40px rgba(0,0,0,.28);
+}
+.nav-in{
+  max-width:1500px;
+  min-height:78px;
+  padding:12px clamp(18px,3vw,42px);
+  gap:clamp(14px,2vw,28px);
+}
+.logo{font-size:19px;letter-spacing:.13em;}
+.crown{border-radius:11px;box-shadow:0 0 18px rgba(233,185,78,.35);}
+.nav-links{gap:clamp(12px,1.8vw,25px);font-size:12px;color:#c0cbe0;}
+.nav-links a:hover{color:#fff;}
+.btn{
+  min-height:44px;
+  border-radius:11px;
+  letter-spacing:.075em;
+  box-shadow:0 8px 24px rgba(0,0,0,.24);
+}
+.btn-gold{
+  color:#181105;
+  background:linear-gradient(135deg,#ffe29a 0%,#e9b94e 46%,#c78c26 100%);
+  box-shadow:0 10px 28px rgba(233,185,78,.22);
+}
+.btn-gold:hover{box-shadow:0 14px 36px rgba(233,185,78,.34);}
+.btn-ghost{
+  color:#ffe2a0;
+  background:rgba(5,12,27,.78);
+  border:1px solid rgba(233,185,78,.52);
+}
+.btn-ghost:hover{background:rgba(233,185,78,.12);}
+
+/* Main hero: existing Trading Hub artwork becomes the environment;
+   existing hero-bot remains the foreground character. */
+.hero{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  width:min(1600px,calc(100vw - 32px));
+  margin-left:50%;
+  transform:translateX(-50%);
+  min-height:clamp(650px,76vh,840px);
+  grid-template-columns:minmax(0,1.04fr) minmax(380px,.96fr);
+  gap:clamp(22px,3vw,54px);
+  padding:clamp(42px,5vw,78px) clamp(28px,5vw,82px);
+  border:1px solid rgba(233,185,78,.28);
+  border-radius:28px;
+  background:#030917;
+  box-shadow:
+    0 34px 100px rgba(0,0,0,.55),
+    inset 0 1px 0 rgba(255,255,255,.08);
+}
+.hero::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-2;
+  background-image:url("assets/images/Kingbot Fintech AI Trading Hub.png");
+  background-position:center center;
+  background-size:cover;
+  background-repeat:no-repeat;
+  opacity:.46;
+  filter:saturate(1.05) contrast(1.06);
+  transform:scale(1.015);
+}
+.hero::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  background:
+    linear-gradient(90deg,
+      rgba(2,6,15,.97) 0%,
+      rgba(2,6,15,.91) 35%,
+      rgba(2,6,15,.60) 62%,
+      rgba(2,6,15,.30) 100%),
+    linear-gradient(180deg,
+      rgba(2,6,15,.18) 0%,
+      rgba(2,6,15,.04) 48%,
+      rgba(2,6,15,.72) 100%);
+}
+.hero > div{position:relative;z-index:1;min-width:0;}
+.hero > div:first-child{max-width:760px;}
+.eyebrow{
+  color:#ffe0a0;
+  background:rgba(3,8,19,.78);
+  border-color:rgba(233,185,78,.42);
+  box-shadow:0 8px 26px rgba(0,0,0,.25);
+  font-size:10px;
+}
+h1{
+  font-size:clamp(36px,4.4vw,66px);
+  line-height:1.08;
+  letter-spacing:-.035em;
+  text-wrap:balance;
+}
+.hero-title{max-width:800px;}
+.hero-led-line{
+  color:#ffdf91;
+  animation:none;
+  text-shadow:
+    0 2px 14px rgba(0,0,0,.85),
+    0 0 22px rgba(233,185,78,.25);
+  -webkit-text-fill-color:initial;
+}
+.hero p{
+  max-width:640px;
+  color:#e0e8f5;
+  font-size:clamp(15px,1.15vw,17px);
+  line-height:1.78;
+  text-shadow:0 2px 12px rgba(0,0,0,.82);
+}
+.hero-cta{gap:13px;}
+.hero-cta .btn{min-height:50px;padding:14px 22px;}
+.trust{gap:12px 20px;color:#d0daeb;font-size:11px;}
+.trust b{color:#62e6b5;}
+.hero-art{
+  min-height:clamp(430px,49vw,610px);
+  align-self:center;
+}
+.hero-art::before{
+  width:min(32vw,470px);
+  height:min(32vw,470px);
+  border-color:rgba(67,217,242,.17);
+  box-shadow:0 0 110px rgba(67,217,242,.12),inset 0 0 100px rgba(233,185,78,.09);
+}
+.hero-art::after{
+  width:min(24vw,340px);
+  height:min(24vw,340px);
+  border-color:rgba(233,185,78,.20);
+}
+.hero-image-frame{
+  width:min(100%,620px);
+  padding:1px;
+  border-radius:24px;
+  background:linear-gradient(145deg,rgba(255,220,145,.66),rgba(67,217,242,.25),rgba(233,185,78,.25));
+  box-shadow:0 28px 80px rgba(0,0,0,.62),0 0 46px rgba(233,185,78,.15);
+  animation:none;
+}
+.hero-image-frame::before{
+  inset:-12px;
+  background:linear-gradient(135deg,rgba(233,185,78,.34),rgba(67,217,242,.16),rgba(233,185,78,.25));
+  filter:blur(24px);
+  opacity:.56;
+  animation:none;
+}
+.hero-image-frame::after{
+  inset:-5px;
+  border:1px solid rgba(255,226,160,.25);
+  box-shadow:0 0 26px rgba(233,185,78,.14);
+  animation:none;
+}
+.hero-art img{
+  height:clamp(430px,48vw,590px);
+  object-fit:contain;
+  object-position:center bottom;
+  background:radial-gradient(circle at 50% 42%,rgba(233,185,78,.10),transparent 46%),linear-gradient(160deg,rgba(7,16,34,.18),rgba(3,7,17,.72));
+  border-radius:23px;
+  animation:kingbotHeroFloat 7s ease-in-out infinite;
+  filter:drop-shadow(0 18px 34px rgba(0,0,0,.50));
+}
+@keyframes kingbotHeroFloat{
+  0%,100%{transform:translateY(0);}
+  50%{transform:translateY(-8px);}
+}
+.quote,.hero-data{
+  background:rgba(3,8,19,.94);
+  border-color:rgba(233,185,78,.34);
+  color:#e2eafa;
+  box-shadow:0 18px 46px rgba(0,0,0,.52);
+  backdrop-filter:blur(18px);
+}
+.quote{right:0;top:12px;max-width:220px;font-size:11px;}
+.quote b{color:#ffdf91;}
+.hero-data{left:-6px;bottom:18px;}
+.hero-data-row{font-size:9px;}
+.hero-data-row span:first-child{color:#c0cce0;}
+.hero-data-row span:last-child{color:#72edbd;}
+
+/* The original trading-hub image section remains in the page,
+   now presented as a premium framed cinematic panel. */
+.infra-section{
+  padding:clamp(22px,3vw,42px) clamp(12px,2vw,28px) !important;
+  background:
+    radial-gradient(ellipse at 50% 50%,rgba(21,71,112,.18),transparent 65%),
+    #020611;
+}
+.infra-visual{
+  width:100%;
+  max-width:1720px;
+  border:1px solid rgba(233,185,78,.25);
+  border-radius:22px;
+  box-shadow:0 26px 90px rgba(0,0,0,.52),0 0 40px rgba(233,185,78,.07);
+  background:#020611;
+}
+#kingbotInfraCanvas{
+  width:100%;
+  height:auto;
+  border-radius:21px;
+}
+
+/* Editorial section rhythm and stronger hierarchy. */
+section:not(.infra-section){padding:clamp(70px,7vw,108px) 0;}
+.sec-tag{color:#f0c66c;font-size:10px;letter-spacing:.26em;}
+h2{
+  font-size:clamp(26px,3.2vw,44px);
+  line-height:1.16;
+  letter-spacing:-.025em;
+}
+.sec-sub{color:#b9c5da;font-size:15px;line-height:1.8;max-width:620px;}
+.plat,.mkts{gap:clamp(28px,5vw,76px);}
+.mock,.stat,.plan{
+  background:linear-gradient(155deg,rgba(16,29,57,.96),rgba(4,10,24,.98));
+  border:1px solid rgba(233,185,78,.15);
+  box-shadow:0 20px 55px rgba(0,0,0,.30),inset 0 1px 0 rgba(255,255,255,.035);
+}
+.mock{border-radius:18px;padding:18px;}
+.stat{border-radius:16px;padding:22px;}
+.stat .v{color:#ffdc8b;font-size:clamp(19px,2vw,25px);}
+.stat .k{color:#b7c4da;font-size:10px;letter-spacing:.04em;}
+.checks{color:#dce5f3;line-height:2.0;}
+.pill{
+  color:#d3dced;
+  background:rgba(10,20,41,.82);
+  border-color:rgba(255,255,255,.10);
+  border-radius:10px;
+}
+.bot-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;margin-top:38px;}
+.bot-card{
+  min-width:0;
+  border-color:rgba(233,185,78,.16);
+  border-radius:18px;
+  background:linear-gradient(160deg,#101d38,#050b1b);
+  box-shadow:0 18px 48px rgba(0,0,0,.24);
+}
+.bot-card:hover{
+  border-color:rgba(233,185,78,.52);
+  box-shadow:0 24px 60px rgba(0,0,0,.43),0 0 26px rgba(233,185,78,.08);
+}
+.bot-image{background:radial-gradient(circle at 50% 35%,rgba(233,185,78,.12),transparent 62%),#060d1d;}
+.bot-info h3{font-size:10px;color:#ffdc8b;}
+.bot-info p{font-size:10px;color:#b7c4da;line-height:1.55;}
+.bot-status{color:#72e4ee;background:rgba(67,217,242,.07);border-color:rgba(67,217,242,.2);}
+.plans{gap:18px;}
+.plan{border-radius:20px;padding:clamp(22px,2.2vw,32px);}
+.plan:hover{border-color:rgba(233,185,78,.38);transform:translateY(-4px);}
+.plan .price{color:#ffdf91;}
+.plan ul{color:#c5d0e3;line-height:2;}
+.plan.pop{
+  border-color:rgba(233,185,78,.55);
+  box-shadow:0 24px 65px rgba(0,0,0,.36),0 0 32px rgba(233,185,78,.09);
+}
+.final-cta{
+  border:1px solid rgba(233,185,78,.27);
+  border-radius:24px;
+  background:
+    radial-gradient(ellipse at 50% 0%,rgba(233,185,78,.16),transparent 62%),
+    linear-gradient(145deg,#101d38,#050b19);
+  box-shadow:0 26px 70px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.045);
+  padding:clamp(34px,5vw,64px);
+}
+.final-cta p{color:#c3cfe2;line-height:1.8;}
+footer{
+  background:linear-gradient(180deg,#050c19,#02050c);
+  border-top:1px solid rgba(233,185,78,.20);
+}
+.f-grid h4{color:#f0c66c;}
+.f-grid a,.f-grid p{color:#aebbd2;}
+.f-bot{color:#aebbd2;border-top-color:rgba(255,255,255,.09);}
+
+/* Responsive: keep the bot visible and controls usable on phones. */
+@media(max-width:1100px){
+  .hero{
+    grid-template-columns:1fr 1fr;
+    min-height:620px;
+    gap:20px;
+  }
+  .hero-art{order:0;min-height:420px;}
+  .hero-art img{height:440px;}
+  .hero-art::before{width:330px;height:330px;}
+  .hero-art::after{width:245px;height:245px;}
+  .bot-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+}
+@media(max-width:900px){
+  .hero{
+    grid-template-columns:1fr;
+    min-height:0;
+    padding:40px 28px 34px;
+  }
+  .hero-art{order:-1;min-height:370px;}
+  .hero-art img{height:390px;}
+  .hero-art::before{width:300px;height:300px;}
+  .hero-art::after{width:220px;height:220px;}
+  .hero > div:first-child{max-width:100%;}
+  .plat,.mkts{grid-template-columns:1fr;}
+}
+@media(max-width:700px){
+  .wrap{padding-left:17px;padding-right:17px;}
+  .nav-in{min-height:68px;padding:10px 17px;}
+  .hero{
+    width:calc(100vw - 20px);
+    padding:30px 17px 25px;
+    border-radius:18px;
+    gap:17px;
+    margin-left:50%;
+  }
+  .hero::before{background-position:58% center;opacity:.36;}
+  .hero::after{
+    background:
+      linear-gradient(180deg,rgba(2,6,15,.45),rgba(2,6,15,.88) 44%,rgba(2,6,15,.97)),
+      linear-gradient(90deg,rgba(2,6,15,.58),rgba(2,6,15,.30));
+  }
+  h1{font-size:clamp(31px,8vw,43px);}
+  .hero p{font-size:14px;line-height:1.72;}
+  .hero-art{min-height:310px;}
+  .hero-art img{height:330px;}
+  .hero-art::before{width:250px;height:250px;}
+  .hero-art::after{width:185px;height:185px;}
+  .quote{right:0;top:0;max-width:165px;font-size:9px;padding:10px 11px;}
+  .hero-data{left:0;bottom:0;min-width:145px;padding:10px;}
+  .hero-data-row{font-size:7px;}
+  .hero-cta .btn{width:100%;}
+  .trust{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:10px;}
+  .infra-section{padding:18px 10px !important;}
+  .infra-visual{border-radius:14px;}
+  #kingbotInfraCanvas{border-radius:13px;}
+  .bot-grid,.plans{grid-template-columns:1fr;}
+  .bot-card{min-height:220px;}
+  .bot-image,.bot-image img{height:180px;}
+  .pricing-head{gap:14px;}
+}
+@media(prefers-reduced-motion:reduce){
+  .hero-art img{animation:none !important;}
+  .bot-card:hover,.plan:hover{transform:none;}
+}
+
 </style>
 <script>
 (function(){
