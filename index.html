@@ -2225,6 +2225,156 @@ footer{
   }
 }
 
+
+/* =========================================
+   HERO CLARITY PASS — PRESERVE ORIGINAL BOT
+   Keep the motion background subtle and put all
+   real landing-page content clearly above it.
+========================================= */
+:root{
+  --dim:#b7c3dc;
+  --txt:#f6f8ff;
+}
+.hero{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  background:#030711;
+  border:1px solid rgba(246,185,59,.2);
+  border-radius:26px;
+}
+.hero-cinematic-video{
+  z-index:0 !important;
+  opacity:.25 !important;
+  object-fit:cover;
+  filter:saturate(.92) contrast(1.04) brightness(.82);
+}
+.hero-video-shade{
+  z-index:1 !important;
+  background:
+    linear-gradient(90deg,
+      rgba(2,5,13,.96) 0%,
+      rgba(2,5,13,.90) 36%,
+      rgba(2,5,13,.74) 62%,
+      rgba(2,5,13,.50) 100%),
+    linear-gradient(180deg,
+      rgba(2,5,13,.18) 0%,
+      rgba(2,5,13,.08) 55%,
+      rgba(2,5,13,.68) 100%);
+}
+.hero > :not(.hero-cinematic-video):not(.hero-video-shade){
+  position:relative;
+  z-index:2;
+}
+.hero-title{
+  max-width:720px;
+  text-wrap:balance;
+}
+.hero-led-line{
+  color:#ffe0a0 !important;
+  animation:none !important;
+  text-shadow:
+    0 2px 12px rgba(0,0,0,.92),
+    0 0 18px rgba(246,185,59,.24) !important;
+  filter:none !important;
+}
+.hero p{
+  color:#e2e9f7 !important;
+  font-size:clamp(15px,1.15vw,17px);
+  line-height:1.78;
+  text-shadow:0 2px 10px rgba(0,0,0,.82);
+}
+.eyebrow{
+  color:#ffe0a0;
+  background:rgba(3,7,17,.82);
+  border-color:rgba(246,185,59,.4);
+  box-shadow:0 8px 24px rgba(0,0,0,.24);
+}
+.trust{
+  color:#d3dced !important;
+}
+.trust b{
+  color:#62e6b5 !important;
+}
+.hero-cta .btn{
+  min-height:48px;
+  font-size:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.34);
+}
+.hero-image-frame{
+  background:linear-gradient(135deg,#d6a640,rgba(25,230,255,.34),#9b762d) !important;
+  background-size:100% 100% !important;
+  animation:none !important;
+  box-shadow:
+    0 26px 70px rgba(0,0,0,.72),
+    0 0 34px rgba(246,185,59,.17) !important;
+}
+.hero-image-frame::before{
+  inset:-10px;
+  background:linear-gradient(135deg,rgba(246,185,59,.30),rgba(25,230,255,.12),rgba(246,185,59,.24)) !important;
+  filter:blur(22px);
+  opacity:.5 !important;
+  animation:none !important;
+}
+.hero-image-frame::after{
+  inset:-5px;
+  border:1px solid rgba(255,221,150,.25) !important;
+  box-shadow:0 0 24px rgba(246,185,59,.16) !important;
+  animation:none !important;
+}
+.hero-art img{
+  object-fit:contain !important;
+  animation:heroBotFloat 7s ease-in-out infinite !important;
+  filter:brightness(1.04) saturate(1.04) drop-shadow(0 12px 28px rgba(0,0,0,.48)) !important;
+  will-change:transform;
+}
+@keyframes heroBotFloat{
+  0%,100%{transform:translateY(0) scale(1);}
+  50%{transform:translateY(-7px) scale(1.008);}
+}
+.quote,
+.hero-data{
+  background:rgba(3,7,17,.96) !important;
+  border-color:rgba(246,185,59,.34) !important;
+  color:#e3eaf8 !important;
+  box-shadow:0 14px 36px rgba(0,0,0,.58) !important;
+  backdrop-filter:blur(18px);
+}
+.hero-data-row span:first-child{color:#c1cce1 !important;}
+.hero-data-row span:last-child{color:#70edbd !important;}
+@media(max-width:1100px){
+  .hero-video-shade{
+    background:
+      linear-gradient(180deg,rgba(2,5,13,.48),rgba(2,5,13,.88) 58%,rgba(2,5,13,.94));
+  }
+}
+@media(max-width:700px){
+  .hero{
+    min-height:auto;
+    padding:34px 16px 28px;
+    gap:20px;
+    border-radius:18px;
+  }
+  .hero-art{min-height:330px;}
+  .hero-art img,
+  .hero-placeholder{height:340px !important;}
+  .hero-cinematic-video{opacity:.19 !important;}
+  .hero-video-shade{
+    background:linear-gradient(180deg,
+      rgba(2,5,13,.68),
+      rgba(2,5,13,.80) 48%,
+      rgba(2,5,13,.95));
+  }
+  .hero-title{font-size:clamp(30px,8vw,42px);}
+  .hero p{font-size:15px;line-height:1.7;}
+  .quote{right:2px;top:4px;max-width:170px;}
+  .hero-data{left:2px;bottom:4px;min-width:150px;}
+}
+@media(prefers-reduced-motion:reduce){
+  .hero-art img{animation:none !important;}
+  .hero-cinematic-video{display:none !important;}
+}
+
 </style>
 <script>
 (function(){
