@@ -422,6 +422,61 @@ nav{
   padding:72px 0 58px;
 }
 
+
+/* =========================================
+   CINEMATIC HERO VIDEO — KEEPS HERO BOT
+========================================= */
+.hero{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  border:1px solid rgba(246,185,59,.14);
+  border-radius:28px;
+  background:#030711;
+  box-shadow:
+    0 24px 80px rgba(0,0,0,.30),
+    inset 0 1px 0 rgba(255,255,255,.035);
+}
+.hero-cinematic-video,
+.hero-video-shade{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+}
+.hero-cinematic-video{
+  z-index:-2;
+  display:block;
+  object-fit:cover;
+  opacity:.34;
+  filter:saturate(1.08) contrast(1.08);
+  background:
+    radial-gradient(circle at 72% 42%,rgba(25,230,255,.10),transparent 34%),
+    linear-gradient(135deg,#081329,#030711);
+}
+.hero-video-shade{
+  z-index:-1;
+  background:
+    linear-gradient(90deg,rgba(3,7,17,.91) 0%,rgba(3,7,17,.80) 42%,rgba(3,7,17,.48) 100%),
+    linear-gradient(180deg,rgba(3,7,17,.16) 0%,rgba(3,7,17,.18) 58%,rgba(3,7,17,.72) 100%);
+}
+.hero > *:not(.hero-cinematic-video):not(.hero-video-shade){
+  position:relative;
+  z-index:1;
+}
+@media(max-width:700px){
+  .hero-cinematic-video{opacity:.24;}
+  .hero-video-shade{
+    background:
+      linear-gradient(90deg,rgba(3,7,17,.88),rgba(3,7,17,.68)),
+      linear-gradient(180deg,rgba(3,7,17,.25),rgba(3,7,17,.76));
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .hero-cinematic-video{display:none;}
+}
+
 .eyebrow{
   display:inline-flex;
   align-items:center;
@@ -2202,6 +2257,19 @@ footer{
 <div class="wrap">
 
   <div class="hero">
+    <video
+      class="hero-cinematic-video"
+      autoplay
+      muted
+      loop
+      playsinline
+      preload="metadata"
+      aria-hidden="true"
+      tabindex="-1"
+    >
+      <source src="https://www.pexels.com/download/video/31121315/" type="video/mp4">
+    </video>
+    <div class="hero-video-shade" aria-hidden="true"></div>
 
     <div>
 
