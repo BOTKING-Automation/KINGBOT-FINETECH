@@ -213,7 +213,7 @@ jobs:
             const trainResponse = await fetch("http://127.0.0.1:19090/train", {
               method: "POST",
               headers: { "content-type": "application/json", "x-kingbot-ml-secret": "ci-secret" },
-              body: JSON.stringify({ botId: "strategic", timeframe: "5m", markets: [{ symbol: "XAUUSD", bars }] })
+              body: JSON.stringify({ botId: "strategic", timeframe: "15m", markets: [{ symbol: "XAUUSD", bars }] })
             });
             const train = await trainResponse.json();
             if (!trainResponse.ok || !train.ok || !train.ready) throw new Error("ML train failed: " + JSON.stringify(train));
