@@ -816,10 +816,10 @@ footer {
   .trust { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 9px; }
   .trust span { min-height: 34px; justify-content: center; text-align: center; padding: 7px 6px; }
 
-  section:not(.infra-section) { padding: 66px 0; }
-  .infra-section { padding: 16px 9px !important; }
-  .infra-visual { border-radius: 13px; }
-  #kingbotInfraCanvas { border-radius: 12px; }
+  section { padding: 66px 0; }
+  
+  
+  
 
   .bot-grid,
   .plans { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
