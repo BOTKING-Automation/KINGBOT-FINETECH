@@ -95,12 +95,13 @@ function strategyDirection(botId,market={},analysis={}){
     const choch=evidenceDirection(market.rawChoch??market.chochDirection);
     const displacement=evidenceDirection(market.rawDisplacement??market.displacementDirection);
     const trigger=sweep!=="HOLD"?sweep:choch;
-    return trigger!=="HOLD"&&trigger===displacement?trigger:"HOLD";
+    const triggerConflict=sweep!=="HOLD"&&choch!=="HOLD"&&sweep!==choch;
+    return !triggerConflict&&trigger!=="HOLD"&&trigger===displacement?trigger:"HOLD";
   }
   if(botId==="breakout"){
     const breakout=evidenceDirection(market.breakoutDirection??market.bosDirection);
     const retest=evidenceDirection(market.retestDirection);
-    return market.breakout&&market.retest&&breakout!=="HOLD"&&(retest==="HOLD"||retest===breakout)?breakout:"HOLD";
+    return market.breakout&&market.retest&&breakout!=="HOLD"&&retest===breakout?breakout:"HOLD";
   }
   if(botId==="smc-pro"){
     const sweep=evidenceDirection(market.rawLiquiditySweep??market.liquiditySweepDirection);
