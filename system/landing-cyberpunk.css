@@ -482,50 +482,13 @@ h1 {
   text-shadow: 0 0 12px rgba(110,231,183,.30);
 }
 
-/* Market ticker */
-.strip {
-  position: relative;
-  background: linear-gradient(90deg, rgba(4,11,27,.98), rgba(9,24,48,.98), rgba(4,11,27,.98));
-  border-top: 1px solid rgba(80,231,255,.21);
-  border-bottom: 1px solid rgba(232,191,112,.17);
-  box-shadow: 0 12px 34px rgba(0,0,0,.22);
-}
-
-.strip::before {
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--kb-cy-cyan), var(--kb-cy-violet), transparent);
-  box-shadow: 0 0 15px rgba(80,231,255,.52);
-  animation-duration: 7s;
-}
-
-.strip-in {
-  max-width: 1440px;
-}
-
-.tk {
-  min-height: 47px;
-  padding: 13px 18px;
-  color: #d8e5f3;
-  font-family: var(--kb-cy-mono);
-  font-size: 9px;
-  border-right: 1px solid rgba(255,255,255,.075);
-}
-
-.tk .up { color: var(--kb-cy-green); }
-.tk .dn { color: #ff8cae; }
-
-.live-dot {
-  background: var(--kb-cy-green);
-  box-shadow: 0 0 10px rgba(110,231,183,.55);
-}
-
 /* Editorial hierarchy and section transitions */
-section:not(.infra-section) {
+section {
   position: relative;
   padding: clamp(74px, 7vw, 108px) 0;
 }
 
-section:not(.infra-section)::after {
+section::after {
   width: min(1100px, 84%);
   background: linear-gradient(90deg, transparent, rgba(80,231,255,.25), rgba(155,117,255,.15), rgba(232,191,112,.18), transparent);
 }
@@ -552,137 +515,6 @@ h2 {
   color: var(--kb-cy-muted);
   font-size: 14px;
   line-height: 1.88;
-}
-
-/* Existing infrastructure visual — keep its canvas and runtime */
-.infra-section {
-  position: relative;
-  overflow: hidden;
-  padding: clamp(22px, 3vw, 42px) clamp(12px, 2vw, 28px) !important;
-  background:
-    radial-gradient(ellipse at 50% 50%, rgba(35,108,177,.19), transparent 63%),
-    linear-gradient(180deg, #030817, #050b1c);
-  border-top: 1px solid rgba(80,231,255,.12);
-  border-bottom: 1px solid rgba(155,117,255,.14);
-}
-
-.infra-section::after { display: none; }
-
-.infra-visual {
-  position: relative;
-  max-width: 1720px;
-  overflow: hidden;
-  border: 1px solid rgba(80,231,255,.24);
-  border-radius: 22px;
-  background: #020611;
-  box-shadow: 0 28px 95px rgba(0,0,0,.55), 0 0 40px rgba(80,231,255,.065);
-}
-
-.infra-visual::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border: 1px solid rgba(255,255,255,.045);
-  border-radius: inherit;
-  background: linear-gradient(135deg, rgba(80,231,255,.045), transparent 32%, transparent 70%, rgba(232,191,112,.045));
-}
-
-#kingbotInfraCanvas {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: inherit;
-}
-
-/* Platform mockups and capability cards */
-.plat,
-.mkts {
-  gap: clamp(30px, 5vw, 78px);
-}
-
-.mock,
-.stat {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(80,231,255,.17);
-  border-radius: 17px;
-  background:
-    linear-gradient(145deg, rgba(16,32,64,.94), rgba(5,12,28,.98));
-  box-shadow: 0 20px 58px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.04);
-}
-
-.mock {
-  padding: 18px;
-}
-
-.mock::before,
-.stat::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(130deg, rgba(80,231,255,.045), transparent 38%, transparent 72%, rgba(155,117,255,.035));
-}
-
-.mock .mh {
-  color: #bcd1e7;
-}
-
-.mrow {
-  color: #d9e6f5;
-  border-bottom-color: rgba(128,183,223,.14);
-}
-
-.checks { color: #dce8f8; }
-
-.pills { gap: 10px; }
-
-.pill {
-  color: #cfdded;
-  border: 1px solid rgba(80,231,255,.15);
-  border-radius: 9px;
-  background: rgba(7,17,38,.82);
-  transition: border-color .2s ease, color .2s ease, background .2s ease, transform .2s ease;
-}
-
-.pill:hover {
-  color: var(--kb-cy-cyan);
-  border-color: rgba(80,231,255,.48);
-  background: rgba(80,231,255,.07);
-  box-shadow: 0 0 22px rgba(80,231,255,.08);
-  transform: translateY(-2px);
-}
-
-.pill b {
-  color: var(--kb-cy-gold-soft);
-  background: rgba(232,191,112,.11);
-}
-
-.stats { gap: 13px; }
-
-.stat {
-  min-height: 102px;
-  padding: 21px;
-  transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease;
-}
-
-.stat:hover {
-  transform: translateY(-3px);
-  border-color: rgba(80,231,255,.34);
-  box-shadow: 0 24px 58px rgba(0,0,0,.38), 0 0 24px rgba(80,231,255,.065);
-}
-
-.stat .v {
-  color: var(--kb-cy-gold-soft);
-  font-family: var(--kb-cy-mono);
-  font-size: clamp(19px, 2vw, 25px);
-}
-
-.stat .k {
-  color: #aebed5;
-  font-size: 9px;
-  letter-spacing: .06em;
 }
 
 /* Five-bot ecosystem */
