@@ -989,6 +989,8 @@ async function execute(row){
     volatility:ind.volatility,trend:ind.trend,momentum:ind.momentum,
     structure:ind.structure,adx:ind.adx,rsi:ind.rsi,emaFast:ind.emaFast,emaSlow:ind.emaSlow,
     velocityPoints:botId==="ladder-flip"?v8Velocity:ind.velocityScore,
+    velocityAtr:ind.velocityScore,
+    volume:ind.volume,
     liquiditySweep:ind.liquiditySweep,rawLiquiditySweep:ind.liquiditySweepDirection,
     displacement:ind.displacement,rawDisplacement:ind.displacementDirection,
     rawBos:ind.bosDirection,bosDirection:ind.bosDirection,
