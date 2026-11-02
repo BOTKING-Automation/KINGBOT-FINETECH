@@ -1,0 +1,209 @@
+/* KINGBOT FINETECH — Personal Settings institutional workspace
+   Visual-only overrides. Preserve profile editing, theme persistence, local
+   preferences, password reset and authentication/security actions. */
+body.kb-settings-page{
+  min-height:100vh;color:#eef2f5!important;
+  background:
+    radial-gradient(ellipse at 8% 0%,rgba(131,203,208,.06),transparent 30%),
+    radial-gradient(ellipse at 92% 4%,rgba(217,180,119,.06),transparent 32%),
+    linear-gradient(180deg,#0a121b 0%,#09111a 54%,#080e15 100%)!important;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+}
+body.kb-settings-page .settings-shell{
+  width:min(1320px,calc(100% - 44px));margin:25px auto 42px;
+}
+body.kb-settings-page .settings-hero{
+  padding:24px 26px;border:1px solid rgba(184,199,211,.12);
+  border-radius:17px;
+  background:
+    radial-gradient(ellipse at 95% 0,rgba(217,180,119,.075),transparent 33%),
+    linear-gradient(150deg,rgba(19,32,45,.98),rgba(11,19,28,.99));
+  box-shadow:0 14px 36px rgba(0,0,0,.16);
+}
+body.kb-settings-page .settings-hero:before{content:none!important;animation:none!important}
+body.kb-settings-page .eyebrow{
+  color:#d9bd8d;font:700 8px "JetBrains Mono",monospace;letter-spacing:.13em;
+}
+body.kb-settings-page .live-dot{background:#78c7a6;box-shadow:none;animation:none}
+body.kb-settings-page h1{
+  color:#f0f3f4;font:750 clamp(27px,3.5vw,40px)/1.08 Inter,sans-serif;
+  letter-spacing:-.04em;
+}
+body.kb-settings-page .hero-copy{color:#a5b2bc;font-size:11px;line-height:1.75}
+body.kb-settings-page .meta-row{gap:7px;margin-top:13px}
+body.kb-settings-page .meta-pill{
+  padding:7px 9px;border:1px solid rgba(184,199,211,.11);
+  border-radius:7px;background:rgba(255,255,255,.022);
+  color:#aab6bd;font:650 7px "JetBrains Mono",monospace;
+}
+body.kb-settings-page .settings-grid{
+  grid-template-columns:minmax(300px,.76fr) minmax(0,1.24fr);gap:13px;margin-top:13px;
+}
+body.kb-settings-page .panel{
+  border:1px solid rgba(184,199,211,.12);border-radius:14px;
+  background:linear-gradient(150deg,rgba(18,30,42,.97),rgba(11,19,28,.99));
+  box-shadow:0 12px 30px rgba(0,0,0,.15);
+}
+body.kb-settings-page .panel:before{content:none!important}
+body.kb-settings-page .panel-inner{padding:17px}
+body.kb-settings-page .panel-head{gap:12px;margin-bottom:13px}
+body.kb-settings-page .panel-kicker{
+  color:#d9bd8d;font:700 7px "JetBrains Mono",monospace;letter-spacing:.12em;
+}
+body.kb-settings-page .panel-title{
+  margin-top:5px;color:#edf1f3;font:700 12px Inter,sans-serif;letter-spacing:.02em;
+}
+body.kb-settings-page .panel-sub{color:#a0aeb7;font-size:9px;line-height:1.65}
+
+/* Identity and avatar controls */
+body.kb-settings-page .identity{
+  gap:12px;padding:12px;border:1px solid rgba(184,199,211,.10);
+  border-radius:11px;background:rgba(255,255,255,.022);
+}
+body.kb-settings-page .avatar{
+  width:74px;height:74px;border:1px solid rgba(217,180,119,.24);
+  background:radial-gradient(circle at 32% 22%,rgba(217,180,119,.18),rgba(131,203,208,.08),#0b1722 70%);
+  box-shadow:0 7px 18px rgba(0,0,0,.17);
+}
+body.kb-settings-page .avatar-ring{border-color:rgba(217,180,119,.20);box-shadow:none;animation:none}
+body.kb-settings-page .identity-name{color:#eef2f4;font:700 13px Inter,sans-serif}
+body.kb-settings-page .identity-email{color:#9eacb5;font:600 8px "JetBrains Mono",monospace}
+body.kb-settings-page .identity-status{
+  margin-top:6px;border:1px solid rgba(120,199,166,.17);
+  border-radius:6px;background:rgba(120,199,166,.045);color:#9bd4b6;
+  font:650 6.5px "JetBrains Mono",monospace;
+}
+body.kb-settings-page .upload-zone{
+  border:1px dashed rgba(131,203,208,.20);border-radius:10px;
+  background:rgba(131,203,208,.035);
+}
+body.kb-settings-page .upload-zone button{
+  min-height:37px;border:1px solid rgba(131,203,208,.20);
+  border-radius:8px;background:rgba(131,203,208,.055);
+  color:#a7d5d6;font:700 7px "JetBrains Mono",monospace;
+}
+body.kb-settings-page .upload-zone small{color:#9baab4;font:600 7px/1.55 "JetBrains Mono",monospace}
+body.kb-settings-page .field{margin-top:11px}
+body.kb-settings-page .field label{
+  color:#aab7bf;font:650 7px "JetBrains Mono",monospace;letter-spacing:.06em;
+}
+body.kb-settings-page .field input{
+  min-height:40px;border:1px solid rgba(184,199,211,.14);
+  border-radius:8px;background:#0b1722;color:#e5ebed;
+  font:600 9px "JetBrains Mono",monospace;
+}
+body.kb-settings-page .field input:focus{
+  border-color:rgba(131,203,208,.56);outline:none;
+  box-shadow:0 0 0 3px rgba(131,203,208,.08);
+}
+body.kb-settings-page .action-row{gap:7px}
+body.kb-settings-page .primary-btn,
+body.kb-settings-page .ghost-btn,
+body.kb-settings-page .danger-btn{
+  min-height:39px;border-radius:8px;font:700 7px "JetBrains Mono",monospace;
+}
+body.kb-settings-page .primary-btn{
+  border:1px solid rgba(217,180,119,.30);
+  background:linear-gradient(120deg,#edcf9c,#c89a5d);color:#241a0d;
+}
+body.kb-settings-page .ghost-btn{
+  border:1px solid rgba(184,199,211,.14);background:rgba(255,255,255,.03);color:#d5dfe3;
+}
+body.kb-settings-page .danger-btn{
+  border:1px solid rgba(225,126,134,.22);background:rgba(225,126,134,.055);color:#e5a0a6;
+}
+body.kb-settings-page .status-line{
+  color:#9eacb5;font:600 7.5px/1.65 "JetBrains Mono",monospace;
+}
+
+/* Theme selection */
+body.kb-settings-page .content-stack{gap:12px}
+body.kb-settings-page .theme-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+body.kb-settings-page .theme-card{
+  min-height:105px;padding:8px;border:1px solid rgba(184,199,211,.10);
+  border-radius:9px;background:rgba(255,255,255,.022);
+  color:#d9e2e5;transition:transform .15s ease,border-color .15s ease,background .15s ease;
+}
+body.kb-settings-page .theme-card:hover{
+  transform:translateY(-1px);border-color:rgba(217,180,119,.27);
+}
+body.kb-settings-page .theme-card[aria-pressed="true"]{
+  border-color:rgba(217,180,119,.36);background:rgba(217,180,119,.055);
+  box-shadow:inset 0 0 0 1px rgba(217,180,119,.07);
+}
+body.kb-settings-page .swatch{height:43px;border-radius:7px}
+body.kb-settings-page .theme-name{color:#e6ecee;font:650 8px Inter,sans-serif}
+body.kb-settings-page .theme-meta{color:#9caab4;font:600 6px "JetBrains Mono",monospace}
+body.kb-settings-page .theme-check{color:#e3c18e}
+
+/* User preferences and security controls */
+body.kb-settings-page .preference-grid{gap:8px}
+body.kb-settings-page .pref{
+  padding:12px;border:1px solid rgba(184,199,211,.10);
+  border-radius:9px;background:rgba(255,255,255,.022);
+}
+body.kb-settings-page .pref b{color:#e3e9eb;font:650 8px Inter,sans-serif}
+body.kb-settings-page .pref p{color:#9daab3;font-size:8px;line-height:1.65}
+body.kb-settings-page .switch{
+  width:37px;height:21px;background:#263746;box-shadow:none;
+}
+body.kb-settings-page .switch:after{
+  background:#9aaab4;box-shadow:none;
+}
+body.kb-settings-page .switch[aria-checked="true"]{
+  background:rgba(120,199,166,.19);box-shadow:none;
+}
+body.kb-settings-page .switch[aria-checked="true"]:after{
+  background:#78c7a6;box-shadow:0 0 6px rgba(120,199,166,.25);
+}
+body.kb-settings-page .security-grid{gap:8px}
+body.kb-settings-page .security{
+  padding:11px;border:1px solid rgba(184,199,211,.10);
+  border-radius:9px;background:rgba(255,255,255,.022);
+}
+body.kb-settings-page .security span{
+  color:#9baab4;font:650 6.5px "JetBrains Mono",monospace;
+}
+body.kb-settings-page .security strong{
+  color:#e5ebed;font:700 9px "JetBrains Mono",monospace;
+  overflow-wrap:anywhere;
+}
+body.kb-settings-page .security small{
+  color:#9caab4;font:600 7px/1.55 "JetBrains Mono",monospace;
+}
+body.kb-settings-page .help-note{
+  border-left:2px solid #d9b477;background:rgba(217,180,119,.035);
+  color:#a5b1b9;font:600 7px/1.65 "JetBrains Mono",monospace;
+}
+
+/* Responsive settings */
+body.kb-settings-page :is(a,button,input,select):focus-visible{
+  outline:2px solid rgba(131,203,208,.85);outline-offset:3px;
+}
+@media(max-width:1080px){
+  body.kb-settings-page .settings-grid{grid-template-columns:1fr}
+  body.kb-settings-page .theme-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  body.kb-settings-page .settings-shell{width:calc(100% - 28px);margin:18px auto 32px}
+  body.kb-settings-page .settings-hero{padding:20px}
+  body.kb-settings-page h1{font-size:30px}
+  body.kb-settings-page .theme-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.kb-settings-page .preference-grid,
+  body.kb-settings-page .security-grid,
+  body.kb-settings-page .action-row{grid-template-columns:1fr}
+  body.kb-settings-page .identity{align-items:flex-start}
+}
+@media(max-width:480px){
+  body.kb-settings-page .settings-shell{width:calc(100% - 18px);margin-top:14px}
+  body.kb-settings-page .settings-hero{padding:16px}
+  body.kb-settings-page .theme-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-settings-page .panel-inner{padding:13px}
+  body.kb-settings-page .avatar{width:66px;height:66px}
+}
+@media(prefers-reduced-motion:reduce){
+  body.kb-settings-page *,body.kb-settings-page *:before,body.kb-settings-page *:after{
+    animation-duration:.01ms!important;animation-iteration-count:1!important;
+    transition-duration:.01ms!important;scroll-behavior:auto!important;
+  }
+}

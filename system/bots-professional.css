@@ -1,0 +1,356 @@
+/* KINGBOT FINETECH — Bot Control Centre institutional design
+   Presentation only. Keep bot entitlements, saved selection, input IDs,
+   execution authorization and risk-control handlers unchanged. */
+body.kb-bots-page{
+  background:
+    radial-gradient(ellipse at 8% 0%,rgba(131,203,208,.065),transparent 30%),
+    radial-gradient(ellipse at 92% 4%,rgba(217,180,119,.065),transparent 31%),
+    linear-gradient(180deg,#0a121b 0%,#09111a 54%,#080e15 100%)!important;
+  color:#eef2f5!important;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+}
+body.kb-bots-page main{
+  width:min(1560px,calc(100% - 48px));
+  margin:0 auto;padding:26px 0 42px;
+}
+body.kb-bots-page .shell{
+  padding:clamp(22px,3vw,36px);
+  border:1px solid rgba(184,199,211,.12);
+  border-radius:22px;
+  background:linear-gradient(150deg,rgba(17,29,42,.97),rgba(10,18,27,.985));
+  box-shadow:0 20px 56px rgba(0,0,0,.24);
+}
+body.kb-bots-page .shell:before,
+body.kb-bots-page .shell:after,
+body.kb-bots-page .bot:after,
+body.kb-bots-page .bot-media:after,
+body.kb-bots-page .panel:before,
+body.kb-bots-page .panel:after,
+body.kb-bots-page .status-card:after,
+body.kb-bots-page .metric:before{
+  animation:none!important;
+}
+body.kb-bots-page .shell:before,
+body.kb-bots-page .shell:after{content:none!important;display:none!important}
+body.kb-bots-page .hud-line{
+  gap:8px;margin-bottom:22px;color:#9baab4;
+  font:650 8px "JetBrains Mono",monospace;letter-spacing:.11em;
+}
+body.kb-bots-page .hud-line i{
+  background:#d9b477;box-shadow:none;width:5px;height:5px;
+}
+body.kb-bots-page .hud-line i:nth-child(2){background:#83cbd0}
+body.kb-bots-page .hud-line i:nth-child(3){background:#78c7a6}
+body.kb-bots-page .top{
+  align-items:flex-end;gap:24px;padding-bottom:22px;
+  border-bottom:1px solid rgba(184,199,211,.11);
+}
+body.kb-bots-page .eyebrow{
+  color:#dfc28f;font:700 9px "JetBrains Mono",monospace;
+  letter-spacing:.14em;
+}
+body.kb-bots-page .top h1{
+  margin:10px 0 9px;
+  background:linear-gradient(105deg,#f2dfbf 0%,#d9b477 54%,#9bcdd0 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  font:750 clamp(29px,4vw,46px)/1.05 Inter,sans-serif;
+  letter-spacing:-.045em;
+}
+body.kb-bots-page .sub{
+  max-width:790px;color:#a5b2bc;font-size:12px;line-height:1.75;
+}
+body.kb-bots-page .telemetry{
+  min-width:215px;padding:14px 16px;border:1px solid rgba(184,199,211,.12);
+  border-radius:13px;background:rgba(255,255,255,.025);
+}
+body.kb-bots-page .telemetry b{
+  color:#e5d0aa;font:700 9px "JetBrains Mono",monospace;letter-spacing:.08em;
+}
+body.kb-bots-page .telemetry span{
+  color:#9aa9b4;font:600 8px "JetBrains Mono",monospace;line-height:1.5;
+}
+body.kb-bots-page #subscriptionState{color:#dfbd82!important}
+
+/* Selectable strategy cards */
+body.kb-bots-page .bot-grid{
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:12px;margin-top:20px;
+}
+body.kb-bots-page .bot{
+  border:1px solid rgba(184,199,211,.12);
+  border-radius:15px;background:linear-gradient(155deg,#172635,#101a26);
+  color:#edf1f3;box-shadow:0 8px 24px rgba(0,0,0,.14);
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+body.kb-bots-page .bot:after{content:none!important;display:none!important}
+body.kb-bots-page .bot-media{
+  height:142px;
+  background:radial-gradient(ellipse at 50% 40%,rgba(217,180,119,.12),transparent 70%),#101b27;
+}
+body.kb-bots-page .bot-media img{
+  opacity:.88;filter:saturate(.82) contrast(1.03);
+  transition:transform .2s ease,opacity .2s ease;
+}
+body.kb-bots-page .bot-media:after{
+  content:"";position:absolute;inset:45% 0 0;
+  background:linear-gradient(180deg,transparent,rgba(12,21,31,.82));
+}
+body.kb-bots-page .bot-body{padding:14px 14px 16px}
+body.kb-bots-page .bot-chip{
+  border:1px solid rgba(217,180,119,.2);
+  border-radius:7px;background:rgba(217,180,119,.06);
+  color:#e2c99f;font:700 7px "JetBrains Mono",monospace;letter-spacing:.07em;
+}
+body.kb-bots-page .bot .code{color:#9baab4}
+body.kb-bots-page .bot strong{
+  margin-top:11px;color:#f0f3f4;font:700 12px Inter,sans-serif;
+  letter-spacing:-.01em;
+}
+body.kb-bots-page .bot small{
+  color:#a1adb7;font-size:9px;line-height:1.6;
+}
+body.kb-bots-page .bot:hover,
+body.kb-bots-page .bot.active{
+  transform:translateY(-2px);
+  border-color:rgba(217,180,119,.42);
+  box-shadow:0 13px 28px rgba(0,0,0,.23);
+}
+body.kb-bots-page .bot:hover img,
+body.kb-bots-page .bot.active img{transform:scale(1.035);opacity:1}
+body.kb-bots-page .bot.active{
+  background:linear-gradient(155deg,rgba(69,55,37,.42),rgba(17,29,41,.98));
+  box-shadow:inset 0 0 0 1px rgba(217,180,119,.09),0 13px 28px rgba(0,0,0,.24);
+}
+body.kb-bots-page .bot.active .bot-chip{
+  background:rgba(217,180,119,.12);border-color:rgba(217,180,119,.35);
+}
+body.kb-bots-page .bot[aria-disabled="true"]{
+  opacity:.56;filter:saturate(.58);
+}
+body.kb-bots-page .bot[aria-disabled="true"]:hover{
+  transform:none;box-shadow:0 8px 24px rgba(0,0,0,.14);
+}
+
+/* Saved selection state */
+body.kb-bots-page .selection-toolbar{
+  margin-top:13px;padding:14px 16px;
+  border:1px solid rgba(184,199,211,.12);border-radius:12px;
+  background:rgba(255,255,255,.025);
+}
+body.kb-bots-page .selection-state strong{
+  color:#e6d1aa;font:700 9px Inter,sans-serif;letter-spacing:.08em;
+}
+body.kb-bots-page .selection-state span{
+  margin-top:5px;color:#9baab4;font:600 8px "JetBrains Mono",monospace;
+}
+body.kb-bots-page .selection-toolbar .change-bot{
+  padding:9px 13px;border:1px solid rgba(217,180,119,.26);
+  border-radius:9px;background:rgba(217,180,119,.07);
+  color:#ebd2a7;font:700 8px Inter,sans-serif;
+}
+body.kb-bots-page #selectionNotice{
+  border-color:rgba(184,199,211,.10)!important;
+  border-radius:10px!important;background:rgba(255,255,255,.018)!important;
+  color:#a0aeb8!important;font:600 8px "JetBrains Mono",monospace!important;
+}
+body.kb-bots-page #selectionNotice a{color:#9bd0d2!important}
+
+/* Configuration and live engine status */
+body.kb-bots-page .layout{
+  grid-template-columns:minmax(0,1.25fr) minmax(330px,.75fr);
+  gap:14px;margin-top:17px;
+}
+body.kb-bots-page .panel{
+  padding:22px;border:1px solid rgba(184,199,211,.12);
+  border-radius:16px;background:linear-gradient(150deg,rgba(19,32,45,.97),rgba(11,19,28,.99));
+  box-shadow:0 12px 30px rgba(0,0,0,.16);
+}
+body.kb-bots-page .panel:before,
+body.kb-bots-page .panel:after{content:none!important}
+body.kb-bots-page .bot-detail-hero{
+  grid-template-columns:170px 1fr;gap:17px;margin:-3px 0 19px;padding:12px;
+  border:1px solid rgba(184,199,211,.11);border-radius:13px;
+  background:linear-gradient(120deg,rgba(131,203,208,.055),rgba(217,180,119,.035));
+}
+body.kb-bots-page .detail-image{
+  height:112px;border:1px solid rgba(184,199,211,.12);
+  border-radius:10px;background:#0c1722;
+}
+body.kb-bots-page .detail-image img{filter:saturate(.86)}
+body.kb-bots-page .bot-chip{
+  color:#e2c99f;border-color:rgba(217,180,119,.22);
+  background:rgba(217,180,119,.06);
+}
+body.kb-bots-page .detail-copy h2,
+body.kb-bots-page .panel h2{
+  color:#eef2f4;font:700 16px Inter,sans-serif;
+  letter-spacing:-.015em;text-transform:none;
+}
+body.kb-bots-page .detail-copy p,
+body.kb-bots-page .panel .desc{
+  color:#a1afb9;font-size:10px;line-height:1.7;
+}
+body.kb-bots-page .panel .desc{margin:0 0 16px}
+body.kb-bots-page .bot-symbol-default{
+  padding:10px 12px;border-color:rgba(184,199,211,.11);
+  border-radius:10px;background:rgba(255,255,255,.025);
+  color:#a1afb9;font-size:8px;
+}
+body.kb-bots-page .bot-symbol-default strong{color:#9bd0d2}
+body.kb-bots-page .risk-grid{gap:12px}
+body.kb-bots-page .field label{
+  margin-bottom:7px;color:#b2bdc5;
+  font:650 8px "JetBrains Mono",monospace;letter-spacing:.045em;
+}
+body.kb-bots-page .field label em{color:#d9b477;font-size:8px}
+body.kb-bots-page .field :is(input,select){
+  min-height:43px;padding:0 12px;border:1px solid rgba(184,199,211,.14);
+  border-radius:9px;background:#0c1722;color:#e8edef;
+  font:600 11px "JetBrains Mono",monospace;transition:border-color .18s ease,box-shadow .18s ease;
+}
+body.kb-bots-page .field :is(input,select):focus{
+  border-color:rgba(131,203,208,.62);
+  box-shadow:0 0 0 3px rgba(131,203,208,.09);
+}
+body.kb-bots-page .field :is(input,select):disabled{
+  opacity:.58;cursor:not-allowed;
+}
+body.kb-bots-page .market-control .market-refresh{
+  min-height:43px;border:1px solid rgba(131,203,208,.23);
+  border-radius:9px;background:rgba(131,203,208,.07);
+  color:#a8d6d8;font:700 9px Inter,sans-serif;
+}
+body.kb-bots-page .switch-row{
+  padding:13px 0;border-color:rgba(184,199,211,.10);
+}
+body.kb-bots-page .switch-row span{color:#d5dfe3;font:600 10px Inter,sans-serif}
+body.kb-bots-page .switch-row small{color:#9baab4;font-size:9px;line-height:1.5}
+body.kb-bots-page .slider{
+  border-color:rgba(184,199,211,.18);background:#182533;
+}
+body.kb-bots-page .slider:before{background:#81919d}
+body.kb-bots-page .switch input:checked+.slider{
+  background:rgba(120,199,166,.17);border-color:rgba(120,199,166,.48);
+}
+body.kb-bots-page .switch input:checked+.slider:before{
+  background:#78c7a6;box-shadow:0 0 10px rgba(120,199,166,.34);
+}
+body.kb-bots-page .switch input:focus-visible+.slider{
+  outline:2px solid #83cbd0;outline-offset:3px;
+}
+body.kb-bots-page #brokerExecutionPanel{
+  border:1px solid rgba(184,199,211,.12)!important;border-radius:11px!important;
+  background:linear-gradient(120deg,rgba(131,203,208,.055),rgba(217,180,119,.045))!important;
+}
+body.kb-bots-page #brokerExecutionTitle{color:#e9edf0!important;font:700 9px Inter,sans-serif!important}
+body.kb-bots-page #brokerExecutionNote{color:#a1afb9!important;font:600 8px "JetBrains Mono",monospace!important}
+body.kb-bots-page #brokerExecutionAction{
+  background:linear-gradient(120deg,#edcf9c,#c89a5d)!important;
+  color:#21190f!important;border-radius:8px!important;
+  font:700 8px Inter,sans-serif!important;
+}
+
+/* Actions — retain risk confirmation attributes and click handlers */
+body.kb-bots-page .actions{gap:8px;margin-top:17px}
+body.kb-bots-page .actions .btn{
+  min-height:41px;padding:0 13px;border:1px solid rgba(184,199,211,.16);
+  border-radius:9px;background:rgba(255,255,255,.035);color:#d5dfe3;
+  font:650 9px Inter,sans-serif;letter-spacing:.015em;
+  transition:transform .16s ease,border-color .16s ease,background .16s ease;
+}
+body.kb-bots-page .actions .btn.primary{
+  border-color:rgba(217,180,119,.34);
+  background:linear-gradient(120deg,#edcf9c,#c89a5d);
+  color:#241a0d;box-shadow:0 8px 20px rgba(217,180,119,.10);
+}
+body.kb-bots-page .actions .btn.warn{
+  border-color:rgba(225,126,134,.24);background:rgba(225,126,134,.07);color:#efadb1;
+}
+body.kb-bots-page .actions .btn:hover{transform:translateY(-1px);border-color:rgba(217,180,119,.42)}
+body.kb-bots-page .actions .btn:disabled{opacity:.48;cursor:not-allowed;transform:none}
+body.kb-bots-page .message{
+  min-height:22px;color:#a4b1bb;font:600 9px "JetBrains Mono",monospace;
+}
+body.kb-bots-page .message.ok{color:#8bd0b1}
+body.kb-bots-page .message.error{color:#e98d95}
+
+/* State, risk and strategy summaries */
+body.kb-bots-page .status-card{
+  margin-bottom:12px;padding:16px;border:1px solid rgba(184,199,211,.11);
+  border-radius:13px;background:rgba(255,255,255,.022);
+}
+body.kb-bots-page .status-card:after{content:none!important}
+body.kb-bots-page .status-line strong{
+  color:#e8edef;font:700 9px Inter,sans-serif;letter-spacing:.06em;
+}
+body.kb-bots-page .pill{
+  border:1px solid rgba(217,180,119,.21);background:rgba(217,180,119,.07);
+  color:#e2c89f;font:700 8px "JetBrains Mono",monospace;
+}
+body.kb-bots-page .metric-grid{gap:8px}
+body.kb-bots-page .metric-grid .metric{
+  padding:11px;border:1px solid rgba(184,199,211,.09);
+  border-radius:10px;background:rgba(7,14,21,.43);
+}
+body.kb-bots-page .metric-grid .metric:before{content:none!important}
+body.kb-bots-page .metric b{
+  color:#94a3ad;font:650 7px "JetBrains Mono",monospace;letter-spacing:.07em;
+}
+body.kb-bots-page .metric span{
+  color:#e4eaed;font:700 12px "JetBrains Mono",monospace;
+}
+body.kb-bots-page .strategy-list,
+body.kb-bots-page .strategy-list .tag{gap:7px}
+body.kb-bots-page .strategy-list .tag{
+  padding:7px 9px;border:1px solid rgba(217,180,119,.15);
+  border-radius:8px;background:rgba(217,180,119,.045);
+  color:#d5c09b;font:650 8px "JetBrains Mono",monospace;
+}
+body.kb-bots-page .telemetry-note{
+  padding:13px 14px;border:1px solid rgba(184,199,211,.11);
+  border-radius:11px;background:rgba(255,255,255,.025);
+  color:#a3b0ba;font-size:9px;line-height:1.7;
+}
+body.kb-bots-page .telemetry-note strong{color:#e5d0a8}
+
+/* Keyboard focus and responsive layouts */
+body.kb-bots-page :is(a,button,input,select):focus-visible{
+  outline:2px solid rgba(131,203,208,.85);outline-offset:3px;
+}
+@media(max-width:1180px){
+  body.kb-bots-page main{width:min(100% - 36px,1560px)}
+  body.kb-bots-page .bot-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.kb-bots-page .layout{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+  body.kb-bots-page main{width:calc(100% - 24px);padding:17px 0 28px}
+  body.kb-bots-page .shell{padding:20px;border-radius:17px}
+  body.kb-bots-page .top{flex-direction:column;align-items:stretch;gap:16px}
+  body.kb-bots-page .telemetry{width:100%;min-width:0}
+  body.kb-bots-page .bot-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  body.kb-bots-page .bot-media{height:118px}
+  body.kb-bots-page .layout{grid-template-columns:1fr}
+  body.kb-bots-page .panel{padding:16px}
+  body.kb-bots-page .bot-detail-hero{grid-template-columns:120px 1fr;gap:12px}
+  body.kb-bots-page .detail-image{height:92px}
+  body.kb-bots-page .risk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:480px){
+  body.kb-bots-page main{width:calc(100% - 18px)}
+  body.kb-bots-page .shell{padding:15px}
+  body.kb-bots-page .bot-grid{grid-template-columns:1fr 1fr}
+  body.kb-bots-page .bot-media{height:105px}
+  body.kb-bots-page .bot-body{padding:11px}
+  body.kb-bots-page .bot strong{font-size:11px}
+  body.kb-bots-page .bot small{font-size:8px}
+  body.kb-bots-page .bot-detail-hero{grid-template-columns:1fr}
+  body.kb-bots-page .detail-image{height:135px}
+  body.kb-bots-page .risk-grid{grid-template-columns:1fr}
+  body.kb-bots-page .actions .btn{flex:1 1 100%}
+  body.kb-bots-page .selection-toolbar{align-items:flex-start}
+}
+@media(prefers-reduced-motion:reduce){
+  body.kb-bots-page *,body.kb-bots-page *:before,body.kb-bots-page *:after{
+    animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;
+  }
+}

@@ -1,0 +1,182 @@
+/* KINGBOT FINETECH — Unified Command Center institutional interface
+   Visual-only layer. Preserve capability registry, platform-state polling,
+   event rendering, account telemetry and risk-governor state bindings. */
+body.kb-command-page{
+  margin:0!important;min-height:100vh;color:#eef2f5!important;
+  background:
+    radial-gradient(ellipse at 8% 0%,rgba(131,203,208,.065),transparent 30%),
+    radial-gradient(ellipse at 92% 4%,rgba(217,180,119,.065),transparent 32%),
+    linear-gradient(180deg,#0a121b 0%,#09111a 54%,#080e15 100%)!important;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+}
+body.kb-command-page .wrap{
+  width:min(1480px,calc(100% - 44px));margin:26px auto 42px;
+}
+body.kb-command-page .hero{
+  padding:25px 27px;border:1px solid rgba(184,199,211,.12);
+  border-radius:17px;
+  background:
+    radial-gradient(ellipse at 95% 0,rgba(217,180,119,.08),transparent 33%),
+    linear-gradient(150deg,rgba(19,32,45,.98),rgba(11,19,28,.99));
+  box-shadow:0 14px 36px rgba(0,0,0,.16);
+}
+body.kb-command-page .ey{
+  color:#d9bd8d;font:700 8px "JetBrains Mono",monospace;letter-spacing:.14em;
+}
+body.kb-command-page h1{
+  margin:10px 0 9px;color:#f0f3f4;
+  font:750 clamp(29px,3.7vw,44px)/1.08 Inter,sans-serif;letter-spacing:-.04em;
+}
+body.kb-command-page .lead{max-width:880px;color:#a5b2bc;font-size:12px;line-height:1.75}
+body.kb-command-page .toolbar{gap:8px;margin-top:17px}
+body.kb-command-page .btn{
+  padding:10px 13px;min-height:38px;border:1px solid rgba(184,199,211,.14);
+  border-radius:9px;background:rgba(255,255,255,.03);color:#d4dfe3;
+  font:650 8px "JetBrains Mono",monospace;
+  transition:transform .16s ease,border-color .16s ease,background .16s ease;
+}
+body.kb-command-page .btn:hover{
+  transform:translateY(-1px);border-color:rgba(217,180,119,.36);
+  background:rgba(217,180,119,.045);
+}
+body.kb-command-page .btn.gold{
+  border-color:rgba(217,180,119,.32);
+  background:linear-gradient(120deg,#edcf9c,#c89a5d);color:#241a0d;
+}
+body.kb-command-page .btn.gold:hover{background:linear-gradient(120deg,#f0d7ad,#d1a46a)}
+
+/* Executive metrics */
+body.kb-command-page .grid{
+  grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:13px;
+}
+body.kb-command-page .card{
+  min-width:0;padding:15px;border:1px solid rgba(184,199,211,.11);
+  border-radius:12px;background:linear-gradient(150deg,rgba(19,32,45,.97),rgba(12,21,31,.99));
+  box-shadow:0 8px 22px rgba(0,0,0,.13);
+}
+body.kb-command-page .label{
+  color:#9aa9b3;font:650 7px "JetBrains Mono",monospace;letter-spacing:.09em;
+}
+body.kb-command-page .value{
+  margin-top:8px;color:#e8edef;font:700 clamp(16px,1.9vw,22px) "JetBrains Mono",monospace;
+  letter-spacing:-.025em;
+}
+body.kb-command-page .sub{
+  margin-top:5px;color:#99a8b1;font:600 7px "JetBrains Mono",monospace;line-height:1.5;
+}
+body.kb-command-page .good{color:#8bd0b1}
+body.kb-command-page .warn{color:#e2c08b}
+body.kb-command-page .bad{color:#e78c94}
+body.kb-command-page .violet{color:#c3b7db}
+
+/* Account state / risk governor / bot runtime / event stream */
+body.kb-command-page .two{
+  grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);
+  gap:12px;margin-top:12px;
+}
+body.kb-command-page .panel{
+  overflow:hidden;border:1px solid rgba(184,199,211,.12);
+  border-radius:14px;background:linear-gradient(150deg,rgba(18,30,42,.97),rgba(11,19,28,.99));
+  box-shadow:0 10px 28px rgba(0,0,0,.15);
+}
+body.kb-command-page .head{
+  min-height:49px;padding:13px 15px;
+  border-color:rgba(184,199,211,.10);background:rgba(255,255,255,.018);
+}
+body.kb-command-page .head h2{
+  margin:0;color:#edf1f3;font:700 9px Inter,sans-serif;letter-spacing:.075em;
+}
+body.kb-command-page .badge{
+  padding:5px 7px;border:1px solid rgba(184,199,211,.12);
+  border-radius:6px;background:rgba(255,255,255,.025);
+  color:#a5b2bb;font:650 7px "JetBrains Mono",monospace;
+}
+body.kb-command-page .badge.good{
+  border-color:rgba(120,199,166,.18);background:rgba(120,199,166,.05);color:#9bd5b7;
+}
+body.kb-command-page .body{padding:13px 15px}
+body.kb-command-page .rows{gap:6px}
+body.kb-command-page .row{
+  align-items:flex-start;gap:13px;padding:10px 11px;
+  border:1px solid rgba(184,199,211,.08);border-radius:8px;
+  background:rgba(255,255,255,.018);
+}
+body.kb-command-page .row span:first-child{
+  color:#9eacb5;font:650 7px "JetBrains Mono",monospace;letter-spacing:.035em;
+}
+body.kb-command-page .row span:last-child{
+  max-width:62%;color:#e3e9eb;text-align:right;
+  font:650 8px "JetBrains Mono",monospace;overflow-wrap:anywhere;
+}
+body.kb-command-page .bot-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+body.kb-command-page .bot{
+  min-width:0;padding:11px;border:1px solid rgba(184,199,211,.09);
+  border-radius:9px;background:rgba(255,255,255,.022);
+}
+body.kb-command-page .bot b{
+  color:#e9eef0;font:700 8px Inter,sans-serif;letter-spacing:.015em;
+}
+body.kb-command-page .bot small{
+  color:#9cabb4;font:600 7px "JetBrains Mono",monospace;line-height:1.55;
+}
+body.kb-command-page .event-list{gap:7px;max-height:360px;overflow:auto}
+body.kb-command-page .event{
+  padding:10px 11px;border:1px solid rgba(184,199,211,.09);
+  border-radius:9px;background:rgba(255,255,255,.02);
+}
+body.kb-command-page .event b{
+  color:#e2c18f;font:700 8px "JetBrains Mono",monospace;letter-spacing:.025em;
+}
+body.kb-command-page .event small{
+  color:#9aa9b2;font:600 7px "JetBrains Mono",monospace;line-height:1.55;
+}
+
+/* Platform capability inventory */
+body.kb-command-page .modules{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+body.kb-command-page .module{
+  min-width:0;padding:12px;border:1px solid rgba(184,199,211,.09);
+  border-radius:9px;background:rgba(255,255,255,.02);
+}
+body.kb-command-page .module b{
+  display:block;color:#e4eaec;font:650 8px Inter,sans-serif;line-height:1.45;
+}
+body.kb-command-page .module span{
+  display:block;margin-top:6px;color:#9eacb5;
+  font:600 7px/1.6 "JetBrains Mono",monospace;
+}
+
+/* Keyboard focus */
+body.kb-command-page :is(a,button,input,select):focus-visible{
+  outline:2px solid rgba(131,203,208,.85);outline-offset:3px;
+}
+
+/* Responsive command centre */
+@media(max-width:1050px){
+  body.kb-command-page .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-command-page .two{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+  body.kb-command-page .wrap{width:calc(100% - 28px);margin:18px auto 30px}
+  body.kb-command-page .hero{padding:20px}
+  body.kb-command-page .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  body.kb-command-page .modules{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-command-page .bot-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:480px){
+  body.kb-command-page .wrap{width:calc(100% - 18px);margin-top:14px}
+  body.kb-command-page .hero{padding:16px}
+  body.kb-command-page .grid{grid-template-columns:1fr 1fr}
+  body.kb-command-page .card{padding:12px}
+  body.kb-command-page .value{font-size:16px}
+  body.kb-command-page .modules{grid-template-columns:1fr}
+  body.kb-command-page .bot-grid{grid-template-columns:1fr}
+  body.kb-command-page .toolbar .btn{flex:1 1 100%;text-align:center}
+  body.kb-command-page .body{padding:10px}
+  body.kb-command-page .row{padding:9px}
+}
+@media(prefers-reduced-motion:reduce){
+  body.kb-command-page *,body.kb-command-page *:before,body.kb-command-page *:after{
+    animation-duration:.01ms!important;animation-iteration-count:1!important;
+    transition-duration:.01ms!important;scroll-behavior:auto!important;
+  }
+}

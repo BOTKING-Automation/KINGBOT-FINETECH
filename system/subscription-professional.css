@@ -1,0 +1,312 @@
+/* KINGBOT FINETECH — Subscription & payments institutional interface
+   Presentation-only. Preserve backend pricing, checkout-link generation,
+   M-Pesa STK Push/manual verification, payment history and entitlement status. */
+body.kb-subscription-page{
+  margin:0;min-height:100vh;color:#eef2f5!important;
+  background:
+    radial-gradient(ellipse at 8% 0%,rgba(131,203,208,.065),transparent 30%),
+    radial-gradient(ellipse at 92% 4%,rgba(217,180,119,.065),transparent 32%),
+    linear-gradient(180deg,#0a121b 0%,#09111a 54%,#080e15 100%)!important;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+}
+body.kb-subscription-page .page{
+  width:min(1480px,calc(100% - 44px));margin:0 auto;padding:27px 0 44px;
+}
+body.kb-subscription-page .command-head{
+  padding:25px 27px;border:1px solid rgba(184,199,211,.12);
+  border-radius:17px;
+  background:
+    radial-gradient(ellipse at 95% 0,rgba(217,180,119,.075),transparent 32%),
+    linear-gradient(150deg,rgba(19,32,45,.98),rgba(11,19,28,.99));
+  box-shadow:0 14px 36px rgba(0,0,0,.16);
+}
+body.kb-subscription-page .command-head:before{
+  height:1px;background:linear-gradient(90deg,transparent,rgba(217,180,119,.6),rgba(131,203,208,.4),transparent);
+  box-shadow:none;animation:none;
+}
+body.kb-subscription-page .head-grid{
+  grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:end;
+}
+body.kb-subscription-page .eyebrow{
+  color:#d9bd8d;font:700 8px "JetBrains Mono",monospace;letter-spacing:.14em;
+}
+body.kb-subscription-page .eyebrow:before{
+  background:#78c7a6;box-shadow:none;animation:none;
+}
+body.kb-subscription-page h1{
+  margin:10px 0;color:#f0f3f4;font:750 clamp(28px,3.6vw,43px)/1.08 Inter,sans-serif;
+  letter-spacing:-.04em;
+}
+body.kb-subscription-page .gradient{
+  background:linear-gradient(105deg,#f2dfbf,#d9b477 60%,#9bcdd0);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+body.kb-subscription-page .lead{
+  max-width:850px;color:#a5b2bc;font-size:12px;line-height:1.75;
+}
+body.kb-subscription-page .head-status{gap:7px}
+body.kb-subscription-page .status-chip{
+  padding:8px 10px;border:1px solid rgba(184,199,211,.12);
+  border-radius:8px;background:rgba(255,255,255,.024);
+  color:#a5b2bb;font:650 7px "JetBrains Mono",monospace;
+}
+body.kb-subscription-page .status-chip.online{
+  border-color:rgba(120,199,166,.17);background:rgba(120,199,166,.05);color:#9bd5b7;
+}
+body.kb-subscription-page .panel{
+  position:relative;overflow:hidden;
+  border:1px solid rgba(184,199,211,.12);border-radius:15px;
+  background:linear-gradient(150deg,rgba(18,30,42,.97),rgba(11,19,28,.99));
+  box-shadow:0 12px 30px rgba(0,0,0,.15);
+}
+body.kb-subscription-page .panel:before{
+  content:none!important;display:none!important;
+}
+body.kb-subscription-page .panel-inner{padding:18px}
+body.kb-subscription-page .panel-head{
+  display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:14px;
+}
+body.kb-subscription-page .section-code{
+  color:#d9bd8d;font:700 7px "JetBrains Mono",monospace;letter-spacing:.12em;
+}
+body.kb-subscription-page .section-title{
+  margin-top:5px;color:#edf1f3;font:700 13px Inter,sans-serif;letter-spacing:.025em;
+}
+body.kb-subscription-page .section-note{
+  color:#9eacb5;font:650 7px "JetBrains Mono",monospace;letter-spacing:.04em;
+}
+
+/* Plans generated from the active backend catalog */
+body.kb-subscription-page .plans{
+  grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;
+}
+body.kb-subscription-page .plan-card{
+  min-height:300px;padding:17px;border:1px solid rgba(184,199,211,.12);
+  border-radius:13px;background:linear-gradient(150deg,#172735,#101a26);
+  box-shadow:0 8px 22px rgba(0,0,0,.12);transition:transform .17s ease,border-color .17s ease,background .17s ease;
+}
+body.kb-subscription-page .plan-card:after{
+  background:radial-gradient(circle,rgba(217,180,119,.09),transparent 68%);
+}
+body.kb-subscription-page .plan-card:hover,
+body.kb-subscription-page .plan-card.active{
+  transform:translateY(-2px);border-color:rgba(217,180,119,.32);
+  background:linear-gradient(150deg,#1c2d3b,#111d29);
+  box-shadow:0 13px 28px rgba(0,0,0,.2);
+}
+body.kb-subscription-page .plan-top{gap:9px}
+body.kb-subscription-page .plan-code{
+  color:#a7d2d4;font:700 7px "JetBrains Mono",monospace;letter-spacing:.08em;
+}
+body.kb-subscription-page .plan-name{
+  color:#f0f3f4;font:700 14px Inter,sans-serif;letter-spacing:-.01em;
+}
+body.kb-subscription-page .plan-price{
+  margin-top:12px;color:#e9d2aa;font:750 25px Inter,sans-serif;letter-spacing:-.035em;
+}
+body.kb-subscription-page .plan-price small{
+  color:#a4b1b9;font:600 8px "JetBrains Mono",monospace;
+}
+body.kb-subscription-page .plan-description{
+  margin-top:8px;color:#a4b1ba;font-size:9px;line-height:1.7;
+}
+body.kb-subscription-page .feature-list{gap:7px;margin-top:13px}
+body.kb-subscription-page .feature-list li{
+  color:#c2cdd2;font-size:8px;line-height:1.5;
+}
+body.kb-subscription-page .featured-badge{
+  padding:6px 8px;border:1px solid rgba(217,180,119,.22);border-radius:7px;
+  background:rgba(217,180,119,.06);color:#e6c995;
+  font:650 7px "JetBrains Mono",monospace;
+}
+body.kb-subscription-page .plan-select{
+  margin-top:auto;min-height:39px;padding:9px 12px;
+  border:1px solid rgba(217,180,119,.3);border-radius:9px;
+  background:linear-gradient(120deg,#edcf9c,#c89a5d);color:#241a0d;
+  font:700 8px Inter,sans-serif;
+}
+body.kb-subscription-page .plan-select:hover{filter:brightness(1.04);transform:translateY(-1px)}
+body.kb-subscription-page .plan-select:disabled{opacity:.5;cursor:not-allowed}
+
+/* Secure checkout and payment method selection */
+body.kb-subscription-page .layout{
+  grid-template-columns:minmax(0,1.35fr) minmax(310px,.8fr);
+  gap:13px;margin-top:14px;align-items:start;
+}
+body.kb-subscription-page .payment-grid{
+  grid-template-columns:minmax(0,1fr) minmax(280px,.82fr);gap:10px;margin-top:14px;
+}
+body.kb-subscription-page .payment-console,
+body.kb-subscription-page .payment-summary{
+  padding:15px;border:1px solid rgba(184,199,211,.10);
+  border-radius:12px;background:rgba(255,255,255,.022);
+}
+body.kb-subscription-page .payment-summary{
+  background:linear-gradient(150deg,rgba(217,180,119,.045),rgba(255,255,255,.02));
+}
+body.kb-subscription-page .console-label{
+  color:#9caab4;font:650 7px "JetBrains Mono",monospace;letter-spacing:.11em;
+}
+body.kb-subscription-page .mpesa-card{
+  border-color:rgba(120,199,166,.18);border-radius:10px;
+  background:linear-gradient(120deg,rgba(120,199,166,.055),rgba(131,203,208,.035));
+}
+body.kb-subscription-page .mpesa-card:after{animation:none!important;content:none!important}
+body.kb-subscription-page .mpesa-title{
+  color:#e8f1ec;font:700 10px Inter,sans-serif;letter-spacing:.03em;
+}
+body.kb-subscription-page .receiver{
+  color:#b6c4c0;font:650 8px "JetBrains Mono",monospace;line-height:1.7;
+}
+body.kb-subscription-page .payment-mode-switch{
+  gap:6px;padding:4px;border-color:rgba(184,199,211,.12);
+  border-radius:9px;background:rgba(255,255,255,.02);
+}
+body.kb-subscription-page .payment-mode{
+  min-height:37px;padding:8px;border:1px solid transparent;border-radius:7px;
+  background:transparent;color:#a1afb8;font:650 7px "JetBrains Mono",monospace;
+}
+body.kb-subscription-page .payment-mode.active{
+  border-color:rgba(217,180,119,.28);background:rgba(217,180,119,.08);color:#edcf9c;
+}
+body.kb-subscription-page .checkout-link-card{
+  padding:12px;border:1px solid rgba(184,199,211,.11);
+  border-radius:10px;background:rgba(255,255,255,.02);
+}
+body.kb-subscription-page .checkout-link-head{
+  color:#e5ebed;font:650 8px Inter,sans-serif;
+}
+body.kb-subscription-page .checkout-link-head span{color:#a5d5d6;font:650 7px "JetBrains Mono",monospace}
+body.kb-subscription-page .checkout-link-row{gap:7px}
+body.kb-subscription-page .checkout-link-row input,
+body.kb-subscription-page .form input,
+body.kb-subscription-page .form select{
+  min-width:0;min-height:41px;padding:0 10px;
+  border:1px solid rgba(184,199,211,.14);border-radius:8px;
+  background:#0b1722;color:#e7edef;font:600 9px "JetBrains Mono",monospace;
+}
+body.kb-subscription-page .form input:focus,
+body.kb-subscription-page .form select:focus{
+  outline:none;border-color:rgba(131,203,208,.58);
+  box-shadow:0 0 0 3px rgba(131,203,208,.08);
+}
+body.kb-subscription-page .copy-link{
+  border:1px solid rgba(217,180,119,.22);border-radius:8px;
+  background:rgba(217,180,119,.06);color:#e7cc9d;
+  font:650 7px "JetBrains Mono",monospace;padding:9px 11px;
+}
+body.kb-subscription-page .checkout-link-note,
+body.kb-subscription-page .bot-choice-note{
+  color:#9eacb5;font-size:8px;line-height:1.65;
+}
+body.kb-subscription-page .form{gap:10px;margin-top:13px}
+body.kb-subscription-page .form label{
+  display:block;margin-bottom:6px;color:#a7b4bc;
+  font:650 7px "JetBrains Mono",monospace;letter-spacing:.06em;
+}
+body.kb-subscription-page .form .row{gap:10px}
+body.kb-subscription-page .bot-choice{
+  border-color:rgba(217,180,119,.15);border-radius:10px;background:rgba(217,180,119,.035);
+}
+body.kb-subscription-page .bot-choice-head{
+  color:#e4c28f;font:650 8px Inter,sans-serif;
+}
+body.kb-subscription-page .submit{
+  min-height:43px;border:1px solid rgba(217,180,119,.30);border-radius:9px;
+  background:linear-gradient(120deg,#edcf9c,#c89a5d);
+  color:#241a0d;box-shadow:0 7px 18px rgba(217,180,119,.09);
+  font:700 8px "JetBrains Mono",monospace;transition:transform .16s ease,filter .16s ease;
+}
+body.kb-subscription-page .submit:hover{transform:translateY(-1px);filter:brightness(1.035);box-shadow:0 9px 20px rgba(217,180,119,.12)}
+body.kb-subscription-page .submit:disabled{opacity:.5;cursor:not-allowed;transform:none}
+body.kb-subscription-page .notice,
+body.kb-subscription-page .status-box,
+body.kb-subscription-page .stk-status{
+  border-color:rgba(184,199,211,.11);border-radius:9px;
+  background:rgba(255,255,255,.025);color:#a6b3bb;
+  font:600 8px/1.65 "JetBrains Mono",monospace;
+}
+body.kb-subscription-page .status-box.ok,
+body.kb-subscription-page .status-box.success{
+  border-color:rgba(120,199,166,.18);background:rgba(120,199,166,.045);color:#9bd5b7;
+}
+body.kb-subscription-page .status-box.error{
+  border-color:rgba(225,126,134,.18);background:rgba(225,126,134,.045);color:#e6a0a6;
+}
+body.kb-subscription-page .summary-head{gap:9px}
+body.kb-subscription-page .summary-name{
+  color:#f0f3f4;font:700 11px Inter,sans-serif;
+}
+body.kb-subscription-page .summary-status{
+  border:1px solid rgba(217,180,119,.18);border-radius:7px;
+  background:rgba(217,180,119,.05);color:#e1c28f;font:650 7px "JetBrains Mono",monospace;
+}
+body.kb-subscription-page .summary-price{
+  color:#e8d0a6;font:750 26px Inter,sans-serif;letter-spacing:-.03em;
+}
+body.kb-subscription-page .summary-price span{
+  color:#9eacb5;font:650 7px "JetBrains Mono",monospace;
+}
+body.kb-subscription-page .summary-line{
+  border-color:rgba(184,199,211,.09);color:#a4b1b9;font:600 8px "JetBrains Mono",monospace;
+}
+body.kb-subscription-page .summary-line strong{color:#e4eaec;font:650 8px "JetBrains Mono",monospace}
+body.kb-subscription-page .summary-note{
+  border-color:rgba(184,199,211,.10);border-radius:9px;background:rgba(255,255,255,.025);
+  color:#a4b1b9;font:600 8px/1.65 "JetBrains Mono",monospace;
+}
+body.kb-subscription-page .access-state{
+  margin-top:10px;padding:12px;border-radius:9px;font:700 8px "JetBrains Mono",monospace;
+  box-shadow:none;
+}
+body.kb-subscription-page .access-state.approved{
+  border-color:rgba(120,199,166,.2);background:rgba(120,199,166,.05);color:#9bd5b7;
+}
+body.kb-subscription-page .access-state.waiting{
+  border-color:rgba(217,180,119,.2);background:rgba(217,180,119,.05);color:#e5ca98;
+}
+body.kb-subscription-page .access-state.denied{
+  border-color:rgba(225,126,134,.2);background:rgba(225,126,134,.05);color:#e5a0a6;
+}
+body.kb-subscription-page .history-panel{border-color:rgba(184,199,211,.10);border-radius:10px;background:rgba(255,255,255,.02)}
+body.kb-subscription-page .history-item{
+  border-color:rgba(184,199,211,.08);border-radius:8px;background:rgba(255,255,255,.018);
+}
+body.kb-subscription-page .history-main strong{color:#e5ebed;font:650 8px "JetBrains Mono",monospace}
+body.kb-subscription-page .history-main span{color:#9caab4;font-size:8px}
+body.kb-subscription-page .history-state{border:1px solid rgba(184,199,211,.1);background:rgba(255,255,255,.02);color:#a7b4bc;font:650 7px "JetBrains Mono",monospace}
+body.kb-subscription-page :is(a,button,input,select):focus-visible{
+  outline:2px solid rgba(131,203,208,.85);outline-offset:3px;
+}
+
+/* Responsive subscription and checkout flow */
+@media(max-width:1100px){
+  body.kb-subscription-page .layout{grid-template-columns:1fr}
+  body.kb-subscription-page .plans{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.kb-subscription-page .payment-grid{grid-template-columns:minmax(0,1fr) minmax(280px,.8fr)}
+}
+@media(max-width:820px){
+  body.kb-subscription-page .page{width:calc(100% - 28px);padding:20px 0 32px}
+  body.kb-subscription-page .head-grid{grid-template-columns:1fr}
+  body.kb-subscription-page .head-status{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.kb-subscription-page .plans{grid-template-columns:1fr}
+  body.kb-subscription-page .payment-grid{grid-template-columns:1fr}
+  body.kb-subscription-page .plan-card{min-height:0}
+}
+@media(max-width:560px){
+  body.kb-subscription-page .page{width:calc(100% - 18px);padding-top:15px}
+  body.kb-subscription-page .command-head{padding:17px}
+  body.kb-subscription-page .head-status{grid-template-columns:1fr}
+  body.kb-subscription-page .panel-inner,
+  body.kb-subscription-page .payment-console,
+  body.kb-subscription-page .payment-summary{padding:13px}
+  body.kb-subscription-page .form .row{grid-template-columns:1fr}
+  body.kb-subscription-page .history-item{grid-template-columns:1fr}
+  body.kb-subscription-page .checkout-link-row{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  body.kb-subscription-page *,body.kb-subscription-page *:before,body.kb-subscription-page *:after{
+    animation-duration:.01ms!important;animation-iteration-count:1!important;
+    transition-duration:.01ms!important;scroll-behavior:auto!important;
+  }
+}

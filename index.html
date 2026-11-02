@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<meta name="theme-color" content="#050a18">
+<meta name="theme-color" content="#030611">
 <meta name="color-scheme" content="dark">
 <style>html{background:#02040a;color:#eef2ff;}</style>
 <script>
@@ -17,9 +17,9 @@
   }
 })();
 </script>
-<meta name="description" content="KINGBOT FINTECH — Intelligent trading infrastructure, market intelligence, automated trading systems and professional analytics.">
+<meta name="description" content="KINGBOT FINTECH brings together AI-assisted trading systems, market intelligence, broker integration and risk-aware trading infrastructure.">
 
-<title>KINGBOT FINTECH — Intelligent Trading Infrastructure</title>
+<title>KINGBOT FINTECH | AI Trading Infrastructure & Market Intelligence</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -992,122 +992,6 @@ h1{
 }
 
 /* =========================================
-   LIVE MARKET STRIP
-========================================= */
-
-.strip{
-  position:relative;
-
-  z-index:2;
-
-  overflow:hidden;
-
-  background:
-    linear-gradient(
-      90deg,
-      #080f25,
-      #101b3e,
-      #080f25
-    );
-
-  border-top:1px solid rgba(246,185,59,.14);
-  border-bottom:1px solid rgba(246,185,59,.14);
-}
-
-.strip::before{
-  content:"";
-
-  position:absolute;
-
-  top:0;
-  left:-30%;
-
-  width:30%;
-  height:1px;
-
-  background:
-    linear-gradient(
-      90deg,
-      transparent,
-      var(--cyan),
-      transparent
-    );
-
-  box-shadow:0 0 15px var(--cyan);
-
-  animation:scan 5s linear infinite;
-}
-
-@keyframes scan{
-  to{
-    left:100%;
-  }
-}
-
-.strip-in{
-  display:flex;
-
-  max-width:1280px;
-  margin:auto;
-
-  overflow-x:auto;
-
-  scrollbar-width:none;
-}
-
-.strip-in::-webkit-scrollbar{
-  display:none;
-}
-
-.tk{
-  min-width:155px;
-
-  display:flex;
-  align-items:center;
-  gap:8px;
-
-  padding:13px 15px;
-
-  font-family:var(--mono);
-
-  font-size:10px;
-
-  white-space:nowrap;
-
-  border-right:1px solid rgba(246,185,59,.06);
-}
-
-.tk .up{
-  color:var(--green);
-}
-
-.tk .dn{
-  color:var(--red);
-}
-
-.live-dot{
-  width:7px;
-  height:7px;
-
-  flex:none;
-
-  border-radius:50%;
-
-  background:var(--green);
-
-  box-shadow:
-    0 0 8px var(--green);
-
-  animation:pu 1.4s infinite;
-}
-
-@keyframes pu{
-  50%{
-    opacity:.25;
-  }
-}
-
-/* =========================================
    SECTION BASE
 ========================================= */
 
@@ -1174,58 +1058,6 @@ h2{
   line-height:1.75;
 
   font-size:14px;
-}
-
-/* =========================================
-   KINGBOT INFRASTRUCTURE — CLEAN FULL-WIDTH ART
-========================================= */
-
-.infra-section{
-  position:relative;
-  width:100%;
-  overflow:hidden;
-  background:#020611;
-  padding:0 !important;
-  isolation:isolate;
-}
-
-.infra-section::after{
-  display:none;
-}
-
-.infra-visual{
-  position:relative;
-  width:100%;
-  max-width:1664px;
-  margin:0 auto;
-  overflow:hidden;
-  background:#020611;
-  line-height:0;
-}
-
-#kingbotInfraCanvas{
-  display:block;
-  width:100%;
-  max-width:1664px;
-  height:auto;
-  margin:0 auto;
-  background:transparent;
-  image-rendering:auto;
-}
-
-@media(max-width:1664px){
-  .infra-visual,
-  #kingbotInfraCanvas{
-    width:100%;
-  }
-}
-
-@media(max-width:700px){
-  .infra-visual,
-  #kingbotInfraCanvas{
-    width:100%;
-    max-width:none;
-  }
 }
 
 /* =========================================
@@ -1299,121 +1131,6 @@ h2{
   padding:8px 0;
 
   border-bottom:1px dashed rgba(147,160,201,.12);
-}
-
-/* =========================================
-   MARKET SECTION
-========================================= */
-
-.mkts{
-  display:grid;
-
-  grid-template-columns:1fr 1fr;
-
-  gap:55px;
-
-  align-items:center;
-}
-
-.pills{
-  display:flex;
-
-  gap:9px;
-
-  flex-wrap:wrap;
-
-  margin-top:28px;
-}
-
-.pill{
-  border:1px solid rgba(255,255,255,.08);
-
-  border-radius:9px;
-
-  padding:10px 13px;
-
-  font-size:11px;
-
-  color:var(--dim);
-
-  display:flex;
-
-  gap:8px;
-
-  align-items:center;
-
-  background:rgba(255,255,255,.018);
-
-  transition:.2s;
-}
-
-.pill:hover{
-  border-color:var(--gold);
-  color:var(--gold);
-
-  box-shadow:
-    0 0 20px rgba(246,185,59,.06);
-}
-
-.pill b{
-  font-family:var(--mono);
-
-  font-size:8px;
-
-  color:var(--gold);
-
-  background:rgba(246,185,59,.08);
-
-  padding:3px 6px;
-
-  border-radius:5px;
-}
-
-.stats{
-  display:grid;
-
-  grid-template-columns:1fr 1fr;
-
-  gap:12px;
-
-  margin-top:28px;
-}
-
-.stat{
-  background:
-    linear-gradient(
-      150deg,
-      rgba(16,26,58,.86),
-      rgba(5,11,27,.94)
-    );
-
-  border:1px solid rgba(255,255,255,.07);
-
-  border-radius:15px;
-
-  padding:20px;
-}
-
-.stat .v{
-  font-family:var(--mono);
-
-  font-size:20px;
-
-  font-weight:800;
-
-  color:var(--gold);
-
-  overflow:hidden;
-
-  text-overflow:ellipsis;
-}
-
-.stat .k{
-  font-size:9px;
-
-  color:var(--dim);
-
-  margin-top:6px;
 }
 
 /* =========================================
@@ -2387,28 +2104,12 @@ h1{
 
 /* The original trading-hub image section remains in the page,
    now presented as a premium framed cinematic panel. */
-.infra-section{
-  padding:clamp(22px,3vw,42px) clamp(12px,2vw,28px) !important;
-  background:
-    radial-gradient(ellipse at 50% 50%,rgba(21,71,112,.18),transparent 65%),
-    #020611;
-}
-.infra-visual{
-  width:100%;
-  max-width:1720px;
-  border:1px solid rgba(233,185,78,.25);
-  border-radius:22px;
-  box-shadow:0 26px 90px rgba(0,0,0,.52),0 0 40px rgba(233,185,78,.07);
-  background:#020611;
-}
-#kingbotInfraCanvas{
-  width:100%;
-  height:auto;
-  border-radius:21px;
-}
+
+
+
 
 /* Editorial section rhythm and stronger hierarchy. */
-section:not(.infra-section){padding:clamp(70px,7vw,108px) 0;}
+section{padding:clamp(70px,7vw,108px) 0;}
 .sec-tag{color:#f0c66c;font-size:10px;letter-spacing:.26em;}
 h2{
   font-size:clamp(26px,3.2vw,44px);
@@ -2529,9 +2230,9 @@ footer{
   .hero-data-row{font-size:7px;}
   .hero-cta .btn{width:100%;}
   .trust{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:10px;}
-  .infra-section{padding:18px 10px !important;}
-  .infra-visual{border-radius:14px;}
-  #kingbotInfraCanvas{border-radius:13px;}
+  
+  
+  
   .bot-grid,.plans{grid-template-columns:1fr;}
   .bot-card{min-height:220px;}
   .bot-image,.bot-image img{height:180px;}
@@ -2561,6 +2262,8 @@ footer{
 })();
 </script>
 
+  <link rel="stylesheet" href="system/landing-refresh.css?v=1">
+  <link rel="stylesheet" href="system/landing-cyberpunk.css?v=1">
 </head>
 
 <body><div data-kingbot-navigation></div> 
@@ -2606,10 +2309,9 @@ footer{
       </h1>
 
       <p>
-        A next-generation trading ecosystem combining
-        automated trading systems, real-time market intelligence,
-        advanced analytics, AI-assisted decision support and
-        professional trading infrastructure.
+        AI-assisted trading infrastructure bringing together strategy
+        systems, market intelligence, broker integration and
+        risk-aware analytics in one connected platform.
       </p>
 
       <div class="hero-cta">
@@ -2627,7 +2329,7 @@ footer{
           class="btn btn-ghost"
           href="markets.html"
         >
-          VIEW LIVE MARKETS
+          EXPLORE MARKETS →
         </a>
 
       </div>
@@ -2636,22 +2338,22 @@ footer{
 
         <span>
           <b>◆</b>
-          Secure Infrastructure
+          Broker Integration Layer
         </span>
 
         <span>
           <b>◆</b>
-          Real-Time Market Data
+          Market Intelligence
         </span>
 
         <span>
           <b>◆</b>
-          Automated Systems
+          Five Strategy Systems
         </span>
 
         <span>
           <b>◆</b>
-          Institutional Analytics
+          Risk-Aware Workflows
         </span>
 
       </div>
@@ -2686,10 +2388,10 @@ footer{
 
       <div class="quote">
 
-        Intelligent systems.
+        Built for focus. Designed for control.
 
         <b>
-          — KINGBOT AI
+          — KINGBOT FINTECH
         </b>
 
       </div>
@@ -2698,23 +2400,23 @@ footer{
       <div class="hero-data">
 
         <div class="hero-data-row">
-          <span>MARKET DATA</span>
-          <span>● LIVE</span>
+          <span>PLATFORM MODEL</span>
+          <span>BROKER-LINKED</span>
         </div>
 
         <div class="hero-data-row">
-          <span>AI CORE</span>
-          <span>READY</span>
+          <span>STRATEGY SYSTEMS</span>
+          <span>05 MODULES</span>
         </div>
 
         <div class="hero-data-row">
-          <span>BOT SYSTEMS</span>
-          <span>05</span>
+          <span>MARKET LAYER</span>
+          <span>INTELLIGENCE</span>
         </div>
 
         <div class="hero-data-row">
-          <span>RISK ENGINE</span>
-          <span>READY</span>
+          <span>DESIGN PRINCIPLE</span>
+          <span>RISK-AWARE</span>
         </div>
 
       </div>
@@ -2726,198 +2428,55 @@ footer{
 </div>
 
 
-<!-- =========================================================
-     LIVE MARKET STRIP
-========================================================= -->
 
-<div class="strip">
-
-  <div
-    class="strip-in"
-    id="strip"
-  >
-
-    <div class="tk">
-
-      <span class="live-dot"></span>
-
-      <b style="color:var(--gold)">
-        LIVE
-      </b>
-
-    </div>
-
-  </div>
-
-</div>
-
-
-<!-- =========================================================
-     KINGBOT INFRASTRUCTURE — VISUAL SYSTEM FLOW
-========================================================= -->
-
-<section id="features" class="infra-section">
-
-  <div class="infra-visual">
-    <canvas
-      id="kingbotInfraCanvas"
-      aria-label="KINGBOT Fintech trading infrastructure artwork"
-    ></canvas>
-  </div>
-
-</section>
-
-
-<!-- =========================================================
-     PLATFORM
-========================================================= -->
-
-<section
-  style="
-    background:
-      linear-gradient(
-        180deg,
-        transparent,
-        rgba(16,26,58,.28),
-        transparent
-      );
-  "
->
-
+<section class="platform-overview">
   <div class="wrap">
-
     <div class="plat">
-
-
-      <div class="mocks">
-
-        <div
-          class="mock"
-          style="flex:1.5"
-        >
-
-          <div class="mh">
-
-            <span>
-              <b style="color:var(--gold)">
-                KINGBOT
-              </b>
-              TERMINAL
-            </span>
-
-            <span style="color:var(--green)">
-              ● LIVE
-            </span>
-
-          </div>
-
-          <div
-            id="mock-chart"
-            style="height:170px"
-          ></div>
-
-        </div>
-
-
-        <div class="mock">
-
-          <div class="mh">
-
-            <span>
-              MARKETS
-            </span>
-
-            <span style="color:var(--cyan)">
-              LIVE
-            </span>
-
-          </div>
-
-          <div id="mock-list"></div>
-
-        </div>
-
-      </div>
-
-
-      <div>
-
-        <div class="sec-tag">
-          THE KINGBOT PLATFORM
-        </div>
-
-        <h2>
-
-          One
-
-          <span class="gold">
-            Trading OS.
-          </span>
-
-        </h2>
-
+      <div class="overview-copy">
+        <div class="sec-tag">THE KINGBOT PLATFORM</div>
+        <h2>One connected <span class="gold">trading workspace.</span></h2>
         <p class="sec-sub">
-          Monitor markets, analyse opportunities,
-          inspect account intelligence and manage
-          automated trading systems through one
-          unified interface.
+          Bring strategy systems, broker connectivity, market discovery and
+          performance oversight together in one focused environment.
         </p>
-
         <div class="checks">
-
-          <div>
-            <b style="color:var(--green)">✓</b>
-            Web-based trading terminal
-          </div>
-
-          <div>
-            <b style="color:var(--green)">✓</b>
-            Real-time market intelligence
-          </div>
-
-          <div>
-            <b style="color:var(--green)">✓</b>
-            Automated trading systems
-          </div>
-
-          <div>
-            <b style="color:var(--green)">✓</b>
-            Institutional analytics
-          </div>
-
-          <div>
-            <b style="color:var(--green)">✓</b>
-            Risk and performance monitoring
-          </div>
-
+          <div><b>✓</b> Web-based trading terminal</div>
+          <div><b>✓</b> Broker account connectivity</div>
+          <div><b>✓</b> Five configurable strategy systems</div>
+          <div><b>✓</b> AI-assisted market analysis</div>
+          <div><b>✓</b> Risk and performance monitoring</div>
         </div>
-
-        <div class="hero-cta" style="margin-top:25px">
-
-          <a
-            class="btn btn-gold"
-            href="terminal.html"
-          >
-            OPEN TERMINAL
-          </a>
-
-          <a
-            class="btn btn-ghost"
-            href="analytics.html"
-          >
-            VIEW ANALYTICS
-          </a>
-
+        <div class="hero-cta overview-actions">
+          <a class="btn btn-gold" href="terminal.html">OPEN TRADING TERMINAL →</a>
+          <a class="btn btn-ghost" href="broker-connect.html">CONNECT A BROKER</a>
         </div>
-
       </div>
 
+      <div class="overview-stack" aria-label="Platform capabilities">
+        <article class="overview-item">
+          <span class="overview-index">01 / WORKSPACE</span>
+          <h3>Trading Terminal</h3>
+          <p>View connected account information, market context and trading activity.</p>
+        </article>
+        <article class="overview-item">
+          <span class="overview-index">02 / CONNECTIVITY</span>
+          <h3>Broker Integration</h3>
+          <p>Link a supported broker account and review its connection status.</p>
+        </article>
+        <article class="overview-item">
+          <span class="overview-index">03 / INTELLIGENCE</span>
+          <h3>AI Analysis</h3>
+          <p>Use analytical tools to examine markets and support trading decisions.</p>
+        </article>
+        <article class="overview-item">
+          <span class="overview-index">04 / OVERSIGHT</span>
+          <h3>Risk & Analytics</h3>
+          <p>Review strategy activity, performance information and risk controls.</p>
+        </article>
+      </div>
     </div>
-
   </div>
-
 </section>
-
 
 <!-- =========================================================
      BOT ECOSYSTEM
@@ -2928,7 +2487,7 @@ footer{
   <div class="wrap">
 
     <div class="sec-tag">
-      KINGBOT EA ECOSYSTEM
+      KINGBOT STRATEGY ECOSYSTEM
     </div>
 
     <h2>
@@ -3177,147 +2736,28 @@ footer{
      MARKETS
 ========================================================= -->
 
-<section id="markets">
-
+<section id="markets" class="market-overview">
   <div class="wrap">
-
-    <div class="mkts">
-
-
+    <div class="market-grid">
       <div>
-
-        <div class="sec-tag">
-          MARKET INTELLIGENCE
-        </div>
-
-        <h2>
-
-          Global Markets.
-
-          <span class="gold">
-            One Interface.
-          </span>
-
-        </h2>
-
+        <div class="sec-tag">MARKET INTELLIGENCE</div>
+        <h2>Explore <span class="gold">global markets.</span></h2>
         <p class="sec-sub">
-          Monitor live public market information through
-          the KINGBOT market intelligence layer. Broker-specific
-          account execution and positions remain inside
-          the authenticated trading environment.
+          Access the KINGBOT market workspace to explore supported instruments
+          and available market information. Quotes, symbol availability and
+          execution depend on the connected data source and broker.
         </p>
-
-
-        <div
-          class="pills"
-          id="pills"
-        ></div>
-
-
-        <a
-          class="btn btn-ghost"
-          href="markets.html"
-          style="margin-top:25px"
-        >
-          EXPLORE MARKETS →
-        </a>
-
+        <a class="btn btn-ghost market-cta" href="markets.html">EXPLORE MARKETS →</a>
       </div>
 
-
-      <div>
-
-        <div
-          class="sec-tag"
-          style="color:var(--green)"
-        >
-          LIVE DATA
-        </div>
-
-        <h2>
-
-          Market
-
-          <span class="gold">
-            Streams.
-          </span>
-
-        </h2>
-
-
-        <div class="stats">
-
-          <div class="stat">
-
-            <div
-              class="v"
-              id="st-sym"
-            >
-              —
-            </div>
-
-            <div class="k">
-              Tracked Instruments
-            </div>
-
-          </div>
-
-
-          <div class="stat">
-
-            <div
-              class="v"
-              id="st-msg"
-            >
-              —
-            </div>
-
-            <div class="k">
-              Stream Messages / sec
-            </div>
-
-          </div>
-
-
-          <div class="stat">
-
-            <div
-              class="v"
-              id="st-lat"
-            >
-              —
-            </div>
-
-            <div class="k">
-              Feed Latency
-            </div>
-
-          </div>
-
-
-          <div class="stat">
-
-            <div
-              class="v"
-              id="st-px"
-            >
-              —
-            </div>
-
-            <div class="k">
-              BTC / USDT
-            </div>
-
-          </div>
-
-        </div>
-
+      <div class="market-categories" aria-label="Market categories">
+        <a class="market-category" href="markets.html"><span>01</span><b>Gold & Precious Metals</b><i>Explore instruments →</i></a>
+        <a class="market-category" href="markets.html"><span>02</span><b>Forex</b><i>Explore instruments →</i></a>
+        <a class="market-category" href="markets.html"><span>03</span><b>Cryptocurrency</b><i>Explore instruments →</i></a>
+        <a class="market-category" href="markets.html"><span>04</span><b>Indices & Commodities</b><i>Explore instruments →</i></a>
       </div>
-
     </div>
-
   </div>
-
 </section>
 
 
@@ -3424,6 +2864,9 @@ footer{
         </ul>
         <a class="btn btn-ghost" href="subscription.html" style="width:100%">CHOOSE INSTITUTIONAL</a>
       </div>
+
+    </div>
+
     <div class="plan-note">
       Subscriptions are monthly. Bot access is granted only after payment verification and automatically expires with the active subscription. Basic users choose one engine; Professional users receive three; Institutional users receive all five.
     </div>
@@ -3583,10 +3026,6 @@ footer{
           Legal Center
         </a>
 
-        <a href="settings.html">
-          Settings
-        </a>
-
         <a href="contact.html">
           Contact
         </a>
@@ -3595,45 +3034,12 @@ footer{
 
 
       <div>
-
-        <h4>
-          PLATFORM UPDATES
-        </h4>
-
-        <p
-          style="
-            color:var(--dim);
-            font-size:11px;
-            line-height:1.65;
-          "
-        >
-          Receive KINGBOT platform updates
-          and market intelligence.
+        <h4>CONTACT</h4>
+        <p style="color:var(--dim);font-size:11px;line-height:1.75;max-width:260px">
+          For platform enquiries, account assistance and partnership discussions,
+          contact the KINGBOT team.
         </p>
-
-        <form
-          class="news"
-          id="newsletterForm"
-        >
-
-          <input
-            type="email"
-            id="newsletterEmail"
-            placeholder="Email address"
-            autocomplete="email"
-            required
-          >
-
-          <button
-            class="btn btn-gold btn-sm"
-            type="submit"
-            id="subscribeBtn"
-          >
-            JOIN
-          </button>
-
-        </form>
-
+        <a class="btn btn-ghost btn-sm" href="contact.html" style="margin-top:14px">CONTACT KINGBOT →</a>
       </div>
 
 
@@ -3669,1183 +3075,19 @@ footer{
 </footer>
 
 
-<!-- =========================================================
-     TOAST
-========================================================= -->
-
-<div
-  class="toast"
-  id="toast"
-></div>
-
-
-<!-- =========================================================
-     LIGHTWEIGHT CHARTS
-========================================================= -->
-
-<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
-
-
 <script>
-
-/* =========================================================
-   HERO IMAGE FALLBACK
-========================================================= */
-
-const heroImage =
-  document.getElementById("heroImage");
-
-const heroPlaceholder =
-  document.getElementById("heroPlaceholder");
-
-
-heroImage.addEventListener(
-  "error",
-  () => {
-
-    heroImage.style.display =
-      "none";
-
-    heroPlaceholder.style.display =
-      "grid";
-
-  }
-);
-
-
-/* =========================================================
-   PUBLIC MARKET DATA
-========================================================= */
-
-const MAP = [
-
-  ["XAUUSD","PAXGUSDT","🥇"],
-  ["EURUSD","EURUSDT","💶"],
-  ["GBPUSD","GBPUSDT","💷"],
-  ["BTCUSD","BTCUSDT","₿"],
-  ["ETHUSD","ETHUSDT","Ξ"],
-  ["SOLUSD","SOLUSDT","◎"]
-
-];
-
-
-const HOSTS = [
-
-  "https://api.binance.com",
-
-  "https://data-api.binance.vision"
-
-];
-
-
-async function api(path){
-
-  for(
-    const host of HOSTS
-  ){
-
-    try{
-
-      const response =
-        await fetch(
-          host + path,
-          {
-            method:"GET",
-            cache:"no-store"
-          }
-        );
-
-      if(response.ok){
-
-        return await response.json();
-
-      }
-
-    }catch(error){
-
-      console.warn(
-        "Market feed unavailable",
-        error
-      );
-
-    }
-
-  }
-
-  return null;
-
-}
-
-
-/* =========================================================
-   FORMAT
-========================================================= */
-
-function fmt(
-  number,
-  decimals
-){
-
-  return Number(number)
-    .toLocaleString(
-      "en-US",
-      {
-        minimumFractionDigits:
-          decimals,
-
-        maximumFractionDigits:
-          decimals
-      }
-    );
-
-}
-
-
-/* =========================================================
-   LIVE MARKET STRIP
-========================================================= */
-
-async function refreshStrip(){
-
-  const start =
-    performance.now();
-
-
-  const symbols =
-    JSON.stringify(
-      MAP.map(
-        item => item[1]
-      )
-    );
-
-
-  const data =
-    await api(
-      "/api/v3/ticker/24hr?symbols="+
-      encodeURIComponent(symbols)
-    );
-
-
-  if(!Array.isArray(data))
-    return;
-
-
-  const latency =
-    Math.round(
-      performance.now()-start
-    );
-
-
-  const latencyElement =
-    document.getElementById("st-lat");
-
-
-  if(latencyElement){
-
-    latencyElement.textContent =
-      latency+" ms";
-
-  }
-
-
-  const strip =
-    document.getElementById("strip");
-
-
-  strip.innerHTML = `
-
-    <div class="tk">
-
-      <span class="live-dot"></span>
-
-      <b style="color:var(--gold)">
-        LIVE
-      </b>
-
-    </div>
-
-  `;
-
-
-  data.forEach(
-    (item,index) => {
-
-      const change =
-        Number(
-          item.priceChangePercent
-        );
-
-
-      const positive =
-        change >= 0;
-
-
-      const price =
-        Number(
-          item.lastPrice
-        );
-
-
-      let decimals = 6;
-
-
-      if(price > 100){
-
-        decimals = 2;
-
-      }else if(price > 1){
-
-        decimals = 4;
-
-      }
-
-
-      const mapped =
-        MAP.find(
-          row =>
-            row[1] === item.symbol
-        );
-
-
-      if(!mapped)
-        return;
-
-
-      strip.innerHTML += `
-
-        <div class="tk">
-
-          <span>
-            ${mapped[2]}
-          </span>
-
-          <b>
-            ${mapped[0]}
-          </b>
-
-          <span>
-            ${fmt(
-              price,
-              decimals
-            )}
-          </span>
-
-          <span
-            class="${positive
-              ? "up"
-              : "dn"
-            }"
-          >
-
-            ${positive
-              ? "▲"
-              : "▼"
-            }
-
-            ${Math.abs(change)
-              .toFixed(2)}%
-
-          </span>
-
-        </div>
-
-      `;
-
-    }
-  );
-
-
-  const btc =
-    data.find(
-      item =>
-        item.symbol ===
-        "BTCUSDT"
-    );
-
-
-  if(btc){
-
-    document
-      .getElementById("st-px")
-      .textContent =
-        "$"+
-        fmt(
-          Number(
-            btc.lastPrice
-          ),
-          2
-        );
-
-  }
-
-}
-
-
-refreshStrip();
-
-setInterval(
-  refreshStrip,
-  5000
-);
-
-
-/* =========================================================
-   MARKET PILLS
-========================================================= */
-
-const PILL = [
-
-  ["🥇 Gold","XAU · PAXG"],
-
-  ["💶 Forex","EUR · GBP"],
-
-  ["₿ Crypto","BTC · ETH · SOL"],
-
-  ["📈 Indices","US30 · NAS100"],
-
-  ["🛢 Commodities","Silver · Oil"],
-
-  ["🌐 Multi-Asset","Live Markets"]
-
-];
-
-
-document
-  .getElementById("pills")
-  .innerHTML =
-
-  PILL.map(
-    item => `
-
-      <a
-        class="pill"
-        href="markets.html"
-      >
-
-        ${item[0]}
-
-        <b>
-          ${item[1]}
-        </b>
-
-      </a>
-
-    `
-  ).join("");
-
-
-/* =========================================================
-   PLATFORM PREVIEW
-========================================================= */
-
-const MOCK = [
-
-  "BTCUSDT",
-  "ETHUSDT",
-  "SOLUSDT",
-  "EURUSDT",
-  "GBPUSDT",
-  "PAXGUSDT"
-
-];
-
-
-async function loadPreview(){
-
-  const data =
-    await api(
-      "/api/v3/ticker/24hr?symbols="+
-      encodeURIComponent(
-        JSON.stringify(MOCK)
-      )
-    );
-
-
-  if(Array.isArray(data)){
-
-    document
-      .getElementById("mock-list")
-      .innerHTML =
-
-      data.map(
-        item => {
-
-          const change =
-            Number(
-              item.priceChangePercent
-            );
-
-
-          const price =
-            Number(
-              item.lastPrice
-            );
-
-
-          let decimals = 6;
-
-
-          if(price > 100){
-
-            decimals = 2;
-
-          }else if(price > 1){
-
-            decimals = 4;
-
-          }
-
-
-          return `
-
-            <div class="mrow">
-
-              <span
-                style="color:var(--dim)"
-              >
-                ${item.symbol
-                  .replace(
-                    "USDT",
-                    ""
-                  )}/USD
-              </span>
-
-              <b>
-                ${fmt(
-                  price,
-                  decimals
-                )}
-              </b>
-
-              <span
-                style="
-                  color:
-                  ${change >= 0
-                    ? "var(--green)"
-                    : "var(--red)"
-                  }
-                "
-              >
-                ${change >= 0
-                  ? "+"
-                  : ""
-                }${change.toFixed(2)}%
-              </span>
-
-            </div>
-
-          `;
-
-        }
-      ).join("");
-
-  }
-
-
-  document
-    .getElementById("st-sym")
-    .textContent =
-      MOCK.length;
-
-
-  /* =======================================================
-     BTC MINI CHART
-  ======================================================= */
-
-  const raw =
-    await api(
-      "/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=100"
-    );
-
-
-  if(
-    raw &&
-    Array.isArray(raw) &&
-    window.LightweightCharts
-  ){
-
-    const container =
-      document.getElementById(
-        "mock-chart"
-      );
-
-
-    if(!container)
-      return;
-
-
-    container.innerHTML =
-      "";
-
-
-    const chart =
-      LightweightCharts
-        .createChart(
-          container,
-          {
-
-            width:
-              container.clientWidth,
-
-            height:170,
-
-            layout:{
-              background:{
-                type:"solid",
-                color:"transparent"
-              },
-
-              textColor:"#93a0c9",
-
-              fontFamily:
-                "JetBrains Mono"
-            },
-
-            grid:{
-              vertLines:{
-                color:
-                  "rgba(246,185,59,.06)"
-              },
-
-              horzLines:{
-                color:
-                  "rgba(246,185,59,.06)"
-              }
-            },
-
-            rightPriceScale:{
-              borderColor:
-                "rgba(246,185,59,.15)"
-            },
-
-            timeScale:{
-              borderColor:
-                "rgba(246,185,59,.15)"
-            }
-
-          }
-        );
-
-
-    const series =
-      chart.addCandlestickSeries({
-
-        upColor:"#2ee6a8",
-
-        downColor:"#ff5c7a",
-
-        borderVisible:false,
-
-        wickUpColor:"#2ee6a8",
-
-        wickDownColor:"#ff5c7a"
-
-      });
-
-
-    series.setData(
-
-      raw.map(
-        item => ({
-
-          time:
-            item[0]/1000,
-
-          open:
-            Number(item[1]),
-
-          high:
-            Number(item[2]),
-
-          low:
-            Number(item[3]),
-
-          close:
-            Number(item[4])
-
-        })
-      )
-
-    );
-
-
-    chart.timeScale()
-      .fitContent();
-
-
-    if(
-      "ResizeObserver"
-      in window
-    ){
-
-      new ResizeObserver(
-        () => {
-
-          chart.applyOptions({
-
-            width:
-              container.clientWidth
-
-          });
-
-        }
-      ).observe(container);
-
-    }
-
-  }
-
-}
-
-
-loadPreview();
-
-
-/* =========================================================
-   KINGBOT INFRASTRUCTURE — LOCALIZED COLOR ENGINE
-   The source artwork is never resized, faded, filtered, or globally
-   color-shifted. Only already-bright pixels inside localized
-   infrastructure regions receive a hue transition.
-========================================================= */
-
-(function initInfrastructureLightEngine(){
-
-  const canvas=document.getElementById("kingbotInfraCanvas");
-  if(!canvas) return;
-
-  const ctx=canvas.getContext("2d",{alpha:true,willReadFrequently:true});
-  const image=new Image();
-  image.decoding="async";
-  image.src="assets/images/Kingbot Fintech AI Trading Hub.png";
-
-  let baseCanvas=null;
-  let baseCtx=null;
-  let basePixels=null;
-  let raf=0;
-  let lastFrame=0;
-  let reducedMotion=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  const COLORS=[
-    [25,230,255],   // cyan
-    [155,92,255],   // violet
-    [77,141,255],   // blue
-    [46,230,168],   // green
-    [255,79,216],   // pink
-    [255,122,24],   // orange
-    [246,185,59]    // gold
-  ];
-
-  function resizeToSource(){
-    const maxWidth=Math.min(window.innerWidth||1664,1664);
-    const ratio=Math.min(1,maxWidth/image.naturalWidth);
-
-    canvas.width=Math.max(1,Math.round(image.naturalWidth*ratio));
-    canvas.height=Math.max(1,Math.round(image.naturalHeight*ratio));
-
-    baseCanvas=document.createElement("canvas");
-    baseCanvas.width=canvas.width;
-    baseCanvas.height=canvas.height;
-
-    baseCtx=baseCanvas.getContext("2d",{alpha:true,willReadFrequently:true});
-    baseCtx.clearRect(0,0,canvas.width,canvas.height);
-    baseCtx.drawImage(image,0,0,canvas.width,canvas.height);
-
-    basePixels=baseCtx.getImageData(0,0,canvas.width,canvas.height).data;
-
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.drawImage(baseCanvas,0,0);
-
-    lastFrame=0;
-    cancelAnimationFrame(raf);
-    raf=requestAnimationFrame(render);
-  }
-
-  function lerp(a,b,t){
-    return a+(b-a)*t;
-  }
-
-  function colorAt(progress){
-    progress=((progress%1)+1)%1;
-    const scaled=progress*(COLORS.length-1);
-    const index=Math.floor(scaled);
-    const next=Math.min(index+1,COLORS.length-1);
-    const mix=scaled-index;
-    const smooth=mix*mix*(3-2*mix);
-
-    return [
-      lerp(COLORS[index][0],COLORS[next][0],smooth),
-      lerp(COLORS[index][1],COLORS[next][1],smooth),
-      lerp(COLORS[index][2],COLORS[next][2],smooth)
-    ];
-  }
-
-  function luminance(r,g,b){
-    return 0.2126*r+0.7152*g+0.0722*b;
-  }
-
-  function saturation(r,g,b){
-    const max=Math.max(r,g,b);
-    const min=Math.min(r,g,b);
-    return max===0?0:(max-min)/max;
-  }
-
-  /*
-    Local regions are deliberately separated:
-    - brain/core: center
-    - robot: right
-    - earth/global: left
-    - all other existing bright lines: spatially independent cells
-  */
-  function regionWeights(nx,ny,t){
-    const brainDx=(nx-0.49)/0.13;
-    const brainDy=(ny-0.54)/0.16;
-    const brain=Math.exp(-(brainDx*brainDx+brainDy*brainDy)*3.0);
-
-    const robotDx=(nx-0.835)/0.22;
-    const robotDy=(ny-0.52)/0.35;
-    const robot=Math.exp(-(robotDx*robotDx+robotDy*robotDy)*2.6);
-
-    const earthDx=(nx-0.115)/0.17;
-    const earthDy=(ny-0.565)/0.23;
-    const earth=Math.exp(-(earthDx*earthDx+earthDy*earthDy)*3.0);
-
-    return {brain,robot,earth};
-  }
-
-  function render(now){
-
-    if(document.hidden){
-      raf=requestAnimationFrame(render);
-      return;
-    }
-
-    if(now-lastFrame<45){
-      raf=requestAnimationFrame(render);
-      return;
-    }
-
-    lastFrame=now;
-
-    if(!basePixels){
-      raf=requestAnimationFrame(render);
-      return;
-    }
-
-    if(reducedMotion){
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      ctx.drawImage(baseCanvas,0,0);
-      return;
-    }
-
-    const frame=new ImageData(
-      new Uint8ClampedArray(basePixels),
-      canvas.width,
-      canvas.height
-    );
-
-    const data=frame.data;
-    const w=canvas.width;
-    const h=canvas.height;
-    const t=now*0.001;
-
-    /*
-      Separate phase speeds prevent the brain, robot, earth and
-      individual network lines from changing at the same moment.
-    */
-    const baseCycle=t*0.035;
-    const brainCycle=t*0.050;
-    const robotCycle=t*0.043;
-    const earthCycle=t*0.047;
-
-    for(let i=0;i<data.length;i+=4){
-
-      const r=basePixels[i];
-      const g=basePixels[i+1];
-      const b=basePixels[i+2];
-      const a=basePixels[i+3];
-
-      if(a===0) continue;
-
-      const lum=luminance(r,g,b);
-      const sat=saturation(r,g,b);
-
-      /*
-        Only existing luminous pixels are eligible.
-        Dark architectural pixels are copied byte-for-byte.
-      */
-      if(lum<145 && sat<0.34) continue;
-
-      const p=i/4;
-      const x=p%w;
-      const y=Math.floor(p/w);
-      const nx=x/w;
-      const ny=y/h;
-
-      const zones=regionWeights(nx,ny,t);
-
-      const cellX=Math.floor(nx*12);
-      const cellY=Math.floor(ny*8);
-      const cellPhase=(
-        (cellX*37+cellY*61)%97
-      )/97;
-
-      let target=colorAt(
-        baseCycle+
-        cellPhase+
-        Math.sin(cellX*2.31+cellY*.77)*0.025
-      );
-
-      /*
-        Brain: its own color stream.
-      */
-      if(zones.brain>0.24){
-        target=colorAt(
-          brainCycle+
-          0.10+
-          Math.sin(nx*18+ny*7)*0.055
-        );
-      }
-
-      /*
-        Robot: independent stream.
-      */
-      if(zones.robot>0.28 && zones.robot>=zones.brain){
-        target=colorAt(
-          robotCycle+
-          0.37+
-          Math.sin(nx*13-ny*11)*0.045
-        );
-      }
-
-      /*
-        Earth/global: independent stream.
-      */
-      if(zones.earth>0.30 &&
-         zones.earth>=zones.brain &&
-         zones.earth>=zones.robot){
-        target=colorAt(
-          earthCycle+
-          0.68+
-          Math.sin(nx*17+ny*9)*0.05
-        );
-      }
-
-      /*
-        Strength depends only on how luminous the original pixel
-        already was. No extra glow or brightness is introduced.
-      */
-      const luminous=Math.min(
-        1,
-        Math.max(
-          0,
-          (lum-125)/130
-        )
-      );
-
-      const saturated=Math.min(
-        1,
-        Math.max(
-          0,
-          (sat-0.16)/0.84
-        )
-      );
-
-      const strength=Math.min(
-        0.72,
-        0.16+
-        luminous*0.34+
-        saturated*0.20
-      );
-
-      /*
-        Preserve original luminance while changing hue/color.
-        This prevents the artwork from being washed out.
-      */
-      const targetLum=luminance(
-        target[0],
-        target[1],
-        target[2]
-      );
-
-      const scale=
-        targetLum>1
-        ? lum/targetLum
-        : 1;
-
-      const tr=Math.min(255,target[0]*scale);
-      const tg=Math.min(255,target[1]*scale);
-      const tb=Math.min(255,target[2]*scale);
-
-      data[i]=Math.round(lerp(r,tr,strength));
-      data[i+1]=Math.round(lerp(g,tg,strength));
-      data[i+2]=Math.round(lerp(b,tb,strength));
-
-      /* Never add external light. Alpha is unchanged. */
-      data[i+3]=a;
-    }
-
-    ctx.putImageData(frame,0,0);
-    raf=requestAnimationFrame(render);
-  }
-
-  image.onload=resizeToSource;
-
-  window.addEventListener("resize",()=>{
-    if(image.complete) resizeToSource();
-  },{passive:true});
-
-  document.addEventListener("visibilitychange",()=>{
-    if(!document.hidden){
-      lastFrame=0;
-      raf=requestAnimationFrame(render);
-    }
-  });
-
-  const motionQuery=window.matchMedia("(prefers-reduced-motion: reduce)");
-  if(motionQuery.addEventListener){
-    motionQuery.addEventListener("change",e=>{
-      reducedMotion=e.matches;
-      if(!reducedMotion && image.complete) raf=requestAnimationFrame(render);
-    });
-  }
-
+(function(){
+  "use strict";
+  const image = document.getElementById("heroImage");
+  const placeholder = document.getElementById("heroPlaceholder");
+  if (!image || !placeholder) return;
+  image.addEventListener("error", function(){
+    image.hidden = true;
+    placeholder.style.display = "grid";
+  }, { once: true });
 })();
- 
- 
-/* =========================================================
-   LIVE WEBSOCKET
-========================================================= */
-
-let messages = 0;
-
-let socket = null;
-
-let reconnectTimer = null;
-
-let reconnectDelay = 2000;
-
-
-const streams = [
-
-  "btcusdt@miniTicker",
-  "ethusdt@miniTicker",
-  "solusdt@miniTicker",
-  "bnbusdt@miniTicker",
-  "xrpusdt@miniTicker",
-  "dogeusdt@miniTicker",
-  "adausdt@miniTicker",
-  "avaxusdt@miniTicker",
-  "linkusdt@miniTicker",
-  "paxgusdt@miniTicker",
-  "eurusdt@miniTicker",
-  "gbpusdt@miniTicker"
-
-];
-
-
-function connectStream(){
-
-  try{
-
-    if(
-      socket &&
-      (
-        socket.readyState ===
-          WebSocket.OPEN ||
-        socket.readyState ===
-          WebSocket.CONNECTING
-      )
-    ){
-
-      return;
-
-    }
-
-
-    socket =
-      new WebSocket(
-        "wss://stream.binance.com:9443/stream?streams="+
-        streams.join("/")
-      );
-
-
-    socket.onopen = () => {
-
-      reconnectDelay =
-        2000;
-
-    };
-
-
-    socket.onmessage = () => {
-
-      messages++;
-
-    };
-
-
-    socket.onerror = () => {
-
-      try{
-        socket.close();
-      }catch(e){}
-
-    };
-
-
-    socket.onclose = () => {
-
-      if(reconnectTimer)
-        return;
-
-
-      reconnectTimer =
-        setTimeout(
-          () => {
-
-            reconnectTimer =
-              null;
-
-            connectStream();
-
-          },
-          reconnectDelay
-        );
-
-
-      reconnectDelay =
-        Math.min(
-          reconnectDelay*2,
-          30000
-        );
-
-    };
-
-  }catch(error){
-
-    console.warn(
-      "Live stream unavailable",
-      error
-    );
-
-  }
-
-}
-
-
-connectStream();
-
-
-setInterval(
-  () => {
-
-    const element =
-      document.getElementById(
-        "st-msg"
-      );
-
-
-    if(element){
-
-      element.textContent =
-        messages;
-
-    }
-
-
-    messages = 0;
-
-  },
-  1000
-);
-
-
-/* =========================================================
-   NEWSLETTER
-========================================================= */
-
-const newsletterForm =
-  document.getElementById(
-    "newsletterForm"
-  );
-
-
-newsletterForm.addEventListener(
-  "submit",
-  event => {
-
-    event.preventDefault();
-
-
-    const email =
-      document
-        .getElementById(
-          "newsletterEmail"
-        )
-        .value
-        .trim();
-
-
-    if(!email)
-      return;
-
-
-    const button =
-      document.getElementById(
-        "subscribeBtn"
-      );
-
-
-    button.textContent =
-      "✓ JOINED";
-
-    button.disabled =
-      true;
-
-
-    showToast(
-      "Platform updates enabled for this session."
-    );
-
-  }
-);
-
-
-/* =========================================================
-   TOAST
-========================================================= */
-
-function showToast(message){
-
-  const toast =
-    document.getElementById(
-      "toast"
-    );
-
-
-  toast.textContent =
-    message;
-
-
-  toast.classList.add(
-    "show"
-  );
-
-
-  setTimeout(
-    () => {
-
-      toast.classList.remove(
-        "show"
-      );
-
-    },
-    3200
-  );
-
-}
-
 </script>
+
 <script src="system/session.js"></script>
 <script src="system/auth-gate.js"></script>
 <script src="system/access-control.js"></script>

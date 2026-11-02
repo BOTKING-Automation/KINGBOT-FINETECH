@@ -1,0 +1,309 @@
+/* KINGBOT FINETECH — Administrator control plane institutional interface
+   Presentation-only overrides. Preserve administrator auth checks, user and
+   payment workflows, entitlement APIs, broker metadata and risk controls. */
+body.kb-admin-page{
+  margin:0;min-height:100vh;color:#eef2f5!important;
+  background:
+    radial-gradient(ellipse at 8% 0%,rgba(131,203,208,.055),transparent 30%),
+    radial-gradient(ellipse at 92% 4%,rgba(217,180,119,.055),transparent 32%),
+    linear-gradient(180deg,#0a121b 0%,#09111a 54%,#080e15 100%)!important;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+}
+body.kb-admin-page .admin-shell{
+  width:min(1560px,calc(100% - 44px));margin:auto;padding:24px 0 48px;
+}
+body.kb-admin-page .lock-screen{min-height:78vh}
+body.kb-admin-page .lock-card{
+  width:min(560px,100%);padding:32px;border:1px solid rgba(184,199,211,.14);
+  border-radius:16px;background:linear-gradient(150deg,rgba(18,30,42,.98),rgba(11,19,28,.99));
+  box-shadow:0 22px 66px rgba(0,0,0,.27);
+}
+body.kb-admin-page .lock-icon{font-size:34px;filter:none}
+body.kb-admin-page .lock-card h1{
+  margin:15px 0 9px;color:#f0f3f4;
+  background:linear-gradient(105deg,#f2dfbf,#d9b477 58%,#9bcdd0);
+  -webkit-background-clip:text;background-clip:text;
+  font:750 26px Inter,sans-serif;
+}
+body.kb-admin-page .lock-card p{color:#a5b2bc;font-size:11px;line-height:1.75}
+body.kb-admin-page .lock-card input{
+  border:1px solid rgba(184,199,211,.14);border-radius:9px;
+  background:#0b1722;color:#e6ecee;
+}
+body.kb-admin-page .lock-card input:focus{
+  border-color:rgba(131,203,208,.55);outline:none;
+  box-shadow:0 0 0 3px rgba(131,203,208,.08);
+}
+
+/* Admin identity and global command actions */
+body.kb-admin-page .topbar{
+  display:flex;justify-content:space-between;align-items:center;gap:20px;
+  padding:19px 21px;border:1px solid rgba(184,199,211,.12);
+  border-radius:15px;background:linear-gradient(150deg,rgba(19,32,45,.98),rgba(11,19,28,.99));
+  box-shadow:0 14px 36px rgba(0,0,0,.17);position:relative;overflow:hidden;
+}
+body.kb-admin-page .topbar:before{content:none!important}
+body.kb-admin-page .ey{
+  color:#d9bd8d;font:700 7px "JetBrains Mono",monospace;letter-spacing:.13em;
+}
+body.kb-admin-page .title{
+  margin:8px 0;color:#f0f3f4;
+  background:linear-gradient(105deg,#f2dfbf,#d9b477 60%,#9bcdd0);
+  -webkit-background-clip:text;background-clip:text;
+  font:750 clamp(25px,3.4vw,40px)/1.08 Inter,sans-serif;letter-spacing:-.04em;
+}
+body.kb-admin-page .sub{color:#a3b0ba;font-size:11px;line-height:1.7}
+body.kb-admin-page .admin-badge{
+  padding:8px 11px;border:1px solid rgba(120,199,166,.19);
+  border-radius:8px;background:rgba(120,199,166,.05);color:#9bd5b7;
+  font:650 7px "JetBrains Mono",monospace;
+}
+body.kb-admin-page .header-actions{gap:7px}
+body.kb-admin-page .btn{
+  min-height:36px;padding:8px 11px;border:1px solid rgba(184,199,211,.14);
+  border-radius:8px;background:rgba(255,255,255,.03);color:#d6e0e3;
+  font:650 7px "JetBrains Mono",monospace;transition:transform .16s ease,border-color .16s ease;
+}
+body.kb-admin-page .btn:hover{transform:translateY(-1px);border-color:rgba(217,180,119,.34)}
+body.kb-admin-page .btn.cyan{
+  border-color:rgba(131,203,208,.20);background:rgba(131,203,208,.055);color:#a7d6d7;
+}
+body.kb-admin-page .btn.gold{
+  border-color:rgba(217,180,119,.24);background:rgba(217,180,119,.07);color:#e6ca99;
+}
+body.kb-admin-page .btn.green{
+  border-color:rgba(120,199,166,.20);background:rgba(120,199,166,.06);color:#9bd5b7;
+}
+body.kb-admin-page .btn.red{
+  border-color:rgba(225,126,134,.26);background:rgba(225,126,134,.075);color:#eaa2a8;
+}
+body.kb-admin-page .btn:disabled{opacity:.48;cursor:not-allowed;transform:none}
+
+/* Backend-fed KPI strip */
+body.kb-admin-page .metrics{
+  grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;margin-top:12px;
+}
+body.kb-admin-page .metric{
+  padding:13px;border:1px solid rgba(184,199,211,.10);
+  border-radius:11px;background:linear-gradient(150deg,rgba(19,32,45,.97),rgba(12,21,31,.99));
+}
+body.kb-admin-page .metric:after{content:none!important}
+body.kb-admin-page .metric .k{
+  color:#99a8b2;font:650 6.5px "JetBrains Mono",monospace;letter-spacing:.08em;
+}
+body.kb-admin-page .metric .v{
+  margin-top:8px;color:#e7edef;font:700 17px "JetBrains Mono",monospace;
+}
+body.kb-admin-page .metric .hint{color:#9baab3;font-size:7px;line-height:1.5}
+
+/* Operator tabs */
+body.kb-admin-page .tabbar{
+  display:flex;gap:5px;flex-wrap:wrap;margin:12px 0 10px;padding:7px;
+  border:1px solid rgba(184,199,211,.12);border-radius:12px;
+  background:rgba(14,24,35,.94);backdrop-filter:blur(14px);
+}
+body.kb-admin-page .tab{
+  min-height:35px;padding:0 10px;border:1px solid rgba(184,199,211,.10);
+  border-radius:7px;background:rgba(255,255,255,.02);color:#a0aeb7;
+  font:650 7px "JetBrains Mono",monospace;transition:background .15s ease,color .15s ease,border-color .15s ease;
+}
+body.kb-admin-page .tab:hover{color:#e8edef;border-color:rgba(217,180,119,.25)}
+body.kb-admin-page .tab.active{
+  border-color:rgba(217,180,119,.27);
+  background:rgba(217,180,119,.09);color:#efcf9c;
+}
+body.kb-admin-page .tab-panel{padding-top:5px}
+body.kb-admin-page .section-head{
+  display:flex;justify-content:space-between;align-items:end;gap:13px;margin:12px 1px;
+}
+body.kb-admin-page .section-head h2{
+  margin:0;color:#edf1f3;font:700 12px Inter,sans-serif;letter-spacing:.035em;
+}
+body.kb-admin-page .section-head p{
+  margin-top:5px;color:#a0aeb7;font-size:9px;line-height:1.6;
+}
+body.kb-admin-page .section-tag{
+  padding:6px 8px;border:1px solid rgba(184,199,211,.12);
+  border-radius:7px;background:rgba(255,255,255,.025);color:#a3b0b8;
+  font:650 7px "JetBrains Mono",monospace;
+}
+
+/* Panels, queue and operational summaries */
+body.kb-admin-page .panel{
+  margin-bottom:12px;padding:16px;border:1px solid rgba(184,199,211,.11);
+  border-radius:13px;background:linear-gradient(150deg,rgba(18,30,42,.97),rgba(11,19,28,.99));
+  box-shadow:0 10px 28px rgba(0,0,0,.15);
+}
+body.kb-admin-page .panel.accent{border-color:rgba(131,203,208,.15)}
+body.kb-admin-page .panel.warn{border-color:rgba(217,180,119,.17)}
+body.kb-admin-page .panel.danger{border-color:rgba(225,126,134,.2)}
+body.kb-admin-page .panel-head{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;
+}
+body.kb-admin-page .panel-head h3{
+  margin:0;color:#e8edef;font:700 10px Inter,sans-serif;letter-spacing:.045em;
+}
+body.kb-admin-page .panel-head span{
+  color:#9caab3;font:650 6.5px "JetBrains Mono",monospace;letter-spacing:.07em;
+}
+body.kb-admin-page .hero-note{
+  padding:12px 13px;border:1px solid rgba(184,199,211,.10);
+  border-radius:9px;background:rgba(255,255,255,.022);
+  color:#a6b3bb;font-size:9px;line-height:1.7;
+}
+body.kb-admin-page .hero-note strong,
+body.kb-admin-page .hero-note b{color:#e0c28e}
+body.kb-admin-page .hero-note.danger-note{
+  border-color:rgba(225,126,134,.18);background:rgba(225,126,134,.045);color:#c6aeb2;
+}
+body.kb-admin-page .hero-note.danger-note b{color:#e9a2a8!important}
+body.kb-admin-page .grid-2{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+body.kb-admin-page .grid-3{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+body.kb-admin-page .status-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+body.kb-admin-page .status-card{
+  padding:12px;border:1px solid rgba(184,199,211,.09);
+  border-radius:9px;background:rgba(255,255,255,.02);
+}
+body.kb-admin-page .status-card .k{
+  color:#9aa9b3;font:650 6.5px "JetBrains Mono",monospace;letter-spacing:.08em;
+}
+body.kb-admin-page .status-card .v{
+  margin-top:7px;color:#e4eaec;font:700 12px "JetBrains Mono",monospace;
+}
+body.kb-admin-page .status-card .s{margin-top:4px;color:#9aa9b3;font-size:7px;line-height:1.5}
+body.kb-admin-page .queue{gap:8px;max-height:680px}
+body.kb-admin-page .payment-card{
+  padding:12px;border:1px solid rgba(184,199,211,.10);
+  border-radius:10px;background:rgba(255,255,255,.025);
+}
+body.kb-admin-page .payment-card.pending{
+  border-color:rgba(217,180,119,.19);box-shadow:none;
+}
+body.kb-admin-page .payment-card.approved{border-color:rgba(120,199,166,.18)}
+body.kb-admin-page .payment-card.rejected{border-color:rgba(225,126,134,.18)}
+body.kb-admin-page .customer{color:#e7edef;font:650 9px Inter,sans-serif}
+body.kb-admin-page .code{color:#e4c28f;font:700 11px "JetBrains Mono",monospace}
+body.kb-admin-page .kv,
+body.kb-admin-page .meta{color:#9daab3;font-size:8px;line-height:1.6}
+body.kb-admin-page .plan-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+body.kb-admin-page .plan{
+  padding:13px;border:1px solid rgba(184,199,211,.10);
+  border-radius:10px;background:rgba(255,255,255,.022);
+}
+body.kb-admin-page .plan .plan-name{color:#e2c08b;font:700 11px Inter,sans-serif}
+body.kb-admin-page .plan .price{color:#e6ecee;font:700 16px "JetBrains Mono",monospace}
+
+/* Data tables */
+body.kb-admin-page .table-wrap{
+  overflow:auto;border:1px solid rgba(184,199,211,.09);border-radius:9px;
+}
+body.kb-admin-page .table{width:100%;min-width:840px;border-collapse:collapse}
+body.kb-admin-page .table th{
+  padding:10px;background:#12202d;border-color:rgba(184,199,211,.10);
+  color:#9baab3;font:650 6.5px "JetBrains Mono",monospace;letter-spacing:.07em;
+}
+body.kb-admin-page .table td{
+  padding:10px;border-color:rgba(184,199,211,.075);
+  color:#d1dce0;font-size:8px;line-height:1.55;vertical-align:top;
+}
+body.kb-admin-page .table tr:hover td{background:rgba(131,203,208,.025)}
+body.kb-admin-page .user-name{color:#e8edef;font-weight:650}
+body.kb-admin-page .email{color:#9caab4;font-size:7px}
+body.kb-admin-page .micro{color:#9baab4;font-size:7px;line-height:1.55}
+body.kb-admin-page .pill{
+  padding:5px 7px;border:1px solid rgba(184,199,211,.12);
+  border-radius:6px;background:rgba(255,255,255,.025);
+  color:#b4c0c7;font:650 6.5px "JetBrains Mono",monospace;
+}
+body.kb-admin-page .pill.ok,
+body.kb-admin-page .pill.green{color:#9bd5b7;border-color:rgba(120,199,166,.18);background:rgba(120,199,166,.05)}
+body.kb-admin-page .pill.wait,
+body.kb-admin-page .pill.warn{color:#e3c18d;border-color:rgba(217,180,119,.18);background:rgba(217,180,119,.05)}
+body.kb-admin-page .pill.bad,
+body.kb-admin-page .pill.red{color:#e6a0a6;border-color:rgba(225,126,134,.18);background:rgba(225,126,134,.05)}
+
+/* Search controls and input fields */
+body.kb-admin-page .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+body.kb-admin-page .search,
+body.kb-admin-page .select,
+body.kb-admin-page input,
+body.kb-admin-page select,
+body.kb-admin-page textarea{
+  border:1px solid rgba(184,199,211,.14);border-radius:8px;
+  background:#0b1722;color:#e5ebed;font:600 8px "JetBrains Mono",monospace;
+}
+body.kb-admin-page .search,
+body.kb-admin-page .select{min-height:38px;padding:0 10px}
+body.kb-admin-page :is(input,select,textarea):focus{
+  outline:none;border-color:rgba(131,203,208,.55);
+  box-shadow:0 0 0 3px rgba(131,203,208,.075);
+}
+body.kb-admin-page .action-row{gap:7px}
+body.kb-admin-page .action-row .btn{min-height:32px}
+
+/* Runtime and risk cards */
+body.kb-admin-page .cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+body.kb-admin-page .bot-card{
+  border:1px solid rgba(184,199,211,.10);border-radius:10px;
+  background:rgba(255,255,255,.022);
+}
+body.kb-admin-page .bot-card .title{color:#e6ecee;font:650 9px Inter,sans-serif}
+body.kb-admin-page .bot-card .sub{color:#9eacb5;font:600 7px "JetBrains Mono",monospace}
+body.kb-admin-page .risk{
+  border-color:rgba(184,199,211,.10);border-radius:9px;background:rgba(255,255,255,.02);
+}
+body.kb-admin-page .risk .k,
+body.kb-admin-page .risk .s{color:#9eacb5;font:600 7px "JetBrains Mono",monospace}
+body.kb-admin-page .risk .v{color:#e3e9eb;font:700 10px "JetBrains Mono",monospace}
+body.kb-admin-page .empty{padding:22px;color:#9caab4;font:600 8px "JetBrains Mono",monospace}
+body.kb-admin-page #toast{
+  border:1px solid rgba(217,180,119,.22);border-radius:10px;
+  background:rgba(13,22,32,.97);color:#e7edef;
+  box-shadow:0 18px 48px rgba(0,0,0,.32);font:650 8px "JetBrains Mono",monospace;
+}
+body.kb-admin-page #toast.ok{border-color:rgba(120,199,166,.24)}
+body.kb-admin-page #toast.err{border-color:rgba(225,126,134,.24)}
+body.kb-admin-page :is(a,button,input,select,textarea):focus-visible{
+  outline:2px solid rgba(131,203,208,.85);outline-offset:3px;
+}
+
+/* Responsive operator console */
+@media(max-width:1300px){
+  body.kb-admin-page .metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+  body.kb-admin-page .cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.kb-admin-page .grid-2{grid-template-columns:1fr}
+}
+@media(max-width:900px){
+  body.kb-admin-page .admin-shell{width:calc(100% - 30px);padding-top:18px}
+  body.kb-admin-page .plan-grid{grid-template-columns:1fr}
+  body.kb-admin-page .status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-admin-page .grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-admin-page .pay-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-admin-page .topbar{align-items:flex-start;flex-direction:column}
+  body.kb-admin-page .header-actions{justify-content:flex-start}
+  body.kb-admin-page .tabbar{position:relative;top:auto}
+}
+@media(max-width:700px){
+  body.kb-admin-page .admin-shell{width:calc(100% - 18px);padding-top:14px}
+  body.kb-admin-page .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-admin-page .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-admin-page .tabbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-admin-page .tab{text-align:center;padding:0 5px;font-size:6.5px}
+  body.kb-admin-page .grid-3,
+  body.kb-admin-page .status-grid,
+  body.kb-admin-page .pay-grid{grid-template-columns:1fr}
+  body.kb-admin-page .panel{padding:13px}
+  body.kb-admin-page .section-head{align-items:flex-start;flex-direction:column}
+}
+@media(max-width:460px){
+  body.kb-admin-page .metrics,
+  body.kb-admin-page .cards{grid-template-columns:1fr}
+  body.kb-admin-page .header-actions .btn{flex:1 1 100%}
+  body.kb-admin-page .lock-card{padding:22px}
+}
+@media(prefers-reduced-motion:reduce){
+  body.kb-admin-page *,body.kb-admin-page *:before,body.kb-admin-page *:after{
+    animation-duration:.01ms!important;animation-iteration-count:1!important;
+    transition-duration:.01ms!important;scroll-behavior:auto!important;
+  }
+}

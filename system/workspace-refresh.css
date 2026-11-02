@@ -1,0 +1,294 @@
+/* =========================================================
+   KINGBOT FINTECH — AUTHENTICATED WORKSPACE DESIGN SYSTEM
+   Presentation layer only. Does not alter data, auth, broker
+   connections, subscription entitlements, risk or execution.
+========================================================= */
+:root{
+  --kb-ui-bg:#080e15;
+  --kb-ui-panel:#101a25;
+  --kb-ui-panel-2:#142130;
+  --kb-ui-border:rgba(255,255,255,.085);
+  --kb-ui-border-gold:rgba(216,173,99,.24);
+  --kb-ui-gold:#d8ad63;
+  --kb-ui-gold-soft:#f0d7ad;
+  --kb-ui-cyan:#72cbd2;
+  --kb-ui-text:#edf1f4;
+  --kb-ui-muted:#a4b0bb;
+  --kb-ui-green:#68c6a4;
+  --kb-ui-red:#e47b83;
+  --kb-ui-shadow:0 18px 52px rgba(0,0,0,.26);
+}
+
+body.kb-app-refresh{
+  color:var(--kb-ui-text)!important;
+  background:
+    radial-gradient(ellipse at 8% 0%,rgba(114,203,210,.065),transparent 30%),
+    radial-gradient(ellipse at 92% 4%,rgba(216,173,99,.065),transparent 32%),
+    linear-gradient(180deg,#080e15 0%,#0a121b 48%,#070c12 100%)!important;
+  font-family:Inter,"Space Grotesk",system-ui,sans-serif!important;
+}
+
+body.kb-app-refresh :is(h1,h2,h3,h4){
+  letter-spacing:-.02em;
+  text-wrap:balance;
+}
+
+body.kb-app-refresh :is(h1,h2){
+  color:#f2f4f6;
+  font-weight:750;
+}
+
+body.kb-app-refresh :is(.eyebrow,.kicker,.ey,.section-code,.section-title small){
+  color:var(--kb-ui-gold-soft);
+}
+
+body.kb-app-refresh :is(.gradient,.gradient-text,.gradient-text span){
+  background:linear-gradient(110deg,#f3dfbd,#d8ad63 55%,#9bd8db);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  text-shadow:none;
+  filter:none;
+}
+
+/* Shared navigation, headers and page frames */
+body.kb-app-refresh :is(.topbar,.top,.topbar-inner){
+  border-color:rgba(216,173,99,.14);
+}
+
+body.kb-app-refresh .topbar{
+  background:rgba(8,14,21,.92);
+  border-bottom:1px solid rgba(216,173,99,.16);
+  box-shadow:0 10px 30px rgba(0,0,0,.12);
+  backdrop-filter:blur(18px);
+}
+
+body.kb-app-refresh :is(.brand-mark,.brand .brand-mark){
+  background:linear-gradient(135deg,#f0d29a,#bd8e4c);
+  color:#21170a;
+  box-shadow:0 0 20px rgba(216,173,99,.16);
+}
+
+body.kb-app-refresh :is(.nav a,.nav-links a,.back){
+  color:#aab6c0;
+  transition:color .18s ease,border-color .18s ease;
+}
+
+body.kb-app-refresh :is(.nav a:hover,.nav-links a:hover,.nav a.active,.nav-links a.active,.back:hover){
+  color:#efd5a7;
+}
+
+body.kb-app-refresh :is(.nav a.active,.nav-links a.active){
+  border-color:rgba(216,173,99,.25);
+}
+
+body.kb-app-refresh :is(.shell,.page,.wrap){
+  color:var(--kb-ui-text);
+}
+
+/* Common surfaces across the separately-built application pages */
+body.kb-app-refresh :is(
+  .panel,.glass,.card,.hero-main,.hero-side,.hero-engine,.account-card,
+  .market,.risk-card,.activity-card,.console,.chat-shell,.context-card,
+  .side-card,.telemetry-card,.quote-cell,.arch,.architecture .arch,
+  .broker,.bot,.bot-card,.kpi,.stat,.metric,.metric-card,.status-card,
+  .health-inner,.network-health,.mode-panel,.intel-panel,.control,
+  .module,.event,.foot-panel,.selection-toolbar,.detail-image,
+  .profile-head,.status,.panel-card
+){
+  background-color:rgba(16,26,37,.82);
+  background-image:linear-gradient(150deg,rgba(255,255,255,.018),rgba(255,255,255,0));
+  border-color:var(--kb-ui-border);
+  box-shadow:var(--kb-ui-shadow);
+}
+
+body.kb-app-refresh :is(
+  .panel,.glass,.card,.hero-main,.hero-side,.hero-engine,.console,
+  .chat-shell,.context-card,.side-card,.broker,.bot,.bot-card,.kpi,
+  .stat,.metric,.status-card,.health-inner,.network-health,.mode-panel,
+  .intel-panel,.control,.module,.foot-panel,.selection-toolbar
+){
+  border-radius:17px;
+}
+
+body.kb-app-refresh :is(
+  .section-sub,.hero-copy,.sub,.lead,.desc,.muted,.telemetry-note,
+  .health-sub,.broker-copy,.plan-description,.message,.context-note
+){
+  color:#a7b3bf;
+  line-height:1.75;
+}
+
+/* Hero and status areas */
+body.kb-app-refresh :is(.hero,.hero-grid,.hero-main,.hero-side,.engineHero){
+  border-color:rgba(216,173,99,.12);
+}
+
+body.kb-app-refresh :is(.hero,.hero-main,.hero-side,.hero-engine){
+  box-shadow:var(--kb-ui-shadow);
+}
+
+body.kb-app-refresh :is(.state-pill,.status-tag,.tag,.badge,.pill,.hero-tag,.bot-chip){
+  border-color:rgba(216,173,99,.19);
+  background:rgba(216,173,99,.055);
+  color:#e5c99c;
+}
+
+body.kb-app-refresh :is(.live-dot,.mini-dot,.dot){
+  box-shadow:0 0 9px rgba(104,198,164,.32);
+}
+
+body.kb-app-refresh :is(.live,.good,.ok,.ready){
+  color:var(--kb-ui-green);
+}
+
+body.kb-app-refresh :is(.bad,.error,.down){
+  color:var(--kb-ui-red);
+}
+
+/* Terminal metrics and sync tiles */
+body.kb-terminal-page :is(.panel,.metric,.sync,.account-card,.market,.risk-card,.activity-card,.signal-box,.telemetry-cell,.engine-cell){
+  background:linear-gradient(155deg,rgba(19,31,43,.94),rgba(10,17,25,.98));
+  border:1px solid var(--kb-ui-border);
+  border-radius:16px;
+  box-shadow:var(--kb-ui-shadow);
+}
+
+body.kb-terminal-page :is(.metric-value,.big-status,.engine-name,.signal-score){
+  color:#ead0a1;
+}
+
+body.kb-terminal-page :is(.section-title,.panel-head,.section-head){
+  color:#edf1f4;
+}
+
+/* AI intelligence surfaces */
+body.kb-app-refresh :is(.orb-stage,.orb){
+  filter:saturate(.82);
+}
+
+body.kb-app-refresh :is(.console-bar,.card-head,.panel-head,.section-head,.engine-head){
+  border-color:rgba(255,255,255,.075);
+}
+
+body.kb-app-refresh :is(.command-input,input,select,textarea,.search){
+  color:#edf1f4;
+  background:rgba(6,12,19,.88);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:11px;
+  box-shadow:none;
+}
+
+body.kb-app-refresh :is(.command-input,input,select,textarea,.search):focus{
+  border-color:rgba(114,203,210,.55);
+  outline:none;
+  box-shadow:0 0 0 3px rgba(114,203,210,.075);
+}
+
+body.kb-app-refresh :is(input::placeholder,textarea::placeholder){
+  color:#778592;
+}
+
+/* Broker directory and account connection */
+body.kb-app-refresh :is(.broker,.broker-inner,.broker-top,.account-item,.step,.drawer,.modal){
+  background-color:#101a25;
+  border-color:rgba(255,255,255,.09);
+}
+
+body.kb-app-refresh :is(.broker.selected,.broker:hover,.account-item:hover){
+  border-color:rgba(216,173,99,.42);
+  box-shadow:0 18px 44px rgba(0,0,0,.30);
+}
+
+body.kb-app-refresh :is(.modal,.drawer){
+  box-shadow:0 28px 100px rgba(0,0,0,.62);
+}
+
+/* Buttons: retain labels and click handlers */
+body.kb-app-refresh :is(.btn,.primary,.btn-primary,.connect,.modal-btn,.save,.signin,.change-bot,.market-refresh,.filter,.mode-btn,.back){
+  border-radius:999px;
+  font-weight:700;
+  letter-spacing:.035em;
+  transition:transform .18s ease,background .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+
+body.kb-app-refresh :is(.btn.primary,.btn-primary,.primary,.connect,.save,.signin,.btn.gold){
+  color:#1c170e;
+  background:linear-gradient(120deg,#f0d29a,#c99a55);
+  border-color:rgba(216,173,99,.38);
+  box-shadow:0 8px 24px rgba(216,173,99,.12);
+}
+
+body.kb-app-refresh :is(.btn.secondary,.btn:not(.primary):not(.btn-primary):not(.gold),.modal-btn,.change-bot,.filter,.mode-btn,.back){
+  color:#e4c99e;
+  background:rgba(255,255,255,.025);
+  border:1px solid rgba(216,173,99,.22);
+}
+
+body.kb-app-refresh :is(.btn,.primary,.btn-primary,.connect,.modal-btn,.save,.signin,.change-bot,.market-refresh,.filter,.mode-btn):hover{
+  transform:translateY(-1px);
+  border-color:rgba(216,173,99,.48);
+}
+
+body.kb-app-refresh :is(button:disabled,.btn:disabled){
+  opacity:.5;
+  cursor:not-allowed;
+  transform:none;
+}
+
+/* Tables, data rows and information density */
+body.kb-app-refresh :is(.row,.data-row,.runtime-row,.position-row,.detail,.event,.risk-item,.exposure-row){
+  border-color:rgba(255,255,255,.07);
+}
+
+body.kb-app-refresh :is(.data-label,.row span:first-child,.detail span:first-child,.label,.telemetry-label,.quote-label){
+  color:#98a6b2;
+}
+
+body.kb-app-refresh :is(.data-value,.row span:last-child,.detail span:last-child,.value,.telemetry-value,.quote-value){
+  color:#e9edf0;
+}
+
+body.kb-app-refresh :is(table,th,td){
+  border-color:rgba(255,255,255,.075);
+}
+
+/* Charts should remain data-driven and preserve their dimensions */
+body.kb-app-refresh :is(.chart-wrap,#equityChart,#distributionChart,canvas){
+  background-color:transparent;
+}
+
+body.kb-app-refresh :is(.progress,.risk-line){
+  background:rgba(255,255,255,.085);
+}
+
+/* Navigation drawer provided by the shared navigation runtime */
+body.kb-app-refresh .kb-menu{
+  background:rgba(9,16,24,.98)!important;
+  border-color:rgba(216,173,99,.21)!important;
+  box-shadow:0 28px 90px rgba(0,0,0,.62)!important;
+}
+body.kb-app-refresh :is(.kb-menu-title,.kb-command-title){color:#f0d7ad!important}
+body.kb-app-refresh :is(.kb-menu-grid a,.kb-menu-grid button){border-color:rgba(255,255,255,.08)!important}
+body.kb-app-refresh :is(.kb-menu-grid a:hover,.kb-menu-grid button:hover){
+  background:rgba(216,173,99,.055)!important;
+  border-color:rgba(216,173,99,.38)!important;
+}
+
+/* Focus visibility and reduced motion */
+body.kb-app-refresh :is(a,button,input,select,textarea):focus-visible{
+  outline:2px solid var(--kb-ui-cyan);
+  outline-offset:3px;
+}
+@media(prefers-reduced-motion:reduce){
+  body.kb-app-refresh *,body.kb-app-refresh *::before,body.kb-app-refresh *::after{
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+  }
+}
+@media(max-width:720px){
+  body.kb-app-refresh :is(.panel,.glass,.card,.broker,.bot,.bot-card,.kpi,.stat,.metric,.status-card){
+    border-radius:14px;
+  }
+}
