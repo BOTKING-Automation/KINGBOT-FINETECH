@@ -1,0 +1,371 @@
+/* KINGBOT FINETECH — Analytics institutional interface
+   Presentation-only layer. Preserve chart instances, filter listeners,
+   broker data, attribution calculations and account/risk metric bindings. */
+body.kb-analytics-page{
+  color:#eef2f5!important;
+  background:
+    radial-gradient(ellipse at 8% 0%,rgba(131,203,208,.065),transparent 30%),
+    radial-gradient(ellipse at 92% 4%,rgba(217,180,119,.065),transparent 32%),
+    linear-gradient(180deg,#0a121b 0%,#09111a 54%,#080e15 100%)!important;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+}
+body.kb-analytics-page:before,body.kb-analytics-page:after{content:none!important;display:none!important}
+body.kb-analytics-page .topbar{
+  height:72px;padding:0 24px;
+  background:rgba(8,15,23,.94)!important;
+  border-bottom:1px solid rgba(217,180,119,.15);
+  box-shadow:0 10px 30px rgba(0,0,0,.15);
+  backdrop-filter:blur(18px);
+}
+body.kb-analytics-page .brand{min-width:210px;gap:11px}
+body.kb-analytics-page .brand-mark{
+  width:39px;height:39px;border-radius:11px;
+  color:#241a0d;background:linear-gradient(145deg,#f0d7ad,#bd9359);
+  box-shadow:0 5px 18px rgba(217,180,119,.14);
+}
+body.kb-analytics-page .brand-text strong{
+  color:#f0f3f4;font:750 12px Inter,sans-serif;letter-spacing:.08em;
+}
+body.kb-analytics-page .brand-text span{
+  color:#91a0ab;font:600 8px Inter,sans-serif;letter-spacing:.12em;
+}
+body.kb-analytics-page .nav{gap:4px}
+body.kb-analytics-page .nav a{
+  padding:9px 11px;border-radius:9px;color:#aab6c0;
+  font:600 11px Inter,sans-serif;transition:background .18s ease,color .18s ease;
+}
+body.kb-analytics-page .nav a:hover,
+body.kb-analytics-page .nav a.active{
+  color:#efd7ad;background:rgba(217,180,119,.065);
+  box-shadow:inset 0 0 0 1px rgba(217,180,119,.08);
+}
+body.kb-analytics-page .top-status{gap:9px;min-width:190px}
+body.kb-analytics-page .status-pill{
+  padding:8px 11px;border-color:rgba(120,199,166,.19);
+  background:rgba(120,199,166,.05);color:#a9d9bf;
+  font:650 8px "JetBrains Mono",monospace;
+}
+body.kb-analytics-page .dot{background:#78c7a6;box-shadow:0 0 9px rgba(120,199,166,.4)}
+body.kb-analytics-page .page{
+  width:min(1560px,calc(100% - 44px));padding:28px 0 48px;
+}
+body.kb-analytics-page .card{
+  border:1px solid rgba(184,199,211,.12)!important;
+  border-radius:15px!important;
+  background:linear-gradient(150deg,rgba(18,30,42,.97),rgba(11,19,28,.99))!important;
+  box-shadow:0 12px 30px rgba(0,0,0,.16)!important;
+}
+body.kb-analytics-page .edge{display:none!important;animation:none!important}
+
+/* Analytics heading and data scope filters */
+body.kb-analytics-page .hero{
+  padding:25px 26px;margin-bottom:15px;border-radius:17px;
+  border-color:rgba(184,199,211,.12);
+  background:
+    radial-gradient(ellipse at 94% 0,rgba(217,180,119,.075),transparent 32%),
+    linear-gradient(145deg,rgba(19,32,45,.98),rgba(11,19,28,.99));
+  box-shadow:0 14px 36px rgba(0,0,0,.16);
+}
+body.kb-analytics-page .hero:before{background:radial-gradient(circle,rgba(131,203,208,.08),transparent 70%)}
+body.kb-analytics-page .hero-grid{
+  grid-template-columns:minmax(0,1fr) auto;gap:20px;
+}
+body.kb-analytics-page .eyebrow{
+  color:#e0c28f;font:700 8px "JetBrains Mono",monospace;
+  letter-spacing:.13em;text-transform:uppercase;
+}
+body.kb-analytics-page .hero h1{
+  color:#f0f3f4;font:750 clamp(28px,3.4vw,42px)/1.08 Inter,sans-serif;
+  letter-spacing:-.04em;
+}
+body.kb-analytics-page .gradient-text{
+  background:linear-gradient(105deg,#f2dfbf,#d9b477 60%,#9bcdd0);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+body.kb-analytics-page .hero p{
+  max-width:760px;margin-top:11px;color:#a5b2bc;font-size:12px;line-height:1.7;
+}
+body.kb-analytics-page .hero-actions{gap:8px;justify-content:flex-end}
+body.kb-analytics-page .btn{
+  min-height:40px;padding:10px 13px;border:1px solid rgba(184,199,211,.14);
+  border-radius:9px;background:rgba(255,255,255,.03);color:#d5dfe3;
+  font:650 9px Inter,sans-serif;transition:transform .16s ease,border-color .16s ease;
+}
+body.kb-analytics-page .btn:hover{
+  transform:translateY(-1px);border-color:rgba(217,180,119,.36);
+  box-shadow:0 8px 18px rgba(0,0,0,.15);
+}
+body.kb-analytics-page .btn.primary{
+  border-color:rgba(217,180,119,.32);
+  background:linear-gradient(120deg,#edcf9c,#c89a5d);
+  color:#241a0d;box-shadow:0 8px 20px rgba(217,180,119,.10);
+}
+
+/* Filter toolbar */
+body.kb-analytics-page .controls{
+  grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;
+  padding:12px;margin-bottom:14px;
+  border:1px solid rgba(184,199,211,.12);border-radius:13px;
+  background:linear-gradient(150deg,rgba(18,30,42,.96),rgba(11,19,28,.98));
+  backdrop-filter:none;
+}
+body.kb-analytics-page .control label{
+  color:#9baab4;font:650 7px "JetBrains Mono",monospace;
+  letter-spacing:.08em;margin:0 0 7px 2px;
+}
+body.kb-analytics-page .control :is(select,input){
+  height:40px;padding:0 10px;border:1px solid rgba(184,199,211,.14);
+  border-radius:8px;background:#0b1722;color:#e5ebed;
+  font:600 9px "JetBrains Mono",monospace;
+  transition:border-color .18s ease,box-shadow .18s ease;
+}
+body.kb-analytics-page .control :is(select,input):focus{
+  border-color:rgba(131,203,208,.58);outline:none;
+  box-shadow:0 0 0 3px rgba(131,203,208,.08);
+}
+body.kb-analytics-page .control :is(select,input):disabled{opacity:.5}
+
+/* Broker performance KPI strip */
+body.kb-analytics-page .kpis{
+  grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:15px;
+}
+body.kb-analytics-page .kpi{
+  padding:15px;border-radius:13px;
+  border-color:rgba(184,199,211,.11);
+  background:linear-gradient(150deg,rgba(19,32,45,.97),rgba(12,21,31,.99));
+}
+body.kb-analytics-page .kpi-top{
+  color:#9baab4;font:650 7px "JetBrains Mono",monospace;letter-spacing:.07em;
+}
+body.kb-analytics-page .kpi-icon{
+  width:27px;height:27px;border-radius:8px;
+  background:rgba(217,180,119,.08);color:#e0bd82;font:700 10px Inter,sans-serif;
+}
+body.kb-analytics-page .kpi-value{
+  margin-top:15px;color:#e7edf0;
+  font:700 clamp(17px,1.9vw,23px) "JetBrains Mono",monospace;
+  letter-spacing:-.04em;overflow-wrap:anywhere;
+}
+body.kb-analytics-page .kpi-value.unavailable{color:#9aa8b2}
+body.kb-analytics-page .kpi-sub{margin-top:6px;color:#98a7b1;font-size:8px;line-height:1.5}
+body.kb-analytics-page .mini-line{
+  height:2px;margin-top:13px;border-radius:2px;
+  background:linear-gradient(90deg,rgba(217,180,119,.65),rgba(131,203,208,.30),transparent);
+  opacity:.75;
+}
+
+/* Main chart and risk intelligence */
+body.kb-analytics-page .main-grid{
+  grid-template-columns:minmax(0,1.55fr) minmax(310px,.75fr);
+  gap:13px;margin-bottom:14px;
+}
+body.kb-analytics-page .panel{padding:17px}
+body.kb-analytics-page .panel-head{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;margin-bottom:15px;
+}
+body.kb-analytics-page .panel-title{
+  color:#edf1f3;font:700 12px Inter,sans-serif;letter-spacing:.025em;
+}
+body.kb-analytics-page .panel-sub{color:#9baab4;font-size:9px;line-height:1.6}
+body.kb-analytics-page .panel-tools{gap:6px;flex-wrap:wrap}
+body.kb-analytics-page .tag{
+  border-color:rgba(184,199,211,.12);border-radius:7px;
+  background:rgba(255,255,255,.025);color:#a3b0b9;
+  font:650 7px "JetBrains Mono",monospace;
+}
+body.kb-analytics-page .tag.live{
+  border-color:rgba(120,199,166,.18);background:rgba(120,199,166,.05);color:#a0d7b9;
+}
+body.kb-analytics-page .chart-wrap{
+  height:350px;min-width:0;
+}
+body.kb-analytics-page .chart-overlay{left:12px;top:10px;gap:6px}
+body.kb-analytics-page .chart-legend{
+  color:#98a7b1;font:600 7px "JetBrains Mono",monospace;
+}
+body.kb-analytics-page .risk-stack{gap:9px}
+body.kb-analytics-page .risk-item{
+  padding:12px;border-color:rgba(184,199,211,.10);
+  border-radius:10px;background:rgba(255,255,255,.022);
+}
+body.kb-analytics-page .risk-line{margin-bottom:8px}
+body.kb-analytics-page .risk-name{color:#c3cdd2;font:600 9px Inter,sans-serif}
+body.kb-analytics-page .risk-value{color:#a4b1ba;font:650 8px "JetBrains Mono",monospace}
+body.kb-analytics-page .progress{
+  height:6px;border-radius:8px;background:rgba(255,255,255,.09);
+}
+body.kb-analytics-page .progress span{
+  background:linear-gradient(90deg,#83cbd0,#d9b477);box-shadow:none;
+}
+body.kb-analytics-page .risk-note{
+  border-color:rgba(217,180,119,.14);border-radius:10px;
+  background:rgba(217,180,119,.035);color:#a7b3bb;font-size:8px;line-height:1.65;
+}
+
+/* Attribution, instrument distribution and matrix */
+body.kb-analytics-page .section-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin-bottom:14px;
+}
+body.kb-analytics-page .table-wrap{overflow:auto}
+body.kb-analytics-page table{width:100%;min-width:680px}
+body.kb-analytics-page th{
+  padding:10px 9px;border-color:rgba(184,199,211,.10);
+  background:rgba(255,255,255,.018);color:#9aa9b3;
+  font:650 7px "JetBrains Mono",monospace;letter-spacing:.07em;
+}
+body.kb-analytics-page td{
+  padding:11px 9px;border-color:rgba(184,199,211,.075);
+  color:#d2dce0;font-size:9px;
+}
+body.kb-analytics-page tr:hover td{background:rgba(131,203,208,.025)}
+body.kb-analytics-page .strategy{color:#e1e8ea;font-size:9px}
+body.kb-analytics-page .strategy-dot{background:#d9b477;box-shadow:none}
+body.kb-analytics-page .waiting{color:#9baab4;font-size:8px}
+body.kb-analytics-page .status{
+  border:1px solid rgba(184,199,211,.12);border-radius:6px;
+  font:650 7px "JetBrains Mono",monospace;
+}
+body.kb-analytics-page .status.wait{color:#a0adb6;background:rgba(255,255,255,.03)}
+body.kb-analytics-page .status.ready{
+  color:#9dd5b8;background:rgba(120,199,166,.05);border-color:rgba(120,199,166,.17);
+}
+body.kb-analytics-page .exposure-list{gap:11px}
+body.kb-analytics-page .exposure-row{
+  grid-template-columns:78px minmax(80px,1fr) 55px;gap:10px;
+}
+body.kb-analytics-page .exposure-name{
+  color:#bcc8ce;font:650 8px "JetBrains Mono",monospace;
+}
+body.kb-analytics-page .exposure-bar{height:7px;background:rgba(255,255,255,.09)}
+body.kb-analytics-page .exposure-bar span{
+  background:linear-gradient(90deg,#83cbd0,#d9b477);
+}
+body.kb-analytics-page .exposure-value{color:#a4b2ba;font:600 8px "JetBrains Mono",monospace}
+body.kb-analytics-page .matrix{
+  grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;min-width:380px;
+}
+body.kb-analytics-page .matrix-cell{
+  min-height:43px;border:1px solid rgba(184,199,211,.07);
+  border-radius:6px;background:rgba(255,255,255,.02);
+  color:#c3cfd3;font:650 8px "JetBrains Mono",monospace;
+}
+body.kb-analytics-page .matrix-cell.matrix-label{
+  border-color:transparent;background:transparent;color:#9eacb4;
+}
+body.kb-analytics-page .matrix-cell.positive{
+  border-color:rgba(120,199,166,.13);background:rgba(120,199,166,.08);color:#9bd5b7;
+}
+body.kb-analytics-page .matrix-cell.negative{
+  border-color:rgba(225,126,134,.13);background:rgba(225,126,134,.08);color:#e5a0a6;
+}
+body.kb-analytics-page .matrix-cell.neutral{
+  border-color:rgba(131,203,208,.12);background:rgba(131,203,208,.05);color:#a8d2d4;
+}
+body.kb-analytics-page .distribution{height:230px;min-width:0}
+
+/* Intelligence insight and execution-quality panels */
+body.kb-analytics-page .ai-panel{
+  background:
+    radial-gradient(ellipse at 92% 0,rgba(217,180,119,.055),transparent 30%),
+    linear-gradient(150deg,rgba(19,32,45,.98),rgba(11,19,28,.99))!important;
+}
+body.kb-analytics-page .ai-head{gap:11px}
+body.kb-analytics-page .ai-core{
+  width:40px;height:40px;border-radius:11px;
+  color:#231a0d;background:linear-gradient(145deg,#edcf9c,#c89a5d);
+  box-shadow:0 6px 18px rgba(217,180,119,.12);
+  font:750 12px Inter,sans-serif;
+}
+body.kb-analytics-page .ai-status{color:#9eacb5;font-size:8px;line-height:1.5}
+body.kb-analytics-page .ai-insight{
+  margin-top:15px;padding:14px;border:1px solid rgba(217,180,119,.14);
+  border-radius:11px;background:rgba(217,180,119,.035);
+}
+body.kb-analytics-page .ai-insight strong{color:#e3c28f;font:700 9px Inter,sans-serif}
+body.kb-analytics-page .ai-insight p{color:#a9b5bc;font-size:9px;line-height:1.7}
+body.kb-analytics-page .ai-signals{gap:8px;margin-top:10px}
+body.kb-analytics-page .ai-signal{
+  padding:11px;border-color:rgba(184,199,211,.10);
+  border-radius:9px;background:rgba(255,255,255,.022);
+}
+body.kb-analytics-page .ai-signal span{
+  color:#99a8b1;font:650 7px "JetBrains Mono",monospace;letter-spacing:.06em;
+}
+body.kb-analytics-page .ai-signal b{
+  color:#e1e8ea;font:650 9px "JetBrains Mono",monospace;overflow-wrap:anywhere;
+}
+body.kb-analytics-page .exec-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+body.kb-analytics-page .exec-card{
+  padding:13px;border-color:rgba(184,199,211,.10);
+  border-radius:10px;background:rgba(255,255,255,.022);
+}
+body.kb-analytics-page .exec-card label{
+  color:#9aa9b2;font:650 7px "JetBrains Mono",monospace;letter-spacing:.06em;
+}
+body.kb-analytics-page .exec-card strong{
+  color:#e4eaec;font:700 12px "JetBrains Mono",monospace;overflow-wrap:anywhere;
+}
+body.kb-analytics-page .data-state{
+  margin-top:13px;border-color:rgba(120,199,166,.16);
+  border-radius:10px;background:rgba(120,199,166,.04);
+}
+body.kb-analytics-page .data-state-icon{
+  border-radius:8px;background:rgba(120,199,166,.09);color:#96d1b2;
+}
+body.kb-analytics-page .data-state strong{color:#e3ece7;font:650 9px Inter,sans-serif}
+body.kb-analytics-page .data-state span{color:#a0b0b1;font-size:8px}
+body.kb-analytics-page footer{
+  color:#93a2ab;font:600 8px/1.7 "JetBrains Mono",monospace;
+}
+body.kb-analytics-page :is(a,button,input,select):focus-visible{
+  outline:2px solid rgba(131,203,208,.85);outline-offset:3px;
+}
+
+/* Responsive analytics layouts */
+@media(max-width:1250px){
+  body.kb-analytics-page .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.kb-analytics-page .controls{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:1050px){
+  body.kb-analytics-page .main-grid,
+  body.kb-analytics-page .bottom-grid,
+  body.kb-analytics-page .section-grid{grid-template-columns:1fr}
+  body.kb-analytics-page .hero-grid{grid-template-columns:1fr}
+  body.kb-analytics-page .hero-actions{justify-content:flex-start}
+  body.kb-analytics-page .top-status{min-width:0}
+}
+@media(max-width:760px){
+  body.kb-analytics-page .page{width:calc(100% - 26px);padding:18px 0 32px}
+  body.kb-analytics-page .topbar{height:65px;padding:0 13px}
+  body.kb-analytics-page .brand{min-width:0}
+  body.kb-analytics-page .brand-text span{display:none}
+  body.kb-analytics-page .nav{display:none}
+  body.kb-analytics-page .top-status{margin-left:auto}
+  body.kb-analytics-page .hero{padding:19px;margin-bottom:12px}
+  body.kb-analytics-page .hero h1{font-size:30px}
+  body.kb-analytics-page .hero-actions{display:grid;grid-template-columns:1fr}
+  body.kb-analytics-page .hero-actions .btn{width:100%}
+  body.kb-analytics-page .controls{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px}
+  body.kb-analytics-page .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  body.kb-analytics-page .kpi{padding:12px}
+  body.kb-analytics-page .kpi-value{font-size:18px}
+  body.kb-analytics-page .panel{padding:14px}
+  body.kb-analytics-page .chart-wrap{height:290px}
+  body.kb-analytics-page .exec-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-analytics-page .matrix{min-width:430px}
+}
+@media(max-width:430px){
+  body.kb-analytics-page .page{width:calc(100% - 18px)}
+  body.kb-analytics-page .controls{grid-template-columns:1fr}
+  body.kb-analytics-page .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-analytics-page .kpi-value{font-size:16px}
+  body.kb-analytics-page .panel-head{align-items:flex-start;flex-direction:column}
+  body.kb-analytics-page .exec-grid{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  body.kb-analytics-page *,body.kb-analytics-page *:before,body.kb-analytics-page *:after{
+    animation-duration:.01ms!important;animation-iteration-count:1!important;
+    transition-duration:.01ms!important;scroll-behavior:auto!important;
+  }
+}
