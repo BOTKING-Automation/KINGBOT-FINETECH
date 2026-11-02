@@ -273,14 +273,14 @@ function evaluateSmc(c) {
     c.structure === (direction === "BUY" ? "bullish" : "bearish");
   const orderBlockOk = c.orderBlock && c.orderBlockDirection === direction;
   const fvgOk = c.fairValueGap && c.fairValueGapDirection === direction;
+  const directionalZoneOk = orderBlockOk || fvgOk;
   const aligned = alignedMtf(c, direction);
   const volatilityOk = c.volatility < 0.92;
   const checks = [
     ["liquidity sweep", true, 18],
     ["directional displacement", true, 18],
     ["BOS/CHOCH or structure shift", bosOk, 22],
-    ["directional order block", orderBlockOk, 14],
-    ["directional fair value gap", fvgOk, 12],
+    ["directional order-block or FVG zone", directionalZoneOk, 26],
     ["multi-timeframe alignment", aligned.ok, 12],
     ["volatility filter", volatilityOk, 4]
   ];
@@ -292,7 +292,7 @@ function evaluateSmc(c) {
     qualified,
     direction,
     reason: qualified
-      ? "SMC sequence validated: sweep → displacement → structure shift with directional OB/FVG and MTF confluence."
+      ? "SMC sequence validated: sweep → displacement → structure shift with at least one direction-confirmed OB/FVG zone and MTF confluence."
       : "SMC sequence is incomplete. Waiting for: " + missing.join(", ") + "."
   };
 }
