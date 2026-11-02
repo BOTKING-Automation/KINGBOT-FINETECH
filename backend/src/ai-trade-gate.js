@@ -65,14 +65,71 @@ function snapshotFingerprint({botId,market,analysis}={}){
   });
 }
 
-function directionFromMarket(market={},analysis={}){
-  const trend=num(market.trend);
-  const momentum=num(market.momentum);
-  const score=trend*.55+momentum*.45;
+function evidenceDirection(value){
+  const text=upper(value);
+  if(["BUY","BULLISH","LONG","UP"].includes(text))return "BUY";
+  if(["SELL","BEARISH","SHORT","DOWN"].includes(text))return "SELL";
+  if(["NONE","WAIT","HOLD","NEUTRAL","MIXED","RANGE",""].includes(text))return "HOLD";
+  if(typeof value==="boolean"||value===null||value===undefined)return "HOLD";
+  const n=Number(value);
+  return Number.isFinite(n)?(n>.12?"BUY":n<-.12?"SELL":"HOLD"):"HOLD";
+}
+
+function strategyDirection(botId,market={},analysis={}){
+  const trend=evidenceDirection(market.trend);
+  const momentum=evidenceDirection(market.momentum);
+  if(botId==="flipper"){
+    const sweep=evidenceDirection(market.rawLiquiditySweep??market.liquiditySweepDirection);
+    const choch=evidenceDirection(market.rawChoch??market.chochDirection);
+    const displacement=evidenceDirection(market.rawDisplacement??market.displacementDirection);
+    const trigger=sweep!=="HOLD"?sweep:choch;
+    return trigger!=="HOLD"&&trigger===displacement?trigger:"HOLD";
+  }
+  if(botId==="breakout"){
+    const breakout=evidenceDirection(market.breakoutDirection??market.bosDirection);
+    const retest=evidenceDirection(market.retestDirection);
+    return market.breakout&&market.retest&&breakout!=="HOLD"&&(retest==="HOLD"||retest===breakout)?breakout:"HOLD";
+  }
+  if(botId==="smc-pro"){
+    const sweep=evidenceDirection(market.rawLiquiditySweep??market.liquiditySweepDirection);
+    const displacement=evidenceDirection(market.rawDisplacement??market.displacementDirection);
+    return sweep!=="HOLD"&&sweep===displacement?sweep:"HOLD";
+  }
+  if(botId==="ladder-flip"){
+    const fast=num(market.emaFast),slow=num(market.emaSlow),price=num(market.price);
+    return fast>slow&&price>fast?"BUY":fast<slow&&price<fast?"SELL":"HOLD";
+  }
+  const score=num(market.trend)*.55+num(market.momentum)*.45;
   if(score>.10)return "BUY";
   if(score<-.10)return "SELL";
-  const s=candidateDirection(analysis.signal);
-  return s||"HOLD";
+  return candidateDirection(analysis.signal)||"HOLD";
+}
+
+function strategyTimeframeEvidence(market={},direction){
+  const multi=market?.multiTimeframe||{};
+  const roles=["regime","setup","execution"];
+  const frames=roles.map(role=>({role,frame:multi[role]||null}));
+  const missing=frames.filter(x=>!x.frame||x.frame.available===false||x.frame.ok===false||!(num(x.frame?.atr,0)>0));
+  const directions=frames.map(({role,frame})=>({
+    role,
+    timeframe:String(frame?.timeframe||""),
+    direction:evidenceDirection(frame?.trend??frame?.structure),
+    momentum:num(frame?.momentum),
+    adx:num(frame?.adx),
+    atr:num(frame?.atr)
+  }));
+  const aligned=missing.length===0&&directions.every(x=>x.direction===direction);
+  return {
+    ready:missing.length===0,
+    aligned,
+    missingRoles:missing.map(x=>x.role),
+    directions,
+    reason:missing.length
+      ? "MTF data is missing for "+missing.map(x=>x.role).join(", ")+"."
+      : aligned
+        ? "Regime, setup and execution timeframe evidence is directionally aligned."
+        : "Regime, setup and execution timeframe evidence is not fully aligned."
+  };
 }
 
 function evaluateNativeSignal({botId,market={},analysis={},risk={}}={}){
@@ -80,63 +137,105 @@ function evaluateNativeSignal({botId,market={},analysis={},risk={}}={}){
   const bot=getBotDefinitions()[botId];
   if(!profile||!bot)return null;
 
-  const direction=directionFromMarket(market,analysis);
+  const direction=strategyDirection(botId,market,analysis);
   const dir=direction==="BUY"?1:direction==="SELL"?-1:0;
-  const trend=num(market.trend), momentum=num(market.momentum), velocity=num(market.velocityPoints);
-  const spread=num(market.spread), atr=Math.max(num(market.atr),1e-12);
+  const trend=num(market.trend),momentum=num(market.momentum),velocity=num(market.velocityPoints);
+  const spread=num(market.spread),atr=Math.max(num(market.atr),1e-12);
   const spreadRatio=Math.abs(spread)/atr;
-  const rsi=num(market.rsi), adx=num(market.adx), fast=num(market.emaFast), slow=num(market.emaSlow);
+  const rsi=num(market.rsi),adx=num(market.adx),fast=num(market.emaFast),slow=num(market.emaSlow);
+  const mtf=strategyTimeframeEvidence(market,direction);
   const tests=[];
 
   if(botId==="strategic"){
-    tests.push(["trend",Math.abs(trend)>=.35,Math.abs(trend)*25]);
-    tests.push(["momentum",Math.sign(momentum)===dir&&Math.abs(momentum)>=.30,Math.abs(momentum)*20]);
-    tests.push(["structure",["bullish","bearish"].includes(String(market.structure||"").toLowerCase()),10]);
-    tests.push(["volatility",num(market.volatility)>0&&num(market.volatility)<.90,10]);
-  } else if(botId==="flipper"){
-    tests.push(["momentum",Math.sign(momentum)===dir&&Math.abs(momentum)>=.45,20]);
-    tests.push(["velocity",Math.sign(velocity)===dir&&Math.abs(velocity)>=.20,22]);
-    tests.push(["spread",spreadRatio<=.20,18]);
-    tests.push(["directional trend",Math.sign(trend)===dir||Math.abs(trend)<.20,15]);
-  } else if(botId==="breakout"){
-    tests.push(["breakout",Boolean(market.breakout)&&Math.sign(trend||momentum)===dir,28]);
-    tests.push(["retest",Boolean(market.retest),20]);
-    tests.push(["volatility",num(market.volatility)>=.35,16]);
-    tests.push(["momentum",Math.sign(momentum)===dir&&Math.abs(momentum)>=.30,16]);
-  } else if(botId==="smc-pro"){
-    tests.push(["structure",String(market.structure||"").toLowerCase()===(dir>0?"bullish":"bearish"),24]);
-    tests.push(["liquidity sweep",Boolean(market.liquiditySweep),18]);
-    tests.push(["displacement",Boolean(market.displacement),18]);
-    tests.push(["order block/FVG",Boolean(market.orderBlock||market.fairValueGap),15]);
-  } else if(botId==="ladder-flip"){
-    tests.push(["EMA trend",fast>0&&slow>0&&((fast>slow&&dir>0)||(fast<slow&&dir<0)),23]);
-    tests.push(["ADX",adx>=18,18]);
-    tests.push(["RSI",rsi>0&&((dir>0&&rsi>=52&&rsi<=72)||(dir<0&&rsi<=48&&rsi>=28)),17]);
-    tests.push(["velocity",Math.sign(velocity)===dir&&Math.abs(velocity)>=.10,16]);
-    tests.push(["spread",spreadRatio<=.25,12]);
+    tests.push(["trend strength",dir!==0&&Math.abs(trend)>=.35,15]);
+    tests.push(["directional momentum",dir!==0&&Math.sign(momentum)===dir&&Math.abs(momentum)>=.30,15]);
+    tests.push(["swing structure",String(market.structure||"").toLowerCase()===(dir>0?"bullish":"bearish"),15]);
+    tests.push(["EMA alignment",fast>0&&slow>0&&((fast>slow&&dir>0)||(fast<slow&&dir<0)),10]);
+    tests.push(["volatility regime",num(market.volatility)>0&&num(market.volatility)<.90,10]);
+    tests.push(["regime timeframe",mtf.directions[0]?.direction===direction,12]);
+    tests.push(["setup timeframe",mtf.directions[1]?.direction===direction,12]);
+    tests.push(["execution timeframe",mtf.directions[2]?.direction===direction,11]);
+  }else if(botId==="flipper"){
+    const sweep=evidenceDirection(market.rawLiquiditySweep??market.liquiditySweepDirection);
+    const choch=evidenceDirection(market.rawChoch??market.chochDirection);
+    const displacement=evidenceDirection(market.rawDisplacement??market.displacementDirection);
+    const trigger=(sweep!=="HOLD"?sweep:choch)===direction&&direction!=="HOLD"&&displacement===direction;
+    const rsiOk=rsi>0&&(dir>0?rsi>=30&&rsi<=62:rsi>=38&&rsi<=70);
+    tests.push(["sweep/CHOCH and displacement",trigger,24]);
+    tests.push(["RSI reversal transition",rsiOk,14]);
+    tests.push(["directional momentum",dir!==0&&Math.sign(momentum)===dir&&Math.abs(momentum)>=.30,14]);
+    tests.push(["micro velocity",dir!==0&&Math.sign(velocity)===dir&&Math.abs(velocity)>=.20,14]);
+    tests.push(["spread efficiency",spreadRatio<=.20,10]);
+    tests.push(["regime timeframe",mtf.directions[0]?.direction===direction,8]);
+    tests.push(["setup timeframe",mtf.directions[1]?.direction===direction,8]);
+    tests.push(["execution timeframe",mtf.directions[2]?.direction===direction,8]);
+  }else if(botId==="breakout"){
+    const breakoutDirection=evidenceDirection(market.breakoutDirection??market.bosDirection);
+    const retestDirection=evidenceDirection(market.retestDirection);
+    tests.push(["directional breakout",Boolean(market.breakout)&&breakoutDirection===direction&&dir!==0,20]);
+    tests.push(["separate retest acceptance",Boolean(market.retest)&&retestDirection===direction,20]);
+    tests.push(["volatility expansion",num(market.volatility)>=.20&&num(market.volatility)<=.90,14]);
+    tests.push(["post-breakout momentum",dir!==0&&Math.sign(momentum)===dir&&Math.abs(momentum)>=.30,14]);
+    tests.push(["relative activity",num(market.volume)>=.30,10]);
+    tests.push(["regime timeframe",mtf.directions[0]?.direction===direction,8]);
+    tests.push(["setup timeframe",mtf.directions[1]?.direction===direction,7]);
+    tests.push(["execution timeframe",mtf.directions[2]?.direction===direction,7]);
+  }else if(botId==="smc-pro"){
+    const sweep=evidenceDirection(market.rawLiquiditySweep??market.liquiditySweepDirection);
+    const displacement=evidenceDirection(market.rawDisplacement??market.displacementDirection);
+    const structure=evidenceDirection(market.rawBos??market.bosDirection??market.structure);
+    const obDirection=evidenceDirection(market.orderBlock?.direction??market.orderBlockDirection);
+    const fvgDirection=evidenceDirection(market.fairValueGapDirection??market.rawFvgDirection);
+    tests.push(["liquidity sweep",sweep===direction&&dir!==0,18]);
+    tests.push(["directional displacement",displacement===direction&&dir!==0,18]);
+    tests.push(["BOS/CHOCH/structure",structure===direction||evidenceDirection(market.rawChoch)===direction,16]);
+    tests.push(["directional order block",Boolean(market.orderBlock)&&obDirection===direction,14]);
+    tests.push(["directional fair-value gap",Boolean(market.fairValueGap)&&fvgDirection===direction,14]);
+    tests.push(["regime timeframe",mtf.directions[0]?.direction===direction,7]);
+    tests.push(["setup timeframe",mtf.directions[1]?.direction===direction,7]);
+    tests.push(["execution timeframe",mtf.directions[2]?.direction===direction,6]);
+  }else if(botId==="ladder-flip"){
+    tests.push(["EMA trend and price",fast>0&&slow>0&&num(market.price)>0&&((fast>slow&&num(market.price)>fast&&dir>0)||(fast<slow&&num(market.price)<fast&&dir<0)),20]);
+    tests.push(["ADX trend strength",adx>=20,18]);
+    tests.push(["RSI trend confirmation",rsi>0&&((dir>0&&rsi>=52&&rsi<=72)||(dir<0&&rsi<=48&&rsi>=28)),18]);
+    tests.push(["directional velocity",dir!==0&&Math.sign(velocity)===dir&&Math.abs(velocity)>=.10,12]);
+    tests.push(["spread efficiency",spreadRatio<=.25,10]);
+    tests.push(["regime timeframe",mtf.directions[0]?.direction===direction,8]);
+    tests.push(["setup timeframe",mtf.directions[1]?.direction===direction,7]);
+    tests.push(["execution timeframe",mtf.directions[2]?.direction===direction,7]);
   }
 
   const evidence=tests.filter(x=>x[1]).map(x=>x[0]);
-  const score=Math.round(tests.length?tests.reduce((s,x)=>s+(x[1]?x[2]:0),0)/tests.reduce((s,x)=>s+x[2],0)*100:0);
-  const baseline=Number(analysis?.score||0);
-  const strategyMatch=dir!==0&&score>=65&&baseline>=50&&!(risk?.blocks||[]).length;
-  const signal=dir===0||!strategyMatch?"HOLD":direction;
+  const totalWeight=tests.reduce((sum,x)=>sum+x[2],0);
+  const score=Math.round(totalWeight?tests.reduce((sum,x)=>sum+(x[1]?x[2]:0),0)/totalWeight*100:0);
+  const baseline=num(analysis?.score,0);
+  const baselineAligned=dir!==0&&Math.sign(baseline)===dir&&Math.abs(baseline)>=50;
+  const primaryTrigger=tests.some(x=>["sweep/CHOCH and displacement","directional breakout","liquidity sweep"].includes(x[0])&&x[1]);
+  const criticalMtf=mtf.ready&&mtf.aligned;
+  const riskBlocks=Array.isArray(risk?.blocks)?risk.blocks:[];
+  const strategyMatch=dir!==0&&score>=65&&baselineAligned&&criticalMtf&&primaryTrigger&&!riskBlocks.length&&risk?.allowed!==false;
+  const signal=!strategyMatch?"HOLD":direction;
   const flags=[];
-  if((risk?.blocks||[]).length)flags.push(...risk.blocks.map(String));
+  if(riskBlocks.length)flags.push(...riskBlocks.map(String));
+  if(risk?.allowed===false)flags.push("RISK_ENGINE_NOT_ALLOWED");
+  if(!mtf.ready)flags.push("MTF_DATA_INCOMPLETE");
+  else if(!mtf.aligned)flags.push("MTF_DIRECTIONAL_CONFLICT");
   if(spreadRatio>.25)flags.push("SPREAD_ELEVATED");
+  if(!baselineAligned)flags.push("DETERMINISTIC_DIRECTION_OR_SCORE_MISMATCH");
   if(score<65)flags.push("STRATEGY_ALIGNMENT_BELOW_CORTEX_THRESHOLD");
-  if(baseline<50)flags.push("DETERMINISTIC_BASELINE_BELOW_THRESHOLD");
 
   return {
     engine:botId,
     direction:signal,
     strategyMatch,
     trigger:evidence.length?evidence.join(" + "):"NO_VALID_SETUP",
-    riskFlags:flags.slice(0,8),
-    reason:(strategyMatch?"CORTEX strategy alignment confirmed from deterministic features. ":"CORTEX rejected the candidate because alignment is insufficient. ")+"Evidence: "+(evidence.join(", ")||"none")+".",
+    riskFlags:flags.slice(0,10),
+    reason:(strategyMatch?"CORTEX confirmed this specialist setup. ":"CORTEX held the candidate because strategy-specific or MTF gates were incomplete. ")+
+      "Evidence: "+(evidence.join(", ")||"none")+". "+mtf.reason,
     engineAccepted:true,
     score,
     evidence,
+    timeframeEvidence:mtf.directions,
     at:Date.now(),
     expiresAt:Date.now()+TTL_MS,
     model:MODEL,
