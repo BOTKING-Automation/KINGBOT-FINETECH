@@ -51,7 +51,7 @@ test("CORTEX MTF uses the native scanner across all four decision timeframes",as
     };
   };
   const result=await buildMultiTimeframeContext({symbol:"XAUUSD",baseTimeframe:"15m",twelveData:{enabled:false},scanRunner});
-  assert.deepEqual(calls.sort(),["1h","15m","4h","5m"]);
+  assert.deepEqual(calls.sort(),["15m","1h","4h","5m"]);
   assert.equal(result.policy,"NATIVE_FULL_MTF");
   assert.equal(result.timeframes.length,4);
   assert.equal(result.timeframes.every(x=>x.ok && x.technicalReady && x.verification.native),true);
