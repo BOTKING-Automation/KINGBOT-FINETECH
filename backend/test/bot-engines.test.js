@@ -88,7 +88,7 @@ test("Breakout does not qualify on the first range cross without a separate rete
 });
 
 test("SMC waits when OB and FVG directional confirmation is not complete",()=>{
-  const snapshot={...market("BUY"),fairValueGap:false,fairValueGapDirection:"NONE"};
+  const snapshot={...market("BUY"),orderBlock:null,orderBlockDirection:"NONE",fairValueGap:false,fairValueGapDirection:"NONE"};
   const result=evaluateBot("smc-pro",snapshot);
   assert.equal(result.signal,"NO_SIGNAL");
   assert.equal(result.qualified,false);
