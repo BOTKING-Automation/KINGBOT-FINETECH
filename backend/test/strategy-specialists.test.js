@@ -90,3 +90,10 @@ test("Ladder Flip waits when higher timeframe bias contradicts its entry",()=>{
   assert.equal(c.direction,"WAIT");
   assert.equal(c.strategyMatch,false);
 });
+test("SMC accepts one direction-confirmed zone without requiring both OB and FVG",()=>{
+  const market={...base,rawLiquiditySweep:"BULLISH",rawDisplacement:"BULLISH",rawBos:"BULLISH",
+    orderBlock:{direction:"BULLISH",high:2504,low:2501},fairValueGap:false,fairValueGapDirection:"NONE"};
+  const c=evaluateStrategySpecialists({market,multiTimeframe:mtf}).find(x=>x.botId==="smc-pro");
+  assert.equal(c.direction,"BUY");
+  assert.equal(c.strategyMatch,true);
+});
