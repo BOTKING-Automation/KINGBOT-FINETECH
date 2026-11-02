@@ -139,36 +139,30 @@ function aggregateCandles(candles,targetTimeframe){
 async function getMultiTimeframeContext(userId,symbol,botId,executionTimeframe){
   const profile=strategyTimeframeProfile(botId,executionTimeframe);
   const unique=[...new Set([profile.regime,profile.setup,profile.execution])];
-  const baseTimeframe=profile.execution;
-  const maxRatio=Math.max(...unique.map(tf=>Math.ceil(timeframeSeconds(tf)/timeframeSeconds(baseTimeframe))));
-  const baseLimit=Math.min(1000,Math.max(240,maxRatio*80));
-  let baseCandles;
-  try{
-    baseCandles=await getWorkerCandles(userId,symbol,baseTimeframe,baseLimit);
-  }catch(error){
-    const reason=String(error?.message||"BASE_TIMEFRAME_DATA_UNAVAILABLE").slice(0,160);
-    console.warn("[KINGBOT MTF] base history unavailable",JSON.stringify({botId,symbol,timeframe:baseTimeframe,reason}));
-    return {profile,ready:false,regime:{timeframe:profile.regime,available:false,reason},setup:{timeframe:profile.setup,available:false,reason},execution:{timeframe:profile.execution,available:false,reason}};
-  }
-
+  const historyLimit=120;
   const byTimeframe={};
-  for(const timeframe of unique){
+
+  // Fetch each decision timeframe directly from the broker. Aggregating a
+  // small execution-timeframe history into 4h bars can leave too little
+  // history for EMA50/ADX and silently block slower strategies.
+  await Promise.all(unique.map(async timeframe=>{
     try{
-      const candles=timeframe===baseTimeframe?baseCandles:aggregateCandles(baseCandles,timeframe);
+      const candles=await getWorkerCandles(userId,symbol,timeframe,historyLimit);
       const data=calculateMarketIndicators(candles);
-      byTimeframe[timeframe]={timeframe,available:true,...data,candleCount:candles.length};
+      byTimeframe[timeframe]={timeframe,available:true,...data,candleCount:candles.length,sourceTimeframe:timeframe};
     }catch(error){
       const reason=String(error?.message||"TIMEFRAME_DATA_UNAVAILABLE").slice(0,160);
-      console.warn("[KINGBOT MTF] timeframe unavailable",JSON.stringify({botId,symbol,timeframe,baseTimeframe,reason,candleCount:timeframe===baseTimeframe?baseCandles.length:aggregateCandles(baseCandles,timeframe).length}));
+      console.warn("[KINGBOT MTF] direct timeframe history unavailable",JSON.stringify({botId,symbol,timeframe,reason}));
       byTimeframe[timeframe]={timeframe,available:false,reason};
     }
-  }
+  }));
+
   const ready=unique.every(tf=>Boolean(byTimeframe[tf]?.available));
   return {
     profile,
     ready,
-    sourceTimeframe:baseTimeframe,
-    sourceCandles:baseCandles.length,
+    sourceTimeframe:profile.execution,
+    sourceCandles:Number(byTimeframe[profile.execution]?.candleCount||0),
     regime:byTimeframe[profile.regime]||null,
     setup:byTimeframe[profile.setup]||null,
     execution:byTimeframe[profile.execution]||null
