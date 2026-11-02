@@ -34,7 +34,7 @@ test("Breakout waits until breakout and retest are both confirmed",()=>{
 });
 
 test("SMC PRO qualifies from a coherent liquidity/structure sequence",()=>{
-  const market={...base,rawLiquiditySweep:"BULLISH",rawDisplacement:"BULLISH",rawBos:"BULLISH",orderBlock:true,fairValueGap:true};
+  const market={...base,rawLiquiditySweep:"BULLISH",rawDisplacement:"BULLISH",rawBos:"BULLISH",orderBlock:{direction:"BULLISH",high:2504,low:2501},fairValueGap:true,fairValueGapDirection:"BULLISH"};
   const c=evaluateStrategySpecialists({market,multiTimeframe:mtf}).find(x=>x.botId==="smc-pro");
   assert.equal(c.direction,"BUY");
   assert.equal(c.strategyMatch,true);
@@ -52,4 +52,41 @@ test("all specialists can independently wait when their conditions are absent",(
   const market={...base,trend:.1,momentum:.05,structure:"range",emaFast:2490,emaSlow:2500,adx:10,rsi:50,breakout:false,retest:false};
   const cards=evaluateStrategySpecialists({market,multiTimeframe:{...mtf,setupState:"WAIT",higherTimeframeBias:"MIXED"}});
   assert.ok(cards.every(x=>x.direction==="WAIT"));
+});
+
+test("Flipper waits when reversal trigger exists but momentum confirmation is missing",()=>{
+  const market={...base,rawLiquiditySweep:"BULLISH",rawDisplacement:"BULLISH",rawChoch:"BULLISH",momentum:-.1,rsi:40};
+  const c=evaluateStrategySpecialists({market,multiTimeframe:mtf}).find(x=>x.botId==="flipper");
+  assert.equal(c.direction,"WAIT");
+  assert.equal(c.strategyMatch,false);
+  assert.ok(c.missingConditions.some(x=>/momentum/i.test(x)));
+});
+
+test("Flipper waits when RSI transition confirmation is unavailable",()=>{
+  const market={...base,rawLiquiditySweep:"BULLISH",rawDisplacement:"BULLISH",rawChoch:"BULLISH",rsi:null};
+  const c=evaluateStrategySpecialists({market,multiTimeframe:mtf}).find(x=>x.botId==="flipper");
+  assert.equal(c.direction,"WAIT");
+  assert.ok(c.missingConditions.some(x=>/RSI/i.test(x)));
+});
+
+test("Breakout rejects a retest that returns in the opposite direction",()=>{
+  const market={...base,breakout:true,retest:true,breakoutDirection:"BULLISH",retestDirection:"BEARISH"};
+  const c=evaluateStrategySpecialists({market,multiTimeframe:mtf}).find(x=>x.botId==="breakout");
+  assert.equal(c.direction,"WAIT");
+  assert.equal(c.strategyMatch,false);
+});
+
+test("SMC rejects a bullish sweep followed by bearish displacement",()=>{
+  const market={...base,rawLiquiditySweep:"BULLISH",rawDisplacement:"BEARISH",rawBos:"BULLISH",
+    orderBlock:{direction:"BULLISH"},fairValueGap:true,fairValueGapDirection:"BULLISH"};
+  const c=evaluateStrategySpecialists({market,multiTimeframe:mtf}).find(x=>x.botId==="smc-pro");
+  assert.equal(c.direction,"WAIT");
+  assert.equal(c.strategyMatch,false);
+});
+
+test("Ladder Flip waits when higher timeframe bias contradicts its entry",()=>{
+  const conflicting={...mtf,higherTimeframeBias:"BEARISH",lowerTimeframeBias:"BULLISH"};
+  const c=evaluateStrategySpecialists({market:base,multiTimeframe:conflicting}).find(x=>x.botId==="ladder-flip");
+  assert.equal(c.direction,"WAIT");
+  assert.equal(c.strategyMatch,false);
 });
