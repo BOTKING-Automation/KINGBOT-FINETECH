@@ -199,11 +199,12 @@ function evaluateNativeSignal({botId,market={},analysis={},risk={}}={}){
     const structure=evidenceDirection(market.rawBos??market.bosDirection??market.structure);
     const obDirection=evidenceDirection(market.orderBlock?.direction??market.orderBlockDirection);
     const fvgDirection=evidenceDirection(market.fairValueGapDirection??market.rawFvgDirection);
+    const directionalZoneOk=(Boolean(market.orderBlock)&&obDirection===direction)||
+      (Boolean(market.fairValueGap)&&fvgDirection===direction);
     tests.push(["liquidity sweep",sweep===direction&&dir!==0,18]);
     tests.push(["directional displacement",displacement===direction&&dir!==0,18]);
     tests.push(["BOS/CHOCH/structure",structure===direction||evidenceDirection(market.rawChoch)===direction,16]);
-    tests.push(["directional order block",Boolean(market.orderBlock)&&obDirection===direction,14]);
-    tests.push(["directional fair-value gap",Boolean(market.fairValueGap)&&fvgDirection===direction,14]);
+    tests.push(["directional OB/FVG zone",directionalZoneOk,28]);
     tests.push(["regime timeframe",mtf.directions[0]?.direction===direction,7]);
     tests.push(["setup timeframe",mtf.directions[1]?.direction===direction,7]);
     tests.push(["execution timeframe",mtf.directions[2]?.direction===direction,6]);
