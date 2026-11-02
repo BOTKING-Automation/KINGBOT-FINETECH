@@ -39,6 +39,8 @@ MAX_BARS_PER_MARKET = max(MIN_BARS, min(1500, int(os.getenv("KINGBOT_ML_MAX_BARS
 MAX_RF_TREES = max(40, min(300, int(os.getenv("KINGBOT_ML_RF_TREES", "120"))))
 TORCH_EPOCHS = max(10, min(150, int(os.getenv("KINGBOT_ML_TORCH_EPOCHS", "40"))))
 TORCH_THREADS = max(1, min(8, int(os.getenv("KINGBOT_ML_TORCH_THREADS", "1"))))
+RF_ENSEMBLE_WEIGHT = 0.55
+TORCH_ENSEMBLE_WEIGHT = 0.45
 MAX_PREDICTIONS = max(2, min(64, int(os.getenv("KINGBOT_ML_MAX_PREDICTIONS", "16"))))
 MAX_CONCURRENT_TRAINING = max(1, min(2, int(os.getenv("KINGBOT_ML_MAX_CONCURRENT_TRAINING", "1"))))
 TRAINING_KEYS: set[str] = set()
@@ -70,14 +72,17 @@ FEATURE_NAMES = [
     "breakout",
     "retest",
     "velocity",
+    "relative_volume",
 ]
 
 STRATEGY_FOCUS = {
     "strategic": {"trend", "momentum", "volatility"},
-    "flipper": {"momentum", "velocity", "spread_atr"},
-    "breakout": {"breakout", "retest", "volatility", "momentum"},
+    # OHLC-only training has no historical bid/ask spread. Spread remains a
+    # deterministic risk input rather than a live-only ML feature.
+    "flipper": {"momentum", "velocity"},
+    "breakout": {"breakout", "retest", "volatility", "momentum", "relative_volume"},
     "smc-pro": {"structure_bull", "structure_bear", "liquidity_sweep", "order_block", "fair_value_gap", "displacement"},
-    "ladder-flip": {"ema_gap", "adx_norm", "rsi_norm", "velocity", "spread_atr"},
+    "ladder-flip": {"ema_gap", "adx_norm", "rsi_norm", "velocity"},
 }
 
 REGIME_ORDER = ["trend", "range", "breakout", "reversal", "volatile"]
@@ -197,6 +202,44 @@ def bool_feature(value: Any) -> float:
     return 1.0 if str(value).strip().lower() in {"1", "true", "yes", "bullish", "bearish", "confirmed"} else 0.0
 
 
+def detect_order_block_feature(bars: list[dict[str, float]], atr_value: float) -> float:
+    """Reconstruct an observable OHLC order-block proxy from closed candles."""
+    if len(bars) < 3 or not math.isfinite(atr_value) or atr_value <= 0:
+        return 0.0
+
+    last = bars[-1]
+    candle_range = max(last["high"] - last["low"], 1e-12)
+    body = abs(last["close"] - last["open"])
+    close_location = (last["close"] - last["low"]) / candle_range
+    direction = (
+        1 if last["close"] > last["open"] and close_location >= 0.72
+        else -1 if last["close"] < last["open"] and close_location <= 0.28
+        else 0
+    )
+    if direction == 0 or body < atr_value * 1.15 or body / candle_range < 0.65:
+        return 0.0
+
+    start = max(0, len(bars) - 12)
+    for index in range(len(bars) - 2, start - 1, -1):
+        candidate = bars[index]
+        impulse = bars[index + 1]
+        if (
+            direction > 0
+            and candidate["close"] < candidate["open"]
+            and impulse["close"] > candidate["high"]
+            and impulse["close"] - candidate["high"] >= atr_value * 0.15
+        ):
+            return 1.0
+        if (
+            direction < 0
+            and candidate["close"] > candidate["open"]
+            and impulse["close"] < candidate["low"]
+            and candidate["low"] - impulse["close"] >= atr_value * 0.15
+        ):
+            return 1.0
+    return 0.0
+
+
 def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list[float] | None:
     window = bars[: index + 1]
     if len(window) < 60:
@@ -205,6 +248,7 @@ def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list
     highs = [b["high"] for b in window]
     lows = [b["low"] for b in window]
     opens = [b["open"] for b in window]
+    volumes = [b["volume"] for b in window]
 
     price = closes[-1]
     ema20 = ema(closes, 20)
@@ -217,7 +261,6 @@ def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list
     if not all(math.isfinite(x) and x > 0 for x in [price, ema20 or 0, ema50 or 0, atr14 or 0]):
         return None
 
-    previous_close = closes[-2]
     roc5 = (price - closes[-6]) / max(abs(closes[-6]), 1e-12) if len(closes) >= 6 else 0.0
     momentum = clamp(
         ((rsi14 or 50.0) - 50.0) / 20.0 * 0.65
@@ -235,7 +278,13 @@ def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list
     displacement = 1.0 if abs(price - opens[-1]) >= 1.25 * atr14 else 0.0
     breakout = 1.0 if price > recent_high or price < recent_low else 0.0
     retest = 1.0 if (price > recent_high and lows[-1] <= recent_high) or (price < recent_low and highs[-1] >= recent_low) else 0.0
-    velocity = clamp((price - previous_close) / max(atr14, 1e-12), -2.0, 2.0) / 2.0
+    velocity_move = (price - closes[-4]) / max(atr14, 1e-12) if len(closes) >= 4 else 0.0
+    velocity = clamp(velocity_move, -2.0, 2.0) / 2.0
+    order_block = detect_order_block_feature(window, atr14)
+    # No historical bid/ask spread is included in OHLC datasets.
+    spread_atr = 0.0
+    mean_volume = sum(volumes[-21:-1]) / max(1, len(volumes[-21:-1]))
+    relative_volume = clamp((volumes[-1] / mean_volume) / 2.0, 0.0, 1.0) if mean_volume > 0 else 0.0
     ema_gap = clamp((ema20 - ema50) / max(price, 1e-12), -0.05, 0.05) / 0.01
 
     return [
@@ -246,16 +295,17 @@ def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list
         clamp(((rsi14 or 50.0) - 50.0) / 50.0, -1.0, 1.0),
         clamp((adx14 or 0.0) / 50.0, 0.0, 2.0),
         clamp(ema_gap, -5.0, 5.0) / 5.0,
-        0.0,
+        spread_atr,
         structure_bull,
         structure_bear,
         liquidity,
-        0.0,
+        order_block,
         fvg,
         displacement,
         breakout,
         retest,
         velocity,
+        relative_volume,
     ]
 
 
@@ -453,6 +503,43 @@ def decide_action(probabilities: np.ndarray, regime: str, direction: int, confid
     return "HOLD", "probability spread is not strong enough"
 
 
+def temporal_split_bounds(sample_count: int, train_fraction: float = 0.78) -> tuple[int, int]:
+    """Split chronologically and embargo overlapping forward labels."""
+    split = max(40, min(sample_count - 20, int(sample_count * train_fraction)))
+    train_end = split - FORWARD_HORIZON
+    return train_end, split
+
+
+def ensemble_probabilities(rf: Any, torch_model: nn.Module, scaled_features: np.ndarray) -> np.ndarray:
+    """Return the RF/PyTorch probability blend used during live inference."""
+    rf_raw = rf.predict_proba(scaled_features)
+    rf_aligned = np.zeros((len(scaled_features), len(LABELS)), dtype=np.float32)
+    for column, label in enumerate(rf.classes_):
+        label_index = LABEL_TO_INDEX.get(int(label))
+        if label_index is not None:
+            rf_aligned[:, label_index] = rf_raw[:, column]
+
+    torch_model.eval()
+    with torch.no_grad():
+        torch_raw = torch.softmax(
+            torch_model(torch.from_numpy(np.asarray(scaled_features, dtype=np.float32))),
+            dim=1,
+        ).cpu().numpy().astype(np.float32)
+
+    blended = rf_aligned * RF_ENSEMBLE_WEIGHT + torch_raw * TORCH_ENSEMBLE_WEIGHT
+    return blended / np.maximum(blended.sum(axis=1, keepdims=True), 1e-12)
+
+
+def ensemble_class_metrics(y_true: np.ndarray, probabilities: np.ndarray) -> dict[str, float]:
+    predicted_indices = np.argmax(probabilities, axis=1)
+    predicted = np.asarray([INDEX_TO_LABEL[int(value)] for value in predicted_indices], dtype=np.int64)
+    return {
+        "accuracy": float(accuracy_score(y_true, predicted)),
+        "balancedAccuracy": float(balanced_accuracy_score(y_true, predicted)),
+        "macroF1": float(f1_score(y_true, predicted, average="macro", zero_division=0)),
+    }
+
+
 def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) -> dict[str, Any]:
     key = f"{strategy}:{timeframe.lower()}"
     if not TRAINING_SEMAPHORE.acquire(blocking=False):
@@ -500,12 +587,12 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 })
                 continue
 
-            split = max(40, min(len(X_part) - 20, int(len(X_part) * 0.78)))
-            X_train_part, X_test_part = X_part[:split], X_part[split:]
-            y_train_part, y_test_part = y_part[:split], y_part[split:]
-            w_train_part = weights_part[:split]
+            train_end, test_start = temporal_split_bounds(len(X_part))
+            X_train_part, X_test_part = X_part[:train_end], X_part[test_start:]
+            y_train_part, y_test_part = y_part[:train_end], y_part[test_start:]
+            w_train_part = weights_part[:train_end]
 
-            if len(X_test_part) < 20 or len(set(int(v) for v in y_train_part)) < 3:
+            if train_end < 40 or len(X_test_part) < 20 or len(set(int(v) for v in y_train_part)) < 3:
                 validation_markets.append({
                     "symbol": symbol,
                     "accepted": False,
@@ -523,7 +610,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "accepted": True,
                 "samples": int(len(X_part)),
                 "trainSamples": int(len(X_train_part)),
-                "testSamples": int(len(X_test_part))
+                "testSamples": int(len(X_test_part)),
+                "embargoBars": int(test_start - train_end)
             })
 
         if not train_x_parts or not test_x_parts:
@@ -587,11 +675,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             X_train, y_train, X_test, y_test, scaler, weights_train
         )
 
-        ensemble_metrics = {
-            "accuracy": float((rf_metrics["accuracy"] + torch_metrics["accuracy"]) / 2.0),
-            "balancedAccuracy": float((rf_metrics["balancedAccuracy"] + torch_metrics["balancedAccuracy"]) / 2.0),
-            "macroF1": float((rf_metrics["macroF1"] + torch_metrics["macroF1"]) / 2.0),
-        }
+        ensemble_test_probabilities = ensemble_probabilities(rf, torch_model, X_test_scaled)
+        ensemble_metrics = ensemble_class_metrics(y_test, ensemble_test_probabilities)
 
         quality_gate = (
             ensemble_metrics["balancedAccuracy"] >= 0.36
@@ -640,10 +725,11 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "ensemble_macro_f1": ensemble_metrics["macroF1"],
                 "quality_gate": quality_gate,
                 "bar_count": total_bar_count,
-                "feature_version": "ai-strategies-v4-walk-forward",
+                "feature_version": "ai-strategies-v5-parity-embargo-ensemble",
                 "validation": {
-                    "type": "per-market-temporal-holdout",
+                    "type": "per-market-temporal-holdout-with-label-embargo",
                     "trainFraction": 0.78,
+                    "embargoBars": FORWARD_HORIZON,
                     "markets": validation_markets,
                 },
                 "selection_score": candidate_score,
@@ -743,15 +829,20 @@ def current_market_features(market: dict[str, Any], strategy: str) -> np.ndarray
     ema_slow = finite(market.get("emaSlow") or market.get("ema50"))
     rsi_value = finite(market.get("rsi") or market.get("rsi14"), 50.0)
     adx_value = finite(market.get("adx") or market.get("adx14"))
-    spread_atr = finite(market.get("spreadAtr") or (finite(market.get("spread")) / atr_value if atr_value > 0 else 0.0))
+    # Historical OHLC training has no bid/ask spread; do not inject a
+    # live-only spread value into the model's feature distribution.
+    spread_atr = 0.0
     trend = clamp(finite(market.get("trend")), -1.0, 1.0)
     momentum = clamp(finite(market.get("momentum")), -1.0, 1.0)
     volatility = clamp(finite(market.get("volatility")), 0.0, 1.0)
     ema_gap = clamp((ema_fast - ema_slow) / max(price, 1e-12) if price > 0 else 0.0, -0.05, 0.05) / 0.01
 
     structure = str(market.get("structure") or "").lower()
-    direction = 1.0 if ema_fast > ema_slow else -1.0 if ema_fast < ema_slow else 0.0
-    velocity = clamp(finite(market.get("velocityPoints")) / max(atr_value, 1e-12), -2.0, 2.0) / 2.0
+    order_block_raw = market.get("orderBlock")
+    order_block_present = bool(order_block_raw) if isinstance(order_block_raw, dict) else bool_feature(order_block_raw)
+    velocity_atr = finite(market.get("velocityAtr"), finite(market.get("velocityPoints"), 0.0))
+    velocity = clamp(velocity_atr, -2.0, 2.0) / 2.0
+    relative_volume = clamp(finite(market.get("volume"), 0.0), 0.0, 1.0)
 
     values = [
         trend,
@@ -765,12 +856,13 @@ def current_market_features(market: dict[str, Any], strategy: str) -> np.ndarray
         1.0 if structure == "bullish" else 0.0,
         1.0 if structure == "bearish" else 0.0,
         bool_feature(market.get("liquiditySweep")),
-        bool_feature(market.get("orderBlock")),
+        1.0 if order_block_present else 0.0,
         bool_feature(market.get("fairValueGap") or market.get("fvg")),
         bool_feature(market.get("displacement")),
         bool_feature(market.get("breakout")),
         bool_feature(market.get("retest")),
-        velocity if abs(velocity) > 0 else direction * momentum * 0.25,
+        velocity,
+        relative_volume,
     ]
     values = apply_strategy_focus(values, strategy)
     array = np.asarray([values], dtype=np.float32)
@@ -855,17 +947,7 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
         X = current_market_features(market, strategy)
         scaled = item["scaler"].transform(X).astype(np.float32)
 
-        rf_prob = item["rf"].predict_proba(scaled)[0]
-        rf_map = {int(label): float(prob) for label, prob in zip(item["rf"].classes_, rf_prob)}
-        rf_probs = np.asarray([rf_map.get(label, 0.0) for label in LABELS], dtype=np.float32)
-
-        item["torch"].eval()
-        with torch.no_grad():
-            torch_prob_raw = torch.softmax(item["torch"](torch.from_numpy(scaled)), dim=1).numpy()[0]
-        torch_probs = np.asarray(torch_prob_raw, dtype=np.float32)
-
-        probs = (rf_probs * 0.55 + torch_probs * 0.45)
-        probs = probs / max(float(probs.sum()), 1e-12)
+        probs = ensemble_probabilities(item["rf"], item["torch"], scaled)[0]
         best_index = int(np.argmax(probs))
         direction = int(INDEX_TO_LABEL[best_index])
         confidence = float(probs[best_index])
