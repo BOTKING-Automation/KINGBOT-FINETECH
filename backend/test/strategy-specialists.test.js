@@ -29,7 +29,7 @@ test("Flipper uses reversal evidence and does not require a breakout",()=>{
 test("Breakout waits until breakout and retest are both confirmed",()=>{
   const pre=evaluateStrategySpecialists({market:{...base,breakout:true,retest:false},multiTimeframe:mtf});
   assert.equal(pre.find(x=>x.botId==="breakout").direction,"WAIT");
-  const confirmed=evaluateStrategySpecialists({market:{...base,breakout:true,retest:true},multiTimeframe:mtf});
+  const confirmed=evaluateStrategySpecialists({market:{...base,breakout:true,retest:true,breakoutDirection:"BULLISH",retestDirection:"BULLISH"},multiTimeframe:mtf});
   assert.equal(confirmed.find(x=>x.botId==="breakout").direction,"BUY");
 });
 
