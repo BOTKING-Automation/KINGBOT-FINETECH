@@ -9,6 +9,7 @@ import { technicalAnalysisBookContext } from "./technical-analysis-book.js";
 import { WebSocketServer, WebSocket } from "ws";
 import { getBotDefinitions } from "./bot-engines.js";
 import { trainMlStrategyModel, mlSignalServiceStatus, probeMlSignalService } from "./ml-signal-client.js";
+import { calculateMarketIndicators } from "./worker-market-perception.js";
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
@@ -296,11 +297,23 @@ export function deriveTechnicalFromBars(bars) {
   const roc5=closes.length>=6?(last.close-closes.at(-6))/Math.max(Math.abs(closes.at(-6)),1e-12):0;
   const momentum=Math.max(-1,Math.min(1,(rsi==null?0:(rsi-50)/20)*0.65+Math.max(-1,Math.min(1,roc5/0.003))*0.35));
   const volatility=atr!=null&&atr60!=null&&atr60>0?Math.max(0,Math.min(1,(atr/atr60)/1.8)):0;
+  const enhanced=calculateMarketIndicators(clean);
 
   return {
-    close:last.close,price:last.close,ema20,ema50,rsi14:rsi,macd:macdLine,macdSignal,
-    atr14:atr,support:lastSwingLow,resistance:lastSwingHigh,trend,structure,momentum,volatility,roc5,
-    bos,choch,liquiditySweep,fvg,displacement,orderBlock,
+    close:last.close,price:last.close,ema20:enhanced.emaFast??ema20,ema50:enhanced.emaSlow??ema50,
+    emaFast:enhanced.emaFast??ema20,emaSlow:enhanced.emaSlow??ema50,
+    rsi14:enhanced.rsi??rsi,adx14:enhanced.adx,adx:enhanced.adx,
+    macd:macdLine,macdSignal,atr14:enhanced.atr??atr,atr:enhanced.atr??atr,
+    support:lastSwingLow,resistance:lastSwingHigh,trend,trendScore:enhanced.trend,
+    structure,momentum:enhanced.momentum,volatility:enhanced.volatility,roc5,
+    bos,choch,liquiditySweep:enhanced.liquiditySweepDirection,
+    liquiditySweepDirection:enhanced.liquiditySweepDirection,
+    fvg:enhanced.fairValueGap,fairValueGapDirection:enhanced.fairValueGapDirection,
+    displacement:enhanced.displacementDirection,displacementDirection:enhanced.displacementDirection,
+    orderBlock:enhanced.orderBlock,
+    breakout:enhanced.breakout,breakoutDirection:enhanced.breakoutDirection,
+    retest:enhanced.retest,retestDirection:enhanced.retestDirection,
+    volume:enhanced.volume,velocityScore:enhanced.velocityScore,candleCount:enhanced.candleCount,
     swingPoints:{highs:swingHighs.slice(-8),lows:swingLows.slice(-8)},
     marketStructure:{lastSwingHigh,lastSwingLow,prevSwingHigh,prevSwingLow},
     source:"KINGBOT raw OHLC perception engine",
