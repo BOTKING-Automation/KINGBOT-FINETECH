@@ -1059,3 +1059,272 @@ footer {
         rgba(2,6,17,.14) 100%) !important;
   }
 }
+
+
+/* =========================================================
+   KINGBOT LUXE LANDING EXPERIENCE — ANIMATION LAYER
+   Cinematic gold / electric-blue visual treatment.
+   Visual-only: preserves existing page structure and systems.
+========================================================= */
+:root {
+  --kb-luxe-gold: #f4c76c;
+  --kb-luxe-gold-bright: #ffe7a8;
+  --kb-luxe-blue: #56e8ff;
+  --kb-luxe-deep: #030817;
+}
+
+.hero {
+  border-color: rgba(244,199,108,.38) !important;
+  box-shadow:
+    0 38px 115px rgba(0,0,0,.62),
+    0 0 60px rgba(86,232,255,.09),
+    0 0 34px rgba(244,199,108,.08),
+    inset 0 1px 0 rgba(255,255,255,.11) !important;
+}
+
+.hero::before {
+  opacity: .88 !important;
+  background-size: cover !important;
+  background-position: 50% 50% !important;
+  animation: kbCityDrift 38s ease-in-out infinite alternate !important;
+  will-change: transform, background-position;
+}
+
+.hero::after {
+  background:
+    linear-gradient(90deg,
+      rgba(2,6,17,.91) 0%,
+      rgba(3,8,22,.78) 27%,
+      rgba(3,8,22,.42) 56%,
+      rgba(3,8,22,.13) 100%),
+    linear-gradient(180deg,
+      rgba(2,6,17,.02) 0%,
+      rgba(2,6,17,.08) 58%,
+      rgba(2,6,17,.58) 100%) !important;
+}
+
+@keyframes kbCityDrift {
+  0% { transform: scale(1.025) translate3d(-.3%,0,0); background-position: 49% 48%; }
+  100% { transform: scale(1.09) translate3d(.4%,-.2%,0); background-position: 53% 53%; }
+}
+
+.hero > div:first-child {
+  animation: kbHeroCopyIn .95s cubic-bezier(.2,.75,.25,1) both;
+}
+
+.hero-art {
+  animation: kbHeroArtIn 1.15s cubic-bezier(.2,.75,.25,1) .08s both;
+}
+
+@keyframes kbHeroCopyIn {
+  from { opacity: 0; transform: translate3d(0,22px,0); }
+  to { opacity: 1; transform: translate3d(0,0,0); }
+}
+
+@keyframes kbHeroArtIn {
+  from { opacity: 0; transform: translate3d(0,16px,0) scale(.975); }
+  to { opacity: 1; transform: translate3d(0,0,0) scale(1); }
+}
+
+.hero-image-frame {
+  border-color: rgba(244,199,108,.58) !important;
+  background: linear-gradient(
+    125deg,
+    rgba(244,199,108,.92),
+    rgba(86,232,255,.78) 34%,
+    rgba(125,105,255,.62) 68%,
+    rgba(244,199,108,.92)
+  ) !important;
+  background-size: 260% 260% !important;
+  animation: kbFrameLustre 9s ease-in-out infinite !important;
+  box-shadow:
+    0 30px 88px rgba(0,0,0,.62),
+    0 0 42px rgba(86,232,255,.13),
+    0 0 33px rgba(244,199,108,.10) !important;
+}
+
+.hero-image-frame::before {
+  opacity: .70 !important;
+  background: conic-gradient(
+    from 0deg,
+    rgba(86,232,255,.34),
+    rgba(100,140,255,.26),
+    rgba(157,112,255,.32),
+    rgba(244,199,108,.38),
+    rgba(86,232,255,.34)
+  ) !important;
+  animation: kbFrameHalo 14s linear infinite !important;
+}
+
+.hero-image-frame::after {
+  border-color: rgba(255,230,168,.38) !important;
+  box-shadow:
+    0 0 25px rgba(86,232,255,.18),
+    0 0 38px rgba(244,199,108,.12),
+    inset 0 0 18px rgba(255,255,255,.035) !important;
+  animation: kbFramePulse 4.6s ease-in-out infinite !important;
+}
+
+@keyframes kbFrameLustre {
+  0%,100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes kbFrameHalo {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes kbFramePulse {
+  0%,100% { opacity: .48; transform: scale(.995); }
+  50% { opacity: .94; transform: scale(1.012); }
+}
+
+.hero-art img {
+  animation: kbKingbotFloat 7.5s ease-in-out infinite !important;
+  filter:
+    drop-shadow(0 22px 38px rgba(0,0,0,.56))
+    drop-shadow(0 0 18px rgba(86,232,255,.13)) !important;
+}
+
+@keyframes kbKingbotFloat {
+  0%,100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-9px) scale(1.006); }
+}
+
+.quote {
+  border-color: rgba(244,199,108,.34) !important;
+  animation: kbFloatingPanel 6.8s ease-in-out infinite;
+}
+
+.hero-data {
+  border-color: rgba(86,232,255,.32) !important;
+  animation: kbFloatingPanel 7.8s ease-in-out -2.4s infinite;
+}
+
+@keyframes kbFloatingPanel {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.hero-led-line {
+  text-shadow:
+    0 0 8px rgba(244,199,108,.48),
+    0 0 22px rgba(86,232,255,.19) !important;
+}
+
+.hero-cta .btn-gold {
+  background: linear-gradient(120deg, #ffe5a2 0%, #f4c76c 48%, #d99d36 100%) !important;
+  border-color: rgba(255,232,176,.76) !important;
+  box-shadow:
+    0 10px 30px rgba(219,164,64,.24),
+    0 0 24px rgba(244,199,108,.13),
+    inset 0 1px 0 rgba(255,255,255,.45) !important;
+}
+
+.hero-cta .btn-ghost {
+  border-color: rgba(86,232,255,.42) !important;
+  color: #e8faff !important;
+}
+
+.bot-card {
+  border-color: rgba(86,232,255,.20) !important;
+  background:
+    linear-gradient(155deg, rgba(14,29,55,.97), rgba(3,9,23,.99)) !important;
+}
+
+.bot-card:hover {
+  border-color: rgba(244,199,108,.55) !important;
+  box-shadow:
+    0 26px 60px rgba(0,0,0,.42),
+    0 0 28px rgba(86,232,255,.10),
+    0 0 22px rgba(244,199,108,.08) !important;
+}
+
+.bot-card .bot-info h3 {
+  color: var(--kb-luxe-gold-bright) !important;
+}
+
+.plan {
+  border-color: rgba(244,199,108,.20) !important;
+}
+
+.plan.pop {
+  border-color: rgba(86,232,255,.48) !important;
+  box-shadow:
+    0 22px 60px rgba(0,0,0,.34),
+    0 0 30px rgba(86,232,255,.09),
+    inset 0 1px 0 rgba(255,255,255,.05) !important;
+}
+
+.plan .btn {
+  border-color: rgba(244,199,108,.40);
+}
+
+.final-cta {
+  border-color: rgba(244,199,108,.36) !important;
+  box-shadow:
+    0 28px 80px rgba(0,0,0,.42),
+    0 0 35px rgba(86,232,255,.08),
+    inset 0 1px 0 rgba(255,255,255,.06) !important;
+}
+
+/* Scroll-triggered reveals are activated by landing-motion.js. */
+body.kb-motion-ready .kb-reveal {
+  opacity: 0;
+  transform: translate3d(0,22px,0);
+  transition:
+    opacity .72s ease,
+    transform .72s cubic-bezier(.2,.7,.2,1);
+  transition-delay: var(--kb-reveal-delay, 0ms);
+}
+
+body.kb-motion-ready .kb-reveal.kb-in-view {
+  opacity: 1;
+  transform: translate3d(0,0,0);
+}
+
+@media (max-width: 900px) {
+  .hero::before {
+    opacity: .84 !important;
+    background-position: 54% 50% !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .hero::before {
+    opacity: .80 !important;
+    background-position: 57% 43% !important;
+  }
+  .hero::after {
+    background:
+      linear-gradient(180deg,
+        rgba(2,6,17,.14) 0%,
+        rgba(2,6,17,.36) 46%,
+        rgba(2,6,17,.90) 100%),
+      linear-gradient(90deg,
+        rgba(2,6,17,.42) 0%,
+        rgba(2,6,17,.16) 100%) !important;
+  }
+  .quote,
+  .hero-data { animation-duration: 9s; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero::before,
+  .hero > div:first-child,
+  .hero-art,
+  .hero-image-frame,
+  .hero-image-frame::before,
+  .hero-image-frame::after,
+  .hero-art img,
+  .quote,
+  .hero-data {
+    animation: none !important;
+  }
+  body.kb-motion-ready .kb-reveal,
+  body.kb-motion-ready .kb-reveal.kb-in-view {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
