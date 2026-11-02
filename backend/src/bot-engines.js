@@ -79,7 +79,7 @@ function directionOf(value) {
 }
 
 function frameContext(frame) {
-  if (!frame || frame.available === false) return { available: false, direction: "WAIT", timeframe: frame?.timeframe || null };
+  if (!frame || frame.available === false || frame.ok === false) return { available: false, direction: "WAIT", timeframe: frame?.timeframe || null };
   return {
     available: true,
     direction: directionOf(frame.trend ?? frame.structure),
@@ -92,11 +92,14 @@ function frameContext(frame) {
   };
 }
 
-function baseContext(snapshot = {}) {
+function baseContext(snapshot = {}, botId = null) {
   const mtf = snapshot.multiTimeframe || {};
-  const regime = frameContext(mtf.regime);
-  const setup = frameContext(mtf.setup);
-  const execution = frameContext(mtf.execution);
+  const profile = snapshot.timeframeProfile || BOT_DEFINITIONS[botId]?.timeframeProfile || {};
+  const frames = Array.isArray(mtf.timeframes) ? mtf.timeframes : [];
+  const byTimeframe = timeframe => frames.find(frame => String(frame?.timeframe || "").toLowerCase() === String(timeframe || "").toLowerCase());
+  const regime = frameContext(mtf.regime || byTimeframe(profile.regime));
+  const setup = frameContext(mtf.setup || byTimeframe(profile.setup));
+  const execution = frameContext(mtf.execution || byTimeframe(profile.execution));
   const frames = [regime, setup, execution];
   const mtfReady = frames.every(frame => frame.available && frame.atr > 0);
   const mtfConflict = mtfReady && new Set(frames.map(frame => frame.direction).filter(x => x !== "WAIT")).size > 1;
@@ -178,7 +181,7 @@ function evaluateStrategic(c) {
   if (!volatilityOk) missing.push("volatility regime");
   if (!aligned.ok) missing.push(aligned.reason);
   return {
-    score: qualified ? score : Math.min(score, 74),
+    score: (qualified ? score : Math.min(score, 74)) * (direction === "BUY" ? 1 : -1),
     qualified,
     direction,
     reason: qualified
@@ -218,7 +221,7 @@ function evaluateFlipper(c) {
   const qualified = checks.every(item => item[1]);
   const missing = checks.filter(item => !item[1]).map(item => item[0]);
   return {
-    score: qualified ? score : Math.min(score, 74),
+    score: (qualified ? score : Math.min(score, 74)) * (direction === "BUY" ? 1 : -1),
     qualified,
     direction,
     reason: qualified
@@ -250,7 +253,7 @@ function evaluateBreakout(c) {
   const qualified = checks.every(item => item[1]);
   const missing = checks.filter(item => !item[1]).map(item => item[0]);
   return {
-    score: qualified ? score : Math.min(score, 71),
+    score: (qualified ? score : Math.min(score, 71)) * (direction === "BUY" ? 1 : -1),
     qualified,
     direction,
     reason: qualified
@@ -268,8 +271,8 @@ function evaluateSmc(c) {
   }
   const bosOk = c.bosDirection === direction || c.chochDirection === direction ||
     c.structure === (direction === "BUY" ? "bullish" : "bearish");
-  const orderBlockOk = c.orderBlock && (c.orderBlockDirection === "WAIT" || c.orderBlockDirection === direction);
-  const fvgOk = c.fairValueGap && (c.fairValueGapDirection === "WAIT" || c.fairValueGapDirection === direction);
+  const orderBlockOk = c.orderBlock && c.orderBlockDirection === direction;
+  const fvgOk = c.fairValueGap && c.fairValueGapDirection === direction;
   const aligned = alignedMtf(c, direction);
   const volatilityOk = c.volatility < 0.92;
   const checks = [
@@ -285,7 +288,7 @@ function evaluateSmc(c) {
   const qualified = checks.every(item => item[1]);
   const missing = checks.filter(item => !item[1]).map(item => item[0]);
   return {
-    score: qualified ? score : Math.min(score, 73),
+    score: (qualified ? score : Math.min(score, 73)) * (direction === "BUY" ? 1 : -1),
     qualified,
     direction,
     reason: qualified
@@ -330,7 +333,7 @@ function evaluateLadder(c) {
   const qualified = checks.every(item => item[1]);
   const missing = checks.filter(item => !item[1]).map(item => item[0]);
   return {
-    score: qualified ? score : Math.min(score, 77),
+    score: (qualified ? score : Math.min(score, 77)) * (direction === "BUY" ? 1 : -1),
     qualified,
     direction,
     emergency: c.volatility > 0.95,
@@ -399,19 +402,33 @@ export function getTradePlan(botId, snapshot, side) {
 export function evaluateBot(botId, snapshot) {
   const bot = BOT_DEFINITIONS[botId];
   if (!bot) throw new Error("Unknown bot.");
-  const context = baseContext(snapshot);
+  const context = baseContext(snapshot, botId);
   const validation = validateSnapshot(context);
   if (!validation.ok) return { ok: false, bot: botId, status: "DATA_BLOCKED", reason: validation.reason };
   const evaluation = evaluators[botId](context);
+  const score = Math.round(Number(evaluation.score || 0) * 100) / 100;
+  const thresholdMet = Math.abs(score) >= bot.signalThreshold;
+  const strategyQualified = evaluation.qualified !== false;
+  const signal = thresholdMet && strategyQualified ? signalFromScore(score) : "NO_SIGNAL";
   return {
     ok: true,
     bot: botId,
     name: bot.name,
-    status: "AI_STRATEGY_CANDIDATE",
-    signal: Math.abs(evaluation.score) >= bot.signalThreshold ? signalFromScore(evaluation.score) : "NO_SIGNAL",
+    status: signal === "NO_SIGNAL" ? "WAITING_FOR_CONFLUENCE" : "AI_STRATEGY_CANDIDATE",
+    signal,
+    direction: evaluation.direction || (signal === "LONG_CANDIDATE" ? "BUY" : signal === "SHORT_CANDIDATE" ? "SELL" : "WAIT"),
     threshold: bot.signalThreshold,
-    score: Math.round(evaluation.score * 100) / 100,
+    score,
+    fit: Math.abs(score),
+    qualified: strategyQualified,
     reason: evaluation.reason,
+    multiTimeframe: {
+      ready: context.mtf.ready,
+      conflict: context.mtf.conflict,
+      regime: context.mtf.regime.direction,
+      setup: context.mtf.setup.direction,
+      execution: context.mtf.execution.direction
+    },
     executionAuthorized: false,
     executionAuthority: "AI_STRATEGIES + RISK_ENGINE",
     risk: bot.risk,
