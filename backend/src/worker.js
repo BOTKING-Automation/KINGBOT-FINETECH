@@ -966,7 +966,7 @@ async function execute(row){
     rawBos:ind.bosDirection,bosDirection:ind.bosDirection,
     breakout:ind.breakout,breakoutDirection:ind.breakoutDirection,
     retest:ind.retest,retestDirection:ind.retestDirection,
-    emaFast:ind.emaFast,emaSlow:ind.emaSlow,adx:ind.adx,rsi:ind.rsi,velocityPoints:v8Velocity,
+    emaFast:ind.emaFast,emaSlow:ind.emaSlow,adx:ind.adx,rsi:ind.rsi,velocityPoints:botId==="ladder-flip"?v8Velocity:ind.velocityScore,
     candleCount:ind.candleCount,brokerPoint:0
   });
   const positions=await getWorkerPositions(userId);
@@ -994,7 +994,7 @@ async function execute(row){
     spread,atr:ind.atr,
     volatility:ind.volatility,trend:ind.trend,momentum:ind.momentum,
     structure:ind.structure,adx:ind.adx,rsi:ind.rsi,emaFast:ind.emaFast,emaSlow:ind.emaSlow,
-    velocityPoints:v8Velocity,
+    velocityPoints:botId==="ladder-flip"?v8Velocity:ind.velocityScore,
     liquiditySweep:ind.liquiditySweep,rawLiquiditySweep:ind.liquiditySweepDirection,
     displacement:ind.displacement,rawDisplacement:ind.displacementDirection,
     rawBos:ind.bosDirection,bosDirection:ind.bosDirection,
