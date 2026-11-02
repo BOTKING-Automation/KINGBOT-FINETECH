@@ -37,9 +37,14 @@ function snapshotFingerprint({botId,market,analysis}={}){
     spreadBucket:Math.round(num(market?.spread)/(atr*.05)),
     atr:num(market?.atr),volatility:num(market?.volatility),trend:num(market?.trend),
     momentum:num(market?.momentum),structure:String(market?.structure||""),
-    liquiditySweep:Boolean(market?.liquiditySweep),orderBlock:Boolean(market?.orderBlock),
-    fairValueGap:Boolean(market?.fairValueGap),displacement:Boolean(market?.displacement),
-    breakout:Boolean(market?.breakout),retest:Boolean(market?.retest),
+    liquiditySweep:Boolean(market?.liquiditySweep),rawLiquiditySweep:String(market?.rawLiquiditySweep??market?.liquiditySweepDirection??""),
+    rawChoch:String(market?.rawChoch??market?.chochDirection??""),rawBos:String(market?.rawBos??market?.bosDirection??""),
+    orderBlock:Boolean(market?.orderBlock),orderBlockDirection:String(market?.orderBlock?.direction??market?.orderBlockDirection??""),
+    fairValueGap:Boolean(market?.fairValueGap),fairValueGapDirection:String(market?.fairValueGapDirection??market?.rawFvgDirection??""),
+    displacement:Boolean(market?.displacement),rawDisplacement:String(market?.rawDisplacement??market?.displacementDirection??""),
+    breakout:Boolean(market?.breakout),breakoutDirection:String(market?.breakoutDirection??""),
+    retest:Boolean(market?.retest),retestDirection:String(market?.retestDirection??""),
+    candleCount:num(market?.candleCount),
     adx:num(market?.adx),rsi:num(market?.rsi),emaFast:num(market?.emaFast),
     emaSlow:num(market?.emaSlow),velocityPoints:num(market?.velocityPoints),
     deterministicSignal:String(analysis?.signal||"NO_SIGNAL"),
@@ -58,7 +63,14 @@ function snapshotFingerprint({botId,market,analysis}={}){
           emaFast:num(x.emaFast),
           emaSlow:num(x.emaSlow),
           adx:num(x.adx),
-          rsi:num(x.rsi)
+          rsi:num(x.rsi),
+          liquiditySweepDirection:String(x.liquiditySweepDirection||""),
+          displacementDirection:String(x.displacementDirection||""),
+          bosDirection:String(x.bosDirection||""),
+          breakoutDirection:String(x.breakoutDirection||""),
+          retestDirection:String(x.retestDirection||""),
+          orderBlockDirection:String(x.orderBlock?.direction||""),
+          fairValueGapDirection:String(x.fairValueGapDirection||"")
         }];
       })
     )
@@ -210,7 +222,14 @@ function evaluateNativeSignal({botId,market={},analysis={},risk={}}={}){
   const score=Math.round(totalWeight?tests.reduce((sum,x)=>sum+(x[1]?x[2]:0),0)/totalWeight*100:0);
   const baseline=num(analysis?.score,0);
   const baselineAligned=dir!==0&&Math.sign(baseline)===dir&&Math.abs(baseline)>=50;
-  const primaryTrigger=tests.some(x=>["sweep/CHOCH and displacement","directional breakout","liquidity sweep"].includes(x[0])&&x[1]);
+  const triggerChecks={
+    strategic:["trend strength","directional momentum","EMA alignment"],
+    flipper:["sweep/CHOCH and displacement"],
+    breakout:["directional breakout","separate retest acceptance"],
+    "smc-pro":["liquidity sweep","directional displacement"],
+    "ladder-flip":["EMA trend and price"]
+  }[botId]||[];
+  const primaryTrigger=triggerChecks.length>0&&triggerChecks.every(name=>tests.some(x=>x[0]===name&&x[1]));
   const criticalMtf=mtf.ready&&mtf.aligned;
   const riskBlocks=Array.isArray(risk?.blocks)?risk.blocks:[];
   const strategyMatch=dir!==0&&score>=65&&baselineAligned&&criticalMtf&&primaryTrigger&&!riskBlocks.length&&risk?.allowed!==false;
@@ -275,6 +294,14 @@ function buildMlTimeframeMarket(baseMarket,frame){
   return {
     ...baseMarket,
     ...usable,
+    rawLiquiditySweep:usable.liquiditySweepDirection??baseMarket?.rawLiquiditySweep??null,
+    rawDisplacement:usable.displacementDirection??baseMarket?.rawDisplacement??null,
+    rawBos:usable.bosDirection??baseMarket?.rawBos??null,
+    breakoutDirection:usable.breakoutDirection??baseMarket?.breakoutDirection??null,
+    retestDirection:usable.retestDirection??baseMarket?.retestDirection??null,
+    orderBlock:usable.orderBlock??baseMarket?.orderBlock??null,
+    fairValueGapDirection:usable.fairValueGapDirection??baseMarket?.fairValueGapDirection??null,
+    candleCount:usable.candleCount??baseMarket?.candleCount??null,
     symbol:String(baseMarket?.symbol||"").toUpperCase(),
     timeframe:frame.timeframe,
     price:num(usable.price, num(baseMarket?.price)),
