@@ -64,9 +64,42 @@ const BOT_DEFINITIONS = {
 };
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
-const num = (v, fallback = 0) => Number.isFinite(Number(v)) ? Number(v) : fallback;
+const num = (v, fallback = 0) => v === null || v === undefined || v === ""
+  ? fallback
+  : Number.isFinite(Number(v)) ? Number(v) : fallback;
+
+function directionOf(value) {
+  const text = String(value ?? "").trim().toUpperCase();
+  if (["BULLISH","BUY","LONG","UP"].includes(text)) return "BUY";
+  if (["BEARISH","SELL","SHORT","DOWN"].includes(text)) return "SELL";
+  if (["NONE","NEUTRAL","RANGE","MIXED","WAIT","UNKNOWN",""].includes(text)) return "WAIT";
+  const valueNumber = Number(value);
+  if (Number.isFinite(valueNumber)) return valueNumber > 0.12 ? "BUY" : valueNumber < -0.12 ? "SELL" : "WAIT";
+  return "WAIT";
+}
+
+function frameContext(frame) {
+  if (!frame || frame.available === false) return { available: false, direction: "WAIT", timeframe: frame?.timeframe || null };
+  return {
+    available: true,
+    direction: directionOf(frame.trend ?? frame.structure),
+    timeframe: frame.timeframe || null,
+    atr: num(frame.atr, 0),
+    rsi: num(frame.rsi, null),
+    adx: num(frame.adx, null),
+    momentum: num(frame.momentum, 0),
+    structure: String(frame.structure || "unknown").toLowerCase()
+  };
+}
 
 function baseContext(snapshot = {}) {
+  const mtf = snapshot.multiTimeframe || {};
+  const regime = frameContext(mtf.regime);
+  const setup = frameContext(mtf.setup);
+  const execution = frameContext(mtf.execution);
+  const frames = [regime, setup, execution];
+  const mtfReady = frames.every(frame => frame.available && frame.atr > 0);
+  const mtfConflict = mtfReady && new Set(frames.map(frame => frame.direction).filter(x => x !== "WAIT")).size > 1;
   return {
     symbol: String(snapshot.symbol || "").toUpperCase(),
     timeframe: String(snapshot.timeframe || "unknown"),
@@ -78,106 +111,237 @@ function baseContext(snapshot = {}) {
     trend: clamp(num(snapshot.trend), -1, 1),
     momentum: clamp(num(snapshot.momentum), -1, 1),
     volume: clamp(num(snapshot.volume), 0, 1),
-    structure: String(snapshot.structure || "unknown"),
+    structure: String(snapshot.structure || "unknown").toLowerCase(),
     liquiditySweep: Boolean(snapshot.liquiditySweep),
+    liquiditySweepDirection: directionOf(snapshot.rawLiquiditySweep ?? snapshot.liquiditySweepDirection),
     orderBlock: Boolean(snapshot.orderBlock),
+    orderBlockDirection: directionOf(snapshot.orderBlock?.direction ?? snapshot.orderBlockDirection),
     fairValueGap: Boolean(snapshot.fairValueGap),
-    emaFast: num(snapshot.emaFast),
-    emaSlow: num(snapshot.emaSlow),
-    adx: num(snapshot.adx),
-    rsi: num(snapshot.rsi),
+    fairValueGapDirection: directionOf(snapshot.fairValueGapDirection),
+    emaFast: num(snapshot.emaFast, null),
+    emaSlow: num(snapshot.emaSlow, null),
+    adx: num(snapshot.adx, null),
+    rsi: num(snapshot.rsi, null),
     velocityPoints: num(snapshot.velocityPoints),
     brokerPoint: num(snapshot.brokerPoint),
     displacement: Boolean(snapshot.displacement),
+    displacementDirection: directionOf(snapshot.rawDisplacement ?? snapshot.displacementDirection),
+    bosDirection: directionOf(snapshot.rawBos ?? snapshot.bosDirection),
+    chochDirection: directionOf(snapshot.rawChoch ?? snapshot.chochDirection),
     breakout: Boolean(snapshot.breakout),
-    retest: Boolean(snapshot.retest)
+    breakoutDirection: directionOf(snapshot.breakoutDirection),
+    retest: Boolean(snapshot.retest),
+    retestDirection: directionOf(snapshot.retestDirection),
+    candleCount: num(snapshot.candleCount, 0),
+    mtf: {
+      ready: mtfReady,
+      conflict: mtfConflict,
+      regime,
+      setup,
+      execution
+    }
   };
 }
 
+function alignedMtf(c, direction) {
+  if (!c.mtf.ready) return { ok: false, reason: "MULTI_TIMEFRAME_EVIDENCE_INCOMPLETE" };
+  if (c.mtf.conflict) return { ok: false, reason: "MULTI_TIMEFRAME_DIRECTION_CONFLICT" };
+  const required = [c.mtf.regime.direction, c.mtf.setup.direction, c.mtf.execution.direction];
+  if (required.some(value => value !== direction)) {
+    return { ok: false, reason: "MULTI_TIMEFRAME_DIRECTION_NOT_ALIGNED" };
+  }
+  return { ok: true, reason: null };
+}
+
 function evaluateStrategic(c) {
-  const regime = c.volatility >= 0.82 ? -0.25 : c.volatility <= 0.08 ? -0.1 : 0.15;
-  const trend = c.trend * 0.38;
-  const momentum = c.momentum * 0.24;
-  const structure = (c.structure === "bullish" ? 0.16 : c.structure === "bearish" ? -0.16 : 0);
-  const breakout = c.breakout ? Math.sign(c.trend || 1) * 0.08 : 0;
-  const meanReversion = (!c.breakout && c.volatility < 0.35) ? -c.trend * 0.12 : 0;
-  const score = clamp((trend + momentum + structure + breakout + meanReversion + regime) * 100, -100, 100);
-  return { score, reason: "Regime classification plus trend, structure, momentum and controlled mean-reversion fit." };
+  const direction = directionOf(c.trend);
+  if (direction === "WAIT") return { score: 0, qualified: false, reason: "Strategic engine is waiting for a measurable directional regime." };
+  const aligned = alignedMtf(c, direction);
+  const sign = direction === "BUY" ? 1 : -1;
+  const trendStrength = Math.min(1, Math.abs(c.trend));
+  const momentumStrength = Math.min(1, Math.abs(c.momentum));
+  const emaDirection = c.emaFast !== null && c.emaSlow !== null
+    ? (c.emaFast > c.emaSlow ? "BUY" : c.emaFast < c.emaSlow ? "SELL" : "WAIT")
+    : "WAIT";
+  const components = [
+    { label: "trend regime", pass: trendStrength >= 0.45, weight: 24 },
+    { label: "directional momentum", pass: Math.sign(c.momentum) === sign && momentumStrength >= 0.30, weight: 20 },
+    { label: "market structure", pass: c.structure === (direction === "BUY" ? "bullish" : "bearish"), weight: 18 },
+    { label: "EMA alignment", pass: emaDirection === direction, weight: 16 },
+    { label: "higher-timeframe regime", pass: c.mtf.regime.direction === direction, weight: 12 },
+    { label: "setup timeframe", pass: c.mtf.setup.direction === direction, weight: 10 }
+  ];
+  const score = Math.round(components.reduce((sum, x) => sum + (x.pass ? x.weight : 0), 0));
+  const volatilityOk = c.volatility >= 0.08 && c.volatility <= 0.90;
+  const qualified = aligned.ok && volatilityOk && components.filter(x => x.pass).length >= 5;
+  const missing = components.filter(x => !x.pass).map(x => x.label);
+  if (!volatilityOk) missing.push("volatility regime");
+  if (!aligned.ok) missing.push(aligned.reason);
+  return {
+    score: qualified ? score : Math.min(score, 74),
+    qualified,
+    direction,
+    reason: qualified
+      ? "Strategic confluence passed: trend, momentum, structure, EMA and all three decision timeframes agree."
+      : "Strategic is waiting for complete multi-timeframe confluence. Missing: " + missing.join(", ") + "."
+  };
 }
 
 function evaluateFlipper(c) {
-  const impulse = c.momentum * 0.5;
-  const microTrend = c.trend * 0.28;
-  const structure = c.structure === "bullish" ? 0.12 : c.structure === "bearish" ? -0.12 : 0;
-  const spreadPenalty = c.spread > 0 && c.atr > 0 ? Math.min(c.spread / c.atr, 1) * 0.35 : 0;
-  const volatilityGate = c.volatility > 0.9 ? -0.3 : c.volatility < 0.08 ? -0.12 : 0.08;
-  const score = clamp((impulse + microTrend + structure - spreadPenalty + volatilityGate) * 100, -100, 100);
-  return { score, reason: "Micro-momentum, impulse, structure and spread/volatility gates for short-horizon entries." };
+  const sweepDirection = c.liquiditySweepDirection;
+  const chochDirection = c.chochDirection;
+  const displacementDirection = c.displacementDirection;
+  const triggerDirection = sweepDirection !== "WAIT" ? sweepDirection : chochDirection;
+  const direction = triggerDirection !== "WAIT" && triggerDirection === displacementDirection
+    ? triggerDirection
+    : "WAIT";
+  if (direction === "WAIT") {
+    return { score: 0, qualified: false, reason: "Flipper requires a same-direction liquidity sweep or CHOCH followed by displacement." };
+  }
+  const sign = direction === "BUY" ? 1 : -1;
+  const rsiOk = c.rsi !== null && (direction === "BUY" ? c.rsi >= 30 && c.rsi <= 62 : c.rsi >= 38 && c.rsi <= 70);
+  const momentumOk = Math.sign(c.momentum) === sign && Math.abs(c.momentum) >= 0.30;
+  const velocityOk = Math.sign(c.velocityPoints) === sign && Math.abs(c.velocityPoints) >= 0.20;
+  const spreadOk = c.atr > 0 && c.spread / c.atr <= 0.20;
+  const volatilityOk = c.volatility >= 0.08 && c.volatility <= 0.90;
+  const aligned = alignedMtf(c, direction);
+  const checks = [
+    ["reversal trigger", true, 24],
+    ["RSI transition", rsiOk, 14],
+    ["directional momentum", momentumOk, 18],
+    ["micro-velocity", velocityOk, 16],
+    ["spread efficiency", spreadOk, 12],
+    ["volatility regime", volatilityOk, 8],
+    ["multi-timeframe context", aligned.ok, 8]
+  ];
+  const score = checks.reduce((sum, item) => sum + (item[1] ? item[2] : 0), 0);
+  const qualified = checks.every(item => item[1]);
+  const missing = checks.filter(item => !item[1]).map(item => item[0]);
+  return {
+    score: qualified ? score : Math.min(score, 74),
+    qualified,
+    direction,
+    reason: qualified
+      ? "Flipper reversal confirmed by sweep/CHOCH, displacement, RSI, momentum, velocity, spread and MTF."
+      : "Flipper is waiting for: " + missing.join(", ") + "."
+  };
 }
 
 function evaluateBreakout(c) {
-  if (!c.breakout) return { score: 0, reason: "No structural breakout is currently detected." };
-  const direction = c.trend >= 0 ? 1 : -1;
-  const breakoutImpulse = 0.42;
-  const retest = c.retest ? 0.28 : -0.08;
-  const momentum = Math.abs(c.momentum) * 0.16;
-  const volume = c.volume * 0.14;
-  const volatilityFit = c.volatility >= 0.2 && c.volatility <= 0.9 ? 0.1 : -0.08;
-  const score = clamp((breakoutImpulse + retest + momentum + volume + volatilityFit) * 100 * direction, -100, 100);
-  return { score, reason: c.retest
-    ? "Breakout confirmed with retest, momentum, activity and volatility expansion."
-    : "Breakout detected; waiting for stronger retest confirmation." };
+  const direction = c.breakoutDirection;
+  if (!c.breakout || direction === "WAIT") {
+    return { score: 0, qualified: false, reason: "No directional range expansion has been confirmed." };
+  }
+  const sign = direction === "BUY" ? 1 : -1;
+  const retestOk = c.retest && c.retestDirection === direction;
+  const momentumOk = Math.sign(c.momentum) === sign && Math.abs(c.momentum) >= 0.30;
+  const volumeOk = c.volume >= 0.30;
+  const volatilityOk = c.volatility >= 0.20 && c.volatility <= 0.90;
+  const aligned = alignedMtf(c, direction);
+  const checks = [
+    ["directional range break", true, 22],
+    ["confirmed retest and acceptance", retestOk, 24],
+    ["post-breakout momentum", momentumOk, 18],
+    ["relative activity", volumeOk, 12],
+    ["controlled volatility expansion", volatilityOk, 12],
+    ["multi-timeframe alignment", aligned.ok, 12]
+  ];
+  const score = checks.reduce((sum, item) => sum + (item[1] ? item[2] : 0), 0);
+  const qualified = checks.every(item => item[1]);
+  const missing = checks.filter(item => !item[1]).map(item => item[0]);
+  return {
+    score: qualified ? score : Math.min(score, 71),
+    qualified,
+    direction,
+    reason: qualified
+      ? "Breakout accepted after a separate retest with momentum, relative activity, controlled volatility and aligned timeframes."
+      : "Breakout is not confirmed yet. Waiting for: " + missing.join(", ") + "."
+  };
 }
 
 function evaluateSmc(c) {
-  const bullish = c.structure === "bullish";
-  const bearish = c.structure === "bearish";
-  const directionalBias = bullish ? 1 : bearish ? -1 : Math.sign(c.trend || 0);
-  if (!c.liquiditySweep || !c.displacement) {
-    return { score: 0, reason: "SMC sequence incomplete: liquidity sweep and displacement confirmation are required." };
+  const sweep = c.liquiditySweepDirection;
+  const displacement = c.displacementDirection;
+  const direction = sweep !== "WAIT" && sweep === displacement ? sweep : "WAIT";
+  if (direction === "WAIT") {
+    return { score: 0, qualified: false, reason: "SMC requires a directional liquidity sweep followed by same-direction displacement." };
   }
-  let quality = 0.46;
-  if (c.orderBlock) quality += 0.16;
-  if (c.fairValueGap) quality += 0.15;
-  if (bullish || bearish) quality += 0.12;
-  quality += Math.min(Math.abs(c.momentum), 1) * 0.1;
-  quality -= c.volatility > 0.92 ? 0.2 : 0;
+  const bosOk = c.bosDirection === direction || c.chochDirection === direction ||
+    c.structure === (direction === "BUY" ? "bullish" : "bearish");
+  const orderBlockOk = c.orderBlock && (c.orderBlockDirection === "WAIT" || c.orderBlockDirection === direction);
+  const fvgOk = c.fairValueGap && (c.fairValueGapDirection === "WAIT" || c.fairValueGapDirection === direction);
+  const aligned = alignedMtf(c, direction);
+  const volatilityOk = c.volatility < 0.92;
+  const checks = [
+    ["liquidity sweep", true, 18],
+    ["directional displacement", true, 18],
+    ["BOS/CHOCH or structure shift", bosOk, 22],
+    ["directional order block", orderBlockOk, 14],
+    ["directional fair value gap", fvgOk, 12],
+    ["multi-timeframe alignment", aligned.ok, 12],
+    ["volatility filter", volatilityOk, 4]
+  ];
+  const score = checks.reduce((sum, item) => sum + (item[1] ? item[2] : 0), 0);
+  const qualified = checks.every(item => item[1]);
+  const missing = checks.filter(item => !item[1]).map(item => item[0]);
   return {
-    score: clamp(quality * 100 * directionalBias, -100, 100),
-    reason: "Liquidity sweep → displacement → structure alignment, with OB/FVG confirmation and volatility filter."
+    score: qualified ? score : Math.min(score, 73),
+    qualified,
+    direction,
+    reason: qualified
+      ? "SMC sequence validated: sweep → displacement → structure shift with directional OB/FVG and MTF confluence."
+      : "SMC sequence is incomplete. Waiting for: " + missing.join(", ") + "."
   };
 }
 
 function evaluateLadder(c) {
-  const cfg=BOT_DEFINITIONS["ladder-flip"].v8;
-  const adx=Number(c.adx);
-  const rsi=Number(c.rsi);
-  const emaFast=Number(c.emaFast);
-  const emaSlow=Number(c.emaSlow);
-  const price=Number(c.price);
-  if(![adx,rsi,emaFast,emaSlow,price].every(Number.isFinite)){
-    return {score:0,emergency:false,reason:"V8 entry gate waiting for EMA20/EMA50, ADX14 and RSI14 data."};
+  const cfg = BOT_DEFINITIONS["ladder-flip"].v8;
+  const adx = c.adx, rsi = c.rsi, fast = c.emaFast, slow = c.emaSlow, price = c.price;
+  if ([adx, rsi, fast, slow, price, c.atr].some(v => v === null || !Number.isFinite(v))) {
+    return { score: 0, qualified: false, reason: "Ladder Flip is waiting for complete EMA20/EMA50, ADX14, RSI14 and ATR data." };
   }
-  if(adx<cfg.adxMinStrength){
-    return {score:0,emergency:false,reason:`V8 entry blocked: ADX14 ${adx.toFixed(2)} is below ${cfg.adxMinStrength.toFixed(2)} trend strength.`};
+  if (adx < cfg.adxMinStrength) {
+    return { score: 0, qualified: false, reason: "Ladder Flip blocked: ADX14 is below the V8 trend-strength threshold." };
   }
-  const bull=emaFast>emaSlow&&price>emaFast&&rsi>=cfg.rsiBullMin;
-  const bear=emaFast<emaSlow&&price<emaFast&&rsi<=cfg.rsiBearMax;
-  if(!bull&&!bear){
-    return {score:0,emergency:false,reason:"V8 entry blocked: EMA20/EMA50, price location and RSI confirmation are not aligned."};
+  const direction = fast > slow && price > fast && rsi >= cfg.rsiBullMin
+    ? "BUY"
+    : fast < slow && price < fast && rsi <= cfg.rsiBearMax
+      ? "SELL"
+      : "WAIT";
+  if (direction === "WAIT") {
+    return { score: 0, qualified: false, reason: "Ladder Flip EMA, price-location and RSI gates are not aligned." };
   }
-  const adxBonus=Math.min(12,Math.max(0,(adx-cfg.adxMinStrength)*0.35));
-  const rsiBonus=bull?Math.min(8,Math.max(0,rsi-cfg.rsiBullMin)*0.8):Math.min(8,Math.max(0,cfg.rsiBearMax-rsi)*0.8);
-  const emaGap=Math.abs(emaFast-emaSlow);
-  const gapBonus=c.atr>0?Math.min(5,(emaGap/c.atr)*2):0;
-  const score=clamp(78+adxBonus+rsiBonus+gapBonus,0,100)*(bull?1:-1);
+  const sign = direction === "BUY" ? 1 : -1;
+  const emaGapAtr = Math.abs(fast - slow) / c.atr;
+  const emaGapOk = emaGapAtr >= 0.02;
+  const velocityOk = Math.sign(c.velocityPoints) === sign && Math.abs(c.velocityPoints) >= 0.10;
+  const spreadOk = c.spread / c.atr <= 0.25;
+  const aligned = alignedMtf(c, direction);
+  const checks = [
+    ["EMA20/EMA50 and price location", true, 26],
+    ["ADX14", true, 18],
+    ["RSI14", true, 16],
+    ["EMA separation / ATR", emaGapOk, 12],
+    ["directional velocity", velocityOk, 10],
+    ["spread efficiency", spreadOk, 8],
+    ["multi-timeframe trend", aligned.ok, 10]
+  ];
+  const score = checks.reduce((sum, item) => sum + (item[1] ? item[2] : 0), 0);
+  const qualified = checks.every(item => item[1]);
+  const missing = checks.filter(item => !item[1]).map(item => item[0]);
   return {
-    score,
-    emergency:Number(c.volatility)>0.95,
-    reason:bull
-      ? `V8 BUY gate confirmed: EMA20>EMA50, price>EMA20, RSI14 ${rsi.toFixed(2)}, ADX14 ${adx.toFixed(2)}.`
-      : `V8 SELL gate confirmed: EMA20<EMA50, price<EMA20, RSI14 ${rsi.toFixed(2)}, ADX14 ${adx.toFixed(2)}.`
+    score: qualified ? score : Math.min(score, 77),
+    qualified,
+    direction,
+    emergency: c.volatility > 0.95,
+    reason: qualified
+      ? "V8 trend gate confirmed with EMA, ADX, RSI, ATR separation, velocity, spread and MTF alignment."
+      : "Ladder Flip is waiting for: " + missing.join(", ") + "."
   };
+}
+
+function evaluateEngine(botId, context) {
+  return evaluators[botId](context);
 }
 
 const evaluators = {
