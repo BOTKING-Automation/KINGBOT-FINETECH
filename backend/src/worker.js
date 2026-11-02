@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { UserBrokerManager } from "./user-broker-manager.js";
+import { calculateMarketIndicators } from "./worker-market-perception.js";
 import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
 import { monitorBotDecision } from "./ai-bot-supervisor.js";
 import { getAiStrategySignal, warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } from "./ai-trade-gate.js";
@@ -101,46 +102,6 @@ async function heartbeat(details={}){
 }
 
 
-function indicators(candles=[]){
-  const rows=candles.filter(x=>Number.isFinite(Number(x.open))&&Number.isFinite(Number(x.high))&&Number.isFinite(Number(x.low))&&Number.isFinite(Number(x.close))).slice(-100);
-  if(rows.length<20)throw new Error("INSUFFICIENT_HISTORICAL_CANDLES");
-  const closes=rows.map(x=>Number(x.close));
-  const highs=rows.map(x=>Number(x.high));
-  const lows=rows.map(x=>Number(x.low));
-  const ranges=rows.map(x=>Number(x.high)-Number(x.low)).filter(x=>x>=0);
-  const atrLegacy=ranges.slice(-14).reduce((a,b)=>a+b,0)/Math.max(1,ranges.slice(-14).length);
-  const fast=closes.slice(-10).reduce((a,b)=>a+b,0)/10;
-  const slow=closes.slice(-30).reduce((a,b)=>a+b,0)/30;
-  const price=closes.at(-1);
-  const momentum=atrLegacy>0?Math.max(-1,Math.min(1,(price-closes[Math.max(0,closes.length-6)])/atrLegacy)):0;
-  const trend=atrLegacy>0?Math.max(-1,Math.min(1,(fast-slow)/(atrLegacy*2))):0;
-  const mean=Math.max(...highs.slice(-20))-Math.min(...lows.slice(-20));
-  const volatility=mean>0?Math.max(0,Math.min(1,atrLegacy/(mean/10))):0;
-  const recentHigh=Math.max(...highs.slice(-20,-1));
-  const recentLow=Math.min(...lows.slice(-20,-1));
-  const breakout=price>recentHigh||price<recentLow;
-  const prevClose=closes.at(-2);
-  const retest=(breakout&&((price>recentHigh&&prevClose<=recentHigh)||(price<recentLow&&prevClose>=recentLow)));
-  let structure="unknown";
-  const h1=highs.at(-1),h2=highs.at(-5),l1=lows.at(-1),l2=lows.at(-5);
-  if(h1>h2&&l1>l2)structure="bullish";
-  if(h1<h2&&l1<l2)structure="bearish";
-  const prevRange=ranges.at(-2)||0;
-  const displacement=prevRange>0 && (ranges.at(-1)>prevRange*1.5);
-  const liquiditySweep=(lows.at(-1)<Math.min(...lows.slice(-6,-1))&&price>prevClose)||(highs.at(-1)>Math.max(...highs.slice(-6,-1))&&price<prevClose);
-  const orderBlock=rows.length>=3 && Math.abs(Number(rows.at(-3).close)-Number(rows.at(-3).open))<(ranges.slice(-3,-2)[0]||0)*0.5;
-  const fairValueGap=rows.length>=3 && (Number(rows.at(-1).low)>Number(rows.at(-3).high)||Number(rows.at(-1).high)<Number(rows.at(-3).low));
-  const volumeValues=rows.map(x=>num(x.tickVolume,num(x.volume,0))).slice(-20);
-  const avgVolume=volumeValues.reduce((a,b)=>a+b,0)/Math.max(1,volumeValues.length);
-  const volume=avgVolume>0?Math.max(0,Math.min(1,num(volumeValues.at(-1))/avgVolume)):0;
-  const v8=rows.length>=60?calculateLadderV8Indicators(rows,LADDER_V8_DEFAULTS):null;
-  return {
-    atr:atrLegacy,trend,momentum,volatility,structure,breakout,retest,displacement,liquiditySweep,orderBlock,fairValueGap,volume,
-    v8Atr:v8?.atr??null,emaFast:v8?.emaFast??null,emaSlow:v8?.emaSlow??null,adx:v8?.adx??null,rsi:v8?.rsi??null,
-    v8Price:v8?.price??price,v8EntryQualified:Boolean(v8?.entryQualified),v8Direction:Number(v8?.direction||0)
-  };
-}
-
 function strategyTimeframeProfile(botId,executionTimeframe){
   const bot=getBotDefinitions()[botId];
   const profile=bot?.timeframeProfile||{};
@@ -180,7 +141,7 @@ async function getMultiTimeframeContext(userId,symbol,botId,executionTimeframe){
   const unique=[...new Set([profile.regime,profile.setup,profile.execution])];
   const baseTimeframe=profile.execution;
   const maxRatio=Math.max(...unique.map(tf=>Math.ceil(timeframeSeconds(tf)/timeframeSeconds(baseTimeframe))));
-  const baseLimit=Math.min(1000,Math.max(120,Math.min(1000,maxRatio*25)));
+  const baseLimit=Math.min(1000,Math.max(240,maxRatio*80));
   let baseCandles;
   try{
     baseCandles=await getWorkerCandles(userId,symbol,baseTimeframe,baseLimit);
@@ -194,7 +155,7 @@ async function getMultiTimeframeContext(userId,symbol,botId,executionTimeframe){
   for(const timeframe of unique){
     try{
       const candles=timeframe===baseTimeframe?baseCandles:aggregateCandles(baseCandles,timeframe);
-      const data=indicators(candles);
+      const data=calculateMarketIndicators(candles);
       byTimeframe[timeframe]={timeframe,available:true,...data,candleCount:candles.length};
     }catch(error){
       const reason=String(error?.message||"TIMEFRAME_DATA_UNAVAILABLE").slice(0,160);
@@ -995,12 +956,18 @@ async function execute(row){
     : 0;
 
   const analysis=evaluateBot(botId,{
-    symbol:config.symbol,timeframe:executionTimeframe,price:(bid+ask)/2,entryPrice:(bid+ask)/2,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,
+    symbol:config.symbol,timeframe:executionTimeframe,price:(bid+ask)/2,entryPrice:(bid+ask)/2,spread,atr:ind.atr,
     timeframeProfile:multiTimeframe.profile,
     multiTimeframe:{regime:multiTimeframe.regime,setup:multiTimeframe.setup,execution:multiTimeframe.execution},
     volatility:ind.volatility,trend:ind.trend,momentum:ind.momentum,volume:ind.volume,structure:ind.structure,
-    liquiditySweep:ind.liquiditySweep,orderBlock:ind.orderBlock,fairValueGap:ind.fairValueGap,displacement:ind.displacement,breakout:ind.breakout,retest:ind.retest,
-    emaFast:ind.emaFast,emaSlow:ind.emaSlow,adx:ind.adx,rsi:ind.rsi,velocityPoints:v8Velocity,brokerPoint:0
+    liquiditySweep:ind.liquiditySweep,rawLiquiditySweep:ind.liquiditySweepDirection,
+    orderBlock:ind.orderBlock,fairValueGap:ind.fairValueGap,fairValueGapDirection:ind.fairValueGapDirection,
+    displacement:ind.displacement,rawDisplacement:ind.displacementDirection,
+    rawBos:ind.bosDirection,bosDirection:ind.bosDirection,
+    breakout:ind.breakout,breakoutDirection:ind.breakoutDirection,
+    retest:ind.retest,retestDirection:ind.retestDirection,
+    emaFast:ind.emaFast,emaSlow:ind.emaSlow,adx:ind.adx,rsi:ind.rsi,velocityPoints:v8Velocity,
+    candleCount:ind.candleCount,brokerPoint:0
   });
   const positions=await getWorkerPositions(userId);
   trace("POSITIONS_READY",{count:positions.length});
@@ -1024,10 +991,17 @@ async function execute(row){
 
   const aiMarket={
     symbol:config.symbol,timeframe:executionTimeframe,price:(bid+ask)/2,bid,ask,
-    spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,
+    spread,atr:ind.atr,
     volatility:ind.volatility,trend:ind.trend,momentum:ind.momentum,
     structure:ind.structure,adx:ind.adx,rsi:ind.rsi,emaFast:ind.emaFast,emaSlow:ind.emaSlow,
     velocityPoints:v8Velocity,
+    liquiditySweep:ind.liquiditySweep,rawLiquiditySweep:ind.liquiditySweepDirection,
+    displacement:ind.displacement,rawDisplacement:ind.displacementDirection,
+    rawBos:ind.bosDirection,bosDirection:ind.bosDirection,
+    breakout:ind.breakout,breakoutDirection:ind.breakoutDirection,
+    retest:ind.retest,retestDirection:ind.retestDirection,
+    orderBlock:ind.orderBlock,fairValueGap:ind.fairValueGap,fairValueGapDirection:ind.fairValueGapDirection,
+    candleCount:ind.candleCount,
     timeframeProfile:multiTimeframe.profile,
     multiTimeframe:{
       regime:multiTimeframe.regime,
