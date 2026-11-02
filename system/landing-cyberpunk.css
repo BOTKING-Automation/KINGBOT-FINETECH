@@ -1006,3 +1006,56 @@ footer {
   .overview-stack,
   .market-categories { grid-template-columns: 1fr; }
 }
+
+
+/* =========================================================
+   LANDSCAPE CLARITY FIX
+   Increase the existing full-resolution city artwork visibility
+   and reduce the overlays that were obscuring the image.
+========================================================= */
+.hero::before {
+  opacity: .86 !important;
+  filter: saturate(1.20) contrast(1.18) brightness(1.08) !important;
+  background-position: center center !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  transform: scale(1.005) !important;
+}
+
+.hero::after {
+  background:
+    linear-gradient(90deg,
+      rgba(2,6,17,.88) 0%,
+      rgba(3,8,22,.72) 29%,
+      rgba(3,8,22,.34) 56%,
+      rgba(3,8,22,.10) 100%),
+    linear-gradient(180deg,
+      rgba(2,6,17,.04) 0%,
+      rgba(2,6,17,.08) 52%,
+      rgba(2,6,17,.48) 100%) !important;
+}
+
+@media (max-width: 900px) {
+  .hero::before {
+    opacity: .82 !important;
+    background-position: center 42% !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .hero::before {
+    opacity: .78 !important;
+    background-position: center 40% !important;
+    filter: saturate(1.18) contrast(1.16) brightness(1.06) !important;
+  }
+  .hero::after {
+    background:
+      linear-gradient(180deg,
+        rgba(2,6,17,.14) 0%,
+        rgba(2,6,17,.28) 44%,
+        rgba(2,6,17,.84) 100%),
+      linear-gradient(90deg,
+        rgba(2,6,17,.34) 0%,
+        rgba(2,6,17,.14) 100%) !important;
+  }
+}
