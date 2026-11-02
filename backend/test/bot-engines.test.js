@@ -116,3 +116,9 @@ test("market analysis refuses snapshots without ATR",()=>{
   assert.equal(result.status,"DATA_BLOCKED");
   assert.equal(result.reason,"ATR_REQUIRED");
 });
+test("SMC can qualify with one direction-confirmed institutional zone",()=>{
+  const snapshot={...market("BUY"),fairValueGap:false,fairValueGapDirection:"NONE"};
+  const result=evaluateBot("smc-pro",snapshot);
+  assert.equal(result.signal,"LONG_CANDIDATE");
+  assert.equal(result.qualified,true);
+});
