@@ -315,6 +315,10 @@ function buildMlTimeframeMarket(baseMarket,frame){
     velocityPoints:frame.role==="execution"
       ? num(baseMarket?.velocityPoints)
       : num(usable.velocityPoints, 0),
+    velocityAtr:frame.role==="execution"
+      ? num(baseMarket?.velocityAtr, num(baseMarket?.velocityPoints))
+      : num(usable.velocityScore, num(usable.velocityAtr, num(usable.velocityPoints, 0))),
+    volume:num(usable.volume, num(baseMarket?.volume, 0)),
     multiTimeframe:baseMarket?.multiTimeframe||null
   };
 }
