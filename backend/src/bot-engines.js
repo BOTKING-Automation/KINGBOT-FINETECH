@@ -72,7 +72,7 @@ function directionOf(value) {
   const text = String(value ?? "").trim().toUpperCase();
   if (["BULLISH","BUY","LONG","UP"].includes(text)) return "BUY";
   if (["BEARISH","SELL","SHORT","DOWN"].includes(text)) return "SELL";
-  if (["NONE","NEUTRAL","RANGE","MIXED","WAIT","UNKNOWN",""].includes(text)) return "WAIT";
+  if (["NONE","NEUTRAL","RANGE","MIXED","WAIT","UNKNOWN",""].includes(text) || typeof value === "boolean") return "WAIT";
   const valueNumber = Number(value);
   if (Number.isFinite(valueNumber)) return valueNumber > 0.12 ? "BUY" : valueNumber < -0.12 ? "SELL" : "WAIT";
   return "WAIT";
@@ -95,8 +95,8 @@ function frameContext(frame) {
 function baseContext(snapshot = {}, botId = null) {
   const mtf = snapshot.multiTimeframe || {};
   const profile = snapshot.timeframeProfile || BOT_DEFINITIONS[botId]?.timeframeProfile || {};
-  const frames = Array.isArray(mtf.timeframes) ? mtf.timeframes : [];
-  const byTimeframe = timeframe => frames.find(frame => String(frame?.timeframe || "").toLowerCase() === String(timeframe || "").toLowerCase());
+  const rawFrames = Array.isArray(mtf.timeframes) ? mtf.timeframes : [];
+  const byTimeframe = timeframe => rawFrames.find(frame => String(frame?.timeframe || "").toLowerCase() === String(timeframe || "").toLowerCase());
   const regime = frameContext(mtf.regime || byTimeframe(profile.regime));
   const setup = frameContext(mtf.setup || byTimeframe(profile.setup));
   const execution = frameContext(mtf.execution || byTimeframe(profile.execution));
@@ -364,6 +364,7 @@ function signalFromScore(score) {
 function validateSnapshot(c) {
   if (!c.symbol || !Number.isFinite(c.price) || c.price <= 0) return { ok: false, reason: "MARKET_DATA_INCOMPLETE" };
   if (c.spread < 0 || c.atr < 0) return { ok: false, reason: "MARKET_DATA_INVALID" };
+  if (!(c.atr > 0)) return { ok: false, reason: "ATR_REQUIRED" };
   return { ok: true };
 }
 
