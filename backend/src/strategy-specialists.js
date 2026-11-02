@@ -92,8 +92,10 @@ function evaluateFlipper(m,mtf){
   const sweep=directionOf(m.rawLiquiditySweep??m.liquiditySweepDirection);
   const choch=directionOf(m.rawChoch??m.chochDirection);
   const displacement=directionOf(m.rawDisplacement??m.displacementDirection);
+  const triggerConflict=sweep!=="WAIT"&&choch!=="WAIT"&&sweep!==choch;
   const trigger=sweep!=="WAIT"?sweep:choch;
-  const direction=trigger!=="WAIT"&&trigger===displacement?trigger:"WAIT";
+  const direction=!triggerConflict&&trigger!=="WAIT"&&trigger===displacement?trigger:"WAIT";
+  if(triggerConflict)contradictions.push("Liquidity sweep and CHOCH point in opposing directions.");
   if(direction==="WAIT")missing.push("Same-direction sweep/CHOCH followed by displacement.");
   else conditions.push("Reversal trigger and displacement agree directionally.");
   const rsiOk=rsi!==null&&(direction==="BUY"?rsi>=30&&rsi<=62:direction==="SELL"?rsi>=38&&rsi<=70:false);
@@ -120,7 +122,7 @@ function evaluateBreakout(m,mtf){
   if(breakout&&direction!=="WAIT")conditions.push("Directional range expansion detected.");
   else missing.push("Directional range-boundary break.");
   const retestDirection=directionOf(m.retestDirection);
-  const retestOk=retest&&((retestDirection==="WAIT")||retestDirection===direction);
+  const retestOk=retest&&retestDirection===direction;
   if(retestOk)conditions.push("Breakout retest/acceptance confirmed.");
   else missing.push("A separate retest and close back in breakout direction.");
   if(vol>=.20&&vol<=.90)conditions.push("Volatility expansion is controlled.");
