@@ -108,7 +108,6 @@ export function calculateMarketIndicators(candles = []) {
   const highs = rows.map(x => x.high);
   const lows = rows.map(x => x.low);
   const last = rows.at(-1);
-  const previous = rows.at(-2);
   const price = last.close;
 
   const emaFast = calculateEma(closes, 20);
@@ -133,6 +132,7 @@ export function calculateMarketIndicators(candles = []) {
   const rsiMomentum = clamp((rsiValue - 50) / 25, -1, 1);
   const priceMomentum = clamp(roc5 / 2.5, -1, 1);
   const momentum = clamp(rsiMomentum * 0.55 + priceMomentum * 0.45, -1, 1);
+  const velocityScore = closes.length >= 4 ? clamp((price - closes.at(-4)) / Math.max(atrValue, 1e-12), -2, 2) : 0;
 
   const volatilityRatio = atrBaseline > 0 ? atrValue / atrBaseline : 1;
   const volatility = clamp(volatilityRatio / 1.8, 0, 1);
@@ -255,6 +255,7 @@ export function calculateMarketIndicators(candles = []) {
     adx: adxValue,
     rsi: rsiValue,
     velocityPoints: 0,
+    velocityScore,
     v8Price: v8?.price ?? price,
     v8EntryQualified: Boolean(v8?.entryQualified),
     v8Direction: Number(v8?.direction || 0),
