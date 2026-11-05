@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 KINGBOT ML Signal Service
-Purpose: supervised market-signal generation inside the AI STRATEGIES stage.
+Purpose: learned temporal market-direction inference inside KINGBOT CORTEX.
 
-The service never places orders. It trains strategy-specific classifiers on
-verified OHLC bars supplied by the KINGBOT market-data service and returns
-BUY / SELL / HOLD probabilities from a scikit-learn + PyTorch ensemble.
+The service never places orders. Its primary decision model is a PyTorch
+attention-GRU trained on causal OHLCV sequences and forward market outcomes.
+Scikit-learn and the tabular PyTorch model remain auxiliary benchmarks.
 """
 from __future__ import annotations
 
@@ -816,7 +816,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "promoted_at": trained_at if promote else None,
                 "feedbackVersion": FEEDBACK_VERSION,
                 "feedbackRowsUsed": len(feedback),
-                "regimeAware": True,
+                "regimeAware": False,
                 "supportedRegimes": REGIME_ORDER,
             }
             if promote:
