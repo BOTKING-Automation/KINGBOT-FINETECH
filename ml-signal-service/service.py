@@ -60,7 +60,7 @@ SEQUENCE_TARGETS = {
     "flipper": {"horizon": 2, "atrBarrier": 0.25},
     "breakout": {"horizon": 4, "atrBarrier": 0.40},
     "smc-pro": {"horizon": 5, "atrBarrier": 0.45},
-    "ladder-flip": {"horizon": 1, "atrBarrier": 0.20},
+    "ladder-flip": {"horizon": 1, "atrBarrier": 0.12},
 }
 TRAINING_KEYS: set[str] = set()
 TRAINING_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_TRAINING)
