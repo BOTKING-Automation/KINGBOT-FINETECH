@@ -149,7 +149,7 @@ async function getMultiTimeframeContext(userId,symbol,botId,executionTimeframe){
     try{
       const candles=await getWorkerCandles(userId,symbol,timeframe,historyLimit);
       const data=calculateMarketIndicators(candles);
-      byTimeframe[timeframe]={timeframe,available:true,...data,candleCount:candles.length,sourceTimeframe:timeframe};
+      byTimeframe[timeframe]={timeframe,available:true,...data,candleCount:candles.length,sourceTimeframe:timeframe,bars:candles.slice(-128)};
     }catch(error){
       const reason=String(error?.message||"TIMEFRAME_DATA_UNAVAILABLE").slice(0,160);
       console.warn("[KINGBOT MTF] direct timeframe history unavailable",JSON.stringify({botId,symbol,timeframe,reason}));
@@ -395,10 +395,9 @@ function positionIdentities(position){
   return [...new Set(ids)];
 }
 async function recordExecutionAdaptiveDecision({userId,botId,config,analysis,marketSnapshot={},risk,riskPercent,account,aiTradeGate,aiStrategySignal}={}) {
-  if(!analysis?.ok || analysis.signal==="NO_SIGNAL") return null;
-  const direction=analysis.signal==="LONG_CANDIDATE"?"BUY":analysis.signal==="SHORT_CANDIDATE"?"SELL":"HOLD";
-  if(direction==="HOLD") return null;
-  const fit=Math.min(100,Math.abs(Number(analysis.score||0)));
+  const direction=String(aiStrategySignal?.direction||"HOLD").toUpperCase();
+  if(!aiStrategySignal?.strategyMatch || !["BUY","SELL"].includes(direction)) return null;
+  const fit=Math.min(100,Math.max(0,num(aiStrategySignal?.mlConfidence,aiStrategySignal?.score||0)));
   const equity=Number(account?.equity||0);
   const riskPct=Number(riskPercent||0);
   const market=marketSnapshot||{};
@@ -424,12 +423,10 @@ async function recordExecutionAdaptiveDecision({userId,botId,config,analysis,mar
     summary:{
       confidence:fit,
       bias:direction==="BUY"?"BULLISH":"BEARISH",
-      regime:(Math.abs(Number(market?.trend||0))>=0.55
-        ? (Number(market?.volatility||0)>=0.65?"TRENDING_VOLATILE":"TRENDING")
-        : (Number(market?.volatility||0)>=0.65?"EXPANSION":Number(market?.volatility||0)<=0.12?"LOW_VOLATILITY":"RANGE"))
+      regime:"TEMPORAL_MODEL_INFERENCE"
     },
     debate:{direction:direction==="BUY"?"BULLISH":"BEARISH"},
-    routing:{selectedEngine:botId,direction,candidate:{botId,score:Number(analysis.score||0),fit,currentFit:fit}},
+    routing:{selectedEngine:botId,direction,candidate:{botId,score:fit,fit,currentFit:fit,source:"TEMPORAL_SEQUENCE_MODEL"}},
     riskCouncil:{status:risk?.allowed?"NORMAL":"BLOCKED",blocks:risk?.blockedReasons||[],flags:[]},
     execution:{authority:"WORKER_EXECUTION_RECORD",authorized:false,riskAmount:equity>0&&riskPct>0?equity*riskPct/100:null},
     adaptive:{decisionId:crypto.randomUUID(),decisionState:risk?.allowed?"TRADE_CANDIDATE":"BLOCKED"}
@@ -998,6 +995,7 @@ async function execute(row){
     retest:ind.retest,retestDirection:ind.retestDirection,
     orderBlock:ind.orderBlock,fairValueGap:ind.fairValueGap,fairValueGapDirection:ind.fairValueGapDirection,
     candleCount:ind.candleCount,
+    bars:Array.isArray(ind.bars)?ind.bars:[],
     timeframeProfile:multiTimeframe.profile,
     multiTimeframe:{
       regime:multiTimeframe.regime,
@@ -1007,7 +1005,7 @@ async function execute(row){
   };
   let aiStrategySignal=null;
   let aiTradeGate=null;
-  if(analysis.ok){
+  if(analysis&&typeof analysis==="object"){
     try{
       aiStrategySignal=await warmAiStrategySignal({userId,botId,market:aiMarket,analysis,risk,tradePlan:null});
       aiTradeGate=aiStrategySignal
@@ -1029,11 +1027,11 @@ async function execute(row){
   });
 
   let adaptiveExecutionDecision=null;
+  const aiLadderInd={...ind,v8Direction:aiTradeGate?.direction==="BUY"?1:aiTradeGate?.direction==="SELL"?-1:0,v8EntryQualified:Boolean(aiTradeGate?.confirm)};
   const adaptiveExecutionEligible=Boolean(
-    analysis.ok &&
-    analysis.signal!=="NO_SIGNAL" &&
     risk?.allowed &&
-    (!aiExecutionGateEnabled() || aiTradeGate?.confirm)
+    aiTradeGate?.confirm &&
+    ["BUY","SELL"].includes(String(aiTradeGate?.direction||""))
   );
   if(adaptiveExecutionEligible){
     try{
@@ -1064,9 +1062,9 @@ async function execute(row){
       const derivBroker=String(status.broker||"").toLowerCase()==="deriv";
       const spreadPoints=spec.point>0?spread/spec.point:Infinity;
       const spreadOk=derivBroker||spreadPoints<=ladderCfg.maxSpreadPoints;
-      if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&spreadOk&&(!aiExecutionGateEnabled()||aiTradeGate?.confirm)){
+      if(risk.allowed&&spreadOk&&aiTradeGate?.confirm){
         try{
-          const start=await executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind,positions,spec,velocity,decisionId:adaptiveExecutionDecision?.decisionId||null});
+          const start=await executeLadderV8DerivStart({userId,botId,config,s,account,quote,ind:aiLadderInd,positions,spec,velocity,decisionId:adaptiveExecutionDecision?.decisionId||null});
           action=start.action;started=start.state;startDetails=start.details||null;
         }catch(error){
           action="DERIV_V8_EXECUTION_REJECTED";
@@ -1108,7 +1106,7 @@ async function execute(row){
     let action="NO_ACTION";
     let started=null;
     if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&spreadOk&&(!aiExecutionGateEnabled()||aiTradeGate?.confirm)){
-      const start=await executeLadderV8Start({userId,botId,config,s,account,quote,ind,positions,spec,velocity,decisionId:adaptiveExecutionDecision?.decisionId||null});
+      const start=await executeLadderV8Start({userId,botId,config,s,account,quote,ind:aiLadderInd,positions,spec,velocity,decisionId:adaptiveExecutionDecision?.decisionId||null});
       action=start.action;started=start.state;
     }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!spreadOk)action="V8_SPREAD_FILTER_BLOCKED";
     else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!risk.allowed)action="RISK_BLOCKED";
@@ -1127,8 +1125,8 @@ async function execute(row){
 
   let action="NO_ACTION",order=null,tradePlan=null;
   if(brokerName==="deriv"){
-    if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&aiExecutionGateEnabled()&&aiTradeGate?.confirm){
-      const side=analysis.signal==="LONG_CANDIDATE"?"BUY":"SELL";
+    if(risk.allowed&&aiTradeGate?.confirm){
+      const side=aiTradeGate.direction;
       tradePlan=getTradePlan(botId,{symbol:config.symbol,timeframe:executionTimeframe,price:(bid+ask)/2,entryPrice:side==="BUY"?ask:bid,atr:ind.atr},side);
       if(!tradePlan.ok)throw new Error(tradePlan.reason||"TRADE_PLAN_UNAVAILABLE");
       const riskAmount=Number(account.equity)*(s.maxRiskPerTradePct/100);
@@ -1156,8 +1154,8 @@ async function execute(row){
       }
     }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&!risk.allowed)action="RISK_BLOCKED";
     else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&aiExecutionGateEnabled()&&!aiTradeGate?.confirm)action=aiTradeGate?.status||"AI_STRATEGY_CONFIRMATION_BLOCKED";
-  }else if(analysis.ok&&analysis.signal!=="NO_SIGNAL"&&risk.allowed&&(!aiExecutionGateEnabled()||aiTradeGate?.confirm)){
-    const side=analysis.signal==="LONG_CANDIDATE"?"BUY":"SELL";
+  }else if(risk.allowed&&aiTradeGate?.confirm){
+    const side=aiTradeGate.direction;
     const specResult=await broker.getSymbolSpecification(config.symbol,userId); const spec=specResult?.data??specResult??{};
     const tickSize=Number(spec.tickSize),minVolume=Number(spec.minVolume),maxVolume=Number(spec.maxVolume),volumeStep=Number(spec.volumeStep),point=Number(spec.point),stopsLevel=Number(spec.stopsLevel);
     const tickValue=Number(side==="BUY"?quote.lossTickValue:quote.lossTickValue);
