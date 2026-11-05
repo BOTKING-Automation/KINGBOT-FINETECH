@@ -25,6 +25,14 @@ from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 from sklearn.preprocessing import StandardScaler
 from torch import nn
 
+from temporal_model import (
+    SEQUENCE_LENGTH,
+    TemporalGRU,
+    bars_to_sequence_arrays,
+    predict_temporal_probabilities,
+    train_temporal_model,
+)
+
 
 HOST = "0.0.0.0"
 PORT = int(os.getenv("PORT", "10000"))
@@ -43,6 +51,9 @@ RF_ENSEMBLE_WEIGHT = 0.55
 TORCH_ENSEMBLE_WEIGHT = 0.45
 MAX_PREDICTIONS = max(2, min(64, int(os.getenv("KINGBOT_ML_MAX_PREDICTIONS", "16"))))
 MAX_CONCURRENT_TRAINING = max(1, min(2, int(os.getenv("KINGBOT_ML_MAX_CONCURRENT_TRAINING", "1"))))
+TEMPORAL_MIN_CONFIDENCE = max(0.40, min(0.90, float(os.getenv("KINGBOT_ML_TEMPORAL_MIN_CONFIDENCE", "0.48"))))
+TEMPORAL_MIN_EDGE = max(0.0, min(0.50, float(os.getenv("KINGBOT_ML_TEMPORAL_MIN_EDGE", "0.04"))))
+TEMPORAL_EPOCHS = max(8, min(80, int(os.getenv("KINGBOT_ML_TEMPORAL_EPOCHS", "24"))))
 TRAINING_KEYS: set[str] = set()
 TRAINING_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_TRAINING)
 PREDICTION_SEMAPHORE = threading.BoundedSemaphore(MAX_PREDICTIONS)
@@ -561,6 +572,10 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         train_w_parts: list[np.ndarray] = []
         test_x_parts: list[np.ndarray] = []
         test_y_parts: list[np.ndarray] = []
+        temporal_train_parts: list[np.ndarray] = []
+        temporal_train_labels: list[np.ndarray] = []
+        temporal_test_parts: list[np.ndarray] = []
+        temporal_test_labels: list[np.ndarray] = []
         validation_markets: list[dict[str, Any]] = []
         total_bar_count = 0
         accepted_markets = 0
@@ -592,7 +607,26 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             y_train_part, y_test_part = y_part[:train_end], y_part[test_start:]
             w_train_part = weights_part[:train_end]
 
-            if train_end < 40 or len(X_test_part) < 20 or len(set(int(v) for v in y_train_part)) < 3:
+            sequence_x, sequence_y = bars_to_sequence_arrays(
+                normalized,
+                horizon=FORWARD_HORIZON,
+                atr_barrier=LABEL_ATR,
+                sequence_length=SEQUENCE_LENGTH,
+            )
+            sequence_train_end, sequence_test_start = temporal_split_bounds(len(sequence_x))
+            sequence_x_train = sequence_x[:sequence_train_end]
+            sequence_x_test = sequence_x[sequence_test_start:]
+            sequence_y_train = sequence_y[:sequence_train_end]
+            sequence_y_test = sequence_y[sequence_test_start:]
+
+            if (
+                train_end < 40
+                or len(X_test_part) < 20
+                or len(set(int(v) for v in y_train_part)) < 3
+                or sequence_train_end < 40
+                or len(sequence_x_test) < 20
+                or len(set(int(v) for v in sequence_y_train)) < 3
+            ):
                 validation_markets.append({
                     "symbol": symbol,
                     "accepted": False,
@@ -605,17 +639,29 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             train_w_parts.append(w_train_part)
             test_x_parts.append(X_test_part)
             test_y_parts.append(y_test_part)
+            temporal_train_parts.append(sequence_x_train)
+            temporal_train_labels.append(sequence_y_train)
+            temporal_test_parts.append(sequence_x_test)
+            temporal_test_labels.append(sequence_y_test)
             validation_markets.append({
                 "symbol": symbol,
                 "accepted": True,
                 "samples": int(len(X_part)),
                 "trainSamples": int(len(X_train_part)),
                 "testSamples": int(len(X_test_part)),
-                "embargoBars": int(test_start - train_end)
+                "sequenceTrainSamples": int(len(sequence_x_train)),
+                "sequenceTestSamples": int(len(sequence_x_test)),
+                "embargoBars": int(test_start - train_end),
+                "sequenceEmbargoBars": int(sequence_test_start - sequence_train_end)
             })
 
-        if not train_x_parts or not test_x_parts:
-            raise ValueError(f"ML_TRAINING_REQUIRES_{MIN_BARS}_BARS")
+        if not train_x_parts or not test_x_parts or not temporal_train_parts or not temporal_test_parts:
+            raise ValueError(f"ML_TRAINING_REQUIRES_{MIN_BARS}_BARS_AND_TEMPORAL_SAMPLES")
+
+        X_temporal_train = np.concatenate(temporal_train_parts, axis=0)
+        y_temporal_train = np.concatenate(temporal_train_labels, axis=0)
+        X_temporal_test = np.concatenate(temporal_test_parts, axis=0)
+        y_temporal_test = np.concatenate(temporal_test_labels, axis=0)
 
         X_train = np.concatenate(train_x_parts, axis=0)
         y_train = np.concatenate(train_y_parts, axis=0)
@@ -678,22 +724,32 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         ensemble_test_probabilities = ensemble_probabilities(rf, torch_model, X_test_scaled)
         ensemble_metrics = ensemble_class_metrics(y_test, ensemble_test_probabilities)
 
+        temporal_model, temporal_scaler, temporal_metrics = train_temporal_model(
+            X_temporal_train,
+            y_temporal_train,
+            X_temporal_test,
+            y_temporal_test,
+            epochs=TEMPORAL_EPOCHS,
+        )
+
+        # The temporal network, not indicator gates or the legacy shallow ensemble,
+        # is the decision authority. A weak candidate is rejected and cannot be promoted.
         quality_gate = (
-            ensemble_metrics["balancedAccuracy"] >= 0.36
-            and ensemble_metrics["macroF1"] >= 0.34
-            and len(X_test) >= 30
+            temporal_metrics["balancedAccuracy"] >= 0.36
+            and temporal_metrics["macroF1"] >= 0.34
+            and len(X_temporal_test) >= 30
         )
         if not quality_gate:
             raise ValueError(
-                "ML_MODEL_QUALITY_GATE_FAILED:"
-                f"balanced={ensemble_metrics['balancedAccuracy']:.3f},"
-                f"f1={ensemble_metrics['macroF1']:.3f},"
-                f"test={len(X_test)}"
+                "ML_TEMPORAL_MODEL_QUALITY_GATE_FAILED:"
+                f"balanced={temporal_metrics['balancedAccuracy']:.3f},"
+                f"f1={temporal_metrics['macroF1']:.3f},"
+                f"test={len(X_temporal_test)}"
             )
 
         candidate_score = (
-            ensemble_metrics["balancedAccuracy"] * 0.60
-            + ensemble_metrics["macroF1"] * 0.40
+            temporal_metrics["balancedAccuracy"] * 0.60
+            + temporal_metrics["macroF1"] * 0.40
         )
         with LOCK:
             incumbent = MODELS.get(key)
@@ -705,6 +761,12 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "rf": rf,
                 "torch": torch_model,
                 "scaler": scaler,
+                "temporal_model": temporal_model,
+                "temporal_scaler": temporal_scaler,
+                "temporal_balanced_accuracy": temporal_metrics["balancedAccuracy"],
+                "temporal_macro_f1": temporal_metrics["macroF1"],
+                "temporal_accuracy": temporal_metrics["accuracy"],
+                "sequence_length": SEQUENCE_LENGTH,
                 "trained_at": trained_at,
                 "strategy": strategy,
                 "symbols": sorted(
@@ -723,9 +785,13 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "ensemble_accuracy": ensemble_metrics["accuracy"],
                 "ensemble_balanced_accuracy": ensemble_metrics["balancedAccuracy"],
                 "ensemble_macro_f1": ensemble_metrics["macroF1"],
+                "temporal_balanced_accuracy": temporal_metrics["balancedAccuracy"],
+                "temporal_macro_f1": temporal_metrics["macroF1"],
+                "temporal_accuracy": temporal_metrics["accuracy"],
                 "quality_gate": quality_gate,
                 "bar_count": total_bar_count,
-                "feature_version": "ai-strategies-v5-parity-embargo-ensemble",
+                "feature_version": "ai-strategies-v6-temporal-gru-primary",
+                "decision_model": "ATTENTION_GRU_CANDLE_SEQUENCE",
                 "validation": {
                     "type": "per-market-temporal-holdout-with-label-embargo",
                     "trainFraction": 0.78,
@@ -773,6 +839,9 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "rf": rf_metrics,
                 "pytorch": torch_metrics,
                 "ensemble": ensemble_metrics,
+                "temporalSequenceModel": temporal_metrics,
+                "sequenceLength": SEQUENCE_LENGTH,
+                "decisionAuthority": "ATTENTION_GRU_CANDLE_SEQUENCE",
                 "qualityGate": quality_gate,
             },
             "regimeAware": True,
@@ -809,6 +878,11 @@ def model_status(key: str) -> dict[str, Any]:
         "ensembleAccuracy": round(item.get("ensemble_accuracy", 0.0) * 100.0, 2),
         "ensembleBalancedAccuracy": round(item.get("ensemble_balanced_accuracy", 0.0) * 100.0, 2),
         "ensembleMacroF1": round(item.get("ensemble_macro_f1", 0.0) * 100.0, 2),
+        "temporalAccuracy": round(item.get("temporal_accuracy", 0.0) * 100.0, 2),
+        "temporalBalancedAccuracy": round(item.get("temporal_balanced_accuracy", 0.0) * 100.0, 2),
+        "temporalMacroF1": round(item.get("temporal_macro_f1", 0.0) * 100.0, 2),
+        "sequenceLength": int(item.get("sequence_length", SEQUENCE_LENGTH)),
+        "decisionModel": item.get("decision_model", "ATTENTION_GRU_CANDLE_SEQUENCE"),
         "qualityGate": bool(item.get("quality_gate", False)),
         "validationType": item.get("validation", {}).get("type", "unknown"),
         "selectionScore": round(float(item.get("selection_score", 0.0)), 4),
@@ -935,49 +1009,59 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
     if not item:
         return {"ok": True, "ready": False, "status": "MODEL_NOT_READY", "modelKey": key}
 
-    price = finite(market.get("price") or market.get("close"))
-    atr_value = finite(market.get("atr") or market.get("atr14"))
-    if price <= 0 or atr_value <= 0:
-        raise ValueError("ML_PREDICT_MARKET_DATA_INVALID")
+    bars = normalize_market_bars(market.get("bars"))
+    if len(bars) < SEQUENCE_LENGTH:
+        return {
+            "ok": True,
+            "ready": False,
+            "status": "SEQUENCE_DATA_REQUIRED",
+            "requiredBars": SEQUENCE_LENGTH,
+            "receivedBars": len(bars),
+            "modelKey": key,
+        }
     if not PREDICTION_SEMAPHORE.acquire(timeout=0.8):
         return {"ok": True, "ready": False, "status": "ML_PREDICTION_CAPACITY_BUSY", "modelKey": key}
     try:
         if not bool(item.get("quality_gate", False)):
             return {"ok": True, "ready": False, "status": "MODEL_QUALITY_GATE_BLOCKED", "modelKey": key}
-        X = current_market_features(market, strategy)
-        scaled = item["scaler"].transform(X).astype(np.float32)
+        if not item.get("temporal_model") or not item.get("temporal_scaler"):
+            return {"ok": True, "ready": False, "status": "TEMPORAL_MODEL_NOT_READY", "modelKey": key}
 
-        probs = ensemble_probabilities(item["rf"], item["torch"], scaled)[0]
+        probs = predict_temporal_probabilities(item["temporal_model"], item["temporal_scaler"], bars)
+        if probs is None:
+            return {"ok": True, "ready": False, "status": "SEQUENCE_DATA_REQUIRED", "requiredBars": SEQUENCE_LENGTH, "receivedBars": len(bars), "modelKey": key}
+
         best_index = int(np.argmax(probs))
-        direction = int(INDEX_TO_LABEL[best_index])
-        confidence = float(probs[best_index])
+        best_confidence = float(probs[best_index])
         signed_score = float((probs[2] - probs[0]) * 100.0)
+        directional_confidence = float(max(probs[0], probs[2]))
+        directional_edge = directional_confidence - float(probs[1])
 
-        if confidence < 0.55 or abs(signed_score) < 12.0:
-            direction = 0
-
-        regime = detect_market_regime(market, strategy)
-        action, action_reason = decide_action(probs, regime, direction, confidence)
-        action_is_trade = action in {"BUY", "SELL"}
-        if not action_is_trade:
-            direction = 0
-        risk_mode = REGIME_RISK_MODE.get(regime, "neutral")
-
-        focus = STRATEGY_FOCUS.get(strategy, set())
-        focus_note = ",".join(sorted(focus))
+        # This is model-probability abstention, not an indicator/regime rule.
+        # The model alone chooses BUY/SELL/HOLD; the backend risk governor
+        # separately decides whether any proposed order is permitted.
+        action = "HOLD"
+        direction = 0
+        action_reason = "learned sequence probabilities do not support a directional trade"
+        if best_index in (0, 2) and best_confidence >= TEMPORAL_MIN_CONFIDENCE and directional_edge >= TEMPORAL_MIN_EDGE:
+            direction = -1 if best_index == 0 else 1
+            action = "SELL" if direction < 0 else "BUY"
+            action_reason = "attention-GRU sequence prediction cleared the model confidence and directional-edge thresholds"
 
         return {
             "ok": True,
             "ready": True,
-            "status": "LIVE_ML_SIGNAL",
+            "status": "LIVE_TEMPORAL_ML_SIGNAL",
             "strategy": strategy,
             "symbol": symbol.upper(),
             "timeframe": timeframe.lower(),
             "direction": "BUY" if direction > 0 else "SELL" if direction < 0 else "HOLD",
-            "confidence": round(confidence * 100.0, 2),
+            "confidence": round(best_confidence * 100.0, 2),
+            "directionalConfidence": round(directional_confidence * 100.0, 2),
+            "directionalEdge": round(directional_edge * 100.0, 2),
             "score": round(signed_score, 2),
-            "regime": regime,
-            "riskMode": risk_mode,
+            "regime": "MODEL_INFERENCE",
+            "riskMode": "DETERMINISTIC_RISK_GOVERNOR",
             "decision": action,
             "decisionReason": action_reason,
             "probabilities": {
@@ -986,189 +1070,30 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
                 "buy": round(float(probs[2]) * 100.0, 2),
             },
             "models": {
-                "scikitLearn": {
-                    "accuracy": round(item["rf_accuracy"] * 100.0, 2),
-                    "balancedAccuracy": round(item.get("rf_balanced_accuracy", 0.0) * 100.0, 2),
-                    "macroF1": round(item.get("rf_macro_f1", 0.0) * 100.0, 2),
-                    "weight": 0.55,
+                "primary": {
+                    "name": "Attention GRU candle-sequence network",
+                    "type": "DEEP_TEMPORAL_LEARNING",
+                    "accuracy": round(item.get("temporal_accuracy", 0.0) * 100.0, 2),
+                    "balancedAccuracy": round(item.get("temporal_balanced_accuracy", 0.0) * 100.0, 2),
+                    "macroF1": round(item.get("temporal_macro_f1", 0.0) * 100.0, 2),
+                    "sequenceLength": int(item.get("sequence_length", SEQUENCE_LENGTH)),
+                    "decisionAuthority": True,
                 },
-                "pytorch": {
-                    "accuracy": round(item["torch_accuracy"] * 100.0, 2),
-                    "balancedAccuracy": round(item.get("torch_balanced_accuracy", 0.0) * 100.0, 2),
-                    "macroF1": round(item.get("torch_macro_f1", 0.0) * 100.0, 2),
-                    "weight": 0.45,
+                "auxiliaryBenchmarks": {
+                    "randomForestBalancedAccuracy": round(item.get("rf_balanced_accuracy", 0.0) * 100.0, 2),
+                    "tabularPytorchBalancedAccuracy": round(item.get("torch_balanced_accuracy", 0.0) * 100.0, 2),
+                    "usedForDirection": False,
                 },
             },
-            "focusFeatures": focus_note,
-            "focusScale": "1.00 focus / 0.25 non-focus",
             "modelKey": key,
             "featureVersion": item["feature_version"],
+            "decisionModel": item.get("decision_model", "ATTENTION_GRU_CANDLE_SEQUENCE"),
             "trainedAt": item["trained_at"],
             "generatedAt": time.time(),
-            "regimeAware": True,
-            "supportedRegimes": REGIME_ORDER,
+            "decisionAuthority": "TEMPORAL_GRU_SEQUENCE_MODEL",
+            "rulesBasedDirection": False,
+            "regimeAware": False,
         }
     finally:
         PREDICTION_SEMAPHORE.release()
 
-
-class Handler(BaseHTTPRequestHandler):
-    server_version = "KINGBOT-ML/1.0"
-
-    def _json(self, status: int, body: dict[str, Any]) -> None:
-        encoded = json.dumps(body, separators=(",", ":")).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Length", str(len(encoded)))
-        self.end_headers()
-        self.wfile.write(encoded)
-
-    def _authorized(self) -> bool:
-        if not SECRET:
-            return False
-        provided = self.headers.get("x-kingbot-ml-secret", "")
-        return hmac.compare_digest(provided, SECRET)
-
-    def _body(self) -> dict[str, Any] | None:
-        try:
-            length = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            return None
-        if length <= 0 or length > MAX_BODY_BYTES:
-            return None
-        raw = self.rfile.read(length)
-        try:
-            data = json.loads(raw.decode("utf-8"))
-            return data if isinstance(data, dict) else None
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            return None
-
-    def do_GET(self) -> None:
-        if self.path == "/health":
-            self._json(200, {
-                "ok": True,
-                "service": "KINGBOT ML Signal Service",
-                "stage": "AI_STRATEGIES",
-                "purpose": "ML_SIGNAL_GENERATION",
-                "libraries": ["scikit-learn", "PyTorch"],
-                "modelsLoaded": len(MODELS),
-                "configured": bool(SECRET),
-                "ready": bool(SECRET),
-                "training": len(TRAINING_KEYS),
-                "feedbackRows": len(FEEDBACK_ROWS),
-                "feedbackVersion": FEEDBACK_VERSION,
-                "championModels": len(MODELS),
-                "challengerModels": len(CHALLENGERS),
-                "maxModels": MAX_MODELS,
-                "maxPredictions": MAX_PREDICTIONS,
-                "maxConcurrentTraining": MAX_CONCURRENT_TRAINING,
-                "rfTrees": MAX_RF_TREES,
-                "torchEpochs": TORCH_EPOCHS,
-                "torchThreads": TORCH_THREADS,
-                "regimeAware": True,
-                "supportedRegimes": REGIME_ORDER,
-            })
-            return
-        if self.path == "/models":
-            if not self._authorized():
-                self._json(401, {"ok": False, "error": "ML_SERVICE_UNAUTHORIZED"})
-                return
-            with LOCK:
-                statuses = []
-                for key in MODELS:
-                    item = model_status(key)
-                    challenger = CHALLENGERS.get(key)
-                    if challenger:
-                        item["challenger"] = {
-                            "trainedAt": challenger.get("trained_at"),
-                            "selectionScore": round(float(challenger.get("selection_score", 0.0)), 4),
-                            "balancedAccuracy": round(float(challenger.get("ensemble_balanced_accuracy", 0.0)) * 100.0, 2),
-                            "macroF1": round(float(challenger.get("ensemble_macro_f1", 0.0)) * 100.0, 2),
-                            "samples": challenger.get("samples", 0)
-                        }
-                    statuses.append(item)
-            self._json(200, {"ok": True, "stage": "AI_STRATEGIES", "models": statuses, "challengers": len(CHALLENGERS)})
-            return
-        self._json(404, {"ok": False, "error": "NOT_FOUND"})
-
-    def do_POST(self) -> None:
-        if not self._authorized():
-            self._json(401, {"ok": False, "error": "ML_SERVICE_UNAUTHORIZED"})
-            return
-        body = self._body()
-        if body is None:
-            self._json(400, {"ok": False, "error": "ML_PAYLOAD_INVALID"})
-            return
-
-        try:
-            path = self.path.split("?", 1)[0]
-            if path == "/train":
-                strategy = str(body.get("botId") or "").strip().lower()
-                timeframe = str(body.get("timeframe") or "5m").strip().lower()
-                markets = body.get("markets")
-                if not isinstance(markets, list):
-                    symbol = str(body.get("symbol") or "").strip().upper()
-                    bars = body.get("bars")
-                    markets = [{"symbol": symbol, "bars": bars}] if symbol and isinstance(bars, list) else []
-                if strategy not in STRATEGY_FOCUS:
-                    self._json(400, {"ok": False, "error": "ML_STRATEGY_INVALID"})
-                    return
-                if not markets:
-                    self._json(400, {"ok": False, "error": "ML_TRAIN_PAYLOAD_REQUIRED"})
-                    return
-                result = train_model(strategy, timeframe, markets)
-                self._json(200, {"ok": True, "stage": "AI_STRATEGIES", **result})
-                return
-
-            if path == "/feedback":
-                strategy = str(body.get("botId") or "").strip().lower()
-                symbol = str(body.get("symbol") or "").strip().upper()
-                timeframe = str(body.get("timeframe") or "5m").strip().lower()
-                direction = str(body.get("direction") or "").strip().upper()
-                outcome = str(body.get("outcome") or "").strip().upper()
-                market = body.get("market")
-                if strategy not in STRATEGY_FOCUS or not symbol or not isinstance(market, dict):
-                    self._json(400, {"ok": False, "error": "ML_FEEDBACK_PAYLOAD_REQUIRED"})
-                    return
-                result = record_feedback(
-                    strategy, symbol, timeframe, direction, outcome, market,
-                    body.get("pnl"), body.get("rMultiple")
-                )
-                self._json(200, {"stage": "AI_STRATEGIES", **result})
-                return
-
-            if path == "/predict":
-                strategy = str(body.get("botId") or "").strip().lower()
-                symbol = str(body.get("symbol") or "").strip().upper()
-                timeframe = str(body.get("timeframe") or "5m").strip().lower()
-                market = body.get("market")
-                if strategy not in STRATEGY_FOCUS or not symbol or not isinstance(market, dict):
-                    self._json(400, {"ok": False, "error": "ML_PREDICT_PAYLOAD_REQUIRED"})
-                    return
-                result = predict_model(strategy, symbol, timeframe, market)
-                self._json(200, {"stage": "AI_STRATEGIES", **result})
-                return
-
-            self._json(404, {"ok": False, "error": "NOT_FOUND"})
-        except RuntimeError as error:
-            self._json(409, {"ok": False, "error": str(error)[:180]})
-        except ValueError as error:
-            self._json(422, {"ok": False, "error": str(error)[:180]})
-        except Exception as error:
-            self._json(500, {"ok": False, "error": "ML_INTERNAL_ERROR", "reason": str(error)[:180]})
-
-    def log_message(self, format: str, *args: Any) -> None:
-        print("[KINGBOT ML]", format % args)
-
-
-def main() -> None:
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
-    server.daemon_threads = True
-    server.allow_reuse_address = True
-    print(f"KINGBOT ML signal service listening on {HOST}:{PORT}")
-    server.serve_forever()
-
-
-if __name__ == "__main__":
-    main()
