@@ -26,7 +26,7 @@ The model architecture is shared, but each trading engine is trained against a d
 | Flipper | 2 bars | 0.25 ATR |
 | Breakout | 4 bars | 0.40 ATR |
 | SMC-Pro | 5 bars | 0.45 ATR |
-| Ladder Flip | 1 bar | 0.20 ATR |
+| Ladder Flip | 1 bar | 0.12 ATR |
 
 These are initial objective settings, not optimized trading parameters. Each model record exposes its horizon and ATR barrier. They must be evaluated with walk-forward backtests and demo-forward results before any parameter is treated as validated.
 
