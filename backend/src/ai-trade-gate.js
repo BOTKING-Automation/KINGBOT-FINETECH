@@ -45,6 +45,9 @@ function snapshotFingerprint({botId,market,analysis}={}){
     breakout:Boolean(market?.breakout),breakoutDirection:String(market?.breakoutDirection??""),
     retest:Boolean(market?.retest),retestDirection:String(market?.retestDirection??""),
     candleCount:num(market?.candleCount),
+    sequenceLength:Array.isArray(market?.bars)?market.bars.length:0,
+    lastBarTime:String(market?.bars?.at(-1)?.datetime||market?.bars?.at(-1)?.time||market?.bars?.at(-1)?.timestamp||""),
+    higherTimeframeBars:Object.fromEntries(["regime","setup"].map(role=>{const bars=market?.multiTimeframe?.[role]?.bars||[];const last=bars.at(-1)||{};return [role,{count:bars.length,lastBarTime:String(last.datetime||last.time||last.timestamp||"")}];})),
     adx:num(market?.adx),rsi:num(market?.rsi),emaFast:num(market?.emaFast),
     emaSlow:num(market?.emaSlow),velocityPoints:num(market?.velocityPoints),
     deterministicSignal:String(analysis?.signal||"NO_SIGNAL"),
@@ -359,6 +362,7 @@ async function predictMultiTimeframeMl({botId,market}={}){
     totalWeight+=weight;
   }
   if(totalWeight<=0)return {ready:false,status:"ML_MTF_AGGREGATION_EMPTY",predictions};
+  if(ready.length<2)return {ready:false,status:"ML_MTF_MODELS_INSUFFICIENT",predictions,readyModels:ready.length,requiredModels:2};
 
   aggregate.sell/=totalWeight;
   aggregate.hold/=totalWeight;
@@ -440,69 +444,83 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
   const run=(async()=>{
     const native=evaluateNativeSignal({botId,market,analysis,risk})||{};
     const ml=await predictMultiTimeframeMl({botId,market});
-    let item={
+    const item={
       ...native,
       fingerprint,
       aiStrategyRequired:aiExecutionGateEnabled(),
       aiStrategyService:mlSignalServiceStatus(),
-      aiTimeframeProfile:strategyTimeframeRoles(botId,market)
+      aiTimeframeProfile:strategyTimeframeRoles(botId,market),
+      nativeAdvisory:{
+        direction:native.direction||"HOLD",
+        score:num(native.score,0),
+        strategyMatch:Boolean(native.strategyMatch),
+        usedForDecision:false
+      },
+      mlPredictions:ml?.predictions||[],
+      mlStatus:ml?.status||"MODEL_NOT_READY",
+      source:"KINGBOT_CORTEX_TEMPORAL_GRU_MTF",
+      model:"KINGBOT-CORTEX-TEMPORAL-GRU-1"
     };
 
     if(ml?.ready){
-      const nativeDirection=candidateDirection(native.direction)||candidateDirection(analysis?.signal);
       const mlDirection=candidateDirection(ml.direction);
-      const mlScore=num(ml.score,0);
-      const nativeScore=num(native.score,0);
-      const combinedScore=Math.round(nativeScore*0.30+mlScore*0.70);
-      const directionAgreement=!nativeDirection||!mlDirection||nativeDirection===mlDirection;
       const mlConfidence=num(ml.confidence,0);
       const consensusDirection=candidateDirection(ml?.consensus?.direction);
       const consensusAgreement=num(ml?.consensus?.agreementPct,0);
-      const contextAligned=!consensusDirection||consensusDirection===mlDirection||consensusAgreement<55;
-      const modelAligned=Boolean(mlDirection)&&mlDirection!=="HOLD"&&mlConfidence>=60&&directionAgreement&&contextAligned;
+      const minConfidence=Math.max(40,Math.min(90,num(process.env.KINGBOT_CORTEX_MIN_ML_CONFIDENCE,48)));
+      const minAgreement=Math.max(50,Math.min(100,num(process.env.KINGBOT_CORTEX_MIN_MTF_AGREEMENT,55)));
+      const riskBlocks=[
+        ...(Array.isArray(risk?.blocks)?risk.blocks:[]),
+        ...(Array.isArray(risk?.blockedReasons)?risk.blockedReasons:[])
+      ];
+      const riskApproved=risk?.allowed!==false&&riskBlocks.length===0;
+      const modelAligned=Boolean(
+        mlDirection&&
+        mlDirection!=="HOLD"&&
+        mlConfidence>=minConfidence&&
+        consensusDirection===mlDirection&&
+        consensusAgreement>=minAgreement&&
+        num(ml?.consensus?.readyModels,0)>=2
+      );
+      const approved=modelAligned&&riskApproved;
 
-      item={
-        ...item,
-        direction:modelAligned?mlDirection:"HOLD",
-        strategyMatch:Boolean(native.strategyMatch)&&modelAligned&&Math.abs(combinedScore)>=65,
-        trigger:[
-          native.trigger||"NATIVE_STRATEGY",
-          "MTF="+String(mlDirection||"HOLD"),
-          "EXEC="+String(ml.execution?.direction||"HOLD"),
-          "CTX="+String(consensusDirection||"HOLD"),
-          "CONF="+mlConfidence.toFixed(1)
-        ].join(" + "),
-        score:combinedScore,
-        nativeScore,
-        mlScore,
+      Object.assign(item,{
+        direction:approved?mlDirection:"HOLD",
+        strategyMatch:approved,
+        engineAccepted:true,
+        riskApproved,
+        riskFlags:riskBlocks.map(String).slice(0,10),
+        score:num(ml.score,0),
+        mlScore:num(ml.score,0),
         mlConfidence,
         mlProbabilities:ml.probabilities||null,
         mlModelKey:ml.execution?.modelKey||null,
-        mlModels:ml.predictions||null,
+        mlModels:ml.predictions||[],
         mlConsensus:ml.consensus||null,
         mlExecution:ml.execution||null,
-        mlTimeframes:ml.predictions||null,
-        mlStatus:ml.status||"LIVE_ML_MTF_CONSENSUS",
-        source:"KINGBOT_CORTEX+SCIKIT_LEARN+PYTORCH+MTF",
-        model:"KINGBOT-CORTEX-1+ML-MTF-ENSEMBLE",
-        reason:(modelAligned
-          ? "AI STRATEGIES confirmed the candidate with deterministic strategy evidence plus regime/setup/execution ML consensus. "
-          : "AI STRATEGIES held the candidate because multi-timeframe model confidence, direction or context agreement was insufficient. ")
-          +"Native context="+nativeScore+"/100; MTF model score="+mlScore.toFixed(1)+"/100; context agreement="+consensusAgreement.toFixed(1)+"%."
-      };
-    }else if(aiExecutionGateEnabled()){
-      item={
-        ...item,
+        mlTimeframes:ml.predictions||[],
+        mlStatus:approved?"TEMPORAL_MODEL_CONFIRMED":!riskApproved?"RISK_GOVERNOR_BLOCKED":"MODEL_CONFIDENCE_OR_MTF_CONSENSUS_INSUFFICIENT",
+        reason:approved
+          ?"The attention-GRU sequence models selected "+mlDirection+" from learned candle-window probabilities across multiple timeframes. Deterministic strategy indicators were not used as a directional veto."
+          :!riskApproved
+            ?"The learned model proposed a direction, but the deterministic risk governor blocked the trade: "+riskBlocks.join(", ")+"."
+            :"The temporal models did not clear confidence, directional consensus or multi-timeframe model-readiness requirements; no trade is proposed.",
+        decisionAuthority:"TEMPORAL_GRU_SEQUENCE_MODELS",
+        nativeDirectionIgnored:true
+      });
+    }else{
+      Object.assign(item,{
         direction:"HOLD",
         strategyMatch:false,
-        trigger:"AI_MODEL_REQUIRED",
         engineAccepted:true,
+        riskApproved:false,
+        riskFlags:["TEMPORAL_MODEL_NOT_READY"],
         mlStatus:ml?.status||"ML_SERVICE_NOT_READY",
         mlError:ml?.error||null,
         mlTimeframes:ml?.predictions||[],
-        source:"KINGBOT_CORTEX+MTF",
-        reason:"AI STRATEGIES is mandatory. The execution-timeframe model must be ready before a broker order is authorized; higher-timeframe context is also monitored when available."
-      };
+        decisionAuthority:"TEMPORAL_GRU_SEQUENCE_MODELS",
+        reason:"The temporal sequence model is mandatory. No indicator or legacy strategy fallback is permitted when the learned model is unavailable."
+      });
     }
 
     signalCache.set(key,item);
@@ -519,15 +537,23 @@ export function routeAiSignalToEngine({botId,signal,candidateSignal}={}){
   const candidate=candidateDirection(candidateSignal);
   const engineAccepted=Boolean(signal?.engineAccepted)&&String(signal?.engine||"")===target;
   const strategyAccepted=Boolean(signal?.strategyMatch);
-  const directionAccepted=!candidate||candidate===direction;
-  const confirm=engineAccepted&&strategyAccepted&&direction!=="HOLD"&&directionAccepted;
+  const riskAccepted=signal?.riskApproved===true;
+  const modelDirectionAccepted=direction==="BUY"||direction==="SELL";
+  const confirm=engineAccepted&&strategyAccepted&&riskAccepted&&modelDirectionAccepted;
   let status="CORTEX_CONFIRMATION_REJECTED";
-  if(confirm)status="CORTEX_ENGINE_SIGNAL_CONFIRMED";
+  if(confirm)status="TEMPORAL_AI_ENGINE_SIGNAL_CONFIRMED";
   else if(direction==="HOLD"||!signal)status="CORTEX_SIGNAL_HOLD";
   else if(!engineAccepted)status="CORTEX_ENGINE_ROUTE_MISMATCH";
-  else if(!strategyAccepted)status="CORTEX_STRATEGY_MISMATCH";
-  else status="CORTEX_DIRECTION_MISMATCH";
-  return {...(signal||{}),confirm,status,candidateDirection:candidate||null};
+  else if(!strategyAccepted)status="TEMPORAL_MODEL_CONFIDENCE_REJECTED";
+  else if(!riskAccepted)status="RISK_GOVERNOR_BLOCKED";
+  else status="TEMPORAL_MODEL_DIRECTION_INVALID";
+  return {
+    ...(signal||{}),
+    confirm,
+    status,
+    candidateDirection:candidate||null,
+    candidateDirectionUsedForDecision:false
+  };
 }
 
 export function getAiTradeConfirmation({userId,botId,signal,market,analysis}={}){
