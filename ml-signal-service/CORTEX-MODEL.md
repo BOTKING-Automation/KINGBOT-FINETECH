@@ -16,6 +16,20 @@ Each candle is represented by eight causal, scale-normalized values: log return,
 
 The model uses a two-layer GRU, temporal attention pooling and a small classification head. The scaler is fitted on training windows only. Class-weighted cross entropy, gradient clipping and chronological holdout validation are used during training.
 
+## Engine-specific training objectives
+
+The model architecture is shared, but each trading engine is trained against a different forward target so its learned direction corresponds to its own holding horizon:
+
+| Engine | Forward horizon | Directional label barrier |
+|---|---:|---:|
+| Strategic | 6 bars | 0.55 ATR |
+| Flipper | 2 bars | 0.25 ATR |
+| Breakout | 4 bars | 0.40 ATR |
+| SMC-Pro | 5 bars | 0.45 ATR |
+| Ladder Flip | 1 bar | 0.20 ATR |
+
+These are initial objective settings, not optimized trading parameters. Each model record exposes its horizon and ATR barrier. They must be evaluated with walk-forward backtests and demo-forward results before any parameter is treated as validated.
+
 ## Multi-timeframe inference
 
 Each engine has its configured regime, setup and execution timeframes. CORTEX requests a separately trained temporal model for each of those timeframes. The execution timeframe must be ready, and at least two timeframe models must return valid probabilities. Probabilities are weighted and aggregated; directional consensus is reported separately.
