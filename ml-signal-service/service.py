@@ -29,6 +29,7 @@ from temporal_model import (
     SEQUENCE_LENGTH,
     TemporalGRU,
     bars_to_sequence_arrays,
+    extract_bar_sequence_features,
     predict_temporal_probabilities,
     train_temporal_model,
 )
@@ -685,6 +686,18 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 y_train = np.concatenate([y_train, feedback_y], axis=0)
                 weights_train = np.concatenate([weights_train, feedback_w], axis=0)
 
+            sequence_feedback = [
+                row for row in feedback
+                if isinstance(row.get("sequence"), list)
+                and len(row["sequence"]) == SEQUENCE_LENGTH
+            ]
+            if sequence_feedback:
+                feedback_sequence_x = np.asarray([row["sequence"] for row in sequence_feedback], dtype=np.float32)
+                feedback_sequence_y = np.asarray([int(row["label"]) for row in sequence_feedback], dtype=np.int64)
+                if feedback_sequence_x.ndim == 3 and feedback_sequence_x.shape[1:] == X_temporal_train.shape[1:]:
+                    X_temporal_train = np.concatenate([X_temporal_train, feedback_sequence_x], axis=0)
+                    y_temporal_train = np.concatenate([y_temporal_train, feedback_sequence_y], axis=0)
+
         if len(X_train) < 70 or len(X_test) < 30:
             raise ValueError("ML_TRAINING_FEATURES_INSUFFICIENT")
 
@@ -965,6 +978,13 @@ def record_feedback(
         raise ValueError("ML_FEEDBACK_MARKET_REQUIRED")
 
     features = current_market_features(market, strategy)[0].astype(float).tolist()
+    sequence = None
+    raw_bars = market.get("bars")
+    if isinstance(raw_bars, list):
+        normalized_bars = normalize_market_bars(raw_bars)
+        sequence_features, _ = extract_bar_sequence_features(normalized_bars)
+        if len(sequence_features) >= SEQUENCE_LENGTH:
+            sequence = sequence_features[-SEQUENCE_LENGTH:].astype(float).tolist()
     label = 1 if normalized_direction == "BUY" else -1
     if normalized_outcome in {"LOSS", "INVALIDATED"}:
         label *= -1
@@ -979,6 +999,7 @@ def record_feedback(
         "outcome": normalized_outcome,
         "label": int(label),
         "features": features,
+        "sequence": sequence,
         "pnl": None if pnl is None else finite(pnl, 0.0),
         "rMultiple": None if r_multiple is None else finite(r_multiple, 0.0),
         "receivedAt": time.time(),
