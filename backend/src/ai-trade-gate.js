@@ -523,8 +523,9 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
       });
     }
 
-    signalCache.set(key,item);
-    return item;
+    const cachedItem={...item,at:Date.now()};
+    signalCache.set(key,cachedItem);
+    return cachedItem;
   })().finally(()=>inflight.delete(key));
 
   inflight.set(key,run);
