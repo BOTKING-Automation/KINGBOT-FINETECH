@@ -451,6 +451,7 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
     const ml=await predictMultiTimeframeMl({botId,market});
     const item={
       ...native,
+      engine:botId,
       fingerprint,
       aiStrategyRequired:aiExecutionGateEnabled(),
       aiStrategyService:mlSignalServiceStatus(),
