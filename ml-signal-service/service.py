@@ -1146,3 +1146,165 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
     finally:
         PREDICTION_SEMAPHORE.release()
 
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "KINGBOT-ML/1.0"
+
+    def _json(self, status: int, body: dict[str, Any]) -> None:
+        encoded = json.dumps(body, separators=(",", ":")).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def _authorized(self) -> bool:
+        if not SECRET:
+            return False
+        provided = self.headers.get("x-kingbot-ml-secret", "")
+        return hmac.compare_digest(provided, SECRET)
+
+    def _body(self) -> dict[str, Any] | None:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            return None
+        if length <= 0 or length > MAX_BODY_BYTES:
+            return None
+        raw = self.rfile.read(length)
+        try:
+            data = json.loads(raw.decode("utf-8"))
+            return data if isinstance(data, dict) else None
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None
+
+    def do_GET(self) -> None:
+        if self.path == "/health":
+            self._json(200, {
+                "ok": True,
+                "service": "KINGBOT ML Signal Service",
+                "stage": "AI_STRATEGIES",
+                "purpose": "TEMPORAL_SEQUENCE_INFERENCE",
+                "decisionModel": "ATTENTION_GRU_CANDLE_SEQUENCE",
+                "libraries": ["scikit-learn", "PyTorch"],
+                "modelsLoaded": len(MODELS),
+                "configured": bool(SECRET),
+                "ready": bool(SECRET),
+                "training": len(TRAINING_KEYS),
+                "feedbackRows": len(FEEDBACK_ROWS),
+                "feedbackVersion": FEEDBACK_VERSION,
+                "championModels": len(MODELS),
+                "challengerModels": len(CHALLENGERS),
+                "maxModels": MAX_MODELS,
+                "maxPredictions": MAX_PREDICTIONS,
+                "maxConcurrentTraining": MAX_CONCURRENT_TRAINING,
+                "rfTrees": MAX_RF_TREES,
+                "torchEpochs": TORCH_EPOCHS,
+                "torchThreads": TORCH_THREADS,
+                "regimeAware": False,
+                "supportedRegimes": REGIME_ORDER,
+            })
+            return
+        if self.path == "/models":
+            if not self._authorized():
+                self._json(401, {"ok": False, "error": "ML_SERVICE_UNAUTHORIZED"})
+                return
+            with LOCK:
+                statuses = []
+                for key in MODELS:
+                    item = model_status(key)
+                    challenger = CHALLENGERS.get(key)
+                    if challenger:
+                        item["challenger"] = {
+                            "trainedAt": challenger.get("trained_at"),
+                            "selectionScore": round(float(challenger.get("selection_score", 0.0)), 4),
+                            "balancedAccuracy": round(float(challenger.get("ensemble_balanced_accuracy", 0.0)) * 100.0, 2),
+                            "macroF1": round(float(challenger.get("ensemble_macro_f1", 0.0)) * 100.0, 2),
+                            "samples": challenger.get("samples", 0)
+                        }
+                    statuses.append(item)
+            self._json(200, {"ok": True, "stage": "AI_STRATEGIES", "models": statuses, "challengers": len(CHALLENGERS)})
+            return
+        self._json(404, {"ok": False, "error": "NOT_FOUND"})
+
+    def do_POST(self) -> None:
+        if not self._authorized():
+            self._json(401, {"ok": False, "error": "ML_SERVICE_UNAUTHORIZED"})
+            return
+        body = self._body()
+        if body is None:
+            self._json(400, {"ok": False, "error": "ML_PAYLOAD_INVALID"})
+            return
+
+        try:
+            path = self.path.split("?", 1)[0]
+            if path == "/train":
+                strategy = str(body.get("botId") or "").strip().lower()
+                timeframe = str(body.get("timeframe") or "5m").strip().lower()
+                markets = body.get("markets")
+                if not isinstance(markets, list):
+                    symbol = str(body.get("symbol") or "").strip().upper()
+                    bars = body.get("bars")
+                    markets = [{"symbol": symbol, "bars": bars}] if symbol and isinstance(bars, list) else []
+                if strategy not in STRATEGY_FOCUS:
+                    self._json(400, {"ok": False, "error": "ML_STRATEGY_INVALID"})
+                    return
+                if not markets:
+                    self._json(400, {"ok": False, "error": "ML_TRAIN_PAYLOAD_REQUIRED"})
+                    return
+                result = train_model(strategy, timeframe, markets)
+                self._json(200, {"ok": True, "stage": "AI_STRATEGIES", **result})
+                return
+
+            if path == "/feedback":
+                strategy = str(body.get("botId") or "").strip().lower()
+                symbol = str(body.get("symbol") or "").strip().upper()
+                timeframe = str(body.get("timeframe") or "5m").strip().lower()
+                direction = str(body.get("direction") or "").strip().upper()
+                outcome = str(body.get("outcome") or "").strip().upper()
+                market = body.get("market")
+                if strategy not in STRATEGY_FOCUS or not symbol or not isinstance(market, dict):
+                    self._json(400, {"ok": False, "error": "ML_FEEDBACK_PAYLOAD_REQUIRED"})
+                    return
+                result = record_feedback(
+                    strategy, symbol, timeframe, direction, outcome, market,
+                    body.get("pnl"), body.get("rMultiple")
+                )
+                self._json(200, {"stage": "AI_STRATEGIES", **result})
+                return
+
+            if path == "/predict":
+                strategy = str(body.get("botId") or "").strip().lower()
+                symbol = str(body.get("symbol") or "").strip().upper()
+                timeframe = str(body.get("timeframe") or "5m").strip().lower()
+                market = body.get("market")
+                if strategy not in STRATEGY_FOCUS or not symbol or not isinstance(market, dict):
+                    self._json(400, {"ok": False, "error": "ML_PREDICT_PAYLOAD_REQUIRED"})
+                    return
+                result = predict_model(strategy, symbol, timeframe, market)
+                self._json(200, {"stage": "AI_STRATEGIES", **result})
+                return
+
+            self._json(404, {"ok": False, "error": "NOT_FOUND"})
+        except RuntimeError as error:
+            self._json(409, {"ok": False, "error": str(error)[:180]})
+        except ValueError as error:
+            self._json(422, {"ok": False, "error": str(error)[:180]})
+        except Exception as error:
+            self._json(500, {"ok": False, "error": "ML_INTERNAL_ERROR", "reason": str(error)[:180]})
+
+    def log_message(self, format: str, *args: Any) -> None:
+        print("[KINGBOT ML]", format % args)
+
+
+def main() -> None:
+    server = ThreadingHTTPServer((HOST, PORT), Handler)
+    server.daemon_threads = True
+    server.allow_reuse_address = True
+    print(f"KINGBOT ML signal service listening on {HOST}:{PORT}")
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()
