@@ -32,6 +32,7 @@ IMPORTANT:
 
     config: {
       protectedPages: [
+        "command-center.html",
         "terminal.html",
         "analytics.html",
         "ai.html",
