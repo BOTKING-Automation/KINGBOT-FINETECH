@@ -169,6 +169,10 @@ jobs:
           node --check system/intelligence-orchestrator.js
           node --check system/ai-support.js
 
+      - name: CORTEX AI direction and risk-boundary tests
+        working-directory: backend
+        run: node --test test/ai-trade-gate.test.js
+
       - name: Specialist brain and strategy council tests
         working-directory: backend
         run: node --test test/bot-engines.test.js test/worker-market-perception.test.js test/strategy-specialists.test.js test/strategy-council.test.js test/intelligence-orchestrator.test.js test/gold-price-feed.test.js test/market-data-fabric.test.js
