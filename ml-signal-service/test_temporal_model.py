@@ -2,6 +2,8 @@ import unittest
 
 import numpy as np
 
+from service import SEQUENCE_TARGETS
+
 from temporal_model import (
     SEQUENCE_FEATURE_NAMES,
     SEQUENCE_LENGTH,
@@ -30,6 +32,14 @@ def make_bars(count=180):
 
 
 class TemporalModelTests(unittest.TestCase):
+    def test_engine_training_objectives_are_distinct(self):
+        self.assertEqual(set(SEQUENCE_TARGETS), {"strategic", "flipper", "breakout", "smc-pro", "ladder-flip"})
+        objectives = {
+            (int(item["horizon"]), float(item["atrBarrier"]))
+            for item in SEQUENCE_TARGETS.values()
+        }
+        self.assertEqual(len(objectives), 5)
+
     def test_sequence_dataset_has_expected_shape_and_three_class_labels(self):
         x, y = bars_to_sequence_arrays(make_bars(220), sequence_length=SEQUENCE_LENGTH)
         self.assertEqual(x.ndim, 3)
