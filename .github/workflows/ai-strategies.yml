@@ -44,6 +44,7 @@ on:
       - "backend/src/strategy-council.js"
       - "backend/src/intelligence-orchestrator.js"
       - "backend/test/strategy-specialists.test.js"
+      - "backend/test/ai-trade-gate.test.js"
       - "backend/test/strategy-council.test.js"
       - "backend/test/intelligence-orchestrator.test.js"
       - "system/intelligence-orchestrator.js"
