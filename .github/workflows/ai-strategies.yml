@@ -67,15 +67,17 @@ jobs:
 
       - name: Python syntax and ML feature regression checks
         run: |
-          python -m py_compile ml-signal-service/service.py
+          python -m py_compile ml-signal-service/service.py ml-signal-service/temporal_model.py
           python -m unittest discover -s ml-signal-service -p "test_*.py"
 
       - name: Train all five AI strategy models
         run: |
           python - <<'PY'
           import math
+          import os
           import sys
           import time
+          os.environ["KINGBOT_ML_TEMPORAL_EPOCHS"] = "8"
           from pathlib import Path
 
           sys.path.insert(0, str(Path("ml-signal-service").resolve()))
@@ -83,7 +85,7 @@ jobs:
 
           bars = []
           base = 100.0
-          for i in range(260):
+          for i in range(520):
               cycle = math.sin(i / 7.0) * 2.4 + math.sin(i / 17.0) * 1.8
               drift = ((i % 31) - 15) * 0.08
               close = base + cycle + drift
@@ -97,7 +99,8 @@ jobs:
           for strategy in ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"]:
               result = service.train_model(strategy, "5m", [market])
               assert result["ready"], result
-              assert result["featureVersion"].startswith("ai-strategies-v5"), result
+              assert result["decisionModel"] == "ATTENTION_GRU_CANDLE_SEQUENCE", result
+              assert result["featureVersion"].startswith("ai-strategies-v6"), result
               trained.append(result["key"])
               prediction = service.predict_model(
                   strategy,
@@ -106,6 +109,7 @@ jobs:
                   {
                       "price": bars[-1]["close"],
                       "atr": 1.5,
+                      "bars": bars,
                       "emaFast": 101.0,
                       "emaSlow": 99.5,
                       "rsi": 58.0,
@@ -130,6 +134,7 @@ jobs:
               assert prediction["strategy"] == strategy, prediction
               assert prediction["modelKey"] == f"{strategy}:5m", prediction
               assert prediction["direction"] in {"BUY", "SELL", "HOLD"}, prediction
+              assert prediction["decisionAuthority"] == "TEMPORAL_GRU_SEQUENCE_MODEL", prediction
 
           print("AI strategy models trained:", ",".join(trained))
           PY
@@ -197,7 +202,7 @@ jobs:
 
             const bars = [];
             let base = 100;
-            for (let i = 0; i < 240; i++) {
+            for (let i = 0; i < 360; i++) {
               const previous = base;
               const close = base + Math.sin(i / 6) * 2 + Math.sin(i / 13) * 1.5 + ((i % 17) - 8) * 0.05;
               base = close;
@@ -210,20 +215,29 @@ jobs:
               });
             }
 
-            const trainResponse = await fetch("http://127.0.0.1:19090/train", {
-              method: "POST",
-              headers: { "content-type": "application/json", "x-kingbot-ml-secret": "ci-secret" },
-              body: JSON.stringify({ botId: "strategic", timeframe: "15m", markets: [{ symbol: "XAUUSD", bars }] })
-            });
-            const train = await trainResponse.json();
-            if (!trainResponse.ok || !train.ok || !train.ready) throw new Error("ML train failed: " + JSON.stringify(train));
+            for (const timeframe of ["4h", "1h", "15m"]) {
+              const trainResponse = await fetch("http://127.0.0.1:19090/train", {
+                method: "POST",
+                headers: { "content-type": "application/json", "x-kingbot-ml-secret": "ci-secret" },
+                body: JSON.stringify({ botId: "strategic", timeframe, markets: [{ symbol: "XAUUSD", bars }] })
+              });
+              const train = await trainResponse.json();
+              if (!trainResponse.ok || !train.ok || !train.ready) throw new Error("ML train failed (" + timeframe + "): " + JSON.stringify(train));
+              if (train.decisionModel !== "ATTENTION_GRU_CANDLE_SEQUENCE") throw new Error("Temporal model not active (" + timeframe + ")");
+            }
 
             const { warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } = await import("./backend/src/ai-trade-gate.js");
             const market = {
-              symbol: "XAUUSD", timeframe: "5m", price: base, spread: 0.2, atr: 1.5,
+              symbol: "XAUUSD", timeframe: "15m", price: base, spread: 0.2, atr: 1.5, bars,
+              timeframeProfile: { regime: "4h", setup: "1h", execution: "15m" },
               volatility: 0.45, trend: 0.7, momentum: 0.6, structure: "bullish",
               adx: 24, rsi: 58, emaFast: 101, emaSlow: 99.5,
-              velocityPoints: 0.8, velocityAtr: 0.8, volume: 0.5
+              velocityPoints: 0.8, velocityAtr: 0.8, volume: 0.5,
+              multiTimeframe: {
+                regime: { timeframe: "4h", available: true, candleCount: bars.length, bars },
+                setup: { timeframe: "1h", available: true, candleCount: bars.length, bars },
+                execution: { timeframe: "15m", available: true, candleCount: bars.length, bars }
+              }
             };
             const analysis = { ok: true, signal: "LONG_CANDIDATE", score: 80, reason: "CI test" };
             const signal = await warmAiStrategySignal({
@@ -231,7 +245,7 @@ jobs:
               botId: "strategic",
               market,
               analysis,
-              risk: { blocks: [] }
+              risk: { allowed: true, blocks: [] }
             });
             const routed = routeAiSignalToEngine({
               botId: "strategic",
@@ -245,7 +259,7 @@ jobs:
             }
             if (signal.engine !== "strategic") throw new Error("Wrong strategy engine");
             if (!["BUY", "SELL", "HOLD"].includes(signal.direction)) throw new Error("Invalid direction");
-            if (!routed || routed.status === "CORTEX_ENGINE_ROUTE_MISMATCH") throw new Error("Signal routing failed");
+            if (!routed || routed.candidateDirectionUsedForDecision !== false) throw new Error("Temporal AI routing failed");
 
             console.log("END-TO-END AI STRATEGIES PASS", JSON.stringify({
               engine: signal.engine,
