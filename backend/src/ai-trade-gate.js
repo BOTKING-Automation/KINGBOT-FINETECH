@@ -377,21 +377,19 @@ async function predictMultiTimeframeMl({botId,market}={}){
   const confidence=ranked[0][1];
   const score=aggregate.buy-aggregate.sell;
 
-  const directional=ready
-    .map(x=>candidateDirection(x.direction))
-    .filter(Boolean);
-  const directionWeight={BUY:0,SELL:0};
+  const directionWeight={BUY:0,SELL:0,HOLD:0};
   for(const prediction of ready){
-    const d=candidateDirection(prediction.direction);
-    if(d)directionWeight[d]+=Math.max(0.05,Number(prediction.weight)||0);
+    const d=candidateDirection(prediction.direction)||"HOLD";
+    directionWeight[d]+=Math.max(0.05,Number(prediction.weight)||0);
   }
-  const directionalTotal=directionWeight.BUY+directionWeight.SELL;
+  // HOLD is a genuine model vote and must count against directional consensus.
+  // Otherwise one BUY model plus several HOLD models could look like 100% agreement.
+  const directionalTotal=directionWeight.BUY+directionWeight.SELL+directionWeight.HOLD;
+  const consensusDirection=["BUY","SELL","HOLD"].sort((a,b)=>directionWeight[b]-directionWeight[a])[0];
   const directionalConsensus=directionalTotal>0
-    ? Math.max(directionWeight.BUY,directionWeight.SELL)/directionalTotal
+    ? directionWeight[consensusDirection]/directionalTotal
     : 0;
-  const modelConsensus=directional.length?(
-    directionWeight.BUY>=directionWeight.SELL?"BUY":"SELL"
-  ):"HOLD";
+  const modelConsensus=consensusDirection;
 
   return {
     ok:true,
