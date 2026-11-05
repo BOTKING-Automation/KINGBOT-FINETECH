@@ -55,6 +55,13 @@ MAX_CONCURRENT_TRAINING = max(1, min(2, int(os.getenv("KINGBOT_ML_MAX_CONCURRENT
 TEMPORAL_MIN_CONFIDENCE = max(0.40, min(0.90, float(os.getenv("KINGBOT_ML_TEMPORAL_MIN_CONFIDENCE", "0.48"))))
 TEMPORAL_MIN_EDGE = max(0.0, min(0.50, float(os.getenv("KINGBOT_ML_TEMPORAL_MIN_EDGE", "0.04"))))
 TEMPORAL_EPOCHS = max(8, min(80, int(os.getenv("KINGBOT_ML_TEMPORAL_EPOCHS", "24"))))
+SEQUENCE_TARGETS = {
+    "strategic": {"horizon": 6, "atrBarrier": 0.55},
+    "flipper": {"horizon": 2, "atrBarrier": 0.25},
+    "breakout": {"horizon": 4, "atrBarrier": 0.40},
+    "smc-pro": {"horizon": 5, "atrBarrier": 0.45},
+    "ladder-flip": {"horizon": 1, "atrBarrier": 0.20},
+}
 TRAINING_KEYS: set[str] = set()
 TRAINING_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_TRAINING)
 PREDICTION_SEMAPHORE = threading.BoundedSemaphore(MAX_PREDICTIONS)
@@ -515,10 +522,15 @@ def decide_action(probabilities: np.ndarray, regime: str, direction: int, confid
     return "HOLD", "probability spread is not strong enough"
 
 
-def temporal_split_bounds(sample_count: int, train_fraction: float = 0.78) -> tuple[int, int]:
+def temporal_split_bounds(
+    sample_count: int,
+    train_fraction: float = 0.78,
+    embargo_bars: int | None = None,
+) -> tuple[int, int]:
     """Split chronologically and embargo overlapping forward labels."""
     split = max(40, min(sample_count - 20, int(sample_count * train_fraction)))
-    train_end = split - FORWARD_HORIZON
+    embargo = FORWARD_HORIZON if embargo_bars is None else max(1, int(embargo_bars))
+    train_end = split - embargo
     return train_end, split
 
 
@@ -578,6 +590,9 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         temporal_test_parts: list[np.ndarray] = []
         temporal_test_labels: list[np.ndarray] = []
         validation_markets: list[dict[str, Any]] = []
+        temporal_target = SEQUENCE_TARGETS.get(strategy, {"horizon": FORWARD_HORIZON, "atrBarrier": LABEL_ATR})
+        sequence_horizon = int(temporal_target["horizon"])
+        sequence_atr_barrier = float(temporal_target["atrBarrier"])
         total_bar_count = 0
         accepted_markets = 0
 
@@ -610,11 +625,13 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
 
             sequence_x, sequence_y = bars_to_sequence_arrays(
                 normalized,
-                horizon=FORWARD_HORIZON,
-                atr_barrier=LABEL_ATR,
+                horizon=sequence_horizon,
+                atr_barrier=sequence_atr_barrier,
                 sequence_length=SEQUENCE_LENGTH,
             )
-            sequence_train_end, sequence_test_start = temporal_split_bounds(len(sequence_x))
+            sequence_train_end, sequence_test_start = temporal_split_bounds(
+                len(sequence_x), embargo_bars=sequence_horizon
+            )
             sequence_x_train = sequence_x[:sequence_train_end]
             sequence_x_test = sequence_x[sequence_test_start:]
             sequence_y_train = sequence_y[:sequence_train_end]
@@ -653,7 +670,9 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "sequenceTrainSamples": int(len(sequence_x_train)),
                 "sequenceTestSamples": int(len(sequence_x_test)),
                 "embargoBars": int(test_start - train_end),
-                "sequenceEmbargoBars": int(sequence_test_start - sequence_train_end)
+                "sequenceEmbargoBars": int(sequence_test_start - sequence_train_end),
+                "sequenceHorizonBars": sequence_horizon,
+                "sequenceAtrBarrier": sequence_atr_barrier
             })
 
         if not train_x_parts or not test_x_parts or not temporal_train_parts or not temporal_test_parts:
@@ -780,6 +799,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "temporal_macro_f1": temporal_metrics["macroF1"],
                 "temporal_accuracy": temporal_metrics["accuracy"],
                 "sequence_length": SEQUENCE_LENGTH,
+                "sequence_horizon": sequence_horizon,
+                "sequence_atr_barrier": sequence_atr_barrier,
                 "trained_at": trained_at,
                 "strategy": strategy,
                 "symbols": sorted(
@@ -808,7 +829,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "validation": {
                     "type": "per-market-temporal-holdout-with-label-embargo",
                     "trainFraction": 0.78,
-                    "embargoBars": FORWARD_HORIZON,
+                    "embargoBars": sequence_horizon,
+                    "tabularEmbargoBars": FORWARD_HORIZON,
                     "markets": validation_markets,
                 },
                 "selection_score": candidate_score,
@@ -846,6 +868,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "classesTest": test_classes,
                 "forwardBars": FORWARD_HORIZON,
                 "labelAtr": LABEL_ATR,
+                "temporalForwardBars": sequence_horizon,
+                "temporalAtrBarrier": sequence_atr_barrier,
             },
             "validation": {
                 "type": "per-market-temporal-holdout",
@@ -895,6 +919,8 @@ def model_status(key: str) -> dict[str, Any]:
         "temporalBalancedAccuracy": round(item.get("temporal_balanced_accuracy", 0.0) * 100.0, 2),
         "temporalMacroF1": round(item.get("temporal_macro_f1", 0.0) * 100.0, 2),
         "sequenceLength": int(item.get("sequence_length", SEQUENCE_LENGTH)),
+        "sequenceHorizonBars": int(item.get("sequence_horizon", FORWARD_HORIZON)),
+        "sequenceAtrBarrier": float(item.get("sequence_atr_barrier", LABEL_ATR)),
         "decisionModel": item.get("decision_model", "ATTENTION_GRU_CANDLE_SEQUENCE"),
         "qualityGate": bool(item.get("quality_gate", False)),
         "validationType": item.get("validation", {}).get("type", "unknown"),
@@ -1098,6 +1124,8 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
                     "balancedAccuracy": round(item.get("temporal_balanced_accuracy", 0.0) * 100.0, 2),
                     "macroF1": round(item.get("temporal_macro_f1", 0.0) * 100.0, 2),
                     "sequenceLength": int(item.get("sequence_length", SEQUENCE_LENGTH)),
+        "sequenceHorizonBars": int(item.get("sequence_horizon", FORWARD_HORIZON)),
+        "sequenceAtrBarrier": float(item.get("sequence_atr_barrier", LABEL_ATR)),
                     "decisionAuthority": True,
                 },
                 "auxiliaryBenchmarks": {
