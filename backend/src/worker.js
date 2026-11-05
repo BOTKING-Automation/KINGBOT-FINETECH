@@ -1249,13 +1249,15 @@ async function cycle(){
 
 export async function startWorker(options={}){
   activeEventBus = options?.eventBus || null;
-  if(!pool){
-    if(String(process.env.WORKER_STANDBY||"").trim()==="1"){
-      console.log("[KINGBOT WORKER] standby mode: database is owned by the primary API service");
-      return;
-    }
-    throw new Error("DATABASE_URL_REQUIRED");
+  // Standby must be checked even when DATABASE_URL exists. The API and the
+  // dedicated worker share the same database, but only the dedicated worker
+  // may own the execution loop. Without this early return both processes
+  // would execute the same RUNNING bot rows independently.
+  if(String(process.env.WORKER_STANDBY||"").trim()==="1"){
+    console.log("[KINGBOT WORKER] standby mode: execution is owned by the dedicated worker service");
+    return;
   }
+  if(!pool)throw new Error("DATABASE_URL_REQUIRED");
   await ensureWorkerSchema();
   await heartbeat({startup:true});
   await activeEventBus?.upsertState({
