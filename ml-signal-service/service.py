@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 KINGBOT ML Signal Service
-Purpose: supervised market-signal generation inside the AI STRATEGIES stage.
+Purpose: learned temporal market-direction inference inside KINGBOT CORTEX.
 
-The service never places orders. It trains strategy-specific classifiers on
-verified OHLC bars supplied by the KINGBOT market-data service and returns
-BUY / SELL / HOLD probabilities from a scikit-learn + PyTorch ensemble.
+The service never places orders. Its primary decision model is a PyTorch
+attention-GRU trained on causal OHLCV sequences and forward market outcomes.
+Scikit-learn and the tabular PyTorch model remain auxiliary benchmarks.
 """
 from __future__ import annotations
 
@@ -25,6 +25,15 @@ from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 from sklearn.preprocessing import StandardScaler
 from torch import nn
 
+from temporal_model import (
+    SEQUENCE_LENGTH,
+    TemporalGRU,
+    bars_to_sequence_arrays,
+    extract_bar_sequence_features,
+    predict_temporal_probabilities,
+    train_temporal_model,
+)
+
 
 HOST = "0.0.0.0"
 PORT = int(os.getenv("PORT", "10000"))
@@ -43,6 +52,16 @@ RF_ENSEMBLE_WEIGHT = 0.55
 TORCH_ENSEMBLE_WEIGHT = 0.45
 MAX_PREDICTIONS = max(2, min(64, int(os.getenv("KINGBOT_ML_MAX_PREDICTIONS", "16"))))
 MAX_CONCURRENT_TRAINING = max(1, min(2, int(os.getenv("KINGBOT_ML_MAX_CONCURRENT_TRAINING", "1"))))
+TEMPORAL_MIN_CONFIDENCE = max(0.40, min(0.90, float(os.getenv("KINGBOT_ML_TEMPORAL_MIN_CONFIDENCE", "0.48"))))
+TEMPORAL_MIN_EDGE = max(0.0, min(0.50, float(os.getenv("KINGBOT_ML_TEMPORAL_MIN_EDGE", "0.04"))))
+TEMPORAL_EPOCHS = max(8, min(80, int(os.getenv("KINGBOT_ML_TEMPORAL_EPOCHS", "24"))))
+SEQUENCE_TARGETS = {
+    "strategic": {"horizon": 6, "atrBarrier": 0.55},
+    "flipper": {"horizon": 2, "atrBarrier": 0.25},
+    "breakout": {"horizon": 4, "atrBarrier": 0.40},
+    "smc-pro": {"horizon": 5, "atrBarrier": 0.45},
+    "ladder-flip": {"horizon": 1, "atrBarrier": 0.12},
+}
 TRAINING_KEYS: set[str] = set()
 TRAINING_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_TRAINING)
 PREDICTION_SEMAPHORE = threading.BoundedSemaphore(MAX_PREDICTIONS)
@@ -503,10 +522,15 @@ def decide_action(probabilities: np.ndarray, regime: str, direction: int, confid
     return "HOLD", "probability spread is not strong enough"
 
 
-def temporal_split_bounds(sample_count: int, train_fraction: float = 0.78) -> tuple[int, int]:
+def temporal_split_bounds(
+    sample_count: int,
+    train_fraction: float = 0.78,
+    embargo_bars: int | None = None,
+) -> tuple[int, int]:
     """Split chronologically and embargo overlapping forward labels."""
     split = max(40, min(sample_count - 20, int(sample_count * train_fraction)))
-    train_end = split - FORWARD_HORIZON
+    embargo = FORWARD_HORIZON if embargo_bars is None else max(1, int(embargo_bars))
+    train_end = split - embargo
     return train_end, split
 
 
@@ -561,7 +585,14 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         train_w_parts: list[np.ndarray] = []
         test_x_parts: list[np.ndarray] = []
         test_y_parts: list[np.ndarray] = []
+        temporal_train_parts: list[np.ndarray] = []
+        temporal_train_labels: list[np.ndarray] = []
+        temporal_test_parts: list[np.ndarray] = []
+        temporal_test_labels: list[np.ndarray] = []
         validation_markets: list[dict[str, Any]] = []
+        temporal_target = SEQUENCE_TARGETS.get(strategy, {"horizon": FORWARD_HORIZON, "atrBarrier": LABEL_ATR})
+        sequence_horizon = int(temporal_target["horizon"])
+        sequence_atr_barrier = float(temporal_target["atrBarrier"])
         total_bar_count = 0
         accepted_markets = 0
 
@@ -592,7 +623,28 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             y_train_part, y_test_part = y_part[:train_end], y_part[test_start:]
             w_train_part = weights_part[:train_end]
 
-            if train_end < 40 or len(X_test_part) < 20 or len(set(int(v) for v in y_train_part)) < 3:
+            sequence_x, sequence_y = bars_to_sequence_arrays(
+                normalized,
+                horizon=sequence_horizon,
+                atr_barrier=sequence_atr_barrier,
+                sequence_length=SEQUENCE_LENGTH,
+            )
+            sequence_train_end, sequence_test_start = temporal_split_bounds(
+                len(sequence_x), embargo_bars=sequence_horizon
+            )
+            sequence_x_train = sequence_x[:sequence_train_end]
+            sequence_x_test = sequence_x[sequence_test_start:]
+            sequence_y_train = sequence_y[:sequence_train_end]
+            sequence_y_test = sequence_y[sequence_test_start:]
+
+            if (
+                train_end < 40
+                or len(X_test_part) < 20
+                or len(set(int(v) for v in y_train_part)) < 3
+                or sequence_train_end < 40
+                or len(sequence_x_test) < 20
+                or len(set(int(v) for v in sequence_y_train)) < 3
+            ):
                 validation_markets.append({
                     "symbol": symbol,
                     "accepted": False,
@@ -605,17 +657,31 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             train_w_parts.append(w_train_part)
             test_x_parts.append(X_test_part)
             test_y_parts.append(y_test_part)
+            temporal_train_parts.append(sequence_x_train)
+            temporal_train_labels.append(sequence_y_train)
+            temporal_test_parts.append(sequence_x_test)
+            temporal_test_labels.append(sequence_y_test)
             validation_markets.append({
                 "symbol": symbol,
                 "accepted": True,
                 "samples": int(len(X_part)),
                 "trainSamples": int(len(X_train_part)),
                 "testSamples": int(len(X_test_part)),
-                "embargoBars": int(test_start - train_end)
+                "sequenceTrainSamples": int(len(sequence_x_train)),
+                "sequenceTestSamples": int(len(sequence_x_test)),
+                "embargoBars": int(test_start - train_end),
+                "sequenceEmbargoBars": int(sequence_test_start - sequence_train_end),
+                "sequenceHorizonBars": sequence_horizon,
+                "sequenceAtrBarrier": sequence_atr_barrier
             })
 
-        if not train_x_parts or not test_x_parts:
-            raise ValueError(f"ML_TRAINING_REQUIRES_{MIN_BARS}_BARS")
+        if not train_x_parts or not test_x_parts or not temporal_train_parts or not temporal_test_parts:
+            raise ValueError(f"ML_TRAINING_REQUIRES_{MIN_BARS}_BARS_AND_TEMPORAL_SAMPLES")
+
+        X_temporal_train = np.concatenate(temporal_train_parts, axis=0)
+        y_temporal_train = np.concatenate(temporal_train_labels, axis=0)
+        X_temporal_test = np.concatenate(temporal_test_parts, axis=0)
+        y_temporal_test = np.concatenate(temporal_test_labels, axis=0)
 
         X_train = np.concatenate(train_x_parts, axis=0)
         y_train = np.concatenate(train_y_parts, axis=0)
@@ -638,6 +704,18 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 X_train = np.concatenate([X_train, feedback_x], axis=0)
                 y_train = np.concatenate([y_train, feedback_y], axis=0)
                 weights_train = np.concatenate([weights_train, feedback_w], axis=0)
+
+            sequence_feedback = [
+                row for row in feedback
+                if isinstance(row.get("sequence"), list)
+                and len(row["sequence"]) == SEQUENCE_LENGTH
+            ]
+            if sequence_feedback:
+                feedback_sequence_x = np.asarray([row["sequence"] for row in sequence_feedback], dtype=np.float32)
+                feedback_sequence_y = np.asarray([int(row["label"]) for row in sequence_feedback], dtype=np.int64)
+                if feedback_sequence_x.ndim == 3 and feedback_sequence_x.shape[1:] == X_temporal_train.shape[1:]:
+                    X_temporal_train = np.concatenate([X_temporal_train, feedback_sequence_x], axis=0)
+                    y_temporal_train = np.concatenate([y_temporal_train, feedback_sequence_y], axis=0)
 
         if len(X_train) < 70 or len(X_test) < 30:
             raise ValueError("ML_TRAINING_FEATURES_INSUFFICIENT")
@@ -678,22 +756,32 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         ensemble_test_probabilities = ensemble_probabilities(rf, torch_model, X_test_scaled)
         ensemble_metrics = ensemble_class_metrics(y_test, ensemble_test_probabilities)
 
+        temporal_model, temporal_scaler, temporal_metrics = train_temporal_model(
+            X_temporal_train,
+            y_temporal_train,
+            X_temporal_test,
+            y_temporal_test,
+            epochs=TEMPORAL_EPOCHS,
+        )
+
+        # The temporal network, not indicator gates or the legacy shallow ensemble,
+        # is the decision authority. A weak candidate is rejected and cannot be promoted.
         quality_gate = (
-            ensemble_metrics["balancedAccuracy"] >= 0.36
-            and ensemble_metrics["macroF1"] >= 0.34
-            and len(X_test) >= 30
+            temporal_metrics["balancedAccuracy"] >= 0.36
+            and temporal_metrics["macroF1"] >= 0.34
+            and len(X_temporal_test) >= 30
         )
         if not quality_gate:
             raise ValueError(
-                "ML_MODEL_QUALITY_GATE_FAILED:"
-                f"balanced={ensemble_metrics['balancedAccuracy']:.3f},"
-                f"f1={ensemble_metrics['macroF1']:.3f},"
-                f"test={len(X_test)}"
+                "ML_TEMPORAL_MODEL_QUALITY_GATE_FAILED:"
+                f"balanced={temporal_metrics['balancedAccuracy']:.3f},"
+                f"f1={temporal_metrics['macroF1']:.3f},"
+                f"test={len(X_temporal_test)}"
             )
 
         candidate_score = (
-            ensemble_metrics["balancedAccuracy"] * 0.60
-            + ensemble_metrics["macroF1"] * 0.40
+            temporal_metrics["balancedAccuracy"] * 0.60
+            + temporal_metrics["macroF1"] * 0.40
         )
         with LOCK:
             incumbent = MODELS.get(key)
@@ -705,6 +793,14 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "rf": rf,
                 "torch": torch_model,
                 "scaler": scaler,
+                "temporal_model": temporal_model,
+                "temporal_scaler": temporal_scaler,
+                "temporal_balanced_accuracy": temporal_metrics["balancedAccuracy"],
+                "temporal_macro_f1": temporal_metrics["macroF1"],
+                "temporal_accuracy": temporal_metrics["accuracy"],
+                "sequence_length": SEQUENCE_LENGTH,
+                "sequence_horizon": sequence_horizon,
+                "sequence_atr_barrier": sequence_atr_barrier,
                 "trained_at": trained_at,
                 "strategy": strategy,
                 "symbols": sorted(
@@ -723,13 +819,18 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "ensemble_accuracy": ensemble_metrics["accuracy"],
                 "ensemble_balanced_accuracy": ensemble_metrics["balancedAccuracy"],
                 "ensemble_macro_f1": ensemble_metrics["macroF1"],
+                "temporal_balanced_accuracy": temporal_metrics["balancedAccuracy"],
+                "temporal_macro_f1": temporal_metrics["macroF1"],
+                "temporal_accuracy": temporal_metrics["accuracy"],
                 "quality_gate": quality_gate,
                 "bar_count": total_bar_count,
-                "feature_version": "ai-strategies-v5-parity-embargo-ensemble",
+                "feature_version": "ai-strategies-v6-temporal-gru-primary",
+                "decision_model": "ATTENTION_GRU_CANDLE_SEQUENCE",
                 "validation": {
                     "type": "per-market-temporal-holdout-with-label-embargo",
                     "trainFraction": 0.78,
-                    "embargoBars": FORWARD_HORIZON,
+                    "embargoBars": sequence_horizon,
+                    "tabularEmbargoBars": FORWARD_HORIZON,
                     "markets": validation_markets,
                 },
                 "selection_score": candidate_score,
@@ -737,7 +838,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "promoted_at": trained_at if promote else None,
                 "feedbackVersion": FEEDBACK_VERSION,
                 "feedbackRowsUsed": len(feedback),
-                "regimeAware": True,
+                "regimeAware": False,
                 "supportedRegimes": REGIME_ORDER,
             }
             if promote:
@@ -767,15 +868,20 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "classesTest": test_classes,
                 "forwardBars": FORWARD_HORIZON,
                 "labelAtr": LABEL_ATR,
+                "temporalForwardBars": sequence_horizon,
+                "temporalAtrBarrier": sequence_atr_barrier,
             },
             "validation": {
                 "type": "per-market-temporal-holdout",
                 "rf": rf_metrics,
                 "pytorch": torch_metrics,
                 "ensemble": ensemble_metrics,
+                "temporalSequenceModel": temporal_metrics,
+                "sequenceLength": SEQUENCE_LENGTH,
+                "decisionAuthority": "ATTENTION_GRU_CANDLE_SEQUENCE",
                 "qualityGate": quality_gate,
             },
-            "regimeAware": True,
+            "regimeAware": False,
             "supportedRegimes": REGIME_ORDER,
         }
     finally:
@@ -809,6 +915,13 @@ def model_status(key: str) -> dict[str, Any]:
         "ensembleAccuracy": round(item.get("ensemble_accuracy", 0.0) * 100.0, 2),
         "ensembleBalancedAccuracy": round(item.get("ensemble_balanced_accuracy", 0.0) * 100.0, 2),
         "ensembleMacroF1": round(item.get("ensemble_macro_f1", 0.0) * 100.0, 2),
+        "temporalAccuracy": round(item.get("temporal_accuracy", 0.0) * 100.0, 2),
+        "temporalBalancedAccuracy": round(item.get("temporal_balanced_accuracy", 0.0) * 100.0, 2),
+        "temporalMacroF1": round(item.get("temporal_macro_f1", 0.0) * 100.0, 2),
+        "sequenceLength": int(item.get("sequence_length", SEQUENCE_LENGTH)),
+        "sequenceHorizonBars": int(item.get("sequence_horizon", FORWARD_HORIZON)),
+        "sequenceAtrBarrier": float(item.get("sequence_atr_barrier", LABEL_ATR)),
+        "decisionModel": item.get("decision_model", "ATTENTION_GRU_CANDLE_SEQUENCE"),
         "qualityGate": bool(item.get("quality_gate", False)),
         "validationType": item.get("validation", {}).get("type", "unknown"),
         "selectionScore": round(float(item.get("selection_score", 0.0)), 4),
@@ -891,6 +1004,13 @@ def record_feedback(
         raise ValueError("ML_FEEDBACK_MARKET_REQUIRED")
 
     features = current_market_features(market, strategy)[0].astype(float).tolist()
+    sequence = None
+    raw_bars = market.get("bars")
+    if isinstance(raw_bars, list):
+        normalized_bars = normalize_market_bars(raw_bars)
+        sequence_features, _ = extract_bar_sequence_features(normalized_bars)
+        if len(sequence_features) >= SEQUENCE_LENGTH:
+            sequence = sequence_features[-SEQUENCE_LENGTH:].astype(float).tolist()
     label = 1 if normalized_direction == "BUY" else -1
     if normalized_outcome in {"LOSS", "INVALIDATED"}:
         label *= -1
@@ -905,6 +1025,7 @@ def record_feedback(
         "outcome": normalized_outcome,
         "label": int(label),
         "features": features,
+        "sequence": sequence,
         "pnl": None if pnl is None else finite(pnl, 0.0),
         "rMultiple": None if r_multiple is None else finite(r_multiple, 0.0),
         "receivedAt": time.time(),
@@ -935,49 +1056,59 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
     if not item:
         return {"ok": True, "ready": False, "status": "MODEL_NOT_READY", "modelKey": key}
 
-    price = finite(market.get("price") or market.get("close"))
-    atr_value = finite(market.get("atr") or market.get("atr14"))
-    if price <= 0 or atr_value <= 0:
-        raise ValueError("ML_PREDICT_MARKET_DATA_INVALID")
+    bars = normalize_market_bars(market.get("bars"))
+    if len(bars) < SEQUENCE_LENGTH:
+        return {
+            "ok": True,
+            "ready": False,
+            "status": "SEQUENCE_DATA_REQUIRED",
+            "requiredBars": SEQUENCE_LENGTH,
+            "receivedBars": len(bars),
+            "modelKey": key,
+        }
     if not PREDICTION_SEMAPHORE.acquire(timeout=0.8):
         return {"ok": True, "ready": False, "status": "ML_PREDICTION_CAPACITY_BUSY", "modelKey": key}
     try:
         if not bool(item.get("quality_gate", False)):
             return {"ok": True, "ready": False, "status": "MODEL_QUALITY_GATE_BLOCKED", "modelKey": key}
-        X = current_market_features(market, strategy)
-        scaled = item["scaler"].transform(X).astype(np.float32)
+        if not item.get("temporal_model") or not item.get("temporal_scaler"):
+            return {"ok": True, "ready": False, "status": "TEMPORAL_MODEL_NOT_READY", "modelKey": key}
 
-        probs = ensemble_probabilities(item["rf"], item["torch"], scaled)[0]
+        probs = predict_temporal_probabilities(item["temporal_model"], item["temporal_scaler"], bars)
+        if probs is None:
+            return {"ok": True, "ready": False, "status": "SEQUENCE_DATA_REQUIRED", "requiredBars": SEQUENCE_LENGTH, "receivedBars": len(bars), "modelKey": key}
+
         best_index = int(np.argmax(probs))
-        direction = int(INDEX_TO_LABEL[best_index])
-        confidence = float(probs[best_index])
+        best_confidence = float(probs[best_index])
         signed_score = float((probs[2] - probs[0]) * 100.0)
+        directional_confidence = float(max(probs[0], probs[2]))
+        directional_edge = directional_confidence - float(probs[1])
 
-        if confidence < 0.55 or abs(signed_score) < 12.0:
-            direction = 0
-
-        regime = detect_market_regime(market, strategy)
-        action, action_reason = decide_action(probs, regime, direction, confidence)
-        action_is_trade = action in {"BUY", "SELL"}
-        if not action_is_trade:
-            direction = 0
-        risk_mode = REGIME_RISK_MODE.get(regime, "neutral")
-
-        focus = STRATEGY_FOCUS.get(strategy, set())
-        focus_note = ",".join(sorted(focus))
+        # This is model-probability abstention, not an indicator/regime rule.
+        # The model alone chooses BUY/SELL/HOLD; the backend risk governor
+        # separately decides whether any proposed order is permitted.
+        action = "HOLD"
+        direction = 0
+        action_reason = "learned sequence probabilities do not support a directional trade"
+        if best_index in (0, 2) and best_confidence >= TEMPORAL_MIN_CONFIDENCE and directional_edge >= TEMPORAL_MIN_EDGE:
+            direction = -1 if best_index == 0 else 1
+            action = "SELL" if direction < 0 else "BUY"
+            action_reason = "attention-GRU sequence prediction cleared the model confidence and directional-edge thresholds"
 
         return {
             "ok": True,
             "ready": True,
-            "status": "LIVE_ML_SIGNAL",
+            "status": "LIVE_TEMPORAL_ML_SIGNAL",
             "strategy": strategy,
             "symbol": symbol.upper(),
             "timeframe": timeframe.lower(),
             "direction": "BUY" if direction > 0 else "SELL" if direction < 0 else "HOLD",
-            "confidence": round(confidence * 100.0, 2),
+            "confidence": round(best_confidence * 100.0, 2),
+            "directionalConfidence": round(directional_confidence * 100.0, 2),
+            "directionalEdge": round(directional_edge * 100.0, 2),
             "score": round(signed_score, 2),
-            "regime": regime,
-            "riskMode": risk_mode,
+            "regime": "MODEL_INFERENCE",
+            "riskMode": "DETERMINISTIC_RISK_GOVERNOR",
             "decision": action,
             "decisionReason": action_reason,
             "probabilities": {
@@ -986,27 +1117,31 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
                 "buy": round(float(probs[2]) * 100.0, 2),
             },
             "models": {
-                "scikitLearn": {
-                    "accuracy": round(item["rf_accuracy"] * 100.0, 2),
-                    "balancedAccuracy": round(item.get("rf_balanced_accuracy", 0.0) * 100.0, 2),
-                    "macroF1": round(item.get("rf_macro_f1", 0.0) * 100.0, 2),
-                    "weight": 0.55,
+                "primary": {
+                    "name": "Attention GRU candle-sequence network",
+                    "type": "DEEP_TEMPORAL_LEARNING",
+                    "accuracy": round(item.get("temporal_accuracy", 0.0) * 100.0, 2),
+                    "balancedAccuracy": round(item.get("temporal_balanced_accuracy", 0.0) * 100.0, 2),
+                    "macroF1": round(item.get("temporal_macro_f1", 0.0) * 100.0, 2),
+                    "sequenceLength": int(item.get("sequence_length", SEQUENCE_LENGTH)),
+        "sequenceHorizonBars": int(item.get("sequence_horizon", FORWARD_HORIZON)),
+        "sequenceAtrBarrier": float(item.get("sequence_atr_barrier", LABEL_ATR)),
+                    "decisionAuthority": True,
                 },
-                "pytorch": {
-                    "accuracy": round(item["torch_accuracy"] * 100.0, 2),
-                    "balancedAccuracy": round(item.get("torch_balanced_accuracy", 0.0) * 100.0, 2),
-                    "macroF1": round(item.get("torch_macro_f1", 0.0) * 100.0, 2),
-                    "weight": 0.45,
+                "auxiliaryBenchmarks": {
+                    "randomForestBalancedAccuracy": round(item.get("rf_balanced_accuracy", 0.0) * 100.0, 2),
+                    "tabularPytorchBalancedAccuracy": round(item.get("torch_balanced_accuracy", 0.0) * 100.0, 2),
+                    "usedForDirection": False,
                 },
             },
-            "focusFeatures": focus_note,
-            "focusScale": "1.00 focus / 0.25 non-focus",
             "modelKey": key,
             "featureVersion": item["feature_version"],
+            "decisionModel": item.get("decision_model", "ATTENTION_GRU_CANDLE_SEQUENCE"),
             "trainedAt": item["trained_at"],
             "generatedAt": time.time(),
-            "regimeAware": True,
-            "supportedRegimes": REGIME_ORDER,
+            "decisionAuthority": "TEMPORAL_GRU_SEQUENCE_MODEL",
+            "rulesBasedDirection": False,
+            "regimeAware": False,
         }
     finally:
         PREDICTION_SEMAPHORE.release()
@@ -1050,7 +1185,8 @@ class Handler(BaseHTTPRequestHandler):
                 "ok": True,
                 "service": "KINGBOT ML Signal Service",
                 "stage": "AI_STRATEGIES",
-                "purpose": "ML_SIGNAL_GENERATION",
+                "purpose": "TEMPORAL_SEQUENCE_INFERENCE",
+                "decisionModel": "ATTENTION_GRU_CANDLE_SEQUENCE",
                 "libraries": ["scikit-learn", "PyTorch"],
                 "modelsLoaded": len(MODELS),
                 "configured": bool(SECRET),
@@ -1066,7 +1202,7 @@ class Handler(BaseHTTPRequestHandler):
                 "rfTrees": MAX_RF_TREES,
                 "torchEpochs": TORCH_EPOCHS,
                 "torchThreads": TORCH_THREADS,
-                "regimeAware": True,
+                "regimeAware": False,
                 "supportedRegimes": REGIME_ORDER,
             })
             return

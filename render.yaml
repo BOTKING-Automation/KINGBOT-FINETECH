@@ -55,7 +55,7 @@ services:
       - key: BROKER_CREDENTIALS_KEY
         sync: false
       - key: WORKER_STANDBY
-        value: "1"
+        value: "0"
       - key: KINGBOT_AI_STRATEGIES_REQUIRED
         value: "true"
       - key: KINGBOT_ML_SIGNAL_HOST
