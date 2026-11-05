@@ -1,119 +1,493 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#050a18">
-<meta name="description" content="KINGBOT FINTECH unified trading command center — broker, account, bot runtime, risk and intelligence state.">
-<title>KINGBOT FINTECH — Trading Command Center</title>
-<link rel="stylesheet" href="system/platform.css">
-<style>
-:root{--bg:#02040a;--panel:rgba(7,12,27,.92);--line:rgba(25,230,255,.12);--gold:#f6b93b;--cyan:#19e6ff;--green:#23f7a3;--red:#ff5c7a;--violet:#9b5cff;--txt:#eef4ff;--muted:#7f8daa}
-body{margin:0;background:radial-gradient(circle at 10% 0%,rgba(25,230,255,.07),transparent 28%),radial-gradient(circle at 92% 8%,rgba(246,185,59,.07),transparent 26%),linear-gradient(180deg,#02040a,#050a18);color:var(--txt);font-family:Space Grotesk,system-ui}
-.wrap{width:min(1440px,calc(100% - 28px));margin:88px auto 50px}
-.hero{padding:24px;border:1px solid rgba(246,185,59,.15);border-radius:20px;background:linear-gradient(145deg,rgba(9,16,37,.96),rgba(3,7,15,.98));box-shadow:0 20px 80px rgba(0,0,0,.28)}
-.ey{font:800 8px JetBrains Mono,monospace;letter-spacing:.2em;color:var(--cyan)}
-h1{font:900 clamp(28px,4vw,46px) Orbitron,sans-serif;margin:9px 0}
-.lead{max-width:880px;color:var(--muted);line-height:1.7;font-size:13px;margin:0}
-.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.btn{border:1px solid rgba(25,230,255,.17);background:rgba(25,230,255,.05);color:#bcefff;border-radius:9px;padding:9px 12px;cursor:pointer;font:800 8px JetBrains Mono}.btn:hover{border-color:rgba(25,230,255,.35)}.btn.gold{color:#211501;background:linear-gradient(135deg,#f6b93b,#ffd977);border-color:transparent}
-.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
-.card{border:1px solid rgba(255,255,255,.07);border-radius:14px;background:var(--panel);padding:14px;min-width:0}
-.label{font:800 7px JetBrains Mono;color:#5f6d87;letter-spacing:.12em}.value{margin-top:6px;font:900 17px Orbitron;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sub{margin-top:4px;color:#68758e;font:700 7px JetBrains Mono}
-.good{color:var(--green)}.warn{color:var(--gold)}.bad{color:var(--red)}.violet{color:#c6b0ff}
-.two{display:grid;grid-template-columns:1.1fr .9fr;gap:10px;margin-top:10px}.panel{border:1px solid rgba(255,255,255,.07);border-radius:16px;background:var(--panel);overflow:hidden}.head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06)}.head h2{margin:0;font:900 9px Orbitron;letter-spacing:.09em}.body{padding:13px}.rows{display:grid;gap:7px}.row{display:flex;justify-content:space-between;gap:12px;padding:8px 9px;border-radius:9px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.045)}.row span:first-child{color:#66738c;font:700 7px JetBrains Mono}.row span:last-child{text-align:right;font:800 7px JetBrains Mono;color:#dce5f5}
-.bot-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.bot{padding:9px;border-radius:10px;border:1px solid rgba(255,255,255,.055);background:rgba(255,255,255,.02)}.bot b{display:block;font:900 8px Orbitron}.bot small{display:block;margin-top:4px;color:#65728a;font:700 6px JetBrains Mono}.badge{display:inline-block;margin-top:7px;padding:4px 6px;border-radius:6px;font:800 6px JetBrains Mono;color:#9fb0c9;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
-.event-list{display:grid;gap:6px;max-height:360px;overflow:auto}.event{padding:8px;border-radius:9px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.045)}.event b{font:900 7px JetBrains Mono;color:#bcd0ea}.event small{display:block;margin-top:3px;color:#65728a;font:600 6px JetBrains Mono;line-height:1.45}
-.modules{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.module{padding:10px;border:1px solid rgba(255,255,255,.055);border-radius:10px;background:rgba(255,255,255,.02)}.module b{display:block;font:900 7px Orbitron}.module span{display:block;margin-top:5px;color:#68758e;font:600 6px JetBrains Mono;line-height:1.5}
-@media(max-width:1050px){.grid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}@media(max-width:620px){.grid,.bot-grid,.modules{grid-template-columns:1fr}.wrap{width:calc(100% - 14px);margin-top:72px}.hero{padding:18px}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#050916">
+  <meta name="description" content="KINGBOT FINETECH institutional command centre for broker connectivity, AI intelligence, trading engines, live markets, account telemetry and risk operations.">
+  <title>KINGBOT FINETECH — Cortex Command Centre</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="system/platform.css">
   <link rel="stylesheet" href="system/workspace-refresh.css?v=1">
-  <link rel="stylesheet" href="system/command-center-professional.css?v=1">
+  <link rel="stylesheet" href="system/command-center-professional.css?v=cortex-v2">
 </head>
-<body class="kb-app-refresh kb-command-page">
-<div data-kingbot-navigation></div>
-<main class="wrap">
-<section class="hero">
-<div class="ey">KINGBOT FINTECH / UNIFIED TRADING COMMAND LAYER</div>
-<h1>ONE CORE. ONE VERIFIED STATE.</h1>
-<p class="lead">A single operational surface for broker connectivity, live account telemetry, bot runtime, risk authorization, subscription state, intelligence and platform events. Trading execution remains server-authoritative.</p>
-<div class="toolbar">
-<button class="btn gold" id="refresh">REFRESH CORE</button>
-<a class="btn" href="terminal.html">OPEN TERMINAL →</a>
-<a class="btn" href="bots.html">MANAGE BOTS →</a>
-<a class="btn" href="analytics.html">ANALYTICS →</a>
-</div>
-</section>
-<section class="grid">
-<div class="card"><div class="label">BROKER</div><div class="value" id="broker">—</div><div class="sub" id="brokerSub">Awaiting verified state</div></div>
-<div class="card"><div class="label">ACCOUNT EQUITY</div><div class="value" id="equity">—</div><div class="sub" id="equitySub">Terminal telemetry</div></div>
-<div class="card"><div class="label">ACTIVE ENGINE</div><div class="value" id="bot">—</div><div class="sub" id="botSub">No selected engine</div></div>
-<div class="card"><div class="label">NEW ORDERS</div><div class="value" id="risk">—</div><div class="sub" id="riskSub">Execution authorization</div></div>
-</section>
-<section class="two">
-<section class="panel"><div class="head"><h2>ACCOUNT + EXECUTION STATE</h2><span class="badge" id="fresh">CORE STANDBY</span></div><div class="body"><div class="rows">
-<div class="row"><span>ACCOUNT</span><span id="accountId">—</span></div>
-<div class="row"><span>MODE</span><span id="mode">—</span></div>
-<div class="row"><span>BALANCE</span><span id="balance">—</span></div>
-<div class="row"><span>POSITIONS</span><span id="positions">—</span></div>
-<div class="row"><span>TRADING ENABLED</span><span id="trading">—</span></div>
-<div class="row"><span>SUBSCRIPTION</span><span id="subscription">—</span></div>
-</div></div></section>
-<section class="panel"><div class="head"><h2>RISK GOVERNOR</h2><span class="badge" id="riskBadge">—</span></div><div class="body"><div class="rows">
-<div class="row"><span>TRADING PAUSED</span><span id="paused">—</span></div>
-<div class="row"><span>GLOBAL KILL SWITCH</span><span id="kill">—</span></div>
-<div class="row"><span>AUTHORIZATION</span><span id="authorization">—</span></div>
-<div class="row"><span>REASON</span><span id="reason">—</span></div>
-</div></div></section>
-</section>
-<section class="two">
-<section class="panel"><div class="head"><h2>BOT RUNTIME FABRIC</h2><span class="badge" id="runtimeCount">0 ENGINES</span></div><div class="body"><div class="bot-grid" id="bots"><div class="row"><span>LOADING</span><span>—</span></div></div></div></section>
-<section class="panel"><div class="head"><h2>LIVE EVENT STREAM</h2><span class="badge">LATEST 20</span></div><div class="body"><div class="event-list" id="events"><div class="event"><b>CORE INITIALIZING</b><small>Waiting for authenticated state.</small></div></div></div></section>
-</section>
-<section class="panel" style="margin-top:10px"><div class="head"><h2>PLATFORM CAPABILITIES</h2><span class="badge">COMPANY OS</span></div><div class="body"><div class="modules" id="modules"></div></div></section>
-</main>
-<script src="system/navigation.js"></script>
-<script>
-(function(){
-"use strict";
-const $=id=>document.getElementById(id);
-const money=(n,c)=>Number.isFinite(Number(n))?(String(c||"")+" "+Number(n).toLocaleString(undefined,{maximumFractionDigits:2})):"—";
-function val(el,text,cls){el.textContent=text||"—";el.className=el.className.split(" ").filter(x=>!["good","warn","bad","violet"].includes(x)).join(" ")+" "+(cls||"");}
-function render(s){
- const b=s?.broker||{}, a=s?.account?.account||{}, sel=s?.botSelection?.bot||{}, risk=s?.risk?.executionControl||{}, sub=s?.subscription?.subscription||null;
- val($("broker"),b.connected?String(b.broker||"CONNECTED").toUpperCase():"OFFLINE",b.connected?"good":"warn");
- $("brokerSub").textContent=b.connected?(b.executionMode||"DEMO")+" · "+(b.accountId||"account linked"):"Connect a verified broker";
- const eq=Number(a.equity);val($("equity"),Number.isFinite(eq)?money(eq,a.currency):"—",Number.isFinite(eq)?"good":"warn");$("equitySub").textContent=a.accountStatus||"Terminal telemetry";
- val($("bot"),sel.name||sel.botId||"NO ENGINE",sel.state==="RUNNING"?"good":"");
- $("botSub").textContent=sel.state||"STOPPED";
- val($("risk"),risk.globalKillSwitch?"BLOCKED":risk.tradingPaused?"PAUSED":risk.newOrdersAuthorized?"OPEN":"BLOCKED",risk.globalKillSwitch||!risk.newOrdersAuthorized?"bad":risk.tradingPaused?"warn":"good");
- $("riskSub").textContent=risk.reason||"Risk governor clear";
- $("accountId").textContent=a.accountId||"—";$("mode").textContent=a.executionMode||b.executionMode||"—";
- $("balance").textContent=money(a.balance,a.currency);$("positions").textContent=String(a.positionCount??"—");
- $("trading").textContent=a.tradingEnabled===true?"ENABLED":a.tradingEnabled===false?"DISABLED":"—";
- $("subscription").textContent=sub?(String(sub.plan_id||"").toUpperCase()+" · "+String(sub.status||"").toUpperCase()):"NO ACTIVE PLAN";
- $("paused").textContent=risk.tradingPaused?"YES":"NO";$("kill").textContent=risk.globalKillSwitch?"ACTIVE":"OFF";
- $("authorization").textContent=risk.newOrdersAuthorized?"AUTHORIZED":"BLOCKED";$("reason").textContent=risk.reason||"NONE";
- val($("riskBadge"),risk.globalKillSwitch?"GLOBAL KILL":risk.tradingPaused?"ORDERS PAUSED":"RISK OPEN",risk.globalKillSwitch?"bad":risk.tradingPaused?"warn":"good");
- const bots=Array.isArray(s?.runtime?.bots)?s.runtime.bots:[];
- $("runtimeCount").textContent=bots.length+" ENGINES";
- $("bots").innerHTML=bots.length?bots.map(x=>'<div class="bot"><b>'+String(x.name||x.botId)+'</b><small>'+String(x.executionMode||"DEMO")+' · '+String(x.symbol||"MARKET UNSET")+' · '+String(x.timeframe||"—")+'</small><span class="badge '+(x.runtime==="RUNNING"?"good":"")+'">'+String(x.runtime||"STOPPED")+'</span></div>').join(""):'<div class="row"><span>NO ENGINE DATA</span><span>—</span></div>';
- const events=Array.isArray(s?.events)?s.events.slice(0,20):[];
- $("events").innerHTML=events.length?events.map(e=>'<div class="event"><b>'+String(e.eventType||"EVENT").replaceAll("_"," ")+'</b><small>'+new Date(e.occurredAt||e.createdAt||Date.now()).toLocaleString()+' · '+String(e.aggregateType||"CORE")+'</small></div>').join(""):'<div class="event"><b>NO RECENT EVENTS</b><small>Core is waiting for live platform events.</small></div>';
- $("fresh").textContent="CORE UPDATED "+new Date(s?.updatedAt||Date.now()).toLocaleTimeString();
-}
-function modules(){
- const data=window.KINGBOT_CAPABILITIES||[];
- $("modules").innerHTML=data.filter(x=>x.status!=="planned").slice(0,18).map(x=>'<div class="module"><b>'+x.name+'</b><span>'+x.desc+'</span></div>').join("");
-}
-async function init(){
- modules();
- const store=window.KINGBOT_CLIENT_STATE;
- if(!store){$("events").innerHTML='<div class="event"><b>STATE FABRIC UNAVAILABLE</b><small>Shared client state did not initialize.</small></div>';return;}
- store.subscribe(render);
- $("refresh").addEventListener("click",()=>store.refresh({includeMarket:true,reason:"command-center-refresh"}));
-}
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
-})();
-</script>
-<script src="system/kingbot-platform-capabilities.js"></script>
-</body></html>
+<body class="kb-command-page">
+  <div data-kingbot-navigation></div>
+  <div class="sidebar-scrim" id="sidebarScrim"></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="KINGBOT platform navigation">
+      <a class="brand" href="index.html">
+        <img src="assets/images/kingbot-fintech-logo.png" alt="KINGBOT FINETECH logo">
+        <span class="brand-copy"><strong>KINGBOT FINETECH</strong><small>INTELLIGENCE PLATFORM</small></span>
+      </a>
+
+      <div class="sidebar-caption">COMMAND LAYER</div>
+      <nav class="side-nav">
+        <a class="side-link active" href="command-center.html" aria-current="page"><span class="nav-icon">◈</span><span>Command Centre</span><span class="nav-active-dot"></span></a>
+        <a class="side-link" href="terminal.html"><span class="nav-icon">⌁</span><span>Trading Terminal</span></a>
+        <a class="side-link" href="markets.html"><span class="nav-icon">◉</span><span>Live Markets</span></a>
+        <a class="side-link" href="bots.html"><span class="nav-icon">⬡</span><span>AI Engines</span></a>
+        <a class="side-link" href="broker-connect.html"><span class="nav-icon">⇄</span><span>Broker Connect</span></a>
+        <a class="side-link" href="ai.html"><span class="nav-icon">✦</span><span>AI Intelligence</span></a>
+        <a class="side-link" href="scanner.html"><span class="nav-icon">⌕</span><span>AI Market Scanner</span></a>
+        <a class="side-link" href="gold-signals.html"><span class="nav-icon">◆</span><span>Gold Signal Desk</span></a>
+        <a class="side-link" href="analytics.html"><span class="nav-icon">▥</span><span>Analytics & Risk</span></a>
+        <a class="side-link" href="reports.html"><span class="nav-icon">▤</span><span>Reports & Audit</span></a>
+      </nav>
+
+      <div class="sidebar-caption">OPERATIONS & SERVICES</div>
+      <nav class="side-nav">
+        <a class="side-link" href="vps-dashboard.html"><span class="nav-icon">▣</span><span>MT5 Cloud / VPS</span></a>
+        <a class="side-link" href="fintech-ops.html"><span class="nav-icon">⌘</span><span>Fintech Operations</span></a>
+        <a class="side-link" href="security-center.html"><span class="nav-icon">⛨</span><span>Security Centre</span></a>
+        <a class="side-link" href="compliance.html"><span class="nav-icon">▧</span><span>Compliance</span></a>
+        <a class="side-link" href="developer.html"><span class="nav-icon">⌗</span><span>Developer API</span></a>
+        <a class="side-link" href="partner-revenue.html"><span class="nav-icon">⇧</span><span>Partner Revenue</span></a>
+      </nav>
+
+      <div class="sidebar-caption">ACCOUNT & LEARNING</div>
+      <nav class="side-nav">
+        <a class="side-link" href="subscription.html"><span class="nav-icon">◇</span><span>Plans & Billing</span></a>
+        <a class="side-link" href="academy.html"><span class="nav-icon">▱</span><span>Academy</span></a>
+        <a class="side-link" href="support-center.html"><span class="nav-icon">◌</span><span>Support Centre</span></a>
+        <a class="side-link" href="profile.html"><span class="nav-icon">◍</span><span>My Profile</span></a>
+        <a class="side-link" href="settings.html"><span class="nav-icon">⚙</span><span>Settings</span></a>
+        <a class="side-link" href="platform-os.html"><span class="nav-icon">▦</span><span>Platform OS</span></a>
+        <a class="side-link" href="admin.html"><span class="nav-icon">♜</span><span>Admin Console</span></a>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="side-security"><span class="security-led"></span><span>SERVER-AUTHORISED CONTROLS</span></div>
+        <div class="side-version">KINGBOT CORTEX · COMMAND LAYER</div>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open platform navigation" aria-expanded="false">☰</button>
+          <div class="breadcrumbs"><span>PLATFORM</span><i>/</i><strong>COMMAND CENTRE</strong></div>
+        </div>
+        <div class="topbar-right">
+          <div class="system-chip" id="connectionChip"><span class="status-led"></span><span id="connectionStatus">SYNCING STATE</span></div>
+          <div class="top-user"><span class="user-avatar">K</span><span class="user-copy"><b id="userName">KINGBOT USER</b><small id="accountMode">ACCOUNT UNVERIFIED</small></span></div>
+          <button class="refresh-button" id="refresh" type="button"><span class="refresh-icon">↻</span><span>REFRESH</span></button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="hero">
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="eyebrow-pulse"></span>KINGBOT CORTEX <i>/</i> INSTITUTIONAL TRADING OPERATIONS</div>
+            <h1>One command layer.<br><span>Every trading system in view.</span></h1>
+            <p>Monitor your broker connection, trading engines, market intelligence, account telemetry and risk authorisation from one secure operating surface.</p>
+            <div class="hero-actions">
+              <a class="action-primary" href="terminal.html">OPEN LIVE TERMINAL <span>↗</span></a>
+              <a class="action-secondary" href="ai.html">ENTER AI INTELLIGENCE <span>↗</span></a>
+              <a class="action-secondary" href="broker-connect.html">CONNECT BROKER <span>↗</span></a>
+            </div>
+          </div>
+          <div class="hero-orbit" aria-hidden="true">
+            <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit orbit-three"></div>
+            <div class="orbit-core"><span>KB</span><small>CORTEX</small></div>
+            <div class="orbit-label orbit-label-top">MARKET INTELLIGENCE</div>
+            <div class="orbit-label orbit-label-bottom">RISK-GOVERNED EXECUTION</div>
+          </div>
+          <div class="hero-foot">
+            <span><i class="tiny-dot"></i> ACCOUNT-SCOPED DATA</span>
+            <span><i class="tiny-dot gold-dot"></i> BROKER-AUTHORITATIVE METRICS</span>
+            <span><i class="tiny-dot blue-dot"></i> SERVER-SIDE RISK CONTROL</span>
+          </div>
+        </section>
+
+        <section class="metric-grid" aria-label="Live account metrics">
+          <article class="metric-card">
+            <div class="metric-top"><span class="metric-label">BROKER CONNECTION</span><span class="metric-icon cyan-icon">⇄</span></div>
+            <div class="metric-value" id="broker">—</div>
+            <div class="metric-foot"><span class="metric-dot" id="brokerDot"></span><span id="brokerSub">Awaiting verified account state</span></div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-top"><span class="metric-label">ACCOUNT BALANCE</span><span class="metric-icon gold-icon">◈</span></div>
+            <div class="metric-value" id="balance">—</div>
+            <div class="metric-foot"><span class="metric-dot neutral-dot"></span><span id="balanceSub">Broker-supplied value</span></div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-top"><span class="metric-label">ACCOUNT EQUITY</span><span class="metric-icon green-icon">⌁</span></div>
+            <div class="metric-value" id="equity">—</div>
+            <div class="metric-foot"><span class="metric-dot neutral-dot"></span><span id="equitySub">Awaiting broker telemetry</span></div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-top"><span class="metric-label">OPEN POSITIONS</span><span class="metric-icon violet-icon">▤</span></div>
+            <div class="metric-value" id="positions">—</div>
+            <div class="metric-foot"><span class="metric-dot neutral-dot"></span><span>Connected account snapshot</span></div>
+          </article>
+          <article class="metric-card metric-risk">
+            <div class="metric-top"><span class="metric-label">NEW ORDER AUTHORISATION</span><span class="metric-icon red-icon">⛨</span></div>
+            <div class="metric-value" id="risk">—</div>
+            <div class="metric-foot"><span class="metric-dot" id="riskDot"></span><span id="riskSub">Risk governor state</span></div>
+          </article>
+        </section>
+
+        <section class="dashboard-grid">
+          <article class="panel market-panel">
+            <div class="panel-head">
+              <div><div class="panel-kicker">GLOBAL MARKET FEED</div><h2>Market watch</h2><p>Quotes returned by the platform market-data service.</p></div>
+              <a class="panel-link" href="markets.html">OPEN MARKETS <span>↗</span></a>
+            </div>
+            <div class="market-table">
+              <div class="market-table-head"><span>INSTRUMENT</span><span>LAST PRICE</span><span>FEED / TIME</span></div>
+              <div id="marketWatch" class="market-rows"><div class="empty-state">Waiting for market data…</div></div>
+            </div>
+            <div class="panel-foot"><span id="marketSource">SOURCE: NOT YET VERIFIED</span><span id="marketLatency">LATENCY: —</span></div>
+          </article>
+
+          <article class="panel risk-panel">
+            <div class="panel-head">
+              <div><div class="panel-kicker">CENTRALISED PROTECTION</div><h2>Risk governor</h2><p>Execution permission is decided server-side.</p></div>
+              <span class="state-badge" id="riskBadge">CHECKING</span>
+            </div>
+            <div class="risk-visual">
+              <div class="risk-shield"><span>⛨</span></div>
+              <div><strong id="riskHeadline">Reading risk controls</strong><small id="riskDescription">Waiting for the authoritative execution state.</small></div>
+            </div>
+            <div class="detail-rows">
+              <div class="detail-row"><span>TRADING PAUSED</span><b id="paused">—</b></div>
+              <div class="detail-row"><span>GLOBAL KILL SWITCH</span><b id="kill">—</b></div>
+              <div class="detail-row"><span>NEW ORDERS</span><b id="authorization">—</b></div>
+              <div class="detail-row"><span>CONTROL REASON</span><b id="reason">—</b></div>
+            </div>
+            <a class="panel-footer-link" href="analytics.html">VIEW RISK & EXECUTION CONTROLS <span>↗</span></a>
+          </article>
+
+          <article class="panel engines-panel">
+            <div class="panel-head">
+              <div><div class="panel-kicker">AI EXECUTION FABRIC</div><h2>Five-engine fleet</h2><p>Runtime state and saved selection from the authenticated platform snapshot.</p></div>
+              <a class="panel-link" href="bots.html">MANAGE ENGINES <span>↗</span></a>
+            </div>
+            <div class="engine-grid" id="bots">
+              <div class="engine-card engine-empty"><span class="engine-mark">KB</span><div><b>Loading engine telemetry</b><small>Waiting for authenticated runtime data</small></div><span class="engine-status">SYNCING</span></div>
+            </div>
+            <div class="engine-summary">
+              <div><span>SELECTED ENGINE</span><strong id="selectedEngine">—</strong></div>
+              <div><span>SAVED SYMBOL / TIMEFRAME</span><strong id="selectedMarket">—</strong></div>
+              <div><span>RUNTIME COUNT</span><strong id="runtimeCount">—</strong></div>
+            </div>
+          </article>
+
+          <article class="panel account-panel">
+            <div class="panel-head">
+              <div><div class="panel-kicker">BROKER & USER ACCOUNT</div><h2>Account overview</h2><p>Identity and subscription state reported by the backend.</p></div>
+              <a class="panel-link" href="broker-connect.html">ACCOUNT SETTINGS <span>↗</span></a>
+            </div>
+            <div class="detail-rows">
+              <div class="detail-row"><span>ACCOUNT ID</span><b id="accountId">—</b></div>
+              <div class="detail-row"><span>EXECUTION MODE</span><b id="mode">—</b></div>
+              <div class="detail-row"><span>BROKER TRADING PERMISSION</span><b id="trading">—</b></div>
+              <div class="detail-row"><span>SUBSCRIPTION</span><b id="subscription">—</b></div>
+              <div class="detail-row"><span>ACCOUNT CURRENCY</span><b id="currency">—</b></div>
+            </div>
+            <a class="panel-footer-link" href="subscription.html">VIEW PLAN & ENTITLEMENTS <span>↗</span></a>
+          </article>
+
+          <article class="panel ai-panel">
+            <div class="panel-head">
+              <div><div class="panel-kicker">KINGBOT CORTEX</div><h2>AI intelligence layer</h2><p>Open the specialist intelligence workspaces for model output, context and diagnostics.</p></div>
+              <span class="ai-emblem">✦</span>
+            </div>
+            <div class="ai-links">
+              <a href="ai.html"><span class="ai-link-icon">✦</span><span><b>KINGBOT Intelligence</b><small>Reasoning, memory and AI workspace</small></span><i>↗</i></a>
+              <a href="scanner.html"><span class="ai-link-icon">⌕</span><span><b>AI Market Scanner</b><small>Market scanning and setup analysis</small></span><i>↗</i></a>
+              <a href="gold-signals.html"><span class="ai-link-icon">◆</span><span><b>Gold Signal Desk</b><small>XAUUSD signal and research workflow</small></span><i>↗</i></a>
+            </div>
+            <div class="ai-note"><span class="note-led"></span><span>This overview does not invent AI scores or trading signals. View verified model output in the linked AI workspaces.</span></div>
+          </article>
+
+          <article class="panel events-panel">
+            <div class="panel-head">
+              <div><div class="panel-kicker">OPERATIONAL ACTIVITY</div><h2>Recent activity</h2><p>Events received by this authenticated browser session.</p></div>
+              <span class="state-badge" id="eventCount">0 EVENTS</span>
+            </div>
+            <div class="event-list" id="events"><div class="empty-state">No recent event records received.</div></div>
+            <div class="panel-foot"><span id="eventBusState">EVENT BUS: STATUS UNAVAILABLE</span><span id="lastUpdate">LAST UPDATE: —</span></div>
+          </article>
+        </section>
+
+        <section class="capability-section">
+          <div class="section-heading">
+            <div><div class="panel-kicker">THE KINGBOT ECOSYSTEM</div><h2>All platform capabilities</h2><p>Open the product modules available in the KINGBOT platform. Planned and foundation capabilities are labelled separately.</p></div>
+            <span class="capability-count" id="moduleCount">LOADING MODULE REGISTRY</span>
+          </div>
+          <div class="capability-filters" role="group" aria-label="Filter platform capabilities">
+            <button class="filter-chip active" type="button" data-filter="all">ALL MODULES</button>
+            <button class="filter-chip" type="button" data-filter="Trading Core">TRADING CORE</button>
+            <button class="filter-chip" type="button" data-filter="Execution">EXECUTION</button>
+            <button class="filter-chip" type="button" data-filter="Intelligence">INTELLIGENCE</button>
+            <button class="filter-chip" type="button" data-filter="Infrastructure">INFRASTRUCTURE</button>
+            <button class="filter-chip" type="button" data-filter="Commercial">COMMERCIAL</button>
+            <button class="filter-chip" type="button" data-filter="Trust">TRUST</button>
+            <button class="filter-chip" type="button" data-filter="Customer">CUSTOMER</button>
+            <button class="filter-chip" type="button" data-filter="Scale">SCALE ROADMAP</button>
+          </div>
+          <div class="module-grid" id="modules"><div class="empty-state">Loading capability registry…</div></div>
+        </section>
+
+        <footer class="workspace-footer">
+          <span>© KINGBOT FINETECH · POWERED BY GIBSONFX TECH</span>
+          <span>ACCOUNT DATA IS USER-SCOPED · EXECUTION AUTHORITY REMAINS SERVER-SIDE</span>
+        </footer>
+      </main>
+    </div>
+  </div>
+
+  <script src="system/session.js?v=20261105-command-center"></script>
+  <script src="system/auth-gate.js?v=20261105-command-center"></script>
+  <script src="system/access-control.js?v=20261105-command-center"></script>
+  <script id="kb-client-state" src="system/kingbot-client-state.js?v=20261105-command-center"></script>
+  <script id="kb-ui-runtime" src="system/ui-runtime.js?v=20261105-command-center"></script>
+  <script src="system/kingbot-platform-capabilities.js?v=20261105-command-center"></script>
+  <script src="system/navigation.js?v=20261105-command-center"></script>
+  <script>
+  (function(){
+    "use strict";
+    const $ = function(id){ return document.getElementById(id); };
+    const esc = function(value){
+      return String(value == null ? "" : value).replace(/[&<>"']/g,function(ch){
+        return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch];
+      });
+    };
+    const finite = function(value){ const n=Number(value); return value!==null&&value!==""&&Number.isFinite(n)?n:null; };
+    const money = function(value,currency){
+      const n=finite(value); if(n===null)return "—";
+      const code=String(currency||"").trim().toUpperCase();
+      return (code?code+" ":"")+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    };
+    const fmtTime = function(value){
+      if(!value)return "—";
+      const d=new Date(value); return Number.isNaN(d.getTime())?"—":d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+    };
+    const setText = function(id,value){ const el=$(id); if(el)el.textContent=String(value==null||value===""?"—":value); };
+    const setTone = function(id,value,tone){
+      const el=$(id); if(!el)return;
+      el.textContent=String(value==null||value===""?"—":value);
+      el.classList.remove("good","warn","bad","neutral");
+      if(tone)el.classList.add(tone);
+    };
+    const normalizeName = function(value){ return String(value||"").replace(/^KINGBOT\s*/i,"").trim(); };
+
+    function renderMarket(quotes){
+      const host=$("marketWatch");
+      if(!host)return;
+      if(!Array.isArray(quotes)||!quotes.length){
+        host.innerHTML='<div class="empty-state">No live quotes are available in the latest market snapshot.</div>';
+        setText("marketSource","SOURCE: NO QUOTES RETURNED");
+        setText("marketLatency","LATENCY: —");
+        return;
+      }
+      host.innerHTML=quotes.map(function(q){
+        const symbol=esc(q.symbol||q.twelveDataSymbol||"UNKNOWN");
+        const available=q.available===true;
+        const price=finite(q.price);
+        const bid=finite(q.bid), ask=finite(q.ask), spread=finite(q.spread);
+        const detail=available
+          ? ((q.source||"Market feed")+" · "+(q.time||fmtTime(q.timestamp)))
+          : (q.error||"Quote unavailable");
+        return '<div class="market-row">'+
+          '<div class="market-instrument"><span class="instrument-mark">'+(symbol.indexOf("XAU")>=0?"Au":symbol.indexOf("BTC")>=0?"₿":"FX")+'</span><span><b>'+symbol+'</b><small>'+esc(available?"FEED AVAILABLE":"FEED UNAVAILABLE")+'</small></span></div>'+
+          '<div class="market-price '+(available?"good":"warn")+'">'+(price===null?"—":esc(price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:price<10?5:2})))+
+          (bid!==null&&ask!==null?'<small>BID '+esc(bid.toString())+' · ASK '+esc(ask.toString())+'</small>':'')+
+          (spread!==null?'<small>SPREAD '+esc(spread.toString())+'</small>':'')+'</div>'+
+          '<div class="market-feed"><b>'+esc(available?(q.source||"LIVE FEED"):"UNAVAILABLE")+'</b><small>'+esc(detail)+'</small></div>'+
+        '</div>';
+      }).join("");
+    }
+
+    function renderBots(bots,selection){
+      const host=$("bots");
+      if(!host)return;
+      const items=Array.isArray(bots)?bots:[];
+      if(!items.length){
+        host.innerHTML='<div class="empty-state">No bot runtime records were returned. Engine names and live runtime states will appear when the authenticated snapshot is available.</div>';
+        setText("runtimeCount","—");
+      }else{
+        host.innerHTML=items.map(function(bot){
+          const active=String(bot.state||"").toUpperCase()==="RUNNING";
+          const state=String(bot.state||"UNKNOWN").toUpperCase();
+          const symbol=bot.symbol||"MARKET NOT SET";
+          const timeframe=bot.timeframe||"—";
+          const selected=selection&&selection.botId===bot.botId;
+          return '<div class="engine-card'+(selected?" selected":"")+'">'+
+            '<span class="engine-mark">'+esc((bot.name||bot.botId||"KB").replace(/[^A-Z0-9]/gi,"").slice(0,2).toUpperCase())+'</span>'+
+            '<div class="engine-main"><b>'+esc(normalizeName(bot.name||bot.botId||"KINGBOT ENGINE"))+'</b><small>'+esc(symbol)+' · '+esc(timeframe)+'</small>'+
+            (selected?'<em>ACCOUNT SELECTION</em>':'')+'</div>'+
+            '<span class="engine-status '+(active?"good":state==="ERROR"?"bad":"warn")+'">'+esc(state)+'</span>'+
+          '</div>';
+        }).join("");
+        setText("runtimeCount",items.length+" ENGINES");
+      }
+      const chosen=selection||null;
+      setText("selectedEngine",chosen?normalizeName(chosen.name||chosen.botId):"NO ENGINE SELECTED");
+      setText("selectedMarket",chosen?String(chosen.symbol||"MARKET NOT SET")+" / "+String(chosen.timeframe||"—"):"—");
+    }
+
+    function renderEvents(events){
+      const host=$("events");
+      const list=Array.isArray(events)?events.slice(0,12):[];
+      setText("eventCount",list.length+" EVENTS");
+      if(!host)return;
+      if(!list.length){
+        host.innerHTML='<div class="empty-state">No recent event records were received in this browser session.</div>';
+        return;
+      }
+      host.innerHTML=list.map(function(event){
+        const title=String(event.eventType||event.type||"PLATFORM EVENT").replace(/_/g," ");
+        const when=event.occurredAt||event.createdAt||event.timestamp||null;
+        const description=event.message||event.aggregateType||event.description||"Event received";
+        return '<div class="event-row"><span class="event-marker"></span><div><b>'+esc(title)+'</b><small>'+esc(description)+'</small></div><time>'+esc(fmtTime(when))+'</time></div>';
+      }).join("");
+    }
+
+    let activeFilter="all";
+    function renderModules(){
+      const host=$("modules");
+      const registry=Array.isArray(window.KINGBOT_CAPABILITIES)?window.KINGBOT_CAPABILITIES:[];
+      if(!host)return;
+      const visible=registry.filter(function(item){
+        return activeFilter==="all"||item.group===activeFilter;
+      });
+      setText("moduleCount",visible.length+" / "+registry.length+" CAPABILITIES");
+      host.innerHTML=visible.map(function(item){
+        const status=String(item.status||"foundation").toLowerCase();
+        const statusLabel=status==="live"?"AVAILABLE":status==="planned"?"PLANNED":"FOUNDATION";
+        const statusClass=status==="live"?"available":status==="planned"?"planned":"foundation";
+        return '<a class="module-card" href="'+esc(item.href||"contact.html")+'">'+
+          '<div class="module-card-top"><span class="module-icon">'+esc(item.name.slice(0,1).toUpperCase())+'</span><span class="module-status '+statusClass+'">'+statusLabel+'</span></div>'+
+          '<b>'+esc(item.name)+'</b><small>'+esc(item.desc||"KINGBOT platform capability")+'</small>'+
+          '<span class="module-open">OPEN MODULE <i>↗</i></span>'+
+        '</a>';
+      }).join("")||'<div class="empty-state">No capabilities in this category.</div>';
+    }
+
+    function render(snapshot){
+      const s=snapshot||{};
+      const broker=s.broker||{};
+      const account=s.account&&s.account.account?s.account.account:null;
+      const selection=s.botSelection&&s.botSelection.bot?s.botSelection.bot:null;
+      const risk=s.risk&&s.risk.executionControl?s.risk.executionControl:{};
+      const subscription=s.subscription&&s.subscription.subscription?s.subscription.subscription:null;
+      const runtime=s.runtime&&Array.isArray(s.runtime.bots)?s.runtime.bots:[];
+      const quotes=s.market&&Array.isArray(s.market.quotes)?s.market.quotes:[];
+      const authenticated=s.auth&&s.auth.authenticated===true;
+
+      setText("userName",s.auth&&s.auth.user?(s.auth.user.name||s.auth.user.email||"KINGBOT USER"):"KINGBOT USER");
+      setText("accountMode",account?(account.executionMode||broker.executionMode||"ACCOUNT LINKED"):"NO VERIFIED ACCOUNT");
+      const connected=broker.connected===true;
+      setTone("broker",connected?String(broker.broker||"CONNECTED").toUpperCase():"NOT CONNECTED",connected?"good":"warn");
+      setText("brokerSub",connected?(broker.executionMode||"CONNECTED")+" · "+(broker.accountId||"ACCOUNT LINKED"):"Connect and verify a broker account");
+      $("brokerDot").className="metric-dot "+(connected?"good-dot":"warn-dot");
+      setText("balance",account?money(account.balance,account.currency):"—");
+      setText("equity",account?money(account.equity,account.currency):"—");
+      setText("balanceSub",account?"CURRENCY "+String(account.currency||"NOT SUPPLIED").toUpperCase():"Awaiting broker account snapshot");
+      setText("equitySub",account?"BROKER-REPORTED EQUITY":"Awaiting broker account snapshot");
+      setText("positions",account?String(account.positionCount??s.positionsCount??"—"):"—");
+      setTone("risk",risk.globalKillSwitch?"BLOCKED":risk.tradingPaused?"PAUSED":risk.newOrdersAuthorized===true?"AUTHORISED":"BLOCKED",risk.globalKillSwitch||risk.tradingPaused||risk.newOrdersAuthorized!==true?"bad":"good");
+      setText("riskSub",risk.reason||"Execution control returned by server");
+      $("riskDot").className="metric-dot "+(risk.globalKillSwitch||risk.tradingPaused||risk.newOrdersAuthorized!==true?"bad-dot":"good-dot");
+
+      setText("accountId",account&&account.accountId?account.accountId:"—");
+      setText("mode",account?(account.executionMode||broker.executionMode||"—"):"—");
+      setText("trading",account?(account.tradingEnabled===true?"ENABLED":account.tradingEnabled===false?"DISABLED":"NOT REPORTED"):"—");
+      setText("subscription",subscription?(String(subscription.plan_id||"PLAN").toUpperCase()+" · "+String(subscription.status||"UNKNOWN").toUpperCase()):"NO ACTIVE PLAN REPORTED");
+      setText("currency",account&&account.currency?String(account.currency).toUpperCase():"—");
+
+      const paused=risk.tradingPaused===true;
+      const killed=risk.globalKillSwitch===true;
+      const authorised=risk.newOrdersAuthorized===true;
+      setTone("paused",paused?"YES":"NO",paused?"bad":"good");
+      setTone("kill",killed?"ACTIVE":"OFF",killed?"bad":"good");
+      setTone("authorization",authorised?"AUTHORISED":"BLOCKED",authorised?"good":"bad");
+      setText("reason",risk.reason||"NO REASON REPORTED");
+      setTone("riskBadge",killed?"GLOBAL KILL SWITCH":paused?"TRADING PAUSED":authorised?"ORDERS AUTHORISED":"ORDERS BLOCKED",killed||paused||!authorised?"bad":"good");
+      setText("riskHeadline",killed?"Global kill switch is active":paused?"Trading is paused":authorised?"New orders are authorised":"New orders are blocked");
+      setText("riskDescription",risk.reason||"The server controls order authorisation. This page cannot override it.");
+
+      renderMarket(quotes);
+      renderBots(runtime,selection);
+      renderEvents(s.events);
+
+      const marketLatency=s.market&&finite(s.market.latencyMs)!==null?s.market.latencyMs:null;
+      setText("marketLatency","LATENCY: "+(marketLatency===null?"—":String(marketLatency)+" MS"));
+      const qSource=quotes.find(function(q){return q&&q.available&&q.source;});
+      setText("marketSource",qSource?"SOURCE: "+String(qSource.source).toUpperCase():"SOURCE: NO VERIFIED FEED");
+
+      const bus=s.eventBus||{};
+      const busLabel=bus.connected===true?"CONNECTED":bus.configured===true?"CONFIGURED":"STATUS UNAVAILABLE";
+      setText("eventBusState","EVENT BUS: "+busLabel);
+      const generated=s.market&&s.market.generatedAt?s.market.generatedAt:s.updatedAt;
+      setText("lastUpdate","LAST UPDATE: "+fmtTime(generated));
+      setText("connectionStatus",authenticated?"AUTHENTICATED SESSION":"SESSION UNVERIFIED");
+      $("connectionChip").classList.toggle("offline",!authenticated);
+      if(!authenticated)setText("accountMode","VERIFY SESSION");
+    }
+
+    function bindFilters(){
+      document.querySelectorAll("[data-filter]").forEach(function(button){
+        button.addEventListener("click",function(){
+          activeFilter=button.getAttribute("data-filter")||"all";
+          document.querySelectorAll("[data-filter]").forEach(function(item){item.classList.toggle("active",item===button)});
+          renderModules();
+        });
+      });
+    }
+
+    function bindNavigation(){
+      const toggle=$("menuToggle"),scrim=$("sidebarScrim");
+      const close=function(){
+        document.body.classList.remove("nav-open");
+        if(toggle)toggle.setAttribute("aria-expanded","false");
+      };
+      if(toggle)toggle.addEventListener("click",function(){
+        const open=!document.body.classList.contains("nav-open");
+        document.body.classList.toggle("nav-open",open);
+        toggle.setAttribute("aria-expanded",String(open));
+      });
+      if(scrim)scrim.addEventListener("click",close);
+      document.querySelectorAll(".side-link").forEach(function(link){link.addEventListener("click",close)});
+      document.addEventListener("keydown",function(event){if(event.key==="Escape")close()});
+    }
+
+    async function init(){
+      renderModules();
+      bindFilters();
+      bindNavigation();
+      const store=window.KINGBOT_CLIENT_STATE;
+      if(!store||typeof store.subscribe!=="function"){
+        setText("connectionStatus","STATE FABRIC OFFLINE");
+        $("connectionChip").classList.add("offline");
+        $("marketWatch").innerHTML='<div class="empty-state">The shared account-state service did not initialize. Reload after the platform session has loaded.</div>';
+        return;
+      }
+      store.subscribe(render);
+      $("refresh").addEventListener("click",function(){
+        const button=$("refresh");button.disabled=true;button.classList.add("loading");
+        store.refresh({includeMarket:true,reason:"command-center-refresh"}).finally(function(){
+          button.disabled=false;button.classList.remove("loading");
+        });
+      });
+      await store.refresh({includeMarket:true,reason:"command-center-open"}).catch(function(error){
+        setText("connectionStatus","SNAPSHOT UNAVAILABLE");
+        setText("marketSource","SOURCE: SNAPSHOT UNAVAILABLE");
+        console.warn("[KINGBOT COMMAND CENTRE]",error);
+      });
+      window.setInterval(function(){
+        if(!document.hidden&&!store.state.loading)store.refresh({includeMarket:true,reason:"command-center-poll"}).catch(function(){});
+      },15000);
+    }
+
+    if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});
+    else init();
+  })();
+  </script>
+</body>
+</html>
