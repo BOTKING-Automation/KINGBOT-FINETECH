@@ -857,7 +857,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "decisionAuthority": "ATTENTION_GRU_CANDLE_SEQUENCE",
                 "qualityGate": quality_gate,
             },
-            "regimeAware": True,
+            "regimeAware": False,
             "supportedRegimes": REGIME_ORDER,
         }
     finally:
