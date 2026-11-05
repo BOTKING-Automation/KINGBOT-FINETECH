@@ -20,7 +20,7 @@ The model uses a two-layer GRU, temporal attention pooling and a small classific
 
 Each engine has its configured regime, setup and execution timeframes. CORTEX requests a separately trained temporal model for each of those timeframes. The execution timeframe must be ready, and at least two timeframe models must return valid probabilities. Probabilities are weighted and aggregated; directional consensus is reported separately.
 
-The learned model chooses BUY, SELL or HOLD. Model confidence and directional-edge thresholds allow it to abstain. The Node gate does not use a legacy indicator candidate as a directional veto. The old strategy analysis remains in the worker for compatibility and diagnostics only.
+The learned model chooses BUY, SELL or HOLD. Model confidence (default 48%) and directional-edge (default 4 percentage points) thresholds allow it to abstain. The Node gate also requires at least 55% weighted directional agreement across at least two ready timeframes, including the execution timeframe. These are model-output acceptance thresholds, not indicator entry rules. The Node gate does not use a legacy indicator candidate as a directional veto. The old strategy analysis remains in the worker for compatibility and diagnostics only.
 
 ## Model promotion
 
