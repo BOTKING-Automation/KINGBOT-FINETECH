@@ -442,7 +442,12 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
   if(inflight.has(key))return inflight.get(key);
 
   const run=(async()=>{
-    const native=evaluateNativeSignal({botId,market,analysis,risk})||{};
+    let native={direction:"HOLD",score:0,strategyMatch:false};
+    try{
+      native=evaluateNativeSignal({botId,market,analysis,risk})||native;
+    }catch(error){
+      native={...native,reason:"NATIVE_ADVISORY_UNAVAILABLE:"+String(error?.message||"UNKNOWN").slice(0,120)};
+    }
     const ml=await predictMultiTimeframeMl({botId,market});
     const item={
       ...native,
@@ -473,7 +478,7 @@ export async function warmAiStrategySignal({userId,botId,market,analysis,risk}={
         ...(Array.isArray(risk?.blocks)?risk.blocks:[]),
         ...(Array.isArray(risk?.blockedReasons)?risk.blockedReasons:[])
       ];
-      const riskApproved=risk?.allowed!==false&&riskBlocks.length===0;
+      const riskApproved=risk?.allowed===true&&riskBlocks.length===0;
       const modelAligned=Boolean(
         mlDirection&&
         mlDirection!=="HOLD"&&
