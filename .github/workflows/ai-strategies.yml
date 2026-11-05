@@ -186,7 +186,13 @@ jobs:
           import http from "node:http";
 
           const ml = spawn(process.env.PYTHON || "python3", ["ml-signal-service/service.py"], {
-            env: { ...process.env, PORT: "19090", KINGBOT_ML_SIGNAL_SECRET: "ci-secret", PYTHONUNBUFFERED: "1" },
+            env: {
+              ...process.env,
+              PORT: "19090",
+              KINGBOT_ML_SIGNAL_SECRET: "ci-secret",
+              KINGBOT_ML_TEMPORAL_EPOCHS: "8",
+              PYTHONUNBUFFERED: "1"
+            },
             stdio: ["ignore", "pipe", "pipe"]
           });
 
@@ -197,12 +203,22 @@ jobs:
           const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
           try {
-            for (let i = 0; i < 40; i++) {
+            let serviceReady = false;
+            for (let i = 0; i < 160; i++) {
+              if (ml.exitCode !== null) {
+                throw new Error("ML service exited before readiness (code " + ml.exitCode + "): " + logs);
+              }
               try {
                 const response = await fetch("http://127.0.0.1:19090/health");
-                if (response.ok) break;
+                if (response.ok) {
+                  serviceReady = true;
+                  break;
+                }
               } catch {}
               await sleep(250);
+            }
+            if (!serviceReady) {
+              throw new Error("ML service did not become ready within 40 seconds: " + logs);
             }
 
             const bars = [];
