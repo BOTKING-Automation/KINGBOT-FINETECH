@@ -97,7 +97,7 @@ class EngineFeatureParityTests(unittest.TestCase):
     def test_normalize_market_bars_sorts_descending_timestamped_history(self):
         bars = make_bars(80)
         for index, bar in enumerate(bars):
-            bar["time"] = f"2026-01-01T00:{index:02d}:00Z"
+            bar["time"] = 1_767_225_600 + index * 60
         normalized = service.normalize_market_bars(list(reversed(bars)))
         self.assertEqual(len(normalized), 80)
         self.assertAlmostEqual(normalized[0]["close"], bars[0]["close"])
