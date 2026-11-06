@@ -149,7 +149,18 @@ async function getMultiTimeframeContext(userId,symbol,botId,executionTimeframe){
     try{
       const candles=await getWorkerCandles(userId,symbol,timeframe,historyLimit);
       const data=calculateMarketIndicators(candles);
-      byTimeframe[timeframe]={timeframe,available:true,...data,candleCount:candles.length,sourceTimeframe:timeframe};
+      const mlBars=candles.slice(-historyLimit).map(c=>({
+        time:c?.time??c?.datetime??c?.timestamp??null,
+        open:Number(c?.open),
+        high:Number(c?.high),
+        low:Number(c?.low),
+        close:Number(c?.close),
+        volume:Number(c?.volume??c?.tickVolume??0)
+      }));
+      byTimeframe[timeframe]={
+        timeframe,available:true,...data,
+        candleCount:candles.length,sourceTimeframe:timeframe,mlBars
+      };
     }catch(error){
       const reason=String(error?.message||"TIMEFRAME_DATA_UNAVAILABLE").slice(0,160);
       console.warn("[KINGBOT MTF] direct timeframe history unavailable",JSON.stringify({botId,symbol,timeframe,reason}));
@@ -402,9 +413,21 @@ async function recordExecutionAdaptiveDecision({userId,botId,config,analysis,mar
   const equity=Number(account?.equity||0);
   const riskPct=Number(riskPercent||0);
   const market=marketSnapshot||{};
+  const persistedMultiTimeframe=market?.multiTimeframe&&typeof market.multiTimeframe==="object"
+    ? Object.fromEntries(["regime","setup","execution"].map(role=>{
+        const frame=market.multiTimeframe[role];
+        if(!frame||typeof frame!=="object")return [role,frame??null];
+        const {mlBars,...summary}=frame;
+        return [role,{
+          ...summary,
+          ...(role==="execution"&&Array.isArray(mlBars)?{mlBars}: {})
+        }];
+      }))
+    : null;
   const result={
     market:{
       ...market,
+      multiTimeframe:persistedMultiTimeframe,
       symbol:String(market?.symbol||config?.symbol||analysis?.market?.symbol||"").toUpperCase(),
       timeframe:String(market?.timeframe||config?.timeframe||analysis?.market?.timeframe||"5m"),
       price:Number(market?.price ?? analysis?.market?.price ?? 0),
