@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { UserBrokerManager } from "./user-broker-manager.js";
 import { calculateMarketIndicators } from "./worker-market-perception.js";
+import { sortChronologicalCandles } from "./chronological-candles.js";
 import { evaluateBot, getBotDefinitions, getTradePlan } from "./bot-engines.js";
 import { monitorBotDecision } from "./ai-bot-supervisor.js";
 import { getAiStrategySignal, warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } from "./ai-trade-gate.js";
@@ -366,8 +367,9 @@ async function getWorkerCandles(userId,symbol,timeframe,limit=100){
   const cached=workerCandleCache.get(key);
   if(cached && Date.now()-cached.at<ttl)return cached.data;
   const response=await broker.getHistoricalCandles(symbol,timeframe,userId,limit);
-  const data=Array.isArray(response)?response:(Array.isArray(response?.data)?response.data:[]);
-  if(data.length===0)throw new Error("EMPTY_HISTORICAL_CANDLES");
+  const raw=Array.isArray(response)?response:(Array.isArray(response?.data)?response.data:[]);
+  if(raw.length===0)throw new Error("EMPTY_HISTORICAL_CANDLES");
+  const data=sortChronologicalCandles(raw);
   workerCandleCache.set(key,{at:Date.now(),data});
   return data;
 }
