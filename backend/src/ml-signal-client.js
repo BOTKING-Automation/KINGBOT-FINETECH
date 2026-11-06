@@ -25,12 +25,13 @@ async function request(
   path,
   body,
   timeoutMs = TIMEOUT_MS,
-  { max429Retries = 0, maxBusyRetries = 0 } = {}
+  { max429Retries = 0, maxBusyRetries = 0, maxUnavailableRetries = 0 } = {}
 ) {
   if (!enabled()) return null;
   const deadline = Date.now() + Math.max(1000, Number(timeoutMs) || TIMEOUT_MS);
   let retry429Count = 0;
   let retryBusyCount = 0;
+  let retryUnavailableCount = 0;
 
   while (true) {
     const remaining = deadline - Date.now();
@@ -78,6 +79,23 @@ async function request(
     // The Python trainer is intentionally single-capacity on the Free tier.
     // Wait for the active model fit instead of treating an ordinary 409 busy
     // response as a failed strategy model.
+    const gatewayUnavailable = [502, 503, 504].includes(response.status) &&
+      errorCode === `ML_SIGNAL_HTTP_${response.status}`;
+    if (gatewayUnavailable && retryUnavailableCount < maxUnavailableRetries) {
+      retryUnavailableCount += 1;
+      const header = String(response.headers.get("retry-after") || "").trim();
+      const parsed = Number(header);
+      const retryAfterMs = Number.isFinite(parsed) && parsed > 0
+        ? parsed * 1000
+        : Math.min(30000, 1500 * (2 ** (retryUnavailableCount - 1)));
+      const delayMs = Math.max(1000, Math.min(30000, retryAfterMs));
+      if (Date.now() + delayMs + 1000 >= deadline) {
+        throw new Error(errorCode);
+      }
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      continue;
+    }
+
     const trainerBusy = response.status === 409 &&
       ["ML_TRAINING_CAPACITY_BUSY", "ML_TRAINING_IN_PROGRESS"].includes(errorCode);
     if (trainerBusy && retryBusyCount < maxBusyRetries) {
@@ -240,7 +258,7 @@ export async function trainMlStrategyModel({ botId, symbol, timeframe, bars, mar
       botId: String(botId).trim().toLowerCase(),
       timeframe: String(timeframe || "5m").trim().toLowerCase(),
       markets: datasets
-    }, TRAIN_TIMEOUT_MS, { max429Retries: 4, maxBusyRetries: 6 });
+    }, TRAIN_TIMEOUT_MS, { max429Retries: 4, maxBusyRetries: 6, maxUnavailableRetries: 4 });
   } catch (error) {
     const code = normalizeError(error, "ML_TRAINING_SERVICE_UNAVAILABLE");
     return {
