@@ -25,6 +25,8 @@ from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 from sklearn.preprocessing import StandardScaler
 from torch import nn
 
+from model_store import load_model_artifacts, save_model_artifact
+
 
 HOST = "0.0.0.0"
 PORT = int(os.getenv("PORT", "10000"))
@@ -97,8 +99,70 @@ REGIME_RISK_MODE = {
 MODELS: dict[str, dict[str, Any]] = {}
 CHALLENGERS: dict[str, dict[str, Any]] = {}
 LOCK = threading.Lock()
+MODEL_RESTORE_EVENT = threading.Event()
+MODEL_RESTORE_STATUS = "PENDING"
+PERSISTED_MODELS_LOADED = 0
+if not os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip():
+    MODEL_RESTORE_STATUS = "DISABLED"
+    MODEL_RESTORE_EVENT.set()
 torch.set_num_threads(TORCH_THREADS)
 torch.set_num_interop_threads(max(1, min(4, TORCH_THREADS)))
+
+
+def restore_persisted_models() -> None:
+    """Restore trusted model artifacts asynchronously after the HTTP server starts."""
+    global MODEL_RESTORE_STATUS, PERSISTED_MODELS_LOADED
+
+    if not os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip():
+        MODEL_RESTORE_STATUS = "DISABLED"
+        MODEL_RESTORE_EVENT.set()
+        return
+
+    MODEL_RESTORE_STATUS = "RESTORING"
+    for attempt in range(4):
+        try:
+            artifacts = load_model_artifacts()
+            loaded = 0
+            with LOCK:
+                for artifact in artifacts:
+                    if not isinstance(artifact, dict):
+                        continue
+                    kind = str(artifact.get("kind") or "")
+                    key = str(artifact.get("modelKey") or "")
+                    record = artifact.get("record")
+                    if kind not in {"champion", "challenger"} or key.count(":") != 1 or not isinstance(record, dict):
+                        continue
+                    strategy, timeframe = key.split(":", 1)
+                    if strategy not in STRATEGY_FOCUS or not timeframe:
+                        continue
+                    if kind == "champion":
+                        MODELS[key] = record
+                    else:
+                        CHALLENGERS[key] = record
+                    loaded += 1
+
+                while len(MODELS) > MAX_MODELS:
+                    oldest = min(MODELS.items(), key=lambda item: item[1].get("trained_at", 0))[0]
+                    MODELS.pop(oldest, None)
+
+            PERSISTED_MODELS_LOADED = loaded
+            MODEL_RESTORE_STATUS = "RESTORED" if loaded else "EMPTY"
+            print("[KINGBOT ML STORE] restore complete", json.dumps({
+                "loaded": loaded,
+                "champions": len(MODELS),
+                "challengers": len(CHALLENGERS),
+            }))
+            MODEL_RESTORE_EVENT.set()
+            return
+        except Exception as error:
+            MODEL_RESTORE_STATUS = "RETRYING"
+            print("[KINGBOT ML STORE] restore attempt failed", attempt + 1, str(error)[:180])
+            if attempt < 3:
+                time.sleep(5 * (attempt + 1))
+
+    MODEL_RESTORE_STATUS = "FAILED"
+    MODEL_RESTORE_EVENT.set()
+    print("[KINGBOT ML STORE] restore deferred; training can repopulate artifacts")
 
 
 def finite(value: Any, fallback: float = 0.0) -> float:
@@ -541,6 +605,8 @@ def ensemble_class_metrics(y_true: np.ndarray, probabilities: np.ndarray) -> dic
 
 
 def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) -> dict[str, Any]:
+    if not MODEL_RESTORE_EVENT.wait(timeout=max(30, int(os.getenv("KINGBOT_ML_RESTORE_WAIT_SEC", "180")))):
+        raise RuntimeError("ML_MODEL_RESTORE_PENDING")
     key = f"{strategy}:{timeframe.lower()}"
     if not TRAINING_SEMAPHORE.acquire(blocking=False):
         raise RuntimeError("ML_TRAINING_CAPACITY_BUSY")
@@ -700,52 +766,58 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             incumbent_score = float(incumbent.get("selection_score", 0.0)) if incumbent else 0.0
         promote = incumbent is None or candidate_score >= incumbent_score - 0.0025
         trained_at = time.time()
+        model_record = {
+            "rf": rf,
+            "torch": torch_model,
+            "scaler": scaler,
+            "trained_at": trained_at,
+            "strategy": strategy,
+            "symbols": sorted(
+                {row["symbol"] for row in validation_markets if row.get("accepted")}
+            ),
+            "timeframe": timeframe.lower(),
+            "samples": int(len(X_train) + len(X_test)),
+            "train_samples": int(len(X_train)),
+            "test_samples": int(len(X_test)),
+            "rf_accuracy": rf_metrics["accuracy"],
+            "rf_balanced_accuracy": rf_metrics["balancedAccuracy"],
+            "rf_macro_f1": rf_metrics["macroF1"],
+            "torch_accuracy": torch_metrics["accuracy"],
+            "torch_balanced_accuracy": torch_metrics["balancedAccuracy"],
+            "torch_macro_f1": torch_metrics["macroF1"],
+            "ensemble_accuracy": ensemble_metrics["accuracy"],
+            "ensemble_balanced_accuracy": ensemble_metrics["balancedAccuracy"],
+            "ensemble_macro_f1": ensemble_metrics["macroF1"],
+            "quality_gate": quality_gate,
+            "bar_count": total_bar_count,
+            "feature_version": "ai-strategies-v5-parity-embargo-ensemble",
+            "validation": {
+                "type": "per-market-temporal-holdout-with-label-embargo",
+                "trainFraction": 0.78,
+                "embargoBars": FORWARD_HORIZON,
+                "markets": validation_markets,
+            },
+            "selection_score": candidate_score,
+            "promotion": "CHAMPION" if promote else "CHALLENGER",
+            "promoted_at": trained_at if promote else None,
+            "feedbackVersion": FEEDBACK_VERSION,
+            "feedbackRowsUsed": len(feedback),
+            "regimeAware": True,
+            "supportedRegimes": REGIME_ORDER,
+        }
+        if os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip():
+            try:
+                save_model_artifact("champion" if promote else "challenger", key, model_record)
+            except Exception as error:
+                raise RuntimeError(f"ML_MODEL_PERSISTENCE_FAILED:{str(error)[:140]}") from error
+
         with LOCK:
-            model_record = {
-                "rf": rf,
-                "torch": torch_model,
-                "scaler": scaler,
-                "trained_at": trained_at,
-                "strategy": strategy,
-                "symbols": sorted(
-                    {row["symbol"] for row in validation_markets if row.get("accepted")}
-                ),
-                "timeframe": timeframe.lower(),
-                "samples": int(len(X_train) + len(X_test)),
-                "train_samples": int(len(X_train)),
-                "test_samples": int(len(X_test)),
-                "rf_accuracy": rf_metrics["accuracy"],
-                "rf_balanced_accuracy": rf_metrics["balancedAccuracy"],
-                "rf_macro_f1": rf_metrics["macroF1"],
-                "torch_accuracy": torch_metrics["accuracy"],
-                "torch_balanced_accuracy": torch_metrics["balancedAccuracy"],
-                "torch_macro_f1": torch_metrics["macroF1"],
-                "ensemble_accuracy": ensemble_metrics["accuracy"],
-                "ensemble_balanced_accuracy": ensemble_metrics["balancedAccuracy"],
-                "ensemble_macro_f1": ensemble_metrics["macroF1"],
-                "quality_gate": quality_gate,
-                "bar_count": total_bar_count,
-                "feature_version": "ai-strategies-v5-parity-embargo-ensemble",
-                "validation": {
-                    "type": "per-market-temporal-holdout-with-label-embargo",
-                    "trainFraction": 0.78,
-                    "embargoBars": FORWARD_HORIZON,
-                    "markets": validation_markets,
-                },
-                "selection_score": candidate_score,
-                "promotion": "CHAMPION" if promote else "CHALLENGER",
-                "promoted_at": trained_at if promote else None,
-                "feedbackVersion": FEEDBACK_VERSION,
-                "feedbackRowsUsed": len(feedback),
-                "regimeAware": True,
-                "supportedRegimes": REGIME_ORDER,
-            }
             if promote:
                 MODELS[key] = model_record
             else:
                 CHALLENGERS[key] = model_record
             while len(MODELS) > MAX_MODELS:
-                oldest = min(MODELS.items(), key=lambda item: item[1]["trained_at"])[0]
+                oldest = min(MODELS.items(), key=lambda item: item[1].get("trained_at", 0))[0]
                 MODELS.pop(oldest, None)
 
         return {
@@ -1054,7 +1126,10 @@ class Handler(BaseHTTPRequestHandler):
                 "libraries": ["scikit-learn", "PyTorch"],
                 "modelsLoaded": len(MODELS),
                 "configured": bool(SECRET),
-                "ready": bool(SECRET),
+                "ready": bool(SECRET) and MODEL_RESTORE_EVENT.is_set(),
+                "persistenceConfigured": bool(os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip()),
+                "modelRestoreStatus": MODEL_RESTORE_STATUS,
+                "persistedModelsLoaded": PERSISTED_MODELS_LOADED,
                 "training": len(TRAINING_KEYS),
                 "feedbackRows": len(FEEDBACK_ROWS),
                 "feedbackVersion": FEEDBACK_VERSION,
@@ -1152,7 +1227,9 @@ class Handler(BaseHTTPRequestHandler):
 
             self._json(404, {"ok": False, "error": "NOT_FOUND"})
         except RuntimeError as error:
-            self._json(409, {"ok": False, "error": str(error)[:180]})
+            message = str(error)[:180]
+            status = 503 if message.startswith("ML_MODEL_PERSISTENCE_FAILED") else 409
+            self._json(status, {"ok": False, "error": message})
         except ValueError as error:
             self._json(422, {"ok": False, "error": str(error)[:180]})
         except Exception as error:
@@ -1163,6 +1240,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    if os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip():
+        threading.Thread(
+            target=restore_persisted_models,
+            name="kingbot-ml-artifact-restore",
+            daemon=True,
+        ).start()
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     server.daemon_threads = True
     server.allow_reuse_address = True
