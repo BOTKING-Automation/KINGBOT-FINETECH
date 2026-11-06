@@ -4,7 +4,7 @@
   "private":true,
   "type":"module",
   "scripts":{
-    "worker":"node backend/src/worker.js"
+    "worker":"node backend/src/worker-web.js"
   },
   "engines":{"node":">=20"},
   "dependencies":{
