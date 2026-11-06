@@ -102,7 +102,7 @@ services:
       - key: KINGBOT_ML_MAX_MARKETS
         value: "12"
       - key: KINGBOT_ML_MAX_BARS_PER_MARKET
-        value: "320"
+        value: "600"
       - key: KINGBOT_ML_MAX_BODY_BYTES
         value: "1500000"
       - key: KINGBOT_ML_ARTIFACTS_URL
