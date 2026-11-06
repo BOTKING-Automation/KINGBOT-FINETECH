@@ -23,6 +23,10 @@ function authFailure(res) {
   return res.status(401).json({ ok: false, error: "ML_SERVICE_UNAUTHORIZED" });
 }
 
+function toArtifactBuffer(value) {
+  return Buffer.isBuffer(value) ? Buffer.from(value) : null;
+}
+
 export async function ensureMlArtifactsSchema(pool) {
   if (!pool) throw new Error("ML_ARTIFACT_DATABASE_UNAVAILABLE");
   await pool.query(`
@@ -88,7 +92,8 @@ export function registerMlArtifacts(app, { pool }) {
     const kind = String(req.params?.kind || "").toLowerCase();
     const strategy = String(req.params?.strategy || "").toLowerCase();
     const timeframe = String(req.params?.timeframe || "").toLowerCase();
-    const artifact = req.body;
+    const artifact = toArtifactBuffer(req.body);
+    const artifactBytes = artifact ? artifact.byteLength : 0;
     const suppliedDigest = String(req.get("x-kingbot-artifact-sha256") || "").toLowerCase();
 
     if (!["champion", "challenger"].includes(kind) ||
@@ -96,7 +101,7 @@ export function registerMlArtifacts(app, { pool }) {
         !TIMEFRAMES.has(timeframe)) {
       return res.status(400).json({ ok: false, error: "ML_ARTIFACT_KEY_INVALID" });
     }
-    if (!Buffer.isBuffer(artifact) || artifact.length < 1 || artifact.length > MAX_ARTIFACT_BYTES) {
+    if (!artifact || artifactBytes < 1 || artifactBytes > MAX_ARTIFACT_BYTES) {
       return res.status(413).json({ ok: false, error: "ML_ARTIFACT_SIZE_INVALID" });
     }
     if (!/^[a-f0-9]{64}$/.test(suppliedDigest)) {
@@ -125,7 +130,7 @@ export function registerMlArtifacts(app, { pool }) {
       return res.status(200).json({
         ok: true,
         modelKey: artifactKey,
-        bytes: artifact.length,
+        bytes: artifactBytes,
         sha256: actualDigest
       });
     } catch (error) {
