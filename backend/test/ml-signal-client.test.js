@@ -6,6 +6,7 @@ let server;
 let baseUrl = "";
 let busyRemaining = 0;
 let rateLimitRemaining = 0;
+let gatewayFailureRemaining = 0;
 let requestCount = 0;
 let trainMlStrategyModel;
 
@@ -32,6 +33,14 @@ before(async () => {
         "content-type": "application/json",
         "retry-after": "0.001",
       }).end(JSON.stringify({ ok: false, error: "ML_TRAINING_CAPACITY_BUSY" }));
+      return;
+    }
+    if (gatewayFailureRemaining > 0) {
+      gatewayFailureRemaining -= 1;
+      res.writeHead(502, {
+        "content-type": "text/plain",
+        "retry-after": "0.001",
+      }).end("bad gateway");
       return;
     }
     res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
@@ -77,6 +86,21 @@ test("training client waits and retries trainer capacity responses", async () =>
 
 test("training client still retries HTTP 429 responses", async () => {
   rateLimitRemaining = 1;
+  requestCount = 0;
+
+  const result = await trainMlStrategyModel({
+    botId: "strategic",
+    timeframe: "15m",
+    markets: [{ symbol: "XAUUSD", bars: [{ open: 1, high: 2, low: 1, close: 2 }] }],
+  });
+
+  assert.equal(result?.ok, true);
+  assert.equal(result?.ready, true);
+  assert.equal(requestCount, 2);
+});
+
+test("training client retries transient ML gateway 502 responses", async () => {
+  gatewayFailureRemaining = 1;
   requestCount = 0;
 
   const result = await trainMlStrategyModel({
