@@ -229,14 +229,16 @@ class EngineFeatureParityTests(unittest.TestCase):
             self.assertLessEqual(value, 1.0)
 
     def test_global_temporal_split_is_shared_and_purges_crossing_labels(self):
-        times = np.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], dtype=np.float64)
-        label_ends = np.asarray([2, 3, 4, 5, 6, 7, 8, 9, 10, 11], dtype=np.float64)
+        times = np.arange(1, 101, dtype=np.float64)
+        label_ends = times + 1.0
         train_mask, test_mask, cutoff = service.global_temporal_split_masks(times, label_ends, 0.6)
-        self.assertEqual(cutoff, 7.0)
+        self.assertEqual(cutoff, 61.0)
         self.assertTrue(np.all(times[train_mask] < cutoff))
         self.assertTrue(np.all(label_ends[train_mask] < cutoff))
         self.assertTrue(np.all(times[test_mask] >= cutoff))
         self.assertFalse(np.any(train_mask & test_mask))
+        self.assertEqual(int(train_mask.sum()), 59)
+        self.assertEqual(int(test_mask.sum()), 40)
 
     def test_validation_measures_the_live_probability_blend(self):
         features = np.zeros((2, len(service.FEATURE_NAMES)), dtype=np.float32)
