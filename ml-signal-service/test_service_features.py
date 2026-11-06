@@ -60,6 +60,35 @@ class EngineFeatureParityTests(unittest.TestCase):
             rtol=1e-7,
         )
 
+    def test_strategy_feature_mask_survives_standard_scaler(self):
+        raw = np.linspace(-1.0, 1.0, len(service.FEATURE_NAMES)).tolist()
+        strategies = ("strategic", "flipper", "breakout", "smc-pro", "ladder-flip")
+        for strategy in strategies:
+            focused = service.apply_strategy_focus(raw, strategy)
+            selected = service.STRATEGY_FOCUS[strategy]
+            self.assertEqual(len(focused), len(service.FEATURE_NAMES))
+            for name, value in zip(service.FEATURE_NAMES, focused):
+                if name in selected:
+                    self.assertEqual(value, raw[service.FEATURE_NAMES.index(name)])
+                else:
+                    self.assertEqual(value, 0.0)
+
+            # Constant-zero columns remain zero after StandardScaler; this proves
+            # the feature mask cannot be undone by per-column scale normalization.
+            scaler = service.StandardScaler().fit(np.asarray([focused, focused], dtype=np.float32))
+            transformed = scaler.transform(np.asarray([focused], dtype=np.float32))[0]
+            for name, value in zip(service.FEATURE_NAMES, transformed):
+                if name not in selected:
+                    self.assertEqual(float(value), 0.0)
+
+    def test_strategy_focus_is_required_for_model_features(self):
+        with self.assertRaisesRegex(ValueError, "ML_STRATEGY_FOCUS_NOT_CONFIGURED"):
+            service.apply_strategy_focus([0.0] * len(service.FEATURE_NAMES), "unknown")
+
+    def test_strategy_feature_width_is_validated(self):
+        with self.assertRaisesRegex(ValueError, "ML_FEATURE_WIDTH_MISMATCH"):
+            service.apply_strategy_focus([0.0], "strategic")
+
     def test_spread_is_not_a_live_only_model_feature(self):
         market = {
             "mlBars": make_bars(),
