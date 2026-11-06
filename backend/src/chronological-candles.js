@@ -15,10 +15,14 @@ export function sortChronologicalCandles(candles) {
     const raw = candle?.time ?? candle?.datetime ?? candle?.timestamp ?? candle?.date ?? null;
     return { candle, index, timestamp: candleTimestamp(raw), hasTimestamp: raw !== null && raw !== undefined && raw !== "" };
   });
+  const hasTimestamp = parsed.filter(item => item.hasTimestamp).length;
   const timestamped = parsed.filter(item => item.timestamp !== null).length;
-  if (timestamped === 0) return candles;
-  if (timestamped !== candles.length) {
+  if (hasTimestamp === 0) return candles;
+  if (hasTimestamp !== candles.length) {
     throw new Error("ML_CANDLE_TIMESTAMPS_INCONSISTENT");
+  }
+  if (timestamped !== candles.length) {
+    throw new Error("ML_CANDLE_TIMESTAMP_INVALID");
   }
 
   parsed.sort((a, b) => a.timestamp - b.timestamp || a.index - b.index);
