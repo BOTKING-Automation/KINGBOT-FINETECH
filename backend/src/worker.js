@@ -1262,13 +1262,11 @@ async function cycle(){
 
 export async function startWorker(options={}){
   activeEventBus = options?.eventBus || null;
-  if(!pool){
-    if(String(process.env.WORKER_STANDBY||"").trim()==="1"){
-      console.log("[KINGBOT WORKER] standby mode: database is owned by the primary API service");
-      return;
-    }
-    throw new Error("DATABASE_URL_REQUIRED");
+  if(String(process.env.WORKER_STANDBY||"").trim()==="1"){
+    console.log("[KINGBOT WORKER] standby mode: execution loop disabled by WORKER_STANDBY=1");
+    return;
   }
+  if(!pool)throw new Error("DATABASE_URL_REQUIRED");
   await ensureWorkerSchema();
   await heartbeat({startup:true});
   await activeEventBus?.upsertState({
