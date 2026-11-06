@@ -6,6 +6,7 @@ Only artifacts written by this trusted service are loaded with pickle.
 """
 from __future__ import annotations
 
+import base64
 import gzip
 import hashlib
 import json
@@ -146,7 +147,7 @@ def load_model_artifacts() -> list[dict[str, Any]]:
             if kind not in {"champion", "challenger"} or not encoded or len(supplied_digest) != 64:
                 continue
 
-            artifact = __import__("base64").b64decode(encoded, validate=True)
+            artifact = base64.b64decode(encoded, validate=True)
             if not artifact or len(artifact) > MAX_ARTIFACT_BYTES:
                 continue
             actual_digest = hashlib.sha256(artifact).hexdigest()
