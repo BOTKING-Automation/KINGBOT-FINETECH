@@ -35,8 +35,9 @@ PORT = int(os.getenv("PORT", "10000"))
 SECRET = os.getenv("KINGBOT_ML_SIGNAL_SECRET", "").strip()
 MAX_BODY_BYTES = max(64_000, int(os.getenv("KINGBOT_ML_MAX_BODY_BYTES", "1500000")))
 MIN_BARS = max(120, int(os.getenv("KINGBOT_ML_MIN_BARS", "150")))
-FORWARD_HORIZON = max(1, int(os.getenv("KINGBOT_ML_FORWARD_BARS", "3")))
-LABEL_ATR = float(os.getenv("KINGBOT_ML_LABEL_ATR", "0.35"))
+FORWARD_HORIZON = max(1, int(os.getenv("KINGBOT_ML_FORWARD_BARS", "6")))
+LABEL_ATR = max(0.1, min(3.0, float(os.getenv("KINGBOT_ML_LABEL_ATR", "0.6"))))
+LABEL_FALLBACK_ATR = max(0.1, min(LABEL_ATR, float(os.getenv("KINGBOT_ML_LABEL_FALLBACK_ATR", "0.35"))))
 MAX_MODELS = max(10, int(os.getenv("KINGBOT_ML_MAX_MODELS", "50")))
 MAX_MARKETS = max(1, int(os.getenv("KINGBOT_ML_MAX_MARKETS", "12")))
 MAX_BARS_PER_MARKET = max(MIN_BARS, min(1500, int(os.getenv("KINGBOT_ML_MAX_BARS_PER_MARKET", "1000"))))
@@ -77,17 +78,27 @@ FEATURE_NAMES = [
     "retest",
     "velocity",
     "relative_volume",
+    "return_1_atr",
+    "return_3_atr",
+    "return_10_atr",
+    "candle_body_atr",
+    "candle_close_location",
+    "upper_wick_ratio",
+    "lower_wick_ratio",
+    "range_position_20",
+    "ema20_slope_atr",
+    "efficiency_10",
 ]
 
 STRATEGY_FOCUS = {
-    "strategic": {"trend", "momentum", "volatility"},
-    # OHLC-only training has no historical bid/ask spread. Spread remains a
-    # deterministic risk input rather than a live-only ML feature.
-    "flipper": {"momentum", "velocity"},
-    "breakout": {"breakout", "retest", "volatility", "momentum", "relative_volume"},
-    "smc-pro": {"structure_bull", "structure_bear", "liquidity_sweep", "order_block", "fair_value_gap", "displacement"},
-    "ladder-flip": {"ema_gap", "adx_norm", "rsi_norm", "velocity"},
+    "strategic": {"trend", "momentum", "volatility", "ema20_slope_atr", "return_3_atr", "return_10_atr", "efficiency_10"},
+    "flipper": {"momentum", "velocity", "return_1_atr", "return_3_atr", "candle_body_atr", "candle_close_location", "upper_wick_ratio", "lower_wick_ratio"},
+    "breakout": {"breakout", "retest", "volatility", "momentum", "relative_volume", "return_3_atr", "candle_close_location", "range_position_20", "efficiency_10"},
+    "smc-pro": {"structure_bull", "structure_bear", "liquidity_sweep", "order_block", "fair_value_gap", "displacement", "candle_body_atr", "candle_close_location", "upper_wick_ratio", "lower_wick_ratio", "range_position_20"},
+    "ladder-flip": {"ema_gap", "adx_norm", "rsi_norm", "velocity", "ema20_slope_atr", "return_1_atr", "return_3_atr"},
 }
+
+FEATURE_VERSION = "ai-strategies-v7-barrier-price-action-global-time"
 
 REGIME_ORDER = ["trend", "range", "breakout", "reversal", "volatile"]
 REGIME_RISK_MODE = {
@@ -139,6 +150,9 @@ def restore_persisted_models() -> None:
                         continue
                     record = deserialize_model_record(artifact_bytes)
                     if not isinstance(record, dict):
+                        continue
+                    # Feature/label semantics changed in v7; never load incompatible v6 weights.
+                    if record.get("feature_version") != FEATURE_VERSION:
                         continue
                     if kind == "champion":
                         MODELS[key] = record
@@ -310,6 +324,7 @@ def detect_order_block_feature(bars: list[dict[str, float]], atr_value: float) -
 
 
 def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list[float] | None:
+    """Extract causal OHLC features; every value is available at the close of index."""
     window = bars[: index + 1]
     if len(window) < 60:
         return None
@@ -322,6 +337,7 @@ def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list
     price = closes[-1]
     ema20 = ema(closes, 20)
     ema50 = ema(closes, 50)
+    previous_ema20 = ema(closes[:-3], 20)
     rsi14 = rsi(closes, 14)
     atr14 = atr(window, 14)
     atr60 = atr(window, min(60, max(14, len(window) // 3)))
@@ -343,18 +359,42 @@ def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list
     structure_bull = 1.0 if price > ema50 else 0.0
     structure_bear = 1.0 if price < ema50 else 0.0
     liquidity = 1.0 if (lows[-1] < recent_low and price > recent_low) or (highs[-1] > recent_high and price < recent_high) else 0.0
-    fvg = 1.0 if len(bars) >= 4 and (lows[-1] > highs[-3] or highs[-1] < lows[-3]) else 0.0
+    fvg = 1.0 if len(window) >= 3 and (lows[-1] > highs[-3] or highs[-1] < lows[-3]) else 0.0
     displacement = 1.0 if abs(price - opens[-1]) >= 1.25 * atr14 else 0.0
     breakout = 1.0 if price > recent_high or price < recent_low else 0.0
     retest = 1.0 if (price > recent_high and lows[-1] <= recent_high) or (price < recent_low and highs[-1] >= recent_low) else 0.0
     velocity_move = (price - closes[-4]) / max(atr14, 1e-12) if len(closes) >= 4 else 0.0
     velocity = clamp(velocity_move, -2.0, 2.0) / 2.0
     order_block = detect_order_block_feature(window, atr14)
-    # No historical bid/ask spread is included in OHLC datasets.
+
+    # OHLC history does not contain a reliable historical bid/ask spread.
     spread_atr = 0.0
     mean_volume = sum(volumes[-21:-1]) / max(1, len(volumes[-21:-1]))
     relative_volume = clamp((volumes[-1] / mean_volume) / 2.0, 0.0, 1.0) if mean_volume > 0 else 0.0
     ema_gap = clamp((ema20 - ema50) / max(price, 1e-12), -0.05, 0.05) / 0.01
+
+    candle_range = max(highs[-1] - lows[-1], 1e-12)
+    candle_body_atr = clamp((price - opens[-1]) / max(atr14, 1e-12), -3.0, 3.0) / 3.0
+    candle_close_location = clamp(2.0 * ((price - lows[-1]) / candle_range) - 1.0, -1.0, 1.0)
+    upper_wick_ratio = clamp((highs[-1] - max(opens[-1], price)) / candle_range, 0.0, 1.0)
+    lower_wick_ratio = clamp((min(opens[-1], price) - lows[-1]) / candle_range, 0.0, 1.0)
+
+    range_high_20 = max(highs[-20:])
+    range_low_20 = min(lows[-20:])
+    range_position_20 = clamp(
+        2.0 * ((price - range_low_20) / max(range_high_20 - range_low_20, 1e-12)) - 1.0,
+        -1.0, 1.0,
+    )
+    return_1_atr = clamp((price - closes[-2]) / max(atr14, 1e-12), -3.0, 3.0) / 3.0
+    return_3_atr = clamp((price - closes[-4]) / max(atr14, 1e-12), -3.0, 3.0) / 3.0
+    return_10_atr = clamp((price - closes[-11]) / max(atr14, 1e-12), -3.0, 3.0) / 3.0
+    ema20_slope_atr = (
+        clamp((ema20 - previous_ema20) / max(atr14, 1e-12), -2.0, 2.0) / 2.0
+        if previous_ema20 is not None else 0.0
+    )
+    recent_closes = closes[-11:]
+    path_length = sum(abs(recent_closes[i] - recent_closes[i - 1]) for i in range(1, len(recent_closes)))
+    efficiency_10 = clamp((price - recent_closes[0]) / max(path_length, 1e-12), -1.0, 1.0)
 
     return [
         trend,
@@ -375,8 +415,17 @@ def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list
         retest,
         velocity,
         relative_volume,
+        return_1_atr,
+        return_3_atr,
+        return_10_atr,
+        candle_body_atr,
+        candle_close_location,
+        upper_wick_ratio,
+        lower_wick_ratio,
+        range_position_20,
+        ema20_slope_atr,
+        efficiency_10,
     ]
-
 
 def apply_strategy_focus(features: list[float], strategy: str) -> list[float]:
     focus = STRATEGY_FOCUS.get(strategy, set())
@@ -386,11 +435,50 @@ def apply_strategy_focus(features: list[float], strategy: str) -> list[float]:
     ]
 
 
-def bars_to_training_arrays(bars: list[dict[str, float]], strategy: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def triple_barrier_label(
+    bars: list[dict[str, float]],
+    index: int,
+    atr_value: float,
+    horizon: int | None = None,
+    barrier_atr: float | None = None,
+) -> int:
+    """Label the first directional ATR barrier touched; same-candle double hits abstain."""
+    forward = FORWARD_HORIZON if horizon is None else max(1, int(horizon))
+    barrier = LABEL_ATR if barrier_atr is None else max(0.1, float(barrier_atr))
+    if atr_value <= 0 or index < 0 or index + forward >= len(bars):
+        return 0
+
+    entry = float(bars[index]["close"])
+    upper = entry + atr_value * barrier
+    lower = entry - atr_value * barrier
+    for offset in range(1, forward + 1):
+        future = bars[index + offset]
+        hit_up = float(future["high"]) >= upper
+        hit_down = float(future["low"]) <= lower
+        if hit_up and hit_down:
+            # OHLC cannot establish which barrier was first inside this candle.
+            return 0
+        if hit_up:
+            return 1
+        if hit_down:
+            return -1
+
+    final_move_atr = (float(bars[index + forward]["close"]) - entry) / atr_value
+    if final_move_atr >= LABEL_FALLBACK_ATR:
+        return 1
+    if final_move_atr <= -LABEL_FALLBACK_ATR:
+        return -1
+    return 0
+
+
+def bars_to_training_arrays(
+    bars: list[dict[str, float]], strategy: str
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     rows: list[list[float]] = []
     labels: list[int] = []
     weights: list[float] = []
-    focus = STRATEGY_FOCUS.get(strategy, set())
+    sample_times: list[float] = []
+    label_end_times: list[float] = []
 
     for index in range(60, len(bars) - FORWARD_HORIZON):
         features = extract_features_from_bars(bars, index)
@@ -399,24 +487,32 @@ def bars_to_training_arrays(bars: list[dict[str, float]], strategy: str) -> tupl
         features = apply_strategy_focus(features, strategy)
         current = bars[index]["close"]
         current_atr = atr(bars[: index + 1], 14)
-        future = bars[index + FORWARD_HORIZON]["close"]
         if current <= 0 or not current_atr or current_atr <= 0:
             continue
-        move_in_atr = (future - current) / current_atr
-        label = 1 if move_in_atr >= LABEL_ATR else -1 if move_in_atr <= -LABEL_ATR else 0
 
-        focus_strength = 0.0
-        for name, value in zip(FEATURE_NAMES, features):
-            if name in focus and abs(value) > 0.15:
-                focus_strength += 0.12
+        label = triple_barrier_label(bars, index, current_atr)
         rows.append(features)
         labels.append(label)
-        weights.append(1.0 + min(0.6, focus_strength))
+        # Class balancing is handled by the estimators; avoid heuristic event weighting.
+        weights.append(1.0)
+        sample_times.append(float(bars[index].get("_timestamp", math.nan)))
+        label_end_times.append(float(bars[index + FORWARD_HORIZON].get("_timestamp", math.nan)))
 
     if not rows:
-        return np.empty((0, len(FEATURE_NAMES))), np.empty((0,), dtype=np.int64), np.empty((0,), dtype=np.float32)
-    return np.asarray(rows, dtype=np.float32), np.asarray(labels, dtype=np.int64), np.asarray(weights, dtype=np.float32)
-
+        return (
+            np.empty((0, len(FEATURE_NAMES))),
+            np.empty((0,), dtype=np.int64),
+            np.empty((0,), dtype=np.float32),
+            np.empty((0,), dtype=np.float64),
+            np.empty((0,), dtype=np.float64),
+        )
+    return (
+        np.asarray(rows, dtype=np.float32),
+        np.asarray(labels, dtype=np.int64),
+        np.asarray(weights, dtype=np.float32),
+        np.asarray(sample_times, dtype=np.float64),
+        np.asarray(label_end_times, dtype=np.float64),
+    )
 
 class MLP(nn.Module):
     def __init__(self, input_size: int, classes: int = 3):
@@ -715,6 +811,7 @@ def normalize_market_bars(bars: Any) -> list[dict[str, float]]:
             timestamp = parse_bar_timestamp(raw_timestamp)
             if timestamp is None:
                 raise ValueError("ML_MARKET_BAR_TIMESTAMP_INVALID")
+            row["_timestamp"] = timestamp
             timestamped_rows.append((timestamp, index, row))
         rows.append(row)
 
@@ -802,6 +899,32 @@ def temporal_split_bounds(sample_count: int, train_fraction: float = 0.78) -> tu
     return train_end, split
 
 
+def global_temporal_split_masks(
+    sample_times: np.ndarray,
+    label_end_times: np.ndarray,
+    train_fraction: float = 0.78,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Split all symbols at one shared UTC cutoff and purge labels crossing it."""
+    times = np.asarray(sample_times, dtype=np.float64)
+    ends = np.asarray(label_end_times, dtype=np.float64)
+    if times.ndim != 1 or ends.ndim != 1 or times.shape != ends.shape or not len(times):
+        raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_INPUT_INVALID")
+    if not np.isfinite(times).all() or not np.isfinite(ends).all():
+        raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_TIMESTAMPS_REQUIRED")
+
+    unique_times = np.unique(times)
+    if len(unique_times) < 4:
+        raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_HISTORY_INSUFFICIENT")
+    fraction = clamp(float(train_fraction), 0.50, 0.90)
+    split_index = max(1, min(len(unique_times) - 1, int(len(unique_times) * fraction)))
+    cutoff = float(unique_times[split_index])
+    train_mask = (times < cutoff) & (ends < cutoff)
+    test_mask = times >= cutoff
+    if int(train_mask.sum()) < 40 or int(test_mask.sum()) < 20:
+        raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_SAMPLES_INSUFFICIENT")
+    return train_mask, test_mask, cutoff
+
+
 def ensemble_probabilities(rf: Any, torch_model: nn.Module, scaled_features: np.ndarray) -> np.ndarray:
     """Return the RF/PyTorch probability blend used during live inference."""
     rf_raw = rf.predict_proba(scaled_features)
@@ -850,12 +973,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         if len(markets) > MAX_MARKETS:
             raise ValueError(f"ML_TRAINING_MAX_MARKETS_{MAX_MARKETS}")
 
-        train_x_parts: list[np.ndarray] = []
-        train_y_parts: list[np.ndarray] = []
-        train_w_parts: list[np.ndarray] = []
-        test_x_parts: list[np.ndarray] = []
-        test_y_parts: list[np.ndarray] = []
-        validation_markets: list[dict[str, Any]] = []
+        market_parts: list[dict[str, Any]] = []
         total_bar_count = 0
         accepted_markets = 0
 
@@ -872,44 +990,100 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
 
             accepted_markets += 1
             total_bar_count += len(normalized)
-            X_part, y_part, weights_part = bars_to_training_arrays(normalized, strategy)
+            X_part, y_part, weights_part, sample_times, label_end_times = bars_to_training_arrays(
+                normalized, strategy
+            )
             if len(X_part) < 90:
-                validation_markets.append({
-                    "symbol": symbol,
-                    "accepted": False,
-                    "reason": "ML_TRAINING_MARKET_SAMPLES_INSUFFICIENT"
-                })
                 continue
 
-            train_end, test_start = temporal_split_bounds(len(X_part))
-            X_train_part, X_test_part = X_part[:train_end], X_part[test_start:]
-            y_train_part, y_test_part = y_part[:train_end], y_part[test_start:]
-            w_train_part = weights_part[:train_end]
-
-            if train_end < 40 or len(X_test_part) < 20 or len(set(int(v) for v in y_train_part)) < 3:
-                validation_markets.append({
-                    "symbol": symbol,
-                    "accepted": False,
-                    "reason": "ML_TRAINING_WALK_FORWARD_SPLIT_INSUFFICIENT"
-                })
-                continue
-
-            train_x_parts.append(X_train_part)
-            train_y_parts.append(y_train_part)
-            train_w_parts.append(w_train_part)
-            test_x_parts.append(X_test_part)
-            test_y_parts.append(y_test_part)
-            validation_markets.append({
+            market_parts.append({
                 "symbol": symbol,
-                "accepted": True,
-                "samples": int(len(X_part)),
-                "trainSamples": int(len(X_train_part)),
-                "testSamples": int(len(X_test_part)),
-                "embargoBars": int(test_start - train_end)
+                "X": X_part,
+                "y": y_part,
+                "weights": weights_part,
+                "sample_times": sample_times,
+                "label_end_times": label_end_times,
             })
 
-        if not train_x_parts or not test_x_parts:
+        if not market_parts:
             raise ValueError(f"ML_TRAINING_REQUIRES_{MIN_BARS}_BARS")
+
+        timestamped = all(
+            np.isfinite(part["sample_times"]).all()
+            and np.isfinite(part["label_end_times"]).all()
+            for part in market_parts
+        )
+        train_x_parts: list[np.ndarray] = []
+        train_y_parts: list[np.ndarray] = []
+        train_w_parts: list[np.ndarray] = []
+        test_x_parts: list[np.ndarray] = []
+        test_y_parts: list[np.ndarray] = []
+        validation_markets: list[dict[str, Any]] = []
+        split_timestamp: float | None = None
+
+        if timestamped:
+            all_times = np.concatenate([part["sample_times"] for part in market_parts])
+            all_label_ends = np.concatenate([part["label_end_times"] for part in market_parts])
+            train_mask, test_mask, split_timestamp = global_temporal_split_masks(
+                all_times, all_label_ends
+            )
+            offset = 0
+            for part in market_parts:
+                count = len(part["X"])
+                local_train = train_mask[offset:offset + count]
+                local_test = test_mask[offset:offset + count]
+                offset += count
+                train_count = int(local_train.sum())
+                test_count = int(local_test.sum())
+                eligible = train_count >= 40 and test_count >= 20
+                validation_markets.append({
+                    "symbol": part["symbol"],
+                    "accepted": eligible,
+                    "samples": count,
+                    "trainSamples": train_count,
+                    "testSamples": test_count,
+                    "splitTimestamp": split_timestamp,
+                    "embargo": "label-end-before-global-cutoff",
+                })
+                if eligible:
+                    train_x_parts.append(part["X"][local_train])
+                    train_y_parts.append(part["y"][local_train])
+                    train_w_parts.append(part["weights"][local_train])
+                    test_x_parts.append(part["X"][local_test])
+                    test_y_parts.append(part["y"][local_test])
+            validation_type = "global-timestamped-purged-holdout"
+        else:
+            # Providers without timestamps retain a per-market chronological split.
+            for part in market_parts:
+                train_end, test_start = temporal_split_bounds(len(part["X"]))
+                X_train_part = part["X"][:train_end]
+                X_test_part = part["X"][test_start:]
+                y_train_part = part["y"][:train_end]
+                y_test_part = part["y"][test_start:]
+                w_train_part = part["weights"][:train_end]
+                eligible = (
+                    train_end >= 40
+                    and len(X_test_part) >= 20
+                    and len(set(int(v) for v in y_train_part)) >= 3
+                )
+                validation_markets.append({
+                    "symbol": part["symbol"],
+                    "accepted": eligible,
+                    "samples": len(part["X"]),
+                    "trainSamples": len(X_train_part),
+                    "testSamples": len(X_test_part),
+                    "embargoBars": int(test_start - train_end),
+                })
+                if eligible:
+                    train_x_parts.append(X_train_part)
+                    train_y_parts.append(y_train_part)
+                    train_w_parts.append(w_train_part)
+                    test_x_parts.append(X_test_part)
+                    test_y_parts.append(y_test_part)
+            validation_type = "per-market-temporal-holdout-with-label-embargo"
+
+        if not train_x_parts or not test_x_parts:
+            raise ValueError("ML_TRAINING_TEMPORAL_SPLIT_INSUFFICIENT")
 
         X_train = np.concatenate(train_x_parts, axis=0)
         y_train = np.concatenate(train_y_parts, axis=0)
@@ -917,17 +1091,25 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         X_test = np.concatenate(test_x_parts, axis=0)
         y_test = np.concatenate(test_y_parts, axis=0)
 
+        # Feedback may enter training only when its capture time precedes the
+        # evaluation cutoff. Without candle timestamps, temporal order is unknown.
         with LOCK:
             feedback = [
                 row for row in FEEDBACK_ROWS
-                if str(row.get("strategy")) == strategy
+                if timestamped
+                and split_timestamp is not None
+                and finite(row.get("receivedAt"), math.inf) < split_timestamp
+                and str(row.get("strategy")) == strategy
                 and str(row.get("timeframe")) == timeframe.lower()
                 and isinstance(row.get("features"), list)
             ][-MAX_FEEDBACK_ROWS:]
         if feedback:
             feedback_x = np.asarray([row["features"] for row in feedback], dtype=np.float32)
             feedback_y = np.asarray([int(row["label"]) for row in feedback], dtype=np.int64)
-            feedback_w = np.asarray([1.5 if row.get("outcome") in {"WIN", "LOSS"} else 1.0 for row in feedback], dtype=np.float32)
+            feedback_w = np.asarray([
+                1.5 if row.get("outcome") in {"WIN", "LOSS"} else 1.0
+                for row in feedback
+            ], dtype=np.float32)
             if feedback_x.ndim == 2 and feedback_x.shape[1] == len(FEATURE_NAMES):
                 X_train = np.concatenate([X_train, feedback_x], axis=0)
                 y_train = np.concatenate([y_train, feedback_y], axis=0)
@@ -991,8 +1173,11 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         )
         with LOCK:
             incumbent = MODELS.get(key)
-            incumbent_score = float(incumbent.get("selection_score", 0.0)) if incumbent else 0.0
-        promote = incumbent is None or candidate_score >= incumbent_score - 0.0025
+            incumbent_compatible = bool(
+                incumbent and incumbent.get("feature_version") == FEATURE_VERSION
+            )
+            incumbent_score = float(incumbent.get("selection_score", 0.0)) if incumbent_compatible else 0.0
+        promote = not incumbent_compatible or candidate_score >= incumbent_score - 0.0025
         trained_at = time.time()
         model_record = {
             "rf": rf,
@@ -1018,11 +1203,12 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             "ensemble_macro_f1": ensemble_metrics["macroF1"],
             "quality_gate": quality_gate,
             "bar_count": total_bar_count,
-            "feature_version": "ai-strategies-v6-ohlc-parity-embargo-ensemble",
+            "feature_version": FEATURE_VERSION,
             "validation": {
-                "type": "per-market-temporal-holdout-with-label-embargo",
+                "type": validation_type,
                 "trainFraction": 0.78,
                 "embargoBars": FORWARD_HORIZON,
+                "splitTimestamp": split_timestamp,
                 "markets": validation_markets,
             },
             "selection_score": candidate_score,
@@ -1068,9 +1254,11 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "classesTest": test_classes,
                 "forwardBars": FORWARD_HORIZON,
                 "labelAtr": LABEL_ATR,
+                "temporalAlignment": "GLOBAL_TIMESTAMPED" if timestamped else "PER_MARKET_FALLBACK",
+                "splitTimestamp": split_timestamp,
             },
             "validation": {
-                "type": "per-market-temporal-holdout",
+                "type": validation_type,
                 "rf": rf_metrics,
                 "pytorch": torch_metrics,
                 "ensemble": ensemble_metrics,
@@ -1083,7 +1271,6 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         with LOCK:
             TRAINING_KEYS.discard(key)
         TRAINING_SEMAPHORE.release()
-
 
 def model_status(key: str) -> dict[str, Any]:
     item = MODELS.get(key)

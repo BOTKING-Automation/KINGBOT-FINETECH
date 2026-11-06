@@ -101,14 +101,15 @@ jobs:
               prev = base + (math.sin((i - 1) / 7.0) * 2.4 + math.sin((i - 1) / 17.0) * 1.8) + (((i - 1) % 31) - 15) * 0.08 if i else 100.0
               high = max(close, prev) + 0.7 + (i % 5) * 0.05
               low = min(close, prev) - 0.7 - (i % 3) * 0.05
-              bars.append({"open": prev, "high": high, "low": low, "close": close, "volume": 100 + (i % 20)})
+              bars.append({"open": prev, "high": high, "low": low, "close": close, "volume": 100 + (i % 20), "time": 1700000000 + i * 300})
 
           market = {"symbol": "XAUUSD", "bars": bars}
           trained = []
           for strategy in ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"]:
               result = service.train_model(strategy, "5m", [market])
               assert result["ready"], result
-              assert result["featureVersion"].startswith("ai-strategies-v6"), result
+              assert result["featureVersion"].startswith("ai-strategies-v7"), result
+              assert result["validation"]["type"] == "global-timestamped-purged-holdout", result
               trained.append(result["key"])
               prediction = service.predict_model(
                   strategy,

@@ -94,8 +94,10 @@ services:
       - key: KINGBOT_ML_MIN_BARS
         value: "150"
       - key: KINGBOT_ML_FORWARD_BARS
-        value: "3"
+        value: "6"
       - key: KINGBOT_ML_LABEL_ATR
+        value: "0.6"
+      - key: KINGBOT_ML_LABEL_FALLBACK_ATR
         value: "0.35"
       - key: KINGBOT_ML_MAX_MODELS
         value: "50"
