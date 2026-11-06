@@ -98,7 +98,7 @@ STRATEGY_FOCUS = {
     "ladder-flip": {"ema_gap", "adx_norm", "rsi_norm", "velocity", "ema20_slope_atr", "return_1_atr", "return_3_atr"},
 }
 
-FEATURE_VERSION = "ai-strategies-v7-barrier-price-action-global-time"
+FEATURE_VERSION = "ai-strategies-v8-barrier6-atr0.60-fallback0.35-price-action-global-time"
 
 REGIME_ORDER = ["trend", "range", "breakout", "reversal", "volatile"]
 REGIME_RISK_MODE = {
