@@ -14,28 +14,58 @@ const URL = normalizeServiceUrl();
 const SECRET = String(process.env.KINGBOT_ML_SIGNAL_SECRET || "").trim();
 // Allow enough time for Render free-tier wake-up + model inference, while
 // keeping the worker bounded and preserving the mandatory AI execution gate.
-const TIMEOUT_MS = Math.max(2500, Number(process.env.KINGBOT_ML_SIGNAL_TIMEOUT_MS || 6500));
-const TRAIN_TIMEOUT_MS = Math.max(8000, Number(process.env.KINGBOT_ML_TRAIN_TIMEOUT_MS || 30000));
+const TIMEOUT_MS = Math.max(5000, Number(process.env.KINGBOT_ML_SIGNAL_TIMEOUT_MS || 10000));
+const TRAIN_TIMEOUT_MS = Math.max(30000, Number(process.env.KINGBOT_ML_TRAIN_TIMEOUT_MS || 180000));
 
 function enabled() {
   return Boolean(URL && SECRET);
 }
 
-async function request(path, body, timeoutMs = TIMEOUT_MS) {
+async function request(path, body, timeoutMs = TIMEOUT_MS, { max429Retries = 0 } = {}) {
   if (!enabled()) return null;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(500, Number(timeoutMs) || TIMEOUT_MS));
-  try {
-    const response = await fetch(URL + path, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "accept": "application/json",
-        "x-kingbot-ml-secret": SECRET
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
+  const deadline = Date.now() + Math.max(1000, Number(timeoutMs) || TIMEOUT_MS);
+  let retryCount = 0;
+
+  while (true) {
+    const remaining = deadline - Date.now();
+    if (remaining < 1000) throw new Error("ML_SIGNAL_REQUEST_TIMEOUT");
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.max(500, remaining));
+    let response;
+    try {
+      response = await fetch(URL + path, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept": "application/json",
+          "x-kingbot-ml-secret": SECRET
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+    } catch (error) {
+      if (error?.name === "AbortError") throw new Error("ML_SIGNAL_REQUEST_TIMEOUT");
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (response.status === 429 && retryCount < max429Retries) {
+      retryCount += 1;
+      const header = String(response.headers.get("retry-after") || "").trim();
+      const parsed = Number(header);
+      const retryAfterMs = Number.isFinite(parsed) && parsed > 0
+        ? parsed * 1000
+        : Math.min(30000, 1500 * (2 ** (retryCount - 1)));
+      const delayMs = Math.max(1000, Math.min(30000, retryAfterMs));
+      if (Date.now() + delayMs + 1000 >= deadline) {
+        throw new Error("ML_SIGNAL_HTTP_429");
+      }
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      continue;
+    }
+
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data?.ok === false) {
       const code = String(data?.error || data?.reason || `ML_SIGNAL_HTTP_${response.status}`);
@@ -43,11 +73,6 @@ async function request(path, body, timeoutMs = TIMEOUT_MS) {
     }
     if (!data || typeof data !== "object") throw new Error("ML_SIGNAL_RESPONSE_INVALID");
     return data;
-  } catch (error) {
-    if (error?.name === "AbortError") throw new Error("ML_SIGNAL_REQUEST_TIMEOUT");
-    throw error;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -188,7 +213,7 @@ export async function trainMlStrategyModel({ botId, symbol, timeframe, bars, mar
       botId: String(botId).trim().toLowerCase(),
       timeframe: String(timeframe || "5m").trim().toLowerCase(),
       markets: datasets
-    }, TRAIN_TIMEOUT_MS);
+    }, TRAIN_TIMEOUT_MS, { max429Retries: 4 });
   } catch (error) {
     const code = normalizeError(error, "ML_TRAINING_SERVICE_UNAVAILABLE");
     return {
