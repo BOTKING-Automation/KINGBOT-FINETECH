@@ -21,10 +21,16 @@ function enabled() {
   return Boolean(URL && SECRET);
 }
 
-async function request(path, body, timeoutMs = TIMEOUT_MS, { max429Retries = 0 } = {}) {
+async function request(
+  path,
+  body,
+  timeoutMs = TIMEOUT_MS,
+  { max429Retries = 0, maxBusyRetries = 0 } = {}
+) {
   if (!enabled()) return null;
   const deadline = Date.now() + Math.max(1000, Number(timeoutMs) || TIMEOUT_MS);
-  let retryCount = 0;
+  let retry429Count = 0;
+  let retryBusyCount = 0;
 
   while (true) {
     const remaining = deadline - Date.now();
@@ -51,13 +57,13 @@ async function request(path, body, timeoutMs = TIMEOUT_MS, { max429Retries = 0 }
       clearTimeout(timer);
     }
 
-    if (response.status === 429 && retryCount < max429Retries) {
-      retryCount += 1;
+    if (response.status === 429 && retry429Count < max429Retries) {
+      retry429Count += 1;
       const header = String(response.headers.get("retry-after") || "").trim();
       const parsed = Number(header);
       const retryAfterMs = Number.isFinite(parsed) && parsed > 0
         ? parsed * 1000
-        : Math.min(30000, 1500 * (2 ** (retryCount - 1)));
+        : Math.min(30000, 1500 * (2 ** (retry429Count - 1)));
       const delayMs = Math.max(1000, Math.min(30000, retryAfterMs));
       if (Date.now() + delayMs + 1000 >= deadline) {
         throw new Error("ML_SIGNAL_HTTP_429");
@@ -67,9 +73,30 @@ async function request(path, body, timeoutMs = TIMEOUT_MS, { max429Retries = 0 }
     }
 
     const data = await response.json().catch(() => ({}));
+    const errorCode = String(data?.error || data?.reason || `ML_SIGNAL_HTTP_${response.status}`);
+
+    // The Python trainer is intentionally single-capacity on the Free tier.
+    // Wait for the active model fit instead of treating an ordinary 409 busy
+    // response as a failed strategy model.
+    const trainerBusy = response.status === 409 &&
+      ["ML_TRAINING_CAPACITY_BUSY", "ML_TRAINING_IN_PROGRESS"].includes(errorCode);
+    if (trainerBusy && retryBusyCount < maxBusyRetries) {
+      retryBusyCount += 1;
+      const header = String(response.headers.get("retry-after") || "").trim();
+      const parsed = Number(header);
+      const retryAfterMs = Number.isFinite(parsed) && parsed > 0
+        ? parsed * 1000
+        : Math.min(30000, 3000 * (2 ** (retryBusyCount - 1)));
+      const delayMs = Math.max(2000, Math.min(30000, retryAfterMs));
+      if (Date.now() + delayMs + 1000 >= deadline) {
+        throw new Error(errorCode);
+      }
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      continue;
+    }
+
     if (!response.ok || data?.ok === false) {
-      const code = String(data?.error || data?.reason || `ML_SIGNAL_HTTP_${response.status}`);
-      throw new Error(code.slice(0, 220));
+      throw new Error(errorCode.slice(0, 220));
     }
     if (!data || typeof data !== "object") throw new Error("ML_SIGNAL_RESPONSE_INVALID");
     return data;
@@ -213,7 +240,7 @@ export async function trainMlStrategyModel({ botId, symbol, timeframe, bars, mar
       botId: String(botId).trim().toLowerCase(),
       timeframe: String(timeframe || "5m").trim().toLowerCase(),
       markets: datasets
-    }, TRAIN_TIMEOUT_MS, { max429Retries: 4 });
+    }, TRAIN_TIMEOUT_MS, { max429Retries: 4, maxBusyRetries: 6 });
   } catch (error) {
     const code = normalizeError(error, "ML_TRAINING_SERVICE_UNAVAILABLE");
     return {
