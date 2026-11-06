@@ -10,6 +10,7 @@ BUY / SELL / HOLD probabilities from a scikit-learn + PyTorch ensemble.
 from __future__ import annotations
 
 import hmac
+import io
 import json
 import math
 import os
@@ -129,11 +130,14 @@ def restore_persisted_models() -> None:
                         continue
                     kind = str(artifact.get("kind") or "")
                     key = str(artifact.get("modelKey") or "")
-                    record = artifact.get("record")
-                    if kind not in {"champion", "challenger"} or key.count(":") != 1 or not isinstance(record, dict):
+                    artifact_bytes = artifact.get("artifact")
+                    if kind not in {"champion", "challenger"} or key.count(":") != 1 or not isinstance(artifact_bytes, bytes):
                         continue
                     strategy, timeframe = key.split(":", 1)
                     if strategy not in STRATEGY_FOCUS or not timeframe:
+                        continue
+                    record = deserialize_model_record(artifact_bytes)
+                    if not isinstance(record, dict):
                         continue
                     if kind == "champion":
                         MODELS[key] = record
@@ -427,6 +431,178 @@ class MLP(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
+
+
+class PersistedForest:
+    """Small, read-only inference adapter reconstructed from safe numeric arrays."""
+
+    def __init__(self, classes: np.ndarray, trees: list[dict[str, np.ndarray]]):
+        self.classes_ = np.asarray(classes).copy()
+        self.trees = trees
+
+    def predict_proba(self, features: np.ndarray) -> np.ndarray:
+        X = np.asarray(features, dtype=np.float64)
+        if X.ndim != 2 or not len(self.trees):
+            raise ValueError("ML_PERSISTED_FOREST_INPUT_INVALID")
+        output = np.zeros((len(X), len(self.classes_)), dtype=np.float64)
+
+        for tree in self.trees:
+            left = tree["children_left"]
+            right = tree["children_right"]
+            feature = tree["feature"]
+            threshold = tree["threshold"]
+            values = tree["values"]
+            tree_classes = tree["classes"]
+            nodes = np.zeros(len(X), dtype=np.int64)
+
+            for _ in range(len(left) + 1):
+                active = left[nodes] >= 0
+                if not np.any(active):
+                    break
+                rows = np.flatnonzero(active)
+                current_nodes = nodes[rows]
+                columns = feature[current_nodes].astype(np.int64)
+                if np.any(columns < 0) or np.any(columns >= X.shape[1]):
+                    raise ValueError("ML_PERSISTED_FOREST_FEATURE_INVALID")
+                go_left = X[rows, columns] <= threshold[current_nodes]
+                nodes[rows] = np.where(go_left, left[current_nodes], right[current_nodes])
+            else:
+                raise ValueError("ML_PERSISTED_FOREST_TREE_DEPTH_INVALID")
+
+            leaf_values = values[nodes, 0, :len(tree_classes)]
+            row_totals = np.sum(leaf_values, axis=1, keepdims=True)
+            row_totals = np.maximum(row_totals, 1e-12)
+            leaf_probabilities = leaf_values / row_totals
+            for local_column, encoded_class in enumerate(tree_classes):
+                output_column = int(encoded_class)
+                if 0 <= output_column < output.shape[1]:
+                    output[:, output_column] += leaf_probabilities[:, local_column]
+
+        output /= float(len(self.trees))
+        return output
+
+
+def serialize_model_record(record: dict[str, Any]) -> bytes:
+    """Serialize RF, MLP and scaler without pickle/object arrays."""
+    if not isinstance(record, dict) or not all(key in record for key in ("rf", "torch", "scaler")):
+        raise ValueError("ML_MODEL_RECORD_INVALID")
+
+    rf = record["rf"]
+    torch_model = record["torch"]
+    scaler = record["scaler"]
+    arrays: dict[str, np.ndarray] = {
+        "forest_classes": np.asarray(rf.classes_, dtype=np.float64),
+        "scaler_mean": np.asarray(scaler.mean_, dtype=np.float64),
+        "scaler_scale": np.asarray(scaler.scale_, dtype=np.float64),
+        "scaler_var": np.asarray(scaler.var_, dtype=np.float64),
+        "scaler_n_features": np.asarray([int(scaler.n_features_in_)], dtype=np.int64),
+        "scaler_n_samples_seen": np.asarray(scaler.n_samples_seen_),
+    }
+
+    trees_meta: list[dict[str, str]] = []
+    for index, estimator in enumerate(rf.estimators_):
+        tree = estimator.tree_
+        prefix = f"forest_{index:03d}_"
+        names = {
+            "children_left": prefix + "children_left",
+            "children_right": prefix + "children_right",
+            "feature": prefix + "feature",
+            "threshold": prefix + "threshold",
+            "values": prefix + "values",
+            "classes": prefix + "classes",
+        }
+        arrays[names["children_left"]] = np.asarray(tree.children_left, dtype=np.int64)
+        arrays[names["children_right"]] = np.asarray(tree.children_right, dtype=np.int64)
+        arrays[names["feature"]] = np.asarray(tree.feature, dtype=np.int64)
+        arrays[names["threshold"]] = np.asarray(tree.threshold, dtype=np.float64)
+        arrays[names["values"]] = np.asarray(tree.value, dtype=np.float64)
+        arrays[names["classes"]] = np.asarray(estimator.classes_, dtype=np.float64)
+        trees_meta.append(names)
+
+    torch_state_names: dict[str, str] = {}
+    for index, (name, tensor) in enumerate(torch_model.state_dict().items()):
+        array_name = f"torch_{index:03d}"
+        arrays[array_name] = tensor.detach().cpu().numpy().copy()
+        torch_state_names[name] = array_name
+
+    excluded = {"rf", "torch", "scaler"}
+    metadata = {
+        "format": "kingbot-ml-npz-v1",
+        "record": {key: value for key, value in record.items() if key not in excluded},
+        "forestTreeArrays": trees_meta,
+        "torchStateArrays": torch_state_names,
+    }
+    metadata_bytes = json.dumps(
+        metadata,
+        separators=(",", ":"),
+        default=lambda value: value.item() if isinstance(value, np.generic) else (
+            value.tolist() if isinstance(value, np.ndarray) else str(value)
+        ),
+    ).encode("utf-8")
+    arrays["metadata_json"] = np.frombuffer(metadata_bytes, dtype=np.uint8)
+
+    buffer = io.BytesIO()
+    np.savez_compressed(buffer, **arrays)
+    artifact = buffer.getvalue()
+    if not artifact or len(artifact) > 4 * 1024 * 1024:
+        raise ValueError("ML_MODEL_ARTIFACT_SIZE_LIMIT")
+    return artifact
+
+
+def deserialize_model_record(artifact: bytes) -> dict[str, Any]:
+    """Restore models from NPZ numeric arrays only; object loading is explicitly disabled."""
+    if not isinstance(artifact, bytes) or not artifact or len(artifact) > 4 * 1024 * 1024:
+        raise ValueError("ML_MODEL_ARTIFACT_INVALID")
+    try:
+        with np.load(io.BytesIO(artifact), allow_pickle=False) as archive:
+            metadata = json.loads(archive["metadata_json"].tobytes().decode("utf-8"))
+            if metadata.get("format") != "kingbot-ml-npz-v1":
+                raise ValueError("ML_MODEL_ARTIFACT_FORMAT_INVALID")
+
+            def numeric_array(name: str) -> np.ndarray:
+                if name not in archive.files:
+                    raise ValueError("ML_MODEL_ARTIFACT_ARRAY_MISSING")
+                value = np.asarray(archive[name])
+                if value.dtype.hasobject or not np.isfinite(value).all():
+                    raise ValueError("ML_MODEL_ARTIFACT_ARRAY_INVALID")
+                return value.copy()
+
+            trees: list[dict[str, np.ndarray]] = []
+            for names in metadata.get("forestTreeArrays", []):
+                trees.append({
+                    key: numeric_array(array_name)
+                    for key, array_name in names.items()
+                })
+            if not trees:
+                raise ValueError("ML_MODEL_ARTIFACT_FOREST_EMPTY")
+
+            forest = PersistedForest(numeric_array("forest_classes"), trees)
+            scaler = StandardScaler()
+            scaler.mean_ = numeric_array("scaler_mean")
+            scaler.scale_ = numeric_array("scaler_scale")
+            scaler.var_ = numeric_array("scaler_var")
+            scaler.n_features_in_ = int(numeric_array("scaler_n_features")[0])
+            n_samples_seen = numeric_array("scaler_n_samples_seen")
+            scaler.n_samples_seen_ = n_samples_seen.item() if n_samples_seen.ndim == 0 else n_samples_seen
+
+            torch_model = MLP(len(FEATURE_NAMES), 3)
+            restored_state: dict[str, torch.Tensor] = {}
+            for parameter_name, array_name in metadata.get("torchStateArrays", {}).items():
+                restored_state[parameter_name] = torch.from_numpy(numeric_array(array_name))
+            if not restored_state:
+                raise ValueError("ML_MODEL_ARTIFACT_TORCH_STATE_EMPTY")
+            torch_model.load_state_dict(restored_state, strict=True)
+            torch_model.eval()
+
+            record = metadata.get("record")
+            if not isinstance(record, dict):
+                raise ValueError("ML_MODEL_ARTIFACT_METADATA_INVALID")
+            record["rf"] = forest
+            record["torch"] = torch_model
+            record["scaler"] = scaler
+            return record
+    except (KeyError, OSError, ValueError, TypeError, json.JSONDecodeError) as error:
+        raise ValueError(f"ML_MODEL_ARTIFACT_DECODE_FAILED:{str(error)[:140]}") from error
 
 
 def train_torch(
@@ -807,7 +983,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         }
         if os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip():
             try:
-                save_model_artifact("champion" if promote else "challenger", key, model_record)
+                artifact_bytes = serialize_model_record(model_record)
+                save_model_artifact("champion" if promote else "challenger", key, artifact_bytes)
             except Exception as error:
                 raise RuntimeError(f"ML_MODEL_PERSISTENCE_FAILED:{str(error)[:140]}") from error
 
