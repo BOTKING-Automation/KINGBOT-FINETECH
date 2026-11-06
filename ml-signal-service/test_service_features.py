@@ -190,6 +190,54 @@ class EngineFeatureParityTests(unittest.TestCase):
         self.assertLess(train_end, test_start)
         self.assertGreaterEqual(train_end, 40)
 
+    def test_triple_barrier_uses_first_intrabar_touch(self):
+        bars = make_bars(80)
+        entry_index = 60
+        entry = bars[entry_index]["close"]
+        bars[entry_index + 1].update({"high": entry + 0.8, "low": entry - 0.1, "close": entry + 0.2})
+        self.assertEqual(service.triple_barrier_label(bars, entry_index, 1.0, horizon=6, barrier_atr=0.6), 1)
+
+        bars = make_bars(80)
+        entry = bars[entry_index]["close"]
+        bars[entry_index + 1].update({"high": entry + 0.1, "low": entry - 0.8, "close": entry - 0.2})
+        self.assertEqual(service.triple_barrier_label(bars, entry_index, 1.0, horizon=6, barrier_atr=0.6), -1)
+
+    def test_triple_barrier_abstains_when_both_barriers_hit_same_candle(self):
+        bars = make_bars(80)
+        entry_index = 60
+        entry = bars[entry_index]["close"]
+        bars[entry_index + 1].update({"high": entry + 0.8, "low": entry - 0.8, "close": entry})
+        self.assertEqual(service.triple_barrier_label(bars, entry_index, 1.0, horizon=6, barrier_atr=0.6), 0)
+
+    def test_triple_barrier_ignores_moves_after_horizon(self):
+        bars = make_bars(80)
+        entry_index = 60
+        entry = bars[entry_index]["close"]
+        for index in range(entry_index + 1, entry_index + 7):
+            bars[index].update({"high": entry + 0.1, "low": entry - 0.1, "close": entry})
+        bars[entry_index + 7].update({"high": entry + 1.0, "low": entry, "close": entry + 0.8})
+        self.assertEqual(service.triple_barrier_label(bars, entry_index, 1.0, horizon=6, barrier_atr=0.6), 0)
+
+    def test_price_action_feature_values_are_finite_and_bounded(self):
+        bars = make_bars()
+        features = service.extract_features_from_bars(bars, len(bars) - 1)
+        self.assertEqual(len(features), len(service.FEATURE_NAMES))
+        self.assertTrue(np.isfinite(np.asarray(features)).all())
+        for name in ("return_1_atr", "return_3_atr", "return_10_atr", "candle_body_atr", "candle_close_location", "range_position_20", "ema20_slope_atr", "efficiency_10"):
+            value = float(features[service.FEATURE_NAMES.index(name)])
+            self.assertGreaterEqual(value, -1.0)
+            self.assertLessEqual(value, 1.0)
+
+    def test_global_temporal_split_is_shared_and_purges_crossing_labels(self):
+        times = np.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], dtype=np.float64)
+        label_ends = np.asarray([2, 3, 4, 5, 6, 7, 8, 9, 10, 11], dtype=np.float64)
+        train_mask, test_mask, cutoff = service.global_temporal_split_masks(times, label_ends, 0.6)
+        self.assertEqual(cutoff, 7.0)
+        self.assertTrue(np.all(times[train_mask] < cutoff))
+        self.assertTrue(np.all(label_ends[train_mask] < cutoff))
+        self.assertTrue(np.all(times[test_mask] >= cutoff))
+        self.assertFalse(np.any(train_mask & test_mask))
+
     def test_validation_measures_the_live_probability_blend(self):
         features = np.zeros((2, len(service.FEATURE_NAMES)), dtype=np.float32)
         probabilities = service.ensemble_probabilities(
