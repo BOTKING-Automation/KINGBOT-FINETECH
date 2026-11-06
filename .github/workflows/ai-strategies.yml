@@ -98,13 +98,14 @@ jobs:
           for strategy in ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"]:
               result = service.train_model(strategy, "5m", [market])
               assert result["ready"], result
-              assert result["featureVersion"].startswith("ai-strategies-v5"), result
+              assert result["featureVersion"].startswith("ai-strategies-v6"), result
               trained.append(result["key"])
               prediction = service.predict_model(
                   strategy,
                   "XAUUSD",
                   "5m",
                   {
+                      "mlBars": bars[-120:],
                       "price": bars[-1]["close"],
                       "atr": 1.5,
                       "emaFast": 101.0,
@@ -222,11 +223,37 @@ jobs:
             if (!trainResponse.ok || !train.ok || !train.ready) throw new Error("ML train failed: " + JSON.stringify(train));
 
             const { warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } = await import("./backend/src/ai-trade-gate.js");
+            const mlBars = bars.slice(-120);
+            const timeframeFrame = {
+              timeframe: "15m",
+              available: true,
+              mlBars,
+              price: base,
+              close: base,
+              atr: 1.5,
+              trend: 0.7,
+              momentum: 0.6,
+              structure: "bullish",
+              adx: 24,
+              rsi: 58,
+              emaFast: 101,
+              emaSlow: 99.5,
+              velocityPoints: 0.8,
+              velocityAtr: 0.8,
+              volume: 0.5
+            };
             const market = {
-              symbol: "XAUUSD", timeframe: "5m", price: base, spread: 0.2, atr: 1.5,
+              symbol: "XAUUSD", timeframe: "15m", price: base, spread: 0.2, atr: 1.5,
               volatility: 0.45, trend: 0.7, momentum: 0.6, structure: "bullish",
               adx: 24, rsi: 58, emaFast: 101, emaSlow: 99.5,
-              velocityPoints: 0.8, velocityAtr: 0.8, volume: 0.5
+              velocityPoints: 0.8, velocityAtr: 0.8, volume: 0.5,
+              mlBars,
+              timeframeProfile: { regime: "15m", setup: "15m", execution: "15m" },
+              multiTimeframe: {
+                regime: { ...timeframeFrame },
+                setup: { ...timeframeFrame },
+                execution: { ...timeframeFrame }
+              }
             };
             const analysis = { ok: true, signal: "LONG_CANDIDATE", score: 80, reason: "CI test" };
             const signal = await warmAiStrategySignal({

@@ -319,6 +319,9 @@ function buildMlTimeframeMarket(baseMarket,frame){
       ? num(baseMarket?.velocityAtr, num(baseMarket?.velocityPoints))
       : num(usable.velocityScore, num(usable.velocityAtr, num(usable.velocityPoints, 0))),
     volume:num(usable.volume, num(baseMarket?.volume, 0)),
+    mlBars:Array.isArray(usable?.mlBars)
+      ? usable.mlBars
+      : (Array.isArray(roleSnapshot?.mlBars) ? roleSnapshot.mlBars : null),
     multiTimeframe:baseMarket?.multiTimeframe||null
   };
 }

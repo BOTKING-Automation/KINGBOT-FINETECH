@@ -966,7 +966,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             "ensemble_macro_f1": ensemble_metrics["macroF1"],
             "quality_gate": quality_gate,
             "bar_count": total_bar_count,
-            "feature_version": "ai-strategies-v5-parity-embargo-ensemble",
+            "feature_version": "ai-strategies-v6-ohlc-parity-embargo-ensemble",
             "validation": {
                 "type": "per-market-temporal-holdout-with-label-embargo",
                 "trainFraction": 0.78,
@@ -1072,53 +1072,32 @@ def model_status(key: str) -> dict[str, Any]:
 
 
 def current_market_features(market: dict[str, Any], strategy: str) -> np.ndarray:
-    price = finite(market.get("price") or market.get("close"))
-    atr_value = max(finite(market.get("atr") or market.get("atr14")), 1e-12)
-    ema_fast = finite(market.get("emaFast") or market.get("ema20"))
-    ema_slow = finite(market.get("emaSlow") or market.get("ema50"))
-    rsi_value = finite(market.get("rsi") or market.get("rsi14"), 50.0)
-    adx_value = finite(market.get("adx") or market.get("adx14"))
-    # Historical OHLC training has no bid/ask spread; do not inject a
-    # live-only spread value into the model's feature distribution.
-    spread_atr = 0.0
-    trend = clamp(finite(market.get("trend")), -1.0, 1.0)
-    momentum = clamp(finite(market.get("momentum")), -1.0, 1.0)
-    volatility = clamp(finite(market.get("volatility")), 0.0, 1.0)
-    ema_gap = clamp((ema_fast - ema_slow) / max(price, 1e-12) if price > 0 else 0.0, -0.05, 0.05) / 0.01
+    """Build live features with the exact same OHLC extractor used during training."""
+    if not isinstance(market, dict):
+        raise ValueError("ML_PREDICT_MARKET_DATA_INVALID")
 
-    structure = str(market.get("structure") or "").lower()
-    order_block_raw = market.get("orderBlock")
-    order_block_present = bool(order_block_raw) if isinstance(order_block_raw, dict) else bool_feature(order_block_raw)
-    velocity_atr = finite(market.get("velocityAtr"), finite(market.get("velocityPoints"), 0.0))
-    velocity = clamp(velocity_atr, -2.0, 2.0) / 2.0
-    relative_volume = clamp(finite(market.get("volume"), 0.0), 0.0, 1.0)
+    raw_bars = market.get("mlBars")
+    if not isinstance(raw_bars, list):
+        multi_timeframe = market.get("multiTimeframe")
+        execution = multi_timeframe.get("execution") if isinstance(multi_timeframe, dict) else None
+        raw_bars = execution.get("mlBars") if isinstance(execution, dict) else None
 
-    values = [
-        trend,
-        momentum,
-        volatility,
-        clamp(atr_value / max(price, 1e-12) * 100.0, 0.0, 10.0) / 10.0,
-        clamp((rsi_value - 50.0) / 50.0, -1.0, 1.0),
-        clamp(adx_value / 50.0, 0.0, 2.0),
-        clamp(ema_gap, -5.0, 5.0) / 5.0,
-        clamp(abs(spread_atr), 0.0, 2.0) / 2.0,
-        1.0 if structure == "bullish" else 0.0,
-        1.0 if structure == "bearish" else 0.0,
-        bool_feature(market.get("liquiditySweep")),
-        1.0 if order_block_present else 0.0,
-        bool_feature(market.get("fairValueGap") or market.get("fvg")),
-        bool_feature(market.get("displacement")),
-        bool_feature(market.get("breakout")),
-        bool_feature(market.get("retest")),
-        velocity,
-        relative_volume,
-    ]
-    values = apply_strategy_focus(values, strategy)
+    if not isinstance(raw_bars, list):
+        raise ValueError("ML_PREDICT_OHLC_FEATURES_REQUIRED")
+
+    bars = normalize_market_bars(raw_bars)
+    if len(bars) < 60:
+        raise ValueError("ML_PREDICT_OHLC_HISTORY_INSUFFICIENT")
+
+    features = extract_features_from_bars(bars, len(bars) - 1)
+    if features is None:
+        raise ValueError("ML_PREDICT_OHLC_FEATURES_UNAVAILABLE")
+
+    values = apply_strategy_focus(features, strategy)
     array = np.asarray([values], dtype=np.float32)
-    if not np.isfinite(array).all():
+    if array.shape != (1, len(FEATURE_NAMES)) or not np.isfinite(array).all():
         raise ValueError("ML_PREDICT_FEATURES_INVALID")
     return array
-
 
 def record_feedback(
     strategy: str,
