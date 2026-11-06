@@ -1091,10 +1091,15 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         X_test = np.concatenate(test_x_parts, axis=0)
         y_test = np.concatenate(test_y_parts, axis=0)
 
+        # Feedback may enter training only when its capture time precedes the
+        # evaluation cutoff. Without candle timestamps, temporal order is unknown.
         with LOCK:
             feedback = [
                 row for row in FEEDBACK_ROWS
-                if str(row.get("strategy")) == strategy
+                if timestamped
+                and split_timestamp is not None
+                and finite(row.get("receivedAt"), math.inf) < split_timestamp
+                and str(row.get("strategy")) == strategy
                 and str(row.get("timeframe")) == timeframe.lower()
                 and isinstance(row.get("features"), list)
             ][-MAX_FEEDBACK_ROWS:]
