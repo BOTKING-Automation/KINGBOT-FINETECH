@@ -41,6 +41,7 @@ import { KingbotEventBus, registerKingbotEventRoutes } from "./kingbot-event-bus
 import { ensureCommercialLedgerSchema, registerCommercialLedgerRoutes } from "./commercial-ledger.js";
 import { ensureUserMemorySchema } from "./kingbot-user-memory.js";
 import { registerCommandPlane } from "./command-plane.js";
+import { registerMlArtifacts, ensureMlArtifactsSchema } from "./ml-artifacts.js";
 import { requestSecurity, corsOptions, createApiLimiter, createWriteLimiter } from "./security.js";
 import { ensureAuditIntegritySchema, verifyAuditChain } from "./audit-integrity.js";
 
@@ -709,6 +710,7 @@ registerIntelligenceOrchestrator(app, { requireUser, pool, twelveData });
 registerKingbotEventRoutes(app, { requireUser, pool, eventBus });
 registerCommercialLedgerRoutes(app,{pool});
 registerCommandPlane(app,{pool,broker,twelveData,eventBus});
+registerMlArtifacts(app,{pool});
 
 app.get("/api/admin/security/audit-integrity", async (req,res)=>{
   const a=await requireUser(pool,req,res); if(!a)return;
@@ -773,7 +775,7 @@ app.use((_req, res) => {
   res.status(404).json({ ok: false, error: "Route not found." });
 });
 
-ensureAuthSchema(pool).then(() => ensureAuditIntegritySchema(pool)).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => ensureFintechOpsSchema(pool)).then(() => ensureGlobalRiskSchema(pool)).then(() => ensureGoldSignalsSchema(pool)).then(() => ensureAiMarketScannerSchema(pool)).then(() => ensureIntelligenceOrchestratorSchema(pool)).then(() => partners.ensureSchema()).then(() => eventBus.ensureSchema()).then(() => ensureUserMemorySchema(pool)).then(() => ensureCommercialLedgerSchema(pool)).then(() => {
+ensureAuthSchema(pool).then(() => ensureAuditIntegritySchema(pool)).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => ensureFintechOpsSchema(pool)).then(() => ensureGlobalRiskSchema(pool)).then(() => ensureGoldSignalsSchema(pool)).then(() => ensureAiMarketScannerSchema(pool)).then(() => ensureIntelligenceOrchestratorSchema(pool)).then(() => partners.ensureSchema()).then(() => eventBus.ensureSchema()).then(() => ensureUserMemorySchema(pool)).then(() => ensureCommercialLedgerSchema(pool)).then(() => ensureMlArtifactsSchema(pool)).then(() => {
   eventBus.start().catch(error => console.warn("[KINGBOT EVENT BUS] startup deferred:",error?.message||error));
   httpServer.listen(PORT, () => {
     console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);

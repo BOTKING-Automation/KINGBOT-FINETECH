@@ -676,7 +676,15 @@ const AI_STRATEGY_BOTS = ["strategic","flipper","breakout","smc-pro","ladder-fli
 const TRAINING_SYMBOLS = DEFAULT_SYMBOLS;
 const TRAINING_HISTORY_LIMIT = Math.max(360,Math.min(1000,Number(process.env.KINGBOT_ML_HISTORY_LIMIT||1000)));
 const TRAINING_HISTORY_CACHE_MS = Math.max(5*60*1000,Number(process.env.KINGBOT_ML_HISTORY_CACHE_MS||6*60*60*1000));
+const TRAIN_REQUEST_SPACING_MS = Math.max(1000,Math.min(10000,Number(process.env.KINGBOT_ML_TRAIN_SPACING_MS||2500)));
 const trainingHistoryCache = new Map();
+let lastMlTrainingRequestAt = 0;
+
+async function paceMlTrainingRequest(){
+  const waitMs = Math.max(0,lastMlTrainingRequestAt+TRAIN_REQUEST_SPACING_MS-Date.now());
+  if(waitMs) await new Promise(resolve=>setTimeout(resolve,waitMs));
+  lastMlTrainingRequestAt = Date.now();
+}
 
 function trainingTimeframes(botId){
   const profile=getBotDefinitions()[botId]?.timeframeProfile||{};
@@ -835,6 +843,7 @@ async function trainAiStrategyModels(twelveData){
         continue;
       }
       try{
+        await paceMlTrainingRequest();
         const result=await trainMlStrategyModel({botId,timeframe,markets});
         if(result?.ok){
           trained++;
@@ -872,7 +881,7 @@ async function trainAiStrategyModels(twelveData){
 function startAiStrategyModelTraining(twelveData){
   if(!mlSignalServiceStatus().configured)return;
   const intervalMs=Math.max(5*60*1000,Number(process.env.KINGBOT_ML_RETRAIN_MS||30*60*1000));
-  const retryMs=Math.max(15*1000,Number(process.env.KINGBOT_ML_RETRY_MS||60*1000));
+  const retryMs=Math.max(60*1000,Number(process.env.KINGBOT_ML_RETRY_MS||5*60*1000));
   let running=false;
   let lastTrainingResult=null;
   const run=async()=>{
@@ -891,8 +900,14 @@ function startAiStrategyModelTraining(twelveData){
     // A restarted/free-tier ML service can be unavailable during the first
     // training cycle. Retry quickly when no strategy model was trained instead
     // of leaving AI execution blocked until the normal 30-minute retrain.
-    if(Number(lastTrainingResult?.trained||0)===0){
-      setTimeout(()=>void run(),retryMs);
+    const trained = Number(lastTrainingResult?.trained||0);
+    const target = Number(lastTrainingResult?.targetModels||0);
+    if(target>0 && trained<target){
+      const hasRateLimit = (lastTrainingResult?.reports||[]).some(item=>/HTTP_429/.test(String(item?.error||"")));
+      const retryDelay = hasRateLimit
+        ? Math.max(retryMs,Number(process.env.KINGBOT_ML_429_RETRY_MS||10*60*1000))
+        : retryMs;
+      setTimeout(()=>void run(),retryDelay);
     }
   };
   setTimeout(()=>void run(),Number(process.env.KINGBOT_ML_INITIAL_TRAIN_DELAY_MS||12000));

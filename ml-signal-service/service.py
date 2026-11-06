@@ -10,6 +10,7 @@ BUY / SELL / HOLD probabilities from a scikit-learn + PyTorch ensemble.
 from __future__ import annotations
 
 import hmac
+import io
 import json
 import math
 import os
@@ -24,6 +25,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 from sklearn.preprocessing import StandardScaler
 from torch import nn
+
+from model_store import load_model_artifacts, save_model_artifact
 
 
 HOST = "0.0.0.0"
@@ -97,8 +100,73 @@ REGIME_RISK_MODE = {
 MODELS: dict[str, dict[str, Any]] = {}
 CHALLENGERS: dict[str, dict[str, Any]] = {}
 LOCK = threading.Lock()
+MODEL_RESTORE_EVENT = threading.Event()
+MODEL_RESTORE_STATUS = "PENDING"
+PERSISTED_MODELS_LOADED = 0
+if not os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip():
+    MODEL_RESTORE_STATUS = "DISABLED"
+    MODEL_RESTORE_EVENT.set()
 torch.set_num_threads(TORCH_THREADS)
 torch.set_num_interop_threads(max(1, min(4, TORCH_THREADS)))
+
+
+def restore_persisted_models() -> None:
+    """Restore trusted model artifacts asynchronously after the HTTP server starts."""
+    global MODEL_RESTORE_STATUS, PERSISTED_MODELS_LOADED
+
+    if not os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip():
+        MODEL_RESTORE_STATUS = "DISABLED"
+        MODEL_RESTORE_EVENT.set()
+        return
+
+    MODEL_RESTORE_STATUS = "RESTORING"
+    for attempt in range(4):
+        try:
+            artifacts = load_model_artifacts()
+            loaded = 0
+            with LOCK:
+                for artifact in artifacts:
+                    if not isinstance(artifact, dict):
+                        continue
+                    kind = str(artifact.get("kind") or "")
+                    key = str(artifact.get("modelKey") or "")
+                    artifact_bytes = artifact.get("artifact")
+                    if kind not in {"champion", "challenger"} or key.count(":") != 1 or not isinstance(artifact_bytes, bytes):
+                        continue
+                    strategy, timeframe = key.split(":", 1)
+                    if strategy not in STRATEGY_FOCUS or not timeframe:
+                        continue
+                    record = deserialize_model_record(artifact_bytes)
+                    if not isinstance(record, dict):
+                        continue
+                    if kind == "champion":
+                        MODELS[key] = record
+                    else:
+                        CHALLENGERS[key] = record
+                    loaded += 1
+
+                while len(MODELS) > MAX_MODELS:
+                    oldest = min(MODELS.items(), key=lambda item: item[1].get("trained_at", 0))[0]
+                    MODELS.pop(oldest, None)
+
+            PERSISTED_MODELS_LOADED = loaded
+            MODEL_RESTORE_STATUS = "RESTORED" if loaded else "EMPTY"
+            print("[KINGBOT ML STORE] restore complete", json.dumps({
+                "loaded": loaded,
+                "champions": len(MODELS),
+                "challengers": len(CHALLENGERS),
+            }))
+            MODEL_RESTORE_EVENT.set()
+            return
+        except Exception as error:
+            MODEL_RESTORE_STATUS = "RETRYING"
+            print("[KINGBOT ML STORE] restore attempt failed", attempt + 1, str(error)[:180])
+            if attempt < 3:
+                time.sleep(5 * (attempt + 1))
+
+    MODEL_RESTORE_STATUS = "FAILED"
+    MODEL_RESTORE_EVENT.set()
+    print("[KINGBOT ML STORE] restore deferred; training can repopulate artifacts")
 
 
 def finite(value: Any, fallback: float = 0.0) -> float:
@@ -365,6 +433,178 @@ class MLP(nn.Module):
         return self.net(x)
 
 
+class PersistedForest:
+    """Small, read-only inference adapter reconstructed from safe numeric arrays."""
+
+    def __init__(self, classes: np.ndarray, trees: list[dict[str, np.ndarray]]):
+        self.classes_ = np.asarray(classes).copy()
+        self.trees = trees
+
+    def predict_proba(self, features: np.ndarray) -> np.ndarray:
+        X = np.asarray(features, dtype=np.float64)
+        if X.ndim != 2 or not len(self.trees):
+            raise ValueError("ML_PERSISTED_FOREST_INPUT_INVALID")
+        output = np.zeros((len(X), len(self.classes_)), dtype=np.float64)
+
+        for tree in self.trees:
+            left = tree["children_left"]
+            right = tree["children_right"]
+            feature = tree["feature"]
+            threshold = tree["threshold"]
+            values = tree["values"]
+            tree_classes = tree["classes"]
+            nodes = np.zeros(len(X), dtype=np.int64)
+
+            for _ in range(len(left) + 1):
+                active = left[nodes] >= 0
+                if not np.any(active):
+                    break
+                rows = np.flatnonzero(active)
+                current_nodes = nodes[rows]
+                columns = feature[current_nodes].astype(np.int64)
+                if np.any(columns < 0) or np.any(columns >= X.shape[1]):
+                    raise ValueError("ML_PERSISTED_FOREST_FEATURE_INVALID")
+                go_left = X[rows, columns] <= threshold[current_nodes]
+                nodes[rows] = np.where(go_left, left[current_nodes], right[current_nodes])
+            else:
+                raise ValueError("ML_PERSISTED_FOREST_TREE_DEPTH_INVALID")
+
+            leaf_values = values[nodes, 0, :len(tree_classes)]
+            row_totals = np.sum(leaf_values, axis=1, keepdims=True)
+            row_totals = np.maximum(row_totals, 1e-12)
+            leaf_probabilities = leaf_values / row_totals
+            for local_column, encoded_class in enumerate(tree_classes):
+                output_column = int(encoded_class)
+                if 0 <= output_column < output.shape[1]:
+                    output[:, output_column] += leaf_probabilities[:, local_column]
+
+        output /= float(len(self.trees))
+        return output
+
+
+def serialize_model_record(record: dict[str, Any]) -> bytes:
+    """Serialize RF, MLP and scaler without pickle/object arrays."""
+    if not isinstance(record, dict) or not all(key in record for key in ("rf", "torch", "scaler")):
+        raise ValueError("ML_MODEL_RECORD_INVALID")
+
+    rf = record["rf"]
+    torch_model = record["torch"]
+    scaler = record["scaler"]
+    arrays: dict[str, np.ndarray] = {
+        "forest_classes": np.asarray(rf.classes_, dtype=np.float64),
+        "scaler_mean": np.asarray(scaler.mean_, dtype=np.float64),
+        "scaler_scale": np.asarray(scaler.scale_, dtype=np.float64),
+        "scaler_var": np.asarray(scaler.var_, dtype=np.float64),
+        "scaler_n_features": np.asarray([int(scaler.n_features_in_)], dtype=np.int64),
+        "scaler_n_samples_seen": np.asarray(scaler.n_samples_seen_),
+    }
+
+    trees_meta: list[dict[str, str]] = []
+    for index, estimator in enumerate(rf.estimators_):
+        tree = estimator.tree_
+        prefix = f"forest_{index:03d}_"
+        names = {
+            "children_left": prefix + "children_left",
+            "children_right": prefix + "children_right",
+            "feature": prefix + "feature",
+            "threshold": prefix + "threshold",
+            "values": prefix + "values",
+            "classes": prefix + "classes",
+        }
+        arrays[names["children_left"]] = np.asarray(tree.children_left, dtype=np.int64)
+        arrays[names["children_right"]] = np.asarray(tree.children_right, dtype=np.int64)
+        arrays[names["feature"]] = np.asarray(tree.feature, dtype=np.int64)
+        arrays[names["threshold"]] = np.asarray(tree.threshold, dtype=np.float64)
+        arrays[names["values"]] = np.asarray(tree.value, dtype=np.float64)
+        arrays[names["classes"]] = np.asarray(estimator.classes_, dtype=np.float64)
+        trees_meta.append(names)
+
+    torch_state_names: dict[str, str] = {}
+    for index, (name, tensor) in enumerate(torch_model.state_dict().items()):
+        array_name = f"torch_{index:03d}"
+        arrays[array_name] = tensor.detach().cpu().numpy().copy()
+        torch_state_names[name] = array_name
+
+    excluded = {"rf", "torch", "scaler"}
+    metadata = {
+        "format": "kingbot-ml-npz-v1",
+        "record": {key: value for key, value in record.items() if key not in excluded},
+        "forestTreeArrays": trees_meta,
+        "torchStateArrays": torch_state_names,
+    }
+    metadata_bytes = json.dumps(
+        metadata,
+        separators=(",", ":"),
+        default=lambda value: value.item() if isinstance(value, np.generic) else (
+            value.tolist() if isinstance(value, np.ndarray) else str(value)
+        ),
+    ).encode("utf-8")
+    arrays["metadata_json"] = np.frombuffer(metadata_bytes, dtype=np.uint8)
+
+    buffer = io.BytesIO()
+    np.savez_compressed(buffer, **arrays)
+    artifact = buffer.getvalue()
+    if not artifact or len(artifact) > 4 * 1024 * 1024:
+        raise ValueError("ML_MODEL_ARTIFACT_SIZE_LIMIT")
+    return artifact
+
+
+def deserialize_model_record(artifact: bytes) -> dict[str, Any]:
+    """Restore models from NPZ numeric arrays only; object loading is explicitly disabled."""
+    if not isinstance(artifact, bytes) or not artifact or len(artifact) > 4 * 1024 * 1024:
+        raise ValueError("ML_MODEL_ARTIFACT_INVALID")
+    try:
+        with np.load(io.BytesIO(artifact), allow_pickle=False) as archive:
+            metadata = json.loads(archive["metadata_json"].tobytes().decode("utf-8"))
+            if metadata.get("format") != "kingbot-ml-npz-v1":
+                raise ValueError("ML_MODEL_ARTIFACT_FORMAT_INVALID")
+
+            def numeric_array(name: str) -> np.ndarray:
+                if name not in archive.files:
+                    raise ValueError("ML_MODEL_ARTIFACT_ARRAY_MISSING")
+                value = np.asarray(archive[name])
+                if value.dtype.hasobject or not np.isfinite(value).all():
+                    raise ValueError("ML_MODEL_ARTIFACT_ARRAY_INVALID")
+                return value.copy()
+
+            trees: list[dict[str, np.ndarray]] = []
+            for names in metadata.get("forestTreeArrays", []):
+                trees.append({
+                    key: numeric_array(array_name)
+                    for key, array_name in names.items()
+                })
+            if not trees:
+                raise ValueError("ML_MODEL_ARTIFACT_FOREST_EMPTY")
+
+            forest = PersistedForest(numeric_array("forest_classes"), trees)
+            scaler = StandardScaler()
+            scaler.mean_ = numeric_array("scaler_mean")
+            scaler.scale_ = numeric_array("scaler_scale")
+            scaler.var_ = numeric_array("scaler_var")
+            scaler.n_features_in_ = int(numeric_array("scaler_n_features")[0])
+            n_samples_seen = numeric_array("scaler_n_samples_seen")
+            scaler.n_samples_seen_ = n_samples_seen.item() if n_samples_seen.ndim == 0 else n_samples_seen
+
+            torch_model = MLP(len(FEATURE_NAMES), 3)
+            restored_state: dict[str, torch.Tensor] = {}
+            for parameter_name, array_name in metadata.get("torchStateArrays", {}).items():
+                restored_state[parameter_name] = torch.from_numpy(numeric_array(array_name))
+            if not restored_state:
+                raise ValueError("ML_MODEL_ARTIFACT_TORCH_STATE_EMPTY")
+            torch_model.load_state_dict(restored_state, strict=True)
+            torch_model.eval()
+
+            record = metadata.get("record")
+            if not isinstance(record, dict):
+                raise ValueError("ML_MODEL_ARTIFACT_METADATA_INVALID")
+            record["rf"] = forest
+            record["torch"] = torch_model
+            record["scaler"] = scaler
+            return record
+    except (KeyError, OSError, ValueError, TypeError, json.JSONDecodeError) as error:
+        raise ValueError(f"ML_MODEL_ARTIFACT_DECODE_FAILED:{str(error)[:140]}") from error
+
+
 def train_torch(
     X_train: np.ndarray,
     y_train: np.ndarray,
@@ -541,6 +781,8 @@ def ensemble_class_metrics(y_true: np.ndarray, probabilities: np.ndarray) -> dic
 
 
 def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) -> dict[str, Any]:
+    if not MODEL_RESTORE_EVENT.wait(timeout=max(30, int(os.getenv("KINGBOT_ML_RESTORE_WAIT_SEC", "180")))):
+        raise RuntimeError("ML_MODEL_RESTORE_PENDING")
     key = f"{strategy}:{timeframe.lower()}"
     if not TRAINING_SEMAPHORE.acquire(blocking=False):
         raise RuntimeError("ML_TRAINING_CAPACITY_BUSY")
@@ -700,52 +942,59 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             incumbent_score = float(incumbent.get("selection_score", 0.0)) if incumbent else 0.0
         promote = incumbent is None or candidate_score >= incumbent_score - 0.0025
         trained_at = time.time()
+        model_record = {
+            "rf": rf,
+            "torch": torch_model,
+            "scaler": scaler,
+            "trained_at": trained_at,
+            "strategy": strategy,
+            "symbols": sorted(
+                {row["symbol"] for row in validation_markets if row.get("accepted")}
+            ),
+            "timeframe": timeframe.lower(),
+            "samples": int(len(X_train) + len(X_test)),
+            "train_samples": int(len(X_train)),
+            "test_samples": int(len(X_test)),
+            "rf_accuracy": rf_metrics["accuracy"],
+            "rf_balanced_accuracy": rf_metrics["balancedAccuracy"],
+            "rf_macro_f1": rf_metrics["macroF1"],
+            "torch_accuracy": torch_metrics["accuracy"],
+            "torch_balanced_accuracy": torch_metrics["balancedAccuracy"],
+            "torch_macro_f1": torch_metrics["macroF1"],
+            "ensemble_accuracy": ensemble_metrics["accuracy"],
+            "ensemble_balanced_accuracy": ensemble_metrics["balancedAccuracy"],
+            "ensemble_macro_f1": ensemble_metrics["macroF1"],
+            "quality_gate": quality_gate,
+            "bar_count": total_bar_count,
+            "feature_version": "ai-strategies-v5-parity-embargo-ensemble",
+            "validation": {
+                "type": "per-market-temporal-holdout-with-label-embargo",
+                "trainFraction": 0.78,
+                "embargoBars": FORWARD_HORIZON,
+                "markets": validation_markets,
+            },
+            "selection_score": candidate_score,
+            "promotion": "CHAMPION" if promote else "CHALLENGER",
+            "promoted_at": trained_at if promote else None,
+            "feedbackVersion": FEEDBACK_VERSION,
+            "feedbackRowsUsed": len(feedback),
+            "regimeAware": True,
+            "supportedRegimes": REGIME_ORDER,
+        }
+        if os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip():
+            try:
+                artifact_bytes = serialize_model_record(model_record)
+                save_model_artifact("champion" if promote else "challenger", key, artifact_bytes)
+            except Exception as error:
+                raise RuntimeError(f"ML_MODEL_PERSISTENCE_FAILED:{str(error)[:140]}") from error
+
         with LOCK:
-            model_record = {
-                "rf": rf,
-                "torch": torch_model,
-                "scaler": scaler,
-                "trained_at": trained_at,
-                "strategy": strategy,
-                "symbols": sorted(
-                    {row["symbol"] for row in validation_markets if row.get("accepted")}
-                ),
-                "timeframe": timeframe.lower(),
-                "samples": int(len(X_train) + len(X_test)),
-                "train_samples": int(len(X_train)),
-                "test_samples": int(len(X_test)),
-                "rf_accuracy": rf_metrics["accuracy"],
-                "rf_balanced_accuracy": rf_metrics["balancedAccuracy"],
-                "rf_macro_f1": rf_metrics["macroF1"],
-                "torch_accuracy": torch_metrics["accuracy"],
-                "torch_balanced_accuracy": torch_metrics["balancedAccuracy"],
-                "torch_macro_f1": torch_metrics["macroF1"],
-                "ensemble_accuracy": ensemble_metrics["accuracy"],
-                "ensemble_balanced_accuracy": ensemble_metrics["balancedAccuracy"],
-                "ensemble_macro_f1": ensemble_metrics["macroF1"],
-                "quality_gate": quality_gate,
-                "bar_count": total_bar_count,
-                "feature_version": "ai-strategies-v5-parity-embargo-ensemble",
-                "validation": {
-                    "type": "per-market-temporal-holdout-with-label-embargo",
-                    "trainFraction": 0.78,
-                    "embargoBars": FORWARD_HORIZON,
-                    "markets": validation_markets,
-                },
-                "selection_score": candidate_score,
-                "promotion": "CHAMPION" if promote else "CHALLENGER",
-                "promoted_at": trained_at if promote else None,
-                "feedbackVersion": FEEDBACK_VERSION,
-                "feedbackRowsUsed": len(feedback),
-                "regimeAware": True,
-                "supportedRegimes": REGIME_ORDER,
-            }
             if promote:
                 MODELS[key] = model_record
             else:
                 CHALLENGERS[key] = model_record
             while len(MODELS) > MAX_MODELS:
-                oldest = min(MODELS.items(), key=lambda item: item[1]["trained_at"])[0]
+                oldest = min(MODELS.items(), key=lambda item: item[1].get("trained_at", 0))[0]
                 MODELS.pop(oldest, None)
 
         return {
@@ -1054,7 +1303,10 @@ class Handler(BaseHTTPRequestHandler):
                 "libraries": ["scikit-learn", "PyTorch"],
                 "modelsLoaded": len(MODELS),
                 "configured": bool(SECRET),
-                "ready": bool(SECRET),
+                "ready": bool(SECRET) and MODEL_RESTORE_EVENT.is_set(),
+                "persistenceConfigured": bool(os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip()),
+                "modelRestoreStatus": MODEL_RESTORE_STATUS,
+                "persistedModelsLoaded": PERSISTED_MODELS_LOADED,
                 "training": len(TRAINING_KEYS),
                 "feedbackRows": len(FEEDBACK_ROWS),
                 "feedbackVersion": FEEDBACK_VERSION,
@@ -1152,7 +1404,9 @@ class Handler(BaseHTTPRequestHandler):
 
             self._json(404, {"ok": False, "error": "NOT_FOUND"})
         except RuntimeError as error:
-            self._json(409, {"ok": False, "error": str(error)[:180]})
+            message = str(error)[:180]
+            status = 503 if message.startswith("ML_MODEL_PERSISTENCE_FAILED") else 409
+            self._json(status, {"ok": False, "error": message})
         except ValueError as error:
             self._json(422, {"ok": False, "error": str(error)[:180]})
         except Exception as error:
@@ -1163,6 +1417,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    if os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip():
+        threading.Thread(
+            target=restore_persisted_models,
+            name="kingbot-ml-artifact-restore",
+            daemon=True,
+        ).start()
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     server.daemon_threads = True
     server.allow_reuse_address = True

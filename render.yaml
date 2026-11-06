@@ -22,16 +22,18 @@ services:
         value: "1"
       - key: KINGBOT_AI_STRATEGIES_REQUIRED
         value: "true"
-      - key: KINGBOT_ML_SIGNAL_HOST
-        fromService:
-          name: kingbot-ml-signal
-          type: web
-          property: host
-      - key: KINGBOT_ML_SIGNAL_PORT
-        fromService:
-          name: kingbot-ml-signal
-          type: web
-          property: port
+      - key: KINGBOT_ML_SIGNAL_URL
+        value: "https://kingbot-ml-signal.onrender.com"
+      - key: KINGBOT_ML_SIGNAL_TIMEOUT_MS
+        value: "10000"
+      - key: KINGBOT_ML_TRAIN_TIMEOUT_MS
+        value: "180000"
+      - key: KINGBOT_ML_TRAIN_SPACING_MS
+        value: "2500"
+      - key: KINGBOT_ML_RETRY_MS
+        value: "300000"
+      - key: KINGBOT_ML_429_RETRY_MS
+        value: "600000"
       - key: KINGBOT_ML_SIGNAL_SECRET
         fromService:
           name: kingbot-ml-signal
@@ -103,3 +105,9 @@ services:
         value: "320"
       - key: KINGBOT_ML_MAX_BODY_BYTES
         value: "1500000"
+      - key: KINGBOT_ML_ARTIFACTS_URL
+        value: "https://kingbot-fintech-api-etfv.onrender.com/api/ml-artifacts"
+      - key: KINGBOT_ML_ARTIFACT_TIMEOUT_SEC
+        value: "60"
+      - key: KINGBOT_ML_RESTORE_WAIT_SEC
+        value: "180"
