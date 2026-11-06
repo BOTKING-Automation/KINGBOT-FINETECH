@@ -240,6 +240,15 @@ class EngineFeatureParityTests(unittest.TestCase):
         self.assertEqual(int(train_mask.sum()), 59)
         self.assertEqual(int(test_mask.sum()), 40)
 
+    def test_model_version_identifies_the_target_label_configuration(self):
+        self.assertEqual(service.FORWARD_HORIZON, 6)
+        self.assertAlmostEqual(service.LABEL_ATR, 0.6)
+        self.assertAlmostEqual(service.LABEL_FALLBACK_ATR, 0.35)
+        self.assertIn(
+            "v8-barrier6-atr0.60-fallback0.35",
+            service.FEATURE_VERSION,
+        )
+
     def test_validation_measures_the_live_probability_blend(self):
         features = np.zeros((2, len(service.FEATURE_NAMES)), dtype=np.float32)
         probabilities = service.ensemble_probabilities(
