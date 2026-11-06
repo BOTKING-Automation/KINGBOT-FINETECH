@@ -52,6 +52,16 @@ test("fails closed when only some candles have timestamps", () => {
   );
 });
 
+test("fails closed when timestamp values are malformed", () => {
+  assert.throws(
+    () => sortChronologicalCandles([
+      candle("not-a-timestamp", 100),
+      candle("also-not-a-timestamp", 101)
+    ]),
+    /ML_CANDLE_TIMESTAMP_INVALID/
+  );
+});
+
 test("preserves provider order when no candle has a timestamp", () => {
   const rows = [
     { open: 101, high: 102, low: 100, close: 101, volume: 100 },
