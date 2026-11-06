@@ -98,7 +98,7 @@ STRATEGY_FOCUS = {
     "ladder-flip": {"ema_gap", "adx_norm", "rsi_norm", "velocity", "ema20_slope_atr", "return_1_atr", "return_3_atr"},
 }
 
-FEATURE_VERSION = "ai-strategies-v8-barrier6-atr0.60-fallback0.35-price-action-global-time"
+FEATURE_VERSION = "ai-strategies-v9-real-strategy-mask-barrier6-atr0.60-fallback0.35-global-time"
 
 REGIME_ORDER = ["trend", "range", "breakout", "reversal", "volatile"]
 REGIME_RISK_MODE = {
@@ -428,9 +428,14 @@ def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list
     ]
 
 def apply_strategy_focus(features: list[float], strategy: str) -> list[float]:
-    focus = STRATEGY_FOCUS.get(strategy, set())
+    """Apply a true feature mask so StandardScaler cannot undo strategy specialization."""
+    focus = STRATEGY_FOCUS.get(strategy)
+    if focus is None:
+        raise ValueError("ML_STRATEGY_FOCUS_NOT_CONFIGURED")
+    if len(features) != len(FEATURE_NAMES):
+        raise ValueError("ML_FEATURE_WIDTH_MISMATCH")
     return [
-        float(value) if name in focus else float(value) * 0.25
+        float(value) if name in focus else 0.0
         for name, value in zip(FEATURE_NAMES, features)
     ]
 
