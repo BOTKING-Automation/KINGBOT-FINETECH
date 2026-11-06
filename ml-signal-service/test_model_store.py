@@ -1,9 +1,7 @@
 import base64
-import gzip
 import hashlib
 import json
 import os
-import pickle
 import unittest
 from unittest.mock import patch
 
@@ -34,8 +32,9 @@ class ModelStoreTests(unittest.TestCase):
         self.environment.start()
         self.addCleanup(self.environment.stop)
 
-    def test_save_sends_compressed_bundle_and_digest(self):
+    def test_save_sends_opaque_bytes_and_digest(self):
         observed = {}
+        artifact = b"npz numeric archive placeholder"
 
         def fake_urlopen(request, timeout):
             observed["url"] = request.full_url
@@ -51,28 +50,16 @@ class ModelStoreTests(unittest.TestCase):
             })
 
         with patch("model_store.urllib.request.urlopen", side_effect=fake_urlopen):
-            result = model_store.save_model_artifact(
-                "champion",
-                "strategic:4h",
-                {"samples": 240, "metric": 0.61},
-            )
+            result = model_store.save_model_artifact("champion", "strategic:4h", artifact)
 
         self.assertEqual(result["modelKey"], "champion:strategic:4h")
         self.assertEqual(observed["method"], "PUT")
         self.assertTrue(observed["url"].endswith("/champion/strategic/4h"))
-        self.assertEqual(observed["digest"], hashlib.sha256(observed["artifact"]).hexdigest())
-        restored = pickle.loads(gzip.decompress(observed["artifact"]))
-        self.assertEqual(restored["format"], model_store.FORMAT_VERSION)
-        self.assertEqual(restored["record"]["samples"], 240)
+        self.assertEqual(observed["artifact"], artifact)
+        self.assertEqual(observed["digest"], hashlib.sha256(artifact).hexdigest())
 
-    def test_load_verifies_digest_before_unpickling(self):
-        envelope = {
-            "format": model_store.FORMAT_VERSION,
-            "modelKey": "strategic:4h",
-            "kind": "champion",
-            "record": {"samples": 320},
-        }
-        artifact = gzip.compress(pickle.dumps(envelope, protocol=pickle.HIGHEST_PROTOCOL), mtime=0)
+    def test_load_verifies_digest_and_returns_opaque_bytes(self):
+        artifact = b"npz numeric archive placeholder"
         digest = hashlib.sha256(artifact).hexdigest()
         payload = {
             "ok": True,
@@ -92,10 +79,11 @@ class ModelStoreTests(unittest.TestCase):
 
         self.assertEqual(len(restored), 1)
         self.assertEqual(restored[0]["kind"], "champion")
-        self.assertEqual(restored[0]["record"]["samples"], 320)
+        self.assertEqual(restored[0]["modelKey"], "strategic:4h")
+        self.assertEqual(restored[0]["artifact"], artifact)
 
     def test_load_skips_digest_mismatch(self):
-        artifact = gzip.compress(b"not-a-model")
+        artifact = b"tampered-model-data"
         payload = {
             "ok": True,
             "items": [{
