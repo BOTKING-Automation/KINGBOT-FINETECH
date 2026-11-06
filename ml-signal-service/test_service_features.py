@@ -43,26 +43,26 @@ class EngineFeatureParityTests(unittest.TestCase):
         bars = make_bars()
         training = service.extract_features_from_bars(bars, len(bars) - 1)
         live = service.current_market_features({
+            "symbol": "XAUUSD",
+            "mlBars": bars,
             "price": bars[-1]["close"],
             "atr": 0.5,
-            "emaFast": bars[-1]["close"] + 0.2,
-            "emaSlow": bars[-1]["close"] - 0.2,
-            "rsi": 56,
-            "adx": 25,
             "trend": 0.7,
             "momentum": 0.5,
-            "volatility": 0.35,
-            "structure": "bullish",
-            "velocityAtr": 0.8,
-            "volume": 0.5,
-            "orderBlock": {"direction": "BUY"},
         }, "strategic")[0]
         self.assertIsNotNone(training)
         self.assertEqual(len(training), len(service.FEATURE_NAMES))
         self.assertEqual(live.shape[0], len(service.FEATURE_NAMES))
+        np.testing.assert_allclose(
+            live,
+            service.apply_strategy_focus(training, "strategic"),
+            atol=1e-7,
+            rtol=1e-7,
+        )
 
     def test_spread_is_not_a_live_only_model_feature(self):
         market = {
+            "mlBars": make_bars(),
             "price": 100.0, "atr": 1.0, "emaFast": 101.0, "emaSlow": 99.0,
             "rsi": 56, "adx": 24, "trend": 0.5, "momentum": 0.4,
             "volatility": 0.4, "structure": "bullish",
@@ -72,20 +72,54 @@ class EngineFeatureParityTests(unittest.TestCase):
         row = service.current_market_features(market, "flipper")[0]
         self.assertEqual(float(row[service.FEATURE_NAMES.index("spread_atr")]), 0.0)
 
-    def test_live_velocity_uses_normalized_atr_feature_not_broker_points(self):
+    def test_live_velocity_is_identical_to_the_training_ohlc_extractor(self):
+        bars = make_bars()
         market = {
-            "price": 100.0, "atr": 1.0, "emaFast": 101.0, "emaSlow": 99.0,
-            "rsi": 56, "adx": 24, "trend": 0.5, "momentum": 0.4,
-            "volatility": 0.4, "structure": "bullish",
-            "velocityAtr": 0.8, "velocityPoints": 800.0,
-            "volume": 0.6,
+            "mlBars": bars,
+            # These scanner summaries must not override or alter OHLC-derived features.
+            "velocityAtr": -1.7,
+            "velocityPoints": 800.0,
+            "trend": -0.9,
+            "momentum": -0.8,
         }
         row = service.current_market_features(market, "flipper")[0]
-        self.assertAlmostEqual(
-            float(row[service.FEATURE_NAMES.index("velocity")]),
-            0.4,
-            places=6,
-        )
+        training = service.extract_features_from_bars(bars, len(bars) - 1)
+        expected = service.apply_strategy_focus(training, "flipper")
+        np.testing.assert_allclose(row, expected, atol=1e-7, rtol=1e-7)
+
+    def test_nested_execution_bars_support_persisted_trade_feedback(self):
+        bars = make_bars()
+        market = {"multiTimeframe": {"execution": {"mlBars": bars}}}
+        top_level = service.current_market_features({"mlBars": bars}, "smc-pro")
+        nested = service.current_market_features(market, "smc-pro")
+        np.testing.assert_allclose(top_level, nested, atol=1e-7, rtol=1e-7)
+
+    def test_prediction_fails_closed_without_raw_ohlc_history(self):
+        with self.assertRaisesRegex(ValueError, "ML_PREDICT_OHLC_FEATURES_REQUIRED"):
+            service.current_market_features({
+                "price": 100.0,
+                "atr": 1.0,
+                "emaFast": 101.0,
+                "emaSlow": 99.0,
+                "rsi": 56,
+                "adx": 24,
+                "trend": 0.5,
+                "momentum": 0.4,
+            }, "strategic")
+
+    def test_feature_extractor_is_causal_at_requested_bar(self):
+        bars = make_bars(180)
+        index = 120
+        baseline = service.extract_features_from_bars(bars, index)
+        changed_future = [dict(row) for row in bars]
+        for future_index in range(index + 1, len(changed_future)):
+            changed_future[future_index]["open"] *= 1.8
+            changed_future[future_index]["high"] *= 1.8
+            changed_future[future_index]["low"] *= 1.8
+            changed_future[future_index]["close"] *= 1.8
+            changed_future[future_index]["volume"] *= 10.0
+        after_future_change = service.extract_features_from_bars(changed_future, index)
+        np.testing.assert_allclose(baseline, after_future_change, atol=1e-7, rtol=1e-7)
 
     def test_training_extracts_relative_volume_and_order_block_features(self):
         bars = make_bars()
