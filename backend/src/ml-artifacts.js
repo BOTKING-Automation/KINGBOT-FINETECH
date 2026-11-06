@@ -66,7 +66,7 @@ export function registerMlArtifacts(app, { pool }) {
         ok: true,
         count: result.rows.length,
         items: result.rows.map(row => ({
-          modelKey: row.artifact_key,
+          modelKey: `${row.strategy}:${row.timeframe}`,
           kind: row.kind,
           strategy: row.strategy,
           timeframe: row.timeframe,
