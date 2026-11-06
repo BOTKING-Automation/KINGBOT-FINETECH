@@ -67,7 +67,7 @@ jobs:
 
       - name: Python syntax and ML feature regression checks
         run: |
-          python -m py_compile ml-signal-service/service.py ml-signal-service/model_store.py
+          python -m py_compile service.py ml-signal-service/service.py ml-signal-service/model_store.py
           python -m unittest discover -s ml-signal-service -p "test_*.py"
 
       - name: Train all five AI strategy models
