@@ -274,7 +274,7 @@ class EngineFeatureParityTests(unittest.TestCase):
         self.assertAlmostEqual(service.LABEL_ATR, 0.6)
         self.assertAlmostEqual(service.LABEL_FALLBACK_ATR, 0.35)
         self.assertIn(
-            "v8-barrier6-atr0.60-fallback0.35",
+            "v9-real-strategy-mask-barrier6-atr0.60-fallback0.35",
             service.FEATURE_VERSION,
         )
 
