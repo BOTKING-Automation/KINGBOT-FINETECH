@@ -94,6 +94,54 @@ class EngineFeatureParityTests(unittest.TestCase):
         nested = service.current_market_features(market, "smc-pro")
         np.testing.assert_allclose(top_level, nested, atol=1e-7, rtol=1e-7)
 
+    def test_normalize_market_bars_sorts_descending_timestamped_history(self):
+        bars = make_bars(80)
+        for index, bar in enumerate(bars):
+            bar["time"] = 1_767_225_600 + index * 60
+        normalized = service.normalize_market_bars(list(reversed(bars)))
+        self.assertEqual(len(normalized), 80)
+        self.assertAlmostEqual(normalized[0]["close"], bars[0]["close"])
+        self.assertAlmostEqual(normalized[-1]["close"], bars[-1]["close"])
+
+    def test_normalize_market_bars_deduplicates_timestamp_using_last_source_row(self):
+        bars = make_bars(70)
+        for index, bar in enumerate(bars):
+            bar["timestamp"] = 1_700_000_000 + index * 60
+        duplicate = dict(bars[35])
+        duplicate["close"] += 0.25
+        duplicate["high"] = max(duplicate["high"], duplicate["close"])
+        bars.insert(36, duplicate)
+        normalized = service.normalize_market_bars(bars)
+        self.assertEqual(len(normalized), 70)
+        self.assertAlmostEqual(normalized[35]["close"], duplicate["close"])
+
+    def test_normalize_market_bars_accepts_epoch_milliseconds(self):
+        bars = make_bars(60)
+        for index, bar in enumerate(bars):
+            bar["time"] = (1_700_000_000 + index * 60) * 1000
+        normalized = service.normalize_market_bars(list(reversed(bars)))
+        self.assertAlmostEqual(normalized[0]["close"], bars[0]["close"])
+        self.assertAlmostEqual(normalized[-1]["close"], bars[-1]["close"])
+
+    def test_normalize_market_bars_fails_closed_on_partial_timestamps(self):
+        bars = make_bars(60)
+        bars[0]["time"] = "2026-01-01T00:00:00Z"
+        with self.assertRaisesRegex(ValueError, "ML_MARKET_BAR_TIMESTAMPS_INCONSISTENT"):
+            service.normalize_market_bars(bars)
+
+    def test_normalize_market_bars_fails_closed_on_invalid_timestamp(self):
+        bars = make_bars(60)
+        for bar in bars:
+            bar["time"] = "not-a-timestamp"
+        with self.assertRaisesRegex(ValueError, "ML_MARKET_BAR_TIMESTAMP_INVALID"):
+            service.normalize_market_bars(bars)
+
+    def test_normalize_market_bars_preserves_order_when_provider_has_no_timestamps(self):
+        bars = make_bars(60)
+        normalized = service.normalize_market_bars(bars)
+        self.assertAlmostEqual(normalized[0]["close"], bars[0]["close"])
+        self.assertAlmostEqual(normalized[-1]["close"], bars[-1]["close"])
+
     def test_prediction_fails_closed_without_raw_ohlc_history(self):
         with self.assertRaisesRegex(ValueError, "ML_PREDICT_OHLC_FEATURES_REQUIRED"):
             service.current_market_features({

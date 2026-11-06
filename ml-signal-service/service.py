@@ -17,6 +17,7 @@ import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
@@ -653,11 +654,42 @@ def train_torch(
     return model, metrics
 
 
+def parse_bar_timestamp(value: Any) -> float | None:
+    """Parse common broker candle timestamps into UTC epoch seconds."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        if not math.isfinite(numeric) or numeric <= 0:
+            return None
+        return numeric / 1000.0 if numeric > 1e12 else numeric
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        numeric = float(text)
+        if math.isfinite(numeric) and numeric > 0:
+            return numeric / 1000.0 if numeric > 1e12 else numeric
+        return None
+    except ValueError:
+        pass
+    try:
+        normalized = text[:-1] + "+00:00" if text.endswith(("Z", "z")) else text
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.timestamp()
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+
 def normalize_market_bars(bars: Any) -> list[dict[str, float]]:
     if not isinstance(bars, list):
         raise ValueError("ML_MARKET_BARS_INVALID")
     rows: list[dict[str, float]] = []
-    for bar in bars:
+    timestamped_rows: list[tuple[float, int, dict[str, float]]] = []
+    timestamp_presence: list[bool] = []
+    for index, bar in enumerate(bars):
         if not isinstance(bar, dict):
             continue
         o = finite(bar.get("open"))
@@ -669,13 +701,33 @@ def normalize_market_bars(bars: Any) -> list[dict[str, float]]:
             continue
         if h < max(o, l, close) or l > min(o, h, close):
             continue
-        rows.append({
+        row = {
             "open": o,
             "high": h,
             "low": l,
             "close": close,
             "volume": max(volume, 0.0),
-        })
+        }
+        raw_timestamp = bar.get("time", bar.get("datetime", bar.get("timestamp", bar.get("date"))))
+        has_timestamp = raw_timestamp is not None and raw_timestamp != ""
+        timestamp_presence.append(has_timestamp)
+        if has_timestamp:
+            timestamp = parse_bar_timestamp(raw_timestamp)
+            if timestamp is None:
+                raise ValueError("ML_MARKET_BAR_TIMESTAMP_INVALID")
+            timestamped_rows.append((timestamp, index, row))
+        rows.append(row)
+
+    if any(timestamp_presence) and not all(timestamp_presence):
+        raise ValueError("ML_MARKET_BAR_TIMESTAMPS_INCONSISTENT")
+    if timestamp_presence and all(timestamp_presence):
+        timestamped_rows.sort(key=lambda item: (item[0], item[1]))
+        # Keep the last source row for a duplicate timestamp.
+        deduplicated: dict[float, dict[str, float]] = {}
+        for timestamp, _, row in timestamped_rows:
+            deduplicated[timestamp] = row
+        rows = list(deduplicated.values())
+
     if len(rows) > MAX_BARS_PER_MARKET:
         rows = rows[-MAX_BARS_PER_MARKET:]
     return rows
