@@ -165,6 +165,15 @@ class EngineFeatureParityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ML_MARKET_BAR_TIMESTAMP_INVALID"):
             service.normalize_market_bars(bars)
 
+    def test_normalize_market_bars_retains_the_latest_configured_history_window(self):
+        bars = make_bars(service.MAX_BARS_PER_MARKET + 120)
+        for index, bar in enumerate(bars):
+            bar["time"] = 1_700_000_000 + index * 60
+        normalized = service.normalize_market_bars(bars)
+        self.assertEqual(len(normalized), service.MAX_BARS_PER_MARKET)
+        self.assertAlmostEqual(normalized[0]["close"], bars[-service.MAX_BARS_PER_MARKET]["close"])
+        self.assertAlmostEqual(normalized[-1]["close"], bars[-1]["close"])
+
     def test_normalize_market_bars_preserves_order_when_provider_has_no_timestamps(self):
         bars = make_bars(60)
         normalized = service.normalize_market_bars(bars)
