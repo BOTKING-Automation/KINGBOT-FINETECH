@@ -75,12 +75,18 @@ async function fetchDerivBars(feed, symbol, timeframe) {
   const maxPages = Math.max(2, Math.ceil(HISTORY_LIMIT / 450) + 1);
 
   for (let page = 0; page < maxPages && merged.size < HISTORY_LIMIT; page++) {
-    const chunk = await feed.getHistoricalCandles(symbol, {
-      timeframe,
-      limit: 500,
-      timeoutMs: 15000,
-      end
-    });
+    let chunk;
+    try {
+      chunk = await feed.getHistoricalCandles(symbol, {
+        timeframe,
+        limit: 500,
+        timeoutMs: 15000,
+        end
+      });
+    } catch (error) {
+      if (merged.size >= 360) break;
+      throw error;
+    }
     if (!Array.isArray(chunk) || chunk.length < 20) {
       if (!merged.size) throw new Error("DERIV_HISTORICAL_CANDLES_INSUFFICIENT");
       break;
@@ -95,7 +101,6 @@ async function fetchDerivBars(feed, symbol, timeframe) {
     if (!Number.isFinite(oldestEpoch) || oldestEpoch >= previousOldestEpoch) break;
     previousOldestEpoch = oldestEpoch;
     end = oldestEpoch - 1;
-    if (chunk.length < 450) break;
   }
 
   return [...merged.entries()]
