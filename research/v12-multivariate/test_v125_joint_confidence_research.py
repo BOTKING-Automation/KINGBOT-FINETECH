@@ -33,15 +33,17 @@ class V125JointConfidenceTests(unittest.TestCase):
         np.testing.assert_array_equal(result, np.eye(3))
 
     def test_joint_threshold_is_selected_with_coverage_constraints(self):
-        action = np.asarray([0.98] * 16 + [0.10] * 4, dtype=float)
+        action = np.asarray([0.98] * 32 + [0.10] * 8, dtype=float)
         direction = np.asarray(
-            [0.95, 0.94, 0.93, 0.92, 0.05, 0.06, 0.07, 0.08] +
-            [0.53, 0.52, 0.51, 0.49, 0.48, 0.47, 0.54, 0.46] +
-            [0.50] * 4,
+            [0.95, 0.94, 0.93, 0.92, 0.91, 0.90, 0.89, 0.88] +
+            [0.05, 0.06, 0.07, 0.08, 0.09, 0.10, 0.11, 0.12] +
+            [0.53, 0.52, 0.51, 0.49, 0.48, 0.47, 0.54, 0.46,
+             0.52, 0.48, 0.51, 0.49, 0.53, 0.47, 0.54, 0.46] +
+            [0.50] * 8,
             dtype=float,
         )
         labels = np.asarray(
-            [1, 1, 1, 1, -1, -1, -1, -1] + [0] * 12,
+            [1] * 8 + [-1] * 8 + [0] * 24,
             dtype=np.int64,
         )
         threshold, details = _select_joint_threshold(
