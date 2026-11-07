@@ -162,6 +162,7 @@ def run_one(
     test_fraction: float = 1.0,
     ensemble_rf_weight: float | None = None,
     capture_validation_probabilities: bool = False,
+    probability_temperature: float | None = None,
 ) -> dict[str, Any]:
     captured = io.StringIO()
     result: dict[str, Any] | None = None
@@ -180,6 +181,7 @@ def run_one(
                 test_fraction=test_fraction,
                 ensemble_rf_weight=ensemble_rf_weight,
                 capture_validation_probabilities=capture_validation_probabilities,
+                probability_temperature=probability_temperature,
             )
         except Exception as exc:
             error = str(exc)[:500]
@@ -360,53 +362,169 @@ def run(input_path: Path, output_path: Path) -> int:
         development.pop("stdout", None)
         weight_sweep = sweep_ensemble_weights(probability_parts)
         selected = weight_sweep.get("selected")
+        frozen_rf_weight = float(selected["rfWeight"]) if selected else service.RF_ENSEMBLE_WEIGHT
+
+        temperature_fit: dict[str, Any] = {
+            "status": "PROBABILITY_PARTS_MISSING",
+            "accepted": False,
+            "temperature": 1.0,
+        }
+        if isinstance(probability_parts, dict):
+            try:
+                development_labels = service.np.asarray(probability_parts["labels"], dtype=service.np.int64)
+                development_rf = service.np.asarray(probability_parts["rf"], dtype=service.np.float32)
+                development_torch = service.np.asarray(probability_parts["torch"], dtype=service.np.float32)
+                development_blend = service.blend_probability_parts(
+                    development_rf, development_torch, frozen_rf_weight
+                )
+                temperature_fit = service.fit_probability_temperature(
+                    development_labels, development_blend
+                )
+            except (KeyError, TypeError, ValueError) as error:
+                temperature_fit = {
+                    "status": "DEVELOPMENT_FIT_ERROR",
+                    "accepted": False,
+                    "temperature": 1.0,
+                    "error": str(error)[:160],
+                }
+
+        frozen_temperature = (
+            float(temperature_fit.get("temperature", 1.0))
+            if temperature_fit.get("accepted") else 1.0
+        )
         candidate_row: dict[str, Any] = {
             "strategy": strategy,
             "timeframe": timeframe,
-            "variant": "V9_DEVELOPMENT_TUNED_ENSEMBLE_WEIGHT",
+            "variant": "V9_DEVELOPMENT_TUNED_ENSEMBLE_AND_PROBABILITY_CALIBRATION",
             "development": development,
             "weightSweep": weight_sweep.get("candidates", []),
             "selectedRfWeight": selected.get("rfWeight") if selected else None,
             "selectedTorchWeight": selected.get("torchWeight") if selected else None,
+            "probabilityCalibration": {
+                "method": "multiclass-temperature-scaling",
+                "developmentFit": temperature_fit,
+                "frozenTemperature": frozen_temperature,
+                "finalEvaluation": None,
+                "status": "NOT_EVALUATED",
+            },
             "final": None,
         }
-        if selected:
+
+        # A selected blend OR an accepted development calibrator advances to
+        # the untouched 85%-100% final fold. The temperature is never refit there.
+        if selected or temperature_fit.get("accepted"):
             final = run_one(
                 strategy,
                 timeframe,
                 prepared,
                 train_fraction=0.85,
                 test_fraction=1.0,
-                ensemble_rf_weight=float(selected["rfWeight"]),
+                ensemble_rf_weight=frozen_rf_weight,
+                probability_temperature=frozen_temperature,
+                capture_validation_probabilities=True,
             )
+            final_parts = final.pop("probabilityParts", None)
+            final.pop("stdout", None)
+            final_evaluation: dict[str, Any] = {
+                "status": "FINAL_PROBABILITIES_MISSING",
+                "raw": None,
+                "calibrated": None,
+                "accepted": False,
+            }
+            if isinstance(final_parts, dict):
+                try:
+                    final_labels = service.np.asarray(final_parts["labels"], dtype=service.np.int64)
+                    final_rf = service.np.asarray(final_parts["rf"], dtype=service.np.float32)
+                    final_torch = service.np.asarray(final_parts["torch"], dtype=service.np.float32)
+                    final_raw_blend = service.blend_probability_parts(
+                        final_rf, final_torch, frozen_rf_weight
+                    )
+                    final_calibrated_blend = service.apply_probability_temperature(
+                        final_raw_blend, frozen_temperature
+                    )
+                    raw_metrics = service.probability_calibration_metrics(
+                        final_labels, final_raw_blend
+                    )
+                    calibrated_metrics = service.probability_calibration_metrics(
+                        final_labels, final_calibrated_blend
+                    )
+                    nll_improvement = (
+                        float(raw_metrics["negativeLogLikelihood"])
+                        - float(calibrated_metrics["negativeLogLikelihood"])
+                    )
+                    brier_delta = (
+                        float(calibrated_metrics["brierScore"])
+                        - float(raw_metrics["brierScore"])
+                    )
+                    ece_delta = (
+                        float(calibrated_metrics["expectedCalibrationError"])
+                        - float(raw_metrics["expectedCalibrationError"])
+                    )
+                    final_accepted = bool(
+                        temperature_fit.get("accepted")
+                        and nll_improvement >= 0.001
+                        and brier_delta <= 0.005
+                        and ece_delta <= 0.03
+                    )
+                    final_evaluation = {
+                        "status": "FINAL_PASS" if final_accepted else "FINAL_REJECTED",
+                        "raw": raw_metrics,
+                        "calibrated": calibrated_metrics,
+                        "nllImprovement": nll_improvement,
+                        "brierDelta": brier_delta,
+                        "eceDelta": ece_delta,
+                        "accepted": final_accepted,
+                    }
+                except (KeyError, TypeError, ValueError) as error:
+                    final_evaluation = {
+                        "status": "FINAL_EVALUATION_ERROR",
+                        "error": str(error)[:160],
+                        "accepted": False,
+                    }
             candidate_row["final"] = final
-            candidate_row["status"] = (
-                "FINAL_PASS"
-                if final["metricGate"] and final["classCoverageGate"]
-                else "FINAL_REJECTED"
-            )
+            candidate_row["probabilityCalibration"]["finalEvaluation"] = final_evaluation
+            candidate_row["probabilityCalibration"]["status"] = final_evaluation["status"]
+            if selected:
+                candidate_row["status"] = (
+                    "FINAL_PASS"
+                    if final["metricGate"] and final["classCoverageGate"]
+                    else "FINAL_REJECTED"
+                )
+            else:
+                candidate_row["status"] = "DEVELOPMENT_REJECTED"
+                candidate_row["reason"] = (
+                    "No development-window blend weight passed the unchanged metric and class-coverage gates"
+                )
         else:
             candidate_row["status"] = "DEVELOPMENT_REJECTED"
             candidate_row["reason"] = weight_sweep.get("error") or (
-                "No development-window blend weight passed the original metric gate "
-                "and the nonzero SELL/HOLD/BUY recall guard"
+                "No development-window blend weight or probability calibrator passed development checks"
             )
+            candidate_row["probabilityCalibration"]["status"] = temperature_fit.get("status", "DEVELOPMENT_REJECTED")
+
         ensemble_weight_candidates.append(candidate_row)
-        print("[KINGBOT V9 ENSEMBLE WEIGHT EXPERIMENT]", json.dumps({
+        print("[KINGBOT V9 ENSEMBLE AND CALIBRATION EXPERIMENT]", json.dumps({
             "strategy": strategy,
             "timeframe": timeframe,
-            "status": candidate_row["status"],
+            "blendStatus": candidate_row["status"],
             "selectedRfWeight": candidate_row["selectedRfWeight"],
-            "selectedTorchWeight": candidate_row["selectedTorchWeight"],
+            "frozenProbabilityTemperature": frozen_temperature,
+            "calibrationStatus": candidate_row["probabilityCalibration"]["status"],
+            "finalNllImprovement": (
+                (candidate_row["probabilityCalibration"].get("finalEvaluation") or {}).get("nllImprovement")
+            ),
+            "finalBrierDelta": (
+                (candidate_row["probabilityCalibration"].get("finalEvaluation") or {}).get("brierDelta")
+            ),
+            "finalEceDelta": (
+                (candidate_row["probabilityCalibration"].get("finalEvaluation") or {}).get("eceDelta")
+            ),
             "finalBalancedAccuracy": (
                 (candidate_row.get("final") or {}).get("validationDiagnostics") or {}
             ).get("ensemble", {}).get("balancedAccuracy"),
             "finalMacroF1": (
                 (candidate_row.get("final") or {}).get("validationDiagnostics") or {}
             ).get("ensemble", {}).get("macroF1"),
-            "finalPerClass": (
-                (candidate_row.get("final") or {}).get("validationDiagnostics") or {}
-            ).get("ensemble", {}).get("perClass"),
         }, sort_keys=True))
 
     metric_pass_count = sum(row["metricGate"] for row in results)
@@ -449,6 +567,11 @@ def run(input_path: Path, output_path: Path) -> int:
             "ensembleWeightExperimentsFinalPassed": sum(
                 row.get("status") == "FINAL_PASS" for row in ensemble_weight_candidates
             ),
+            "probabilityCalibrationExperiments": len(ensemble_weight_candidates),
+            "probabilityCalibrationFinalPassed": sum(
+                (row.get("probabilityCalibration") or {}).get("status") == "FINAL_PASS"
+                for row in ensemble_weight_candidates
+            ),
             "elapsedSeconds": round(time.time() - started_at, 3),
             "botsReadyAtBaseline": sum(
                 all(item["deploymentReady"] for item in results if item["strategy"] == strategy)
@@ -457,6 +580,17 @@ def run(input_path: Path, output_path: Path) -> int:
         },
         "results": results,
         "featureExperiments": candidates,
+        "probabilityCalibrationPolicy": {
+            "method": "multiclass-temperature-scaling",
+            "fitWindow": "70%-85% development probabilities only",
+            "finalWindow": "85%-100%, untouched during temperature fitting",
+            "temperatureBounds": [0.5, 3.0],
+            "minimumSamples": 40,
+            "minimumSamplesPerClass": 5,
+            "acceptance": "Development NLL improves by >=0.001; Brier delta <=0.005; ECE delta <=0.03; same tolerances rechecked on untouched final window",
+            "changesArgmax": False,
+            "changesOriginalMetricGate": False,
+        },
         "ensembleWeightPolicy": {
             "defaultRfWeight": 0.55,
             "defaultTorchWeight": 0.45,
