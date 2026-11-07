@@ -3,7 +3,7 @@ import path from "node:path";
 import { getDerivMarketFeed } from "../src/deriv-market-feed.js";
 
 const OUTPUT = process.argv[2] || "/tmp/kingbot-v122-input.json";
-const HISTORY_LIMIT = Math.max(360, Math.min(3000, Number(process.env.KINGBOT_V9_HISTORY_LIMIT || 2500)));
+const HISTORY_LIMIT = Math.max(360, Math.min(3000, Number(process.env.KINGBOT_V122_HISTORY_LIMIT || process.env.KINGBOT_V9_HISTORY_LIMIT || 2500)));
 const SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"];
 const BINANCE_KLINE_BASES = [
