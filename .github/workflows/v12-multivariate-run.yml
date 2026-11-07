@@ -1,16 +1,15 @@
 name: KINGBOT V12 Multivariate Research Run
 
 on:
-  pull_request:
-    branches: [v9-training-audit]
-    types: [synchronize, labeled]
+  push:
+    branches: [v12-multivariate-research]
 
 permissions:
   contents: read
 
 jobs:
   multivariate-research:
-    if: github.event.pull_request.head.ref == 'v12-multivariate-research' && contains(github.event.pull_request.labels.*.name, 'run-v12-research')
+    if: github.ref == 'refs/heads/v12-multivariate-research'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
