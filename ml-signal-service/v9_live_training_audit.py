@@ -40,6 +40,17 @@ def parse_audit(stdout: str) -> dict[str, Any] | None:
     return None
 
 
+def parse_validation(stdout: str) -> dict[str, Any] | None:
+    prefix = "[KINGBOT ML VALIDATION] "
+    for line in stdout.splitlines():
+        if line.startswith(prefix):
+            try:
+                return json.loads(line[len(prefix):])
+            except json.JSONDecodeError:
+                return {"parseError": line[len(prefix):][:1000]}
+    return None
+
+
 def run(input_path: Path, output_path: Path) -> int:
     payload = json.loads(input_path.read_text(encoding="utf-8"))
     if service.FEATURE_VERSION != EXPECTED_FEATURE_VERSION:
@@ -80,6 +91,7 @@ def run(input_path: Path, output_path: Path) -> int:
                     for market in prepared
                 ],
                 "audit": audit,
+                "validationDiagnostics": parse_validation(captured.getvalue()),
                 "metrics": (result or {}).get("validation"),
                 "dataset": (result or {}).get("dataset"),
                 "candidate": (result or {}).get("candidate"),
@@ -95,8 +107,14 @@ def run(input_path: Path, output_path: Path) -> int:
                 "markets": len(prepared),
                 "trainClasses": (audit or {}).get("trainClassDistribution"),
                 "testClasses": (audit or {}).get("testClassDistribution"),
-                "balancedAccuracy": ((result or {}).get("validation") or {}).get("ensemble", {}).get("balancedAccuracy"),
-                "macroF1": ((result or {}).get("validation") or {}).get("ensemble", {}).get("macroF1"),
+                "balancedAccuracy": (
+                    ((result or {}).get("validation") or {}).get("ensemble", {}).get("balancedAccuracy")
+                    if result else (parse_validation(captured.getvalue()) or {}).get("ensemble", {}).get("balancedAccuracy")
+                ),
+                "macroF1": (
+                    ((result or {}).get("validation") or {}).get("ensemble", {}).get("macroF1")
+                    if result else (parse_validation(captured.getvalue()) or {}).get("ensemble", {}).get("macroF1")
+                ),
             }, sort_keys=True))
 
     passed = sum(row["status"] == "PASSED" for row in results)
