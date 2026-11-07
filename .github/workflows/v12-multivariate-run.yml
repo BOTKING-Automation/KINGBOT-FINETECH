@@ -1,0 +1,49 @@
+name: KINGBOT V12 Multivariate Research Run
+
+on:
+  pull_request:
+    branches: [v9-training-audit]
+    types: [synchronize, labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  multivariate-research:
+    if: github.event.pull_request.head.ref == 'v12-multivariate-research' && contains(github.event.pull_request.labels.*.name, 'run-v12-research')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ML dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ml-signal-service/requirements.txt
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package.json
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Fetch closed, timestamped market history
+        run: node backend/scripts/v9-fetch-live-markets.mjs /tmp/kingbot-v12-input.json
+      - name: Run V12 multivariate research
+        run: python research/v12-multivariate/run_multivariate_research.py /tmp/kingbot-v12-input.json /tmp/kingbot-v12-report.json
+      - name: Upload V12 report and input data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kingbot-v12-multivariate-research
+          path: |
+            /tmp/kingbot-v12-input.json
+            /tmp/kingbot-v12-report.json
+          if-no-files-found: warn
+          retention-days: 14
