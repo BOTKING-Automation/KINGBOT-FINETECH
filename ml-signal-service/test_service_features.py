@@ -295,5 +295,56 @@ class EngineFeatureParityTests(unittest.TestCase):
         self.assertTrue(np.allclose(probabilities[0], expected, atol=1e-6))
 
 
+class V9LabelDistributionTests(unittest.TestCase):
+    def test_class_distribution_reports_sell_hold_buy_counts_and_ratios(self):
+        distribution = service.class_distribution(
+            np.asarray([-1, -1, 0, 1, 1, 1], dtype=np.int64)
+        )
+        self.assertEqual(distribution["samples"], 6)
+        self.assertEqual(distribution["counts"], {"SELL": 2, "HOLD": 1, "BUY": 3})
+        self.assertEqual(
+            distribution["ratios"],
+            {"SELL": 0.3333, "HOLD": 0.1667, "BUY": 0.5},
+        )
+
+    def test_label_sensitivity_reports_alternative_fallbacks_without_mutating_v9_default(self):
+        bars = make_bars(180)
+        baseline = [
+            service.triple_barrier_label(
+                bars, index, service.atr(bars[:index + 1], 14)
+            )
+            for index in range(60, len(bars) - service.FORWARD_HORIZON)
+            if service.atr(bars[:index + 1], 14) is not None
+        ]
+        report = service.label_sensitivity_distribution(bars)
+        self.assertEqual(set(report), {"0.35", "0.45", "0.55", "0.60"})
+        self.assertEqual(report["0.35"]["samples"], len(baseline))
+        self.assertEqual(
+            report["0.35"]["counts"],
+            service.class_distribution(np.asarray(baseline, dtype=np.int64))["counts"],
+        )
+        for distribution in report.values():
+            self.assertEqual(set(distribution["counts"]), {"SELL", "HOLD", "BUY"})
+            self.assertAlmostEqual(sum(distribution["ratios"].values()), 1.0, places=3)
+
+    def test_fallback_override_is_diagnostic_and_default_label_is_unchanged(self):
+        bars = [
+            {"open": 100.0, "high": 100.2, "low": 99.8, "close": 100.0, "volume": 100.0}
+            for _ in range(80)
+        ]
+        for offset in range(1, 7):
+            bars[60 + offset] = {
+                "open": 100.0,
+                "high": 100.55,
+                "low": 99.80,
+                "close": 100.0 + (0.45 if offset == 6 else 0.15 * offset / 6),
+                "volume": 100.0,
+            }
+        default_label = service.triple_barrier_label(bars, 60, 1.0)
+        relaxed_hold_label = service.triple_barrier_label(bars, 60, 1.0, fallback_atr=0.60)
+        self.assertEqual(default_label, 1)
+        self.assertEqual(relaxed_hold_label, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
