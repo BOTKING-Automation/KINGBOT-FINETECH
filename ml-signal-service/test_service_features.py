@@ -319,6 +319,48 @@ class EngineFeatureParityTests(unittest.TestCase):
         ])
         self.assertTrue(np.allclose(probabilities[0], expected, atol=1e-6))
 
+    def test_per_model_ensemble_weight_can_select_either_component(self):
+        features = np.zeros((2, len(service.FEATURE_NAMES)), dtype=np.float32)
+        rf = DummyRandomForest()
+        torch_model = UniformTorchModel()
+        rf_only = service.ensemble_probabilities(rf, torch_model, features, rf_weight=1.0)
+        torch_only = service.ensemble_probabilities(rf, torch_model, features, rf_weight=0.0)
+        np.testing.assert_allclose(
+            rf_only,
+            np.tile(np.asarray([[0.20, 0.30, 0.50]], dtype=np.float32), (2, 1)),
+            atol=1e-6,
+        )
+        np.testing.assert_allclose(
+            torch_only,
+            np.full((2, 3), 1.0 / 3.0, dtype=np.float32),
+            atol=1e-6,
+        )
+
+    def test_per_model_ensemble_weight_rejects_invalid_values(self):
+        features = np.zeros((1, len(service.FEATURE_NAMES)), dtype=np.float32)
+        with self.assertRaisesRegex(ValueError, "ML_ENSEMBLE_RF_WEIGHT_INVALID"):
+            service.ensemble_probabilities(
+                DummyRandomForest(), UniformTorchModel(), features, rf_weight=1.5
+            )
+
+    def test_model_artifact_preserves_model_specific_ensemble_weight(self):
+        X = np.zeros((9, len(service.FEATURE_NAMES)), dtype=np.float32)
+        X[:, 0] = np.linspace(-1.0, 1.0, len(X))
+        y = np.asarray([-1, 0, 1, -1, 0, 1, -1, 0, 1], dtype=np.int64)
+        forest = service.RandomForestClassifier(
+            n_estimators=3, max_depth=2, random_state=7
+        ).fit(X, y)
+        scaler = service.StandardScaler().fit(X)
+        record = {
+            "rf": forest,
+            "torch": service.MLP(len(service.FEATURE_NAMES), 3),
+            "scaler": scaler,
+            "feature_version": service.FEATURE_VERSION,
+            "ensemble_rf_weight": 0.8,
+        }
+        restored = service.deserialize_model_record(service.serialize_model_record(record))
+        self.assertAlmostEqual(restored["ensemble_rf_weight"], 0.8)
+
 
 class V9LabelDistributionTests(unittest.TestCase):
     def test_atr_window_optimization_matches_full_prefix_exactly(self):
