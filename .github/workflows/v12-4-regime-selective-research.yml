@@ -36,7 +36,7 @@ jobs:
       - name: Validate V12.4 code and regression suite
         run: |
           node --check backend/scripts/v122-fetch-live-markets.mjs
-          python -m py_compile ml-signal-service/service.py research/v12-multivariate/multivariate_transformer.py research/v12-multivariate/run_v122_hold_research.py research/v12-multivariate/technical_pattern_features.py research/v12-multivariate/run_v123_regime_selective_research.py research/v12-multivariate/test_v124_regime_selective_research.py
+          python -m py_compile ml-signal-service/service.py research/v12-multivariate/multivariate_transformer.py research/v12-multivariate/run_v122_hold_research.py research/v12-multivariate/technical_pattern_features.py research/v12-multivariate/run_v124_regime_selective_research.py research/v12-multivariate/test_v124_regime_selective_research.py
           python -m unittest discover -s research/v12-multivariate -p "test_*.py"
       - name: Fetch closed market history for V12.4 experiment
         env:

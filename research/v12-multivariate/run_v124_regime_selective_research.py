@@ -398,7 +398,7 @@ def _select_action_threshold(action_probabilities, actionable_targets):
         recall = tp / max(1, tp + fn)
         f1 = 2.0 * precision * recall / max(1e-12, precision + recall)
         candidate = (f1, precision, float(threshold), precision, recall, f1)
-        if candidate[:2] > best[:2]:
+        if candidate[:3] > best[:3]:
             best = candidate
     return best[2], {"f1": best[5], "precision": best[3], "recall": best[4]}
 
