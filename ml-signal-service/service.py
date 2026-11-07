@@ -40,6 +40,10 @@ LABEL_ATR = max(0.1, min(3.0, float(os.getenv("KINGBOT_ML_LABEL_ATR", "0.6"))))
 LABEL_FALLBACK_ATR = max(0.1, min(LABEL_ATR, float(os.getenv("KINGBOT_ML_LABEL_FALLBACK_ATR", "0.35"))))
 MAX_MODELS = max(10, int(os.getenv("KINGBOT_ML_MAX_MODELS", "50")))
 MAX_MARKETS = max(1, int(os.getenv("KINGBOT_ML_MAX_MARKETS", "12")))
+MIN_VALIDATION_MARKETS = min(
+    MAX_MARKETS,
+    max(1, int(os.getenv("KINGBOT_ML_MIN_VALIDATION_MARKETS", "3"))),
+)
 MAX_BARS_PER_MARKET = max(MIN_BARS, min(1500, int(os.getenv("KINGBOT_ML_MAX_BARS_PER_MARKET", "1000"))))
 MAX_RF_TREES = max(40, min(300, int(os.getenv("KINGBOT_ML_RF_TREES", "120"))))
 TORCH_EPOCHS = max(10, min(150, int(os.getenv("KINGBOT_ML_TORCH_EPOCHS", "40"))))
@@ -98,7 +102,7 @@ STRATEGY_FOCUS = {
     "ladder-flip": {"ema_gap", "adx_norm", "rsi_norm", "velocity", "ema20_slope_atr", "return_1_atr", "return_3_atr"},
 }
 
-FEATURE_VERSION = "ai-strategies-v9-real-strategy-mask-barrier6-atr0.60-fallback0.35-global-time"
+FEATURE_VERSION = "ai-strategies-v10-common-window-market-coverage-real-strategy-mask-barrier6-atr0.60-fallback0.35-global-time"
 
 REGIME_ORDER = ["trend", "range", "breakout", "reversal", "volatile"]
 REGIME_RISK_MODE = {
@@ -151,7 +155,7 @@ def restore_persisted_models() -> None:
                     record = deserialize_model_record(artifact_bytes)
                     if not isinstance(record, dict):
                         continue
-                    # Feature/label semantics changed in v7; never load incompatible v6 weights.
+                    # Load only artifacts produced by this exact feature/label schema version.
                     if record.get("feature_version") != FEATURE_VERSION:
                         continue
                     if kind == "champion":
@@ -908,8 +912,9 @@ def global_temporal_split_masks(
     sample_times: np.ndarray,
     label_end_times: np.ndarray,
     train_fraction: float = 0.78,
+    group_slices: list[tuple[int, int]] | None = None,
 ) -> tuple[np.ndarray, np.ndarray, float]:
-    """Split all symbols at one shared UTC cutoff and purge labels crossing it."""
+    """Split at one shared UTC boundary; grouped mode requires a common market window."""
     times = np.asarray(sample_times, dtype=np.float64)
     ends = np.asarray(label_end_times, dtype=np.float64)
     if times.ndim != 1 or ends.ndim != 1 or times.shape != ends.shape or not len(times):
@@ -917,10 +922,51 @@ def global_temporal_split_masks(
     if not np.isfinite(times).all() or not np.isfinite(ends).all():
         raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_TIMESTAMPS_REQUIRED")
 
+    fraction = clamp(float(train_fraction), 0.50, 0.90)
     unique_times = np.unique(times)
     if len(unique_times) < 4:
         raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_HISTORY_INSUFFICIENT")
-    fraction = clamp(float(train_fraction), 0.50, 0.90)
+
+    if group_slices is not None:
+        if not group_slices:
+            raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_GROUPS_REQUIRED")
+        normalized_slices: list[tuple[int, int]] = []
+        previous_end = 0
+        for raw_start, raw_end in group_slices:
+            start, end = int(raw_start), int(raw_end)
+            if start < previous_end or end <= start or end > len(times):
+                raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_GROUPS_INVALID")
+            normalized_slices.append((start, end))
+            previous_end = end
+
+        group_starts = [float(np.min(times[start:end])) for start, end in normalized_slices]
+        group_ends = [float(np.max(times[start:end])) for start, end in normalized_slices]
+        common_start = max(group_starts)
+        common_end = min(group_ends)
+        if common_start >= common_end:
+            raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_NO_COMMON_MARKET_WINDOW")
+
+        common_times = np.unique(times[(times >= common_start) & (times <= common_end)])
+        if len(common_times) < 4:
+            raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_COMMON_WINDOW_TOO_SHORT")
+        desired_index = max(1, min(len(common_times) - 1, int(len(common_times) * fraction)))
+        candidate_indices = sorted(
+            range(1, len(common_times)),
+            key=lambda index: (abs(index - desired_index), index),
+        )
+        for split_index in candidate_indices:
+            cutoff = float(common_times[split_index])
+            train_mask = (times < cutoff) & (ends < cutoff)
+            test_mask = (times >= cutoff) & (times <= common_end)
+            coverage_ok = all(
+                int(train_mask[start:end].sum()) >= 40
+                and int(test_mask[start:end].sum()) >= 20
+                for start, end in normalized_slices
+            )
+            if coverage_ok:
+                return train_mask, test_mask, cutoff
+        raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_MARKET_COVERAGE_INSUFFICIENT")
+
     split_index = max(1, min(len(unique_times) - 1, int(len(unique_times) * fraction)))
     cutoff = float(unique_times[split_index])
     train_mask = (times < cutoff) & (ends < cutoff)
@@ -929,6 +975,18 @@ def global_temporal_split_masks(
         raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_SAMPLES_INSUFFICIENT")
     return train_mask, test_mask, cutoff
 
+
+def class_distribution(labels: np.ndarray) -> dict[str, Any]:
+    """Expose SELL/HOLD/BUY sample counts and proportions for validation audit."""
+    values = np.asarray(labels, dtype=np.int64)
+    total = int(values.size)
+    names = {-1: "SELL", 0: "HOLD", 1: "BUY"}
+    counts = {name: int(np.sum(values == label)) for label, name in names.items()}
+    ratios = {
+        name: round(count / total, 4) if total else 0.0
+        for name, count in counts.items()
+    }
+    return {"samples": total, "counts": counts, "ratios": ratios}
 
 def ensemble_probabilities(rf: Any, torch_model: nn.Module, scaled_features: np.ndarray) -> np.ndarray:
     """Return the RF/PyTorch probability blend used during live inference."""
@@ -1029,8 +1087,17 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         if timestamped:
             all_times = np.concatenate([part["sample_times"] for part in market_parts])
             all_label_ends = np.concatenate([part["label_end_times"] for part in market_parts])
+            market_slices: list[tuple[int, int]] = []
+            offset = 0
+            for part in market_parts:
+                end = offset + len(part["X"])
+                market_slices.append((offset, end))
+                offset = end
+
             train_mask, test_mask, split_timestamp = global_temporal_split_masks(
-                all_times, all_label_ends
+                all_times,
+                all_label_ends,
+                group_slices=market_slices,
             )
             offset = 0
             for part in market_parts:
@@ -1047,6 +1114,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                     "samples": count,
                     "trainSamples": train_count,
                     "testSamples": test_count,
+                    "trainClassDistribution": class_distribution(part["y"][local_train]),
+                    "testClassDistribution": class_distribution(part["y"][local_test]),
                     "splitTimestamp": split_timestamp,
                     "embargo": "label-end-before-global-cutoff",
                 })
@@ -1056,7 +1125,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                     train_w_parts.append(part["weights"][local_train])
                     test_x_parts.append(part["X"][local_test])
                     test_y_parts.append(part["y"][local_test])
-            validation_type = "global-timestamped-purged-holdout"
+            validation_type = "global-common-window-purged-holdout"
         else:
             # Providers without timestamps retain a per-market chronological split.
             for part in market_parts:
@@ -1077,6 +1146,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                     "samples": len(part["X"]),
                     "trainSamples": len(X_train_part),
                     "testSamples": len(X_test_part),
+                    "trainClassDistribution": class_distribution(y_train_part),
+                    "testClassDistribution": class_distribution(y_test_part),
                     "embargoBars": int(test_start - train_end),
                 })
                 if eligible:
@@ -1087,6 +1158,14 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                     test_y_parts.append(y_test_part)
             validation_type = "per-market-temporal-holdout-with-label-embargo"
 
+        validated_markets = sum(1 for row in validation_markets if row.get("accepted"))
+        required_markets = MIN_VALIDATION_MARKETS
+        if validated_markets < required_markets:
+            raise ValueError(
+                "ML_TRAINING_MARKET_COVERAGE_INSUFFICIENT:"
+                f"validated={validated_markets},required={required_markets},"
+                f"received={len(market_parts)}"
+            )
         if not train_x_parts or not test_x_parts:
             raise ValueError("ML_TRAINING_TEMPORAL_SPLIT_INSUFFICIENT")
 
@@ -1098,6 +1177,18 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
 
         # Feedback may enter training only when its capture time precedes the
         # evaluation cutoff. Without candle timestamps, temporal order is unknown.
+        train_label_distribution = class_distribution(y_train)
+        test_label_distribution = class_distribution(y_test)
+        validation_market_symbols = sorted(
+            row["symbol"] for row in validation_markets if row.get("accepted")
+        )
+        market_coverage = {
+            "inputMarkets": len(market_parts),
+            "validatedMarkets": validated_markets,
+            "requiredMarkets": required_markets,
+            "symbols": validation_market_symbols,
+        }
+
         with LOCK:
             feedback = [
                 row for row in FEEDBACK_ROWS
@@ -1215,6 +1306,11 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "embargoBars": FORWARD_HORIZON,
                 "splitTimestamp": split_timestamp,
                 "markets": validation_markets,
+                "marketCoverage": market_coverage,
+                "classDistribution": {
+                    "train": train_label_distribution,
+                    "test": test_label_distribution,
+                },
             },
             "selection_score": candidate_score,
             "promotion": "CHAMPION" if promote else "CHALLENGER",
@@ -1249,14 +1345,16 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             },
             "dataset": {
                 "marketsAccepted": accepted_markets,
-                "symbols": sorted(
-                    {row["symbol"] for row in validation_markets if row.get("accepted")}
-                ),
+                "marketCoverage": market_coverage,
+                "marketValidation": validation_markets,
+                "symbols": validation_market_symbols,
                 "bars": total_bar_count,
                 "trainSamples": int(len(X_train)),
                 "testSamples": int(len(X_test)),
                 "classesTrain": train_classes,
                 "classesTest": test_classes,
+                "classDistributionTrain": train_label_distribution,
+                "classDistributionTest": test_label_distribution,
                 "forwardBars": FORWARD_HORIZON,
                 "labelAtr": LABEL_ATR,
                 "temporalAlignment": "GLOBAL_TIMESTAMPED" if timestamped else "PER_MARKET_FALLBACK",

@@ -269,12 +269,61 @@ class EngineFeatureParityTests(unittest.TestCase):
         self.assertEqual(int(train_mask.sum()), 59)
         self.assertEqual(int(test_mask.sum()), 40)
 
+    def test_global_temporal_split_uses_one_cutoff_inside_common_market_window(self):
+        first = np.arange(1, 101, dtype=np.float64)
+        second = np.arange(11, 111, dtype=np.float64)
+        third = np.arange(21, 121, dtype=np.float64)
+        times = np.concatenate([first, second, third])
+        ends = times + 1.0
+        slices = [(0, 100), (100, 200), (200, 300)]
+        train_mask, test_mask, cutoff = service.global_temporal_split_masks(
+            times, ends, 0.78, group_slices=slices
+        )
+        self.assertGreaterEqual(cutoff, 1.0)
+        self.assertLessEqual(cutoff, 81.0)
+        for start, end in slices:
+            self.assertGreaterEqual(int(train_mask[start:end].sum()), 40)
+            self.assertGreaterEqual(int(test_mask[start:end].sum()), 20)
+            self.assertTrue(np.all(times[start:end][test_mask[start:end]] <= 100.0))
+        self.assertTrue(np.all(ends[train_mask] < cutoff))
+        self.assertFalse(np.any(train_mask & test_mask))
+
+    def test_global_temporal_split_rejects_non_overlapping_market_histories(self):
+        first = np.arange(1, 101, dtype=np.float64)
+        second = np.arange(201, 301, dtype=np.float64)
+        times = np.concatenate([first, second])
+        ends = times + 1.0
+        with self.assertRaisesRegex(ValueError, "ML_GLOBAL_TEMPORAL_SPLIT_NO_COMMON_MARKET_WINDOW"):
+            service.global_temporal_split_masks(
+                times, ends, group_slices=[(0, 100), (100, 200)]
+            )
+
+    def test_training_rejects_candidates_without_minimum_market_coverage(self):
+        self.assertEqual(service.MIN_VALIDATION_MARKETS, 3)
+        with self.assertRaisesRegex(
+            ValueError,
+            "ML_TRAINING_MARKET_COVERAGE_INSUFFICIENT",
+        ):
+            service.train_model(
+                "strategic",
+                "5m",
+                [{"symbol": "XAUUSD", "bars": make_bars(240)}],
+            )
+
+    def test_class_distribution_reports_buy_sell_hold_counts(self):
+        distribution = service.class_distribution(
+            np.asarray([-1, -1, 0, 1, 1, 1], dtype=np.int64)
+        )
+        self.assertEqual(distribution["samples"], 6)
+        self.assertEqual(distribution["counts"], {"SELL": 2, "HOLD": 1, "BUY": 3})
+        self.assertEqual(distribution["ratios"], {"SELL": 0.3333, "HOLD": 0.1667, "BUY": 0.5})
+
     def test_model_version_identifies_the_target_label_configuration(self):
         self.assertEqual(service.FORWARD_HORIZON, 6)
         self.assertAlmostEqual(service.LABEL_ATR, 0.6)
         self.assertAlmostEqual(service.LABEL_FALLBACK_ATR, 0.35)
         self.assertIn(
-            "v9-real-strategy-mask-barrier6-atr0.60-fallback0.35",
+            "v10-common-window-market-coverage-real-strategy-mask-barrier6-atr0.60-fallback0.35",
             service.FEATURE_VERSION,
         )
 

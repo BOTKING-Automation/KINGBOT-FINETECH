@@ -103,13 +103,29 @@ jobs:
               low = min(close, prev) - 0.7 - (i % 3) * 0.05
               bars.append({"open": prev, "high": high, "low": low, "close": close, "volume": 100 + (i % 20), "time": 1700000000 + i * 300})
 
-          market = {"symbol": "XAUUSD", "bars": bars}
+          markets = []
+          for market_index, symbol in enumerate(["XAUUSD", "EURUSD", "GBPUSD"]):
+              price_offset = market_index * 50.0
+              symbol_bars = [
+                  {
+                      **bar,
+                      "open": bar["open"] + price_offset,
+                      "high": bar["high"] + price_offset,
+                      "low": bar["low"] + price_offset,
+                      "close": bar["close"] + price_offset,
+                  }
+                  for bar in bars
+              ]
+              markets.append({"symbol": symbol, "bars": symbol_bars})
+
           trained = []
           for strategy in ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"]:
-              result = service.train_model(strategy, "5m", [market])
+              result = service.train_model(strategy, "5m", markets)
               assert result["ready"], result
-              assert result["featureVersion"].startswith("ai-strategies-v9-real-strategy-mask-barrier6-atr0.60-fallback0.35"), result
-              assert result["validation"]["type"] == "global-timestamped-purged-holdout", result
+              assert result["featureVersion"].startswith("ai-strategies-v10-common-window-market-coverage-real-strategy-mask-barrier6-atr0.60-fallback0.35"), result
+              assert result["validation"]["type"] == "global-common-window-purged-holdout", result
+              assert result["dataset"]["marketCoverage"]["validatedMarkets"] >= 3, result
+              assert len(result["dataset"]["marketCoverage"]["symbols"]) >= 3, result
               trained.append(result["key"])
               prediction = service.predict_model(
                   strategy,
@@ -225,17 +241,34 @@ jobs:
                 high: Math.max(previous, close) + 0.6,
                 low: Math.min(previous, close) - 0.6,
                 close,
-                volume: 100 + (i % 10)
+                volume: 100 + (i % 10),
+                time: 1700000000 + i * 900
               });
             }
 
+            const markets = ["XAUUSD", "EURUSD", "GBPUSD"].map((symbol, marketIndex) => {
+              const offset = marketIndex * 50;
+              return {
+                symbol,
+                bars: bars.map(bar => ({
+                  ...bar,
+                  open: bar.open + offset,
+                  high: bar.high + offset,
+                  low: bar.low + offset,
+                  close: bar.close + offset
+                }))
+              };
+            });
             const trainResponse = await fetch("http://127.0.0.1:19090/train", {
               method: "POST",
               headers: { "content-type": "application/json", "x-kingbot-ml-secret": "ci-secret" },
-              body: JSON.stringify({ botId: "strategic", timeframe: "15m", markets: [{ symbol: "XAUUSD", bars }] })
+              body: JSON.stringify({ botId: "strategic", timeframe: "15m", markets })
             });
             const train = await trainResponse.json();
             if (!trainResponse.ok || !train.ok || !train.ready) throw new Error("ML train failed: " + JSON.stringify(train));
+            if (train.dataset?.marketCoverage?.validatedMarkets < 3) {
+              throw new Error("ML training did not validate three markets: " + JSON.stringify(train.dataset));
+            }
 
             const { warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } = await import("./backend/src/ai-trade-gate.js");
             const mlBars = bars.slice(-120);
