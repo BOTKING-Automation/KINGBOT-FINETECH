@@ -1,9 +1,9 @@
-name: KINGBOT V12 Multivariate Transformer Research
+name: KINGBOT V12 Multivariate Transformer Validation
 
 on:
   pull_request:
     branches: [v9-training-audit]
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
     paths:
       - "research/v12-multivariate/**"
       - ".github/workflows/v12-multivariate-research.yml"
@@ -30,43 +30,3 @@ jobs:
         run: |
           python -m py_compile ml-signal-service/service.py research/v12-multivariate/multivariate_transformer.py research/v12-multivariate/run_multivariate_research.py
           python -m unittest discover -s research/v12-multivariate -p "test_*.py"
-
-  research:
-    if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-v12-research')
-    needs: [validate]
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install ML dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r ml-signal-service/requirements.txt
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: backend/package.json
-      - name: Install backend dependencies
-        working-directory: backend
-        run: npm install --omit=dev
-      - name: Fetch closed, timestamped market history
-        run: node backend/scripts/v9-fetch-live-markets.mjs /tmp/kingbot-v12-input.json
-      - name: Run V12 multivariate research
-        run: python research/v12-multivariate/run_multivariate_research.py /tmp/kingbot-v12-input.json /tmp/kingbot-v12-report.json
-      - name: Upload V12 report and input data
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: kingbot-v12-multivariate-research
-          path: |
-            /tmp/kingbot-v12-input.json
-            /tmp/kingbot-v12-report.json
-          if-no-files-found: warn
-          retention-days: 14
