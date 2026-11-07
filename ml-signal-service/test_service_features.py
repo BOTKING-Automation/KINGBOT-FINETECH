@@ -279,7 +279,7 @@ class EngineFeatureParityTests(unittest.TestCase):
         )
 
     def test_global_temporal_split_supports_a_disjoint_development_window(self):
-        times = np.arange(100, dtype=np.float64)
+        times = np.arange(200, dtype=np.float64)
         ends = times + 1.0
         train, test, cutoff = service.global_temporal_split_masks(
             times, ends, train_fraction=0.70, test_fraction=0.85
@@ -290,7 +290,7 @@ class EngineFeatureParityTests(unittest.TestCase):
         self.assertTrue(np.all(times[test] < np.quantile(times, 0.85) + 2))
         self.assertFalse(np.any(train & test))
         self.assertGreater(int(train.sum()), 40)
-        self.assertGreater(int(test.sum()), 10)
+        self.assertGreaterEqual(int(test.sum()), 20)
 
     def test_default_global_temporal_split_is_unchanged(self):
         times = np.arange(100, dtype=np.float64)
