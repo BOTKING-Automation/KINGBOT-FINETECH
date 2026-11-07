@@ -912,8 +912,13 @@ def global_temporal_split_masks(
     sample_times: np.ndarray,
     label_end_times: np.ndarray,
     train_fraction: float = 0.78,
+    test_fraction: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray, float]:
-    """Split all symbols at one shared UTC cutoff and purge labels crossing it."""
+    """Create a purged forward holdout, optionally ending before the dataset tail.
+
+    test_fraction=1.0 preserves the original V9 train/test split exactly. Smaller
+    values create an earlier development window for walk-forward candidate tests.
+    """
     times = np.asarray(sample_times, dtype=np.float64)
     ends = np.asarray(label_end_times, dtype=np.float64)
     if times.ndim != 1 or ends.ndim != 1 or times.shape != ends.shape or not len(times):
@@ -925,10 +930,16 @@ def global_temporal_split_masks(
     if len(unique_times) < 4:
         raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_HISTORY_INSUFFICIENT")
     fraction = clamp(float(train_fraction), 0.50, 0.90)
+    end_fraction = clamp(float(test_fraction), fraction + 0.05, 1.0)
     split_index = max(1, min(len(unique_times) - 1, int(len(unique_times) * fraction)))
     cutoff = float(unique_times[split_index])
+    if end_fraction >= 1.0:
+        test_cutoff = math.inf
+    else:
+        test_end_index = max(split_index + 1, min(len(unique_times) - 1, int(len(unique_times) * end_fraction)))
+        test_cutoff = float(unique_times[test_end_index])
     train_mask = (times < cutoff) & (ends < cutoff)
-    test_mask = times >= cutoff
+    test_mask = (times >= cutoff) & (times < test_cutoff) & (ends < test_cutoff)
     if int(train_mask.sum()) < 40 or int(test_mask.sum()) < 20:
         raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_SAMPLES_INSUFFICIENT")
     return train_mask, test_mask, cutoff
@@ -1027,7 +1038,13 @@ def ensemble_class_metrics(y_true: np.ndarray, probabilities: np.ndarray) -> dic
     }
 
 
-def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) -> dict[str, Any]:
+def train_model(
+    strategy: str,
+    timeframe: str,
+    markets: list[dict[str, Any]],
+    train_fraction: float = 0.78,
+    test_fraction: float = 1.0,
+) -> dict[str, Any]:
     if not MODEL_RESTORE_EVENT.wait(timeout=max(30, int(os.getenv("KINGBOT_ML_RESTORE_WAIT_SEC", "180")))):
         raise RuntimeError("ML_MODEL_RESTORE_PENDING")
     key = f"{strategy}:{timeframe.lower()}"
@@ -1098,7 +1115,10 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             all_times = np.concatenate([part["sample_times"] for part in market_parts])
             all_label_ends = np.concatenate([part["label_end_times"] for part in market_parts])
             train_mask, test_mask, split_timestamp = global_temporal_split_masks(
-                all_times, all_label_ends
+                all_times,
+                all_label_ends,
+                train_fraction=train_fraction,
+                test_fraction=test_fraction,
             )
             offset = 0
             for part in market_parts:
@@ -1131,11 +1151,16 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         else:
             # Providers without timestamps retain a per-market chronological split.
             for part in market_parts:
-                train_end, test_start = temporal_split_bounds(len(part["X"]))
+                train_end, test_start = temporal_split_bounds(
+                    len(part["X"]), train_fraction=train_fraction
+                )
+                test_end = max(test_start + 1, min(
+                    len(part["X"]), int(len(part["X"]) * clamp(float(test_fraction), train_fraction + 0.05, 1.0))
+                ))
                 X_train_part = part["X"][:train_end]
-                X_test_part = part["X"][test_start:]
+                X_test_part = part["X"][test_start:test_end]
                 y_train_part = part["y"][:train_end]
-                y_test_part = part["y"][test_start:]
+                y_test_part = part["y"][test_start:test_end]
                 w_train_part = part["weights"][:train_end]
                 eligible = (
                     train_end >= 40
@@ -1148,6 +1173,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                     "samples": len(part["X"]),
                     "trainSamples": len(X_train_part),
                     "testSamples": len(X_test_part),
+                    "testEndIndex": int(test_end),
                     "trainClassDistribution": class_distribution(y_train_part),
                     "testClassDistribution": class_distribution(y_test_part),
                     "labelSensitivity": part["label_sensitivity"],
@@ -1315,7 +1341,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             "feature_version": FEATURE_VERSION,
             "validation": {
                 "type": validation_type,
-                "trainFraction": 0.78,
+                "trainFraction": float(train_fraction),
+                "testFraction": float(test_fraction),
                 "embargoBars": FORWARD_HORIZON,
                 "splitTimestamp": split_timestamp,
                 "markets": validation_markets,
