@@ -1,0 +1,54 @@
+name: KINGBOT V11 Self-Supervised AI Research
+
+on:
+  pull_request:
+    branches: [v9-training-audit]
+    paths:
+      - "research/v11-self-supervised/**"
+      - ".github/workflows/v11-self-supervised-research.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  self-supervised-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install existing ML dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ml-signal-service/requirements.txt
+      - name: Syntax and SSL regression tests
+        run: |
+          python -m py_compile ml-signal-service/service.py research/v11-self-supervised/ssl_market_encoder.py research/v11-self-supervised/run_ssl_research.py
+          python -m unittest discover -s research/v11-self-supervised -p "test_*.py"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package.json
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Fetch closed, timestamped market history
+        run: node backend/scripts/v9-fetch-live-markets.mjs /tmp/kingbot-v11-ssl-input.json
+      - name: Run V11 self-supervised research
+        run: python research/v11-self-supervised/run_ssl_research.py /tmp/kingbot-v11-ssl-input.json /tmp/kingbot-v11-ssl-report.json
+      - name: Upload V11 report and input data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kingbot-v11-self-supervised-research
+          path: |
+            /tmp/kingbot-v11-ssl-input.json
+            /tmp/kingbot-v11-ssl-report.json
+          if-no-files-found: warn
+          retention-days: 14
