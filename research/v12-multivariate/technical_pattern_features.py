@@ -287,3 +287,30 @@ def select_feature_columns(base_features: np.ndarray, pattern_features: np.ndarr
     else:
         raise ValueError("V123_FEATURE_VARIANT_INVALID")
     return np.concatenate((base, patterns[:, :, indices]), axis=2).astype(np.float32)
+
+
+
+def asof_pattern_lookup(pattern_matrix: np.ndarray, bar_open_times: np.ndarray,
+                        timeframe_seconds: int, decision_times: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Return the last pattern vector available by each decision time (closed candles only).
+
+    A candle becomes usable at open_time + timeframe_seconds. Rows are never
+    forward-filled from a candle whose close is later than the decision timestamp.
+    """
+    patterns = np.asarray(pattern_matrix, dtype=np.float32)
+    opens = np.asarray(bar_open_times, dtype=np.float64)
+    decisions = np.asarray(decision_times, dtype=np.float64)
+    if (patterns.ndim != 2 or opens.ndim != 1 or decisions.ndim != 1
+            or len(patterns) != len(opens) or patterns.shape[1] != len(FEATURE_NAMES)
+            or timeframe_seconds <= 0 or not np.isfinite(opens).all()
+            or not np.isfinite(decisions).all() or not np.isfinite(patterns).all()):
+        raise ValueError("V123_ASOF_INPUT_INVALID")
+    available = opens + float(timeframe_seconds)
+    if np.any(np.diff(available) < 0):
+        raise ValueError("V123_ASOF_TIMESTAMPS_UNSORTED")
+    positions = np.searchsorted(available, decisions, side="right") - 1
+    present = positions >= 0
+    output = np.zeros((len(decisions), len(FEATURE_NAMES)), dtype=np.float32)
+    if present.any():
+        output[present] = patterns[positions[present]]
+    return output, present
