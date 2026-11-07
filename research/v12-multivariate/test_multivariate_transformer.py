@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import torch
 from multivariate_transformer import (
-    CrossMarketTransformer, build_dataset, fit_predict, run_fold
+    CrossMarketTransformer, build_dataset, context_ablation, fit_predict, run_fold
 )
 
 
@@ -63,6 +63,45 @@ class MultivariatePanelTests(unittest.TestCase):
         data = build_dataset(panel(), "strategic", "15m", seq_len=16)
         own = data["slots"].index("XAUUSD|15m")
         self.assertTrue(data["M"][:, own].all())
+
+    def test_target_only_ablation_masks_every_context_slot(self):
+        context = np.ones((5, 3, 2), dtype=np.float32)
+        missing = np.zeros((5, 3), dtype=bool)
+        ages = np.ones((5, 3), dtype=np.float32)
+        out_c, out_m, out_a, selected, coverage = context_ablation(
+            context, missing, ages, np.asarray([0, 1]), "target_only")
+        self.assertEqual(selected, [])
+        self.assertTrue(out_m.all())
+        self.assertTrue((out_c == 0).all())
+        self.assertTrue((out_a == 0).all())
+
+    def test_high_coverage_ablation_uses_training_rows_only(self):
+        context = np.ones((5, 3, 2), dtype=np.float32)
+        missing = np.asarray([
+            [False, False, True],
+            [False, True, True],
+            [True, False, False],
+            [True, True, False],
+            [False, False, False],
+        ], dtype=bool)
+        ages = np.ones((5, 3), dtype=np.float32)
+        train = np.asarray([0, 1])
+        out_c, out_m, out_a, selected, coverage = context_ablation(
+            context, missing, ages, train, "high_coverage", threshold=0.60)
+        self.assertEqual(selected, [0])
+        self.assertAlmostEqual(coverage[0], 1.0)
+        self.assertAlmostEqual(coverage[1], 0.5)
+        self.assertTrue(out_m[:, 1:].all())
+        self.assertTrue((out_c[:, 1:, :] == 0).all())
+
+    def test_full_context_keeps_only_slots_present_in_training_fold(self):
+        context = np.ones((4, 2, 2), dtype=np.float32)
+        missing = np.asarray([[False, True], [True, True], [True, False], [True, False]])
+        ages = np.zeros((4, 2), dtype=np.float32)
+        _, out_m, _, selected, _ = context_ablation(
+            context, missing, ages, np.asarray([0, 1]), "full_context")
+        self.assertEqual(selected, [0])
+        self.assertTrue(out_m[:, 1].all())
 
     def test_joint_transformer_produces_three_class_logits(self):
         model = CrossMarketTransformer(features=28, slots=5, seq_len=16)
