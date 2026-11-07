@@ -28,19 +28,20 @@ from sklearn.preprocessing import StandardScaler
 from torch import nn
 
 from model_store import load_model_artifacts, save_model_artifact
+from probability_calibration import apply_probability_temperature, fit_probability_temperature, probability_calibration_metrics
 
 
 HOST = "0.0.0.0"
 PORT = int(os.getenv("PORT", "10000"))
 SECRET = os.getenv("KINGBOT_ML_SIGNAL_SECRET", "").strip()
-MAX_BODY_BYTES = max(64_000, int(os.getenv("KINGBOT_ML_MAX_BODY_BYTES", "1500000")))
+MAX_BODY_BYTES = max(64_000, int(os.getenv("KINGBOT_ML_MAX_BODY_BYTES", "4000000")))
 MIN_BARS = max(120, int(os.getenv("KINGBOT_ML_MIN_BARS", "150")))
 FORWARD_HORIZON = max(1, int(os.getenv("KINGBOT_ML_FORWARD_BARS", "6")))
 LABEL_ATR = max(0.1, min(3.0, float(os.getenv("KINGBOT_ML_LABEL_ATR", "0.6"))))
 LABEL_FALLBACK_ATR = max(0.1, min(LABEL_ATR, float(os.getenv("KINGBOT_ML_LABEL_FALLBACK_ATR", "0.35"))))
 MAX_MODELS = max(10, int(os.getenv("KINGBOT_ML_MAX_MODELS", "50")))
 MAX_MARKETS = max(1, int(os.getenv("KINGBOT_ML_MAX_MARKETS", "12")))
-MAX_BARS_PER_MARKET = max(MIN_BARS, min(1500, int(os.getenv("KINGBOT_ML_MAX_BARS_PER_MARKET", "1000"))))
+MAX_BARS_PER_MARKET = max(MIN_BARS, min(3000, int(os.getenv("KINGBOT_ML_MAX_BARS_PER_MARKET", "2500"))))
 MAX_RF_TREES = max(40, min(300, int(os.getenv("KINGBOT_ML_RF_TREES", "120"))))
 TORCH_EPOCHS = max(10, min(150, int(os.getenv("KINGBOT_ML_TORCH_EPOCHS", "40"))))
 TORCH_THREADS = max(1, min(8, int(os.getenv("KINGBOT_ML_TORCH_THREADS", "1"))))
@@ -446,10 +447,12 @@ def triple_barrier_label(
     atr_value: float,
     horizon: int | None = None,
     barrier_atr: float | None = None,
+    fallback_atr: float | None = None,
 ) -> int:
     """Label the first directional ATR barrier touched; same-candle double hits abstain."""
     forward = FORWARD_HORIZON if horizon is None else max(1, int(horizon))
     barrier = LABEL_ATR if barrier_atr is None else max(0.1, float(barrier_atr))
+    fallback = LABEL_FALLBACK_ATR if fallback_atr is None else max(0.1, min(barrier, float(fallback_atr)))
     if atr_value <= 0 or index < 0 or index + forward >= len(bars):
         return 0
 
@@ -469,9 +472,9 @@ def triple_barrier_label(
             return -1
 
     final_move_atr = (float(bars[index + forward]["close"]) - entry) / atr_value
-    if final_move_atr >= LABEL_FALLBACK_ATR:
+    if final_move_atr >= fallback:
         return 1
-    if final_move_atr <= -LABEL_FALLBACK_ATR:
+    if final_move_atr <= -fallback:
         return -1
     return 0
 
@@ -491,7 +494,9 @@ def bars_to_training_arrays(
             continue
         features = apply_strategy_focus(features, strategy)
         current = bars[index]["close"]
-        current_atr = atr(bars[: index + 1], 14)
+        # ATR(14) depends only on the latest 14 true ranges; keep the
+        # preceding close so this window is numerically identical to the full prefix.
+        current_atr = atr(bars[max(0, index - 14): index + 1], 14)
         if current <= 0 or not current_atr or current_atr <= 0:
             continue
 
@@ -908,8 +913,13 @@ def global_temporal_split_masks(
     sample_times: np.ndarray,
     label_end_times: np.ndarray,
     train_fraction: float = 0.78,
+    test_fraction: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray, float]:
-    """Split all symbols at one shared UTC cutoff and purge labels crossing it."""
+    """Create a purged forward holdout, optionally ending before the dataset tail.
+
+    test_fraction=1.0 preserves the original V9 train/test split exactly. Smaller
+    values create an earlier development window for walk-forward candidate tests.
+    """
     times = np.asarray(sample_times, dtype=np.float64)
     ends = np.asarray(label_end_times, dtype=np.float64)
     if times.ndim != 1 or ends.ndim != 1 or times.shape != ends.shape or not len(times):
@@ -921,19 +931,71 @@ def global_temporal_split_masks(
     if len(unique_times) < 4:
         raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_HISTORY_INSUFFICIENT")
     fraction = clamp(float(train_fraction), 0.50, 0.90)
+    end_fraction = clamp(float(test_fraction), fraction + 0.05, 1.0)
     split_index = max(1, min(len(unique_times) - 1, int(len(unique_times) * fraction)))
     cutoff = float(unique_times[split_index])
+    if end_fraction >= 1.0:
+        test_cutoff = math.inf
+    else:
+        test_end_index = max(split_index + 1, min(len(unique_times) - 1, int(len(unique_times) * end_fraction)))
+        test_cutoff = float(unique_times[test_end_index])
     train_mask = (times < cutoff) & (ends < cutoff)
-    test_mask = times >= cutoff
+    test_mask = (times >= cutoff) & (times < test_cutoff) & (ends < test_cutoff)
     if int(train_mask.sum()) < 40 or int(test_mask.sum()) < 20:
         raise ValueError("ML_GLOBAL_TEMPORAL_SPLIT_SAMPLES_INSUFFICIENT")
     return train_mask, test_mask, cutoff
 
 
-def ensemble_probabilities(rf: Any, torch_model: nn.Module, scaled_features: np.ndarray) -> np.ndarray:
-    """Return the RF/PyTorch probability blend used during live inference."""
-    rf_raw = rf.predict_proba(scaled_features)
-    rf_aligned = np.zeros((len(scaled_features), len(LABELS)), dtype=np.float32)
+def class_distribution(labels: np.ndarray) -> dict[str, Any]:
+    """Return explicit SELL/HOLD/BUY counts and proportions for a V9 audit."""
+    values = np.asarray(labels, dtype=np.int64)
+    total = int(values.size)
+    names = {-1: "SELL", 0: "HOLD", 1: "BUY"}
+    counts = {name: int(np.sum(values == label)) for label, name in names.items()}
+    ratios = {
+        name: round(count / total, 4) if total else 0.0
+        for name, count in counts.items()
+    }
+    return {"samples": total, "counts": counts, "ratios": ratios}
+
+
+def label_sensitivity_distribution(
+    bars: list[dict[str, float]],
+    fallback_values: tuple[float, ...] = (0.35, 0.45, 0.55, 0.60),
+) -> dict[str, dict[str, Any]]:
+    """Audit the V9 triple-barrier fallback sensitivity without changing live labels."""
+    labels_by_fallback: dict[str, list[int]] = {
+        f"{float(value):.2f}": [] for value in fallback_values
+    }
+    for index in range(60, len(bars) - FORWARD_HORIZON):
+        current_atr = atr(bars[max(0, index - 14):index + 1], 14)
+        if current_atr is None or current_atr <= 0:
+            continue
+        for value in fallback_values:
+            key = f"{float(value):.2f}"
+            labels_by_fallback[key].append(
+                triple_barrier_label(
+                    bars,
+                    index,
+                    current_atr,
+                    fallback_atr=float(value),
+                )
+            )
+    return {
+        key: class_distribution(np.asarray(values, dtype=np.int64))
+        for key, values in labels_by_fallback.items()
+    }
+
+
+def ensemble_component_probabilities(
+    rf: Any,
+    torch_model: nn.Module,
+    scaled_features: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return class-aligned RF and PyTorch probabilities before blending."""
+    X = np.asarray(scaled_features, dtype=np.float32)
+    rf_raw = rf.predict_proba(X)
+    rf_aligned = np.zeros((len(X), len(LABELS)), dtype=np.float32)
     for column, label in enumerate(rf.classes_):
         label_index = LABEL_TO_INDEX.get(int(label))
         if label_index is not None:
@@ -942,28 +1004,102 @@ def ensemble_probabilities(rf: Any, torch_model: nn.Module, scaled_features: np.
     torch_model.eval()
     with torch.no_grad():
         torch_raw = torch.softmax(
-            torch_model(torch.from_numpy(np.asarray(scaled_features, dtype=np.float32))),
+            torch_model(torch.from_numpy(X)),
             dim=1,
         ).cpu().numpy().astype(np.float32)
+    return rf_aligned, torch_raw
 
-    blended = rf_aligned * RF_ENSEMBLE_WEIGHT + torch_raw * TORCH_ENSEMBLE_WEIGHT
+
+def blend_probability_parts(
+    rf_probabilities: np.ndarray,
+    torch_probabilities: np.ndarray,
+    rf_weight: float,
+) -> np.ndarray:
+    """Blend aligned model probabilities with a validated RF share."""
+    weight = float(rf_weight)
+    if not math.isfinite(weight) or not 0.0 <= weight <= 1.0:
+        raise ValueError("ML_ENSEMBLE_RF_WEIGHT_INVALID")
+    rf_values = np.asarray(rf_probabilities, dtype=np.float32)
+    torch_values = np.asarray(torch_probabilities, dtype=np.float32)
+    if rf_values.shape != torch_values.shape or rf_values.ndim != 2 or rf_values.shape[1] != len(LABELS):
+        raise ValueError("ML_ENSEMBLE_PROBABILITY_SHAPE_INVALID")
+    blended = rf_values * weight + torch_values * (1.0 - weight)
     return blended / np.maximum(blended.sum(axis=1, keepdims=True), 1e-12)
 
 
-def ensemble_class_metrics(y_true: np.ndarray, probabilities: np.ndarray) -> dict[str, float]:
+def ensemble_probabilities(
+    rf: Any,
+    torch_model: nn.Module,
+    scaled_features: np.ndarray,
+    rf_weight: float | None = None,
+) -> np.ndarray:
+    """Return the RF/PyTorch blend used during training and live inference."""
+    rf_probabilities, torch_probabilities = ensemble_component_probabilities(
+        rf, torch_model, scaled_features
+    )
+    weight = RF_ENSEMBLE_WEIGHT if rf_weight is None else float(rf_weight)
+    return blend_probability_parts(rf_probabilities, torch_probabilities, weight)
+
+def ensemble_class_metrics(y_true: np.ndarray, probabilities: np.ndarray) -> dict[str, Any]:
     predicted_indices = np.argmax(probabilities, axis=1)
     predicted = np.asarray([INDEX_TO_LABEL[int(value)] for value in predicted_indices], dtype=np.int64)
+    per_class: dict[str, dict[str, float | int]] = {}
+    confusion: list[list[int]] = []
+    for actual in LABELS:
+        confusion.append([
+            int(np.sum((y_true == actual) & (predicted == predicted_label)))
+            for predicted_label in LABELS
+        ])
+    for label, name in ((-1, "SELL"), (0, "HOLD"), (1, "BUY")):
+        true_positive = int(np.sum((y_true == label) & (predicted == label)))
+        false_positive = int(np.sum((y_true != label) & (predicted == label)))
+        false_negative = int(np.sum((y_true == label) & (predicted != label)))
+        support = int(np.sum(y_true == label))
+        precision = true_positive / max(1, true_positive + false_positive)
+        recall = true_positive / max(1, true_positive + false_negative)
+        per_class[name] = {
+            "precision": float(precision),
+            "recall": float(recall),
+            "f1": float(2.0 * precision * recall / max(1e-12, precision + recall)),
+            "support": support,
+        }
     return {
         "accuracy": float(accuracy_score(y_true, predicted)),
         "balancedAccuracy": float(balanced_accuracy_score(y_true, predicted)),
         "macroF1": float(f1_score(y_true, predicted, average="macro", zero_division=0)),
+        "perClass": per_class,
+        "confusionMatrix": {"labels": ["SELL", "HOLD", "BUY"], "counts": confusion},
     }
 
 
-def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) -> dict[str, Any]:
+def train_model(
+    strategy: str,
+    timeframe: str,
+    markets: list[dict[str, Any]],
+    train_fraction: float = 0.78,
+    test_fraction: float = 1.0,
+    ensemble_rf_weight: float | None = None,
+    capture_validation_probabilities: bool = False,
+    probability_temperature: float | None = None,
+) -> dict[str, Any]:
     if not MODEL_RESTORE_EVENT.wait(timeout=max(30, int(os.getenv("KINGBOT_ML_RESTORE_WAIT_SEC", "180")))):
         raise RuntimeError("ML_MODEL_RESTORE_PENDING")
     key = f"{strategy}:{timeframe.lower()}"
+    resolved_ensemble_rf_weight = (
+        RF_ENSEMBLE_WEIGHT if ensemble_rf_weight is None else finite(ensemble_rf_weight, math.nan)
+    )
+    if not math.isfinite(resolved_ensemble_rf_weight) or not 0.0 <= resolved_ensemble_rf_weight <= 1.0:
+        raise ValueError("ML_ENSEMBLE_RF_WEIGHT_INVALID")
+    if not isinstance(capture_validation_probabilities, bool):
+        raise ValueError("ML_VALIDATION_PROBABILITY_CAPTURE_FLAG_INVALID")
+    resolved_probability_temperature = (
+        1.0 if probability_temperature is None else finite(probability_temperature, math.nan)
+    )
+    if (
+        not math.isfinite(resolved_probability_temperature)
+        or not 0.5 <= resolved_probability_temperature <= 3.0
+    ):
+        raise ValueError("ML_PROBABILITY_TEMPERATURE_INVALID")
     if not TRAINING_SEMAPHORE.acquire(blocking=False):
         raise RuntimeError("ML_TRAINING_CAPACITY_BUSY")
     with LOCK:
@@ -1008,6 +1144,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "weights": weights_part,
                 "sample_times": sample_times,
                 "label_end_times": label_end_times,
+                "label_sensitivity": label_sensitivity_distribution(normalized),
             })
 
         if not market_parts:
@@ -1030,7 +1167,10 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             all_times = np.concatenate([part["sample_times"] for part in market_parts])
             all_label_ends = np.concatenate([part["label_end_times"] for part in market_parts])
             train_mask, test_mask, split_timestamp = global_temporal_split_masks(
-                all_times, all_label_ends
+                all_times,
+                all_label_ends,
+                train_fraction=train_fraction,
+                test_fraction=test_fraction,
             )
             offset = 0
             for part in market_parts:
@@ -1047,6 +1187,9 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                     "samples": count,
                     "trainSamples": train_count,
                     "testSamples": test_count,
+                    "trainClassDistribution": class_distribution(part["y"][local_train]),
+                    "testClassDistribution": class_distribution(part["y"][local_test]),
+                    "labelSensitivity": part["label_sensitivity"],
                     "splitTimestamp": split_timestamp,
                     "embargo": "label-end-before-global-cutoff",
                 })
@@ -1060,11 +1203,16 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
         else:
             # Providers without timestamps retain a per-market chronological split.
             for part in market_parts:
-                train_end, test_start = temporal_split_bounds(len(part["X"]))
+                train_end, test_start = temporal_split_bounds(
+                    len(part["X"]), train_fraction=train_fraction
+                )
+                test_end = max(test_start + 1, min(
+                    len(part["X"]), int(len(part["X"]) * clamp(float(test_fraction), train_fraction + 0.05, 1.0))
+                ))
                 X_train_part = part["X"][:train_end]
-                X_test_part = part["X"][test_start:]
+                X_test_part = part["X"][test_start:test_end]
                 y_train_part = part["y"][:train_end]
-                y_test_part = part["y"][test_start:]
+                y_test_part = part["y"][test_start:test_end]
                 w_train_part = part["weights"][:train_end]
                 eligible = (
                     train_end >= 40
@@ -1077,6 +1225,10 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                     "samples": len(part["X"]),
                     "trainSamples": len(X_train_part),
                     "testSamples": len(X_test_part),
+                    "testEndIndex": int(test_end),
+                    "trainClassDistribution": class_distribution(y_train_part),
+                    "testClassDistribution": class_distribution(y_test_part),
+                    "labelSensitivity": part["label_sensitivity"],
                     "embargoBars": int(test_start - train_end),
                 })
                 if eligible:
@@ -1125,6 +1277,27 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
 
         train_classes = sorted(set(int(v) for v in y_train))
         test_classes = sorted(set(int(v) for v in y_test))
+        train_label_distribution = class_distribution(y_train)
+        test_label_distribution = class_distribution(y_test)
+        validation_audit = {
+            "strategy": strategy,
+            "timeframe": timeframe.lower(),
+            "featureVersion": FEATURE_VERSION,
+            "strategyFocus": sorted(STRATEGY_FOCUS[strategy]),
+            "validationType": validation_type,
+            "marketsAccepted": accepted_markets,
+            "marketsValidated": sum(1 for row in validation_markets if row.get("accepted")),
+            "marketCount": len(validation_markets),
+            "barCount": total_bar_count,
+            "trainClassDistribution": train_label_distribution,
+            "testClassDistribution": test_label_distribution,
+            "perMarket": validation_markets,
+            "labelSensitivityByMarket": [
+                {"symbol": row["symbol"], "fallbacks": row.get("labelSensitivity", {})}
+                for row in validation_markets
+            ],
+        }
+        print("[KINGBOT ML AUDIT]", json.dumps(validation_audit, sort_keys=True))
         if len(train_classes) < 3:
             raise ValueError("ML_TRAINING_REQUIRES_BUY_SELL_HOLD_TRAIN_CLASSES")
         if len(test_classes) < 2:
@@ -1156,8 +1329,37 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             X_train, y_train, X_test, y_test, scaler, weights_train
         )
 
-        ensemble_test_probabilities = ensemble_probabilities(rf, torch_model, X_test_scaled)
+        rf_probability_parts, torch_probability_parts = ensemble_component_probabilities(
+            rf, torch_model, X_test_scaled
+        )
+        ensemble_test_probabilities = blend_probability_parts(
+            rf_probability_parts, torch_probability_parts, resolved_ensemble_rf_weight
+        )
         ensemble_metrics = ensemble_class_metrics(y_test, ensemble_test_probabilities)
+        calibrated_test_probabilities = apply_probability_temperature(
+            ensemble_test_probabilities, resolved_probability_temperature
+        )
+        probability_calibration = {
+            "method": "multiclass-temperature-scaling",
+            "temperature": resolved_probability_temperature,
+            "raw": probability_calibration_metrics(y_test, ensemble_test_probabilities),
+            "calibrated": probability_calibration_metrics(y_test, calibrated_test_probabilities),
+        }
+        if capture_validation_probabilities:
+            print("[KINGBOT ML PROBABILITY AUDIT]", json.dumps({
+                "labels": y_test.tolist(),
+                "rf": np.round(rf_probability_parts, 6).tolist(),
+                "torch": np.round(torch_probability_parts, 6).tolist(),
+            }, separators=(",", ":")))
+
+        print("[KINGBOT ML VALIDATION]", json.dumps({
+            "strategy": strategy,
+            "timeframe": timeframe.lower(),
+            "featureVersion": FEATURE_VERSION,
+            "rf": rf_metrics,
+            "pytorch": torch_metrics,
+            "ensemble": ensemble_metrics,
+        }, sort_keys=True))
 
         quality_gate = (
             ensemble_metrics["balancedAccuracy"] >= 0.36
@@ -1211,12 +1413,16 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             "feature_version": FEATURE_VERSION,
             "validation": {
                 "type": validation_type,
-                "trainFraction": 0.78,
+                "trainFraction": float(train_fraction),
+                "testFraction": float(test_fraction),
                 "embargoBars": FORWARD_HORIZON,
                 "splitTimestamp": split_timestamp,
                 "markets": validation_markets,
             },
             "selection_score": candidate_score,
+            "ensemble_rf_weight": resolved_ensemble_rf_weight,
+            "probability_temperature": resolved_probability_temperature,
+            "probability_calibration": probability_calibration,
             "promotion": "CHAMPION" if promote else "CHALLENGER",
             "promoted_at": trained_at if promote else None,
             "feedbackVersion": FEEDBACK_VERSION,
@@ -1257,6 +1463,10 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "testSamples": int(len(X_test)),
                 "classesTrain": train_classes,
                 "classesTest": test_classes,
+                "classDistributionTrain": train_label_distribution,
+                "classDistributionTest": test_label_distribution,
+                "marketValidation": validation_markets,
+                "labelSensitivityByMarket": validation_audit["labelSensitivityByMarket"],
                 "forwardBars": FORWARD_HORIZON,
                 "labelAtr": LABEL_ATR,
                 "temporalAlignment": "GLOBAL_TIMESTAMPED" if timestamped else "PER_MARKET_FALLBACK",
@@ -1267,6 +1477,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "rf": rf_metrics,
                 "pytorch": torch_metrics,
                 "ensemble": ensemble_metrics,
+                "ensembleRfWeight": resolved_ensemble_rf_weight,
+                "probabilityCalibration": probability_calibration,
                 "qualityGate": quality_gate,
             },
             "regimeAware": True,
@@ -1293,6 +1505,9 @@ def model_status(key: str) -> dict[str, Any]:
         "trainSamples": item.get("train_samples", 0),
         "testSamples": item.get("test_samples", 0),
         "barCount": item["bar_count"],
+        "ensembleRfWeight": round(float(item.get("ensemble_rf_weight", RF_ENSEMBLE_WEIGHT)), 3),
+        "probabilityTemperature": round(float(item.get("probability_temperature", 1.0)), 4),
+        "probabilityCalibration": item.get("probability_calibration", {"method": "multiclass-temperature-scaling", "status": "IDENTITY"}),
         "rfAccuracy": round(item["rf_accuracy"] * 100.0, 2),
         "rfBalancedAccuracy": round(item.get("rf_balanced_accuracy", 0.0) * 100.0, 2),
         "rfMacroF1": round(item.get("rf_macro_f1", 0.0) * 100.0, 2),
@@ -1419,7 +1634,16 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
         X = current_market_features(market, strategy)
         scaled = item["scaler"].transform(X).astype(np.float32)
 
-        probs = ensemble_probabilities(item["rf"], item["torch"], scaled)[0]
+        raw_probs = ensemble_probabilities(
+            item["rf"],
+            item["torch"],
+            scaled,
+            rf_weight=item.get("ensemble_rf_weight", RF_ENSEMBLE_WEIGHT),
+        )[0]
+        probability_temperature = float(item.get("probability_temperature", 1.0))
+        probs = apply_probability_temperature(
+            raw_probs.reshape(1, -1), probability_temperature
+        )[0]
         best_index = int(np.argmax(probs))
         direction = int(INDEX_TO_LABEL[best_index])
         confidence = float(probs[best_index])
@@ -1457,18 +1681,28 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
                 "hold": round(float(probs[1]) * 100.0, 2),
                 "buy": round(float(probs[2]) * 100.0, 2),
             },
+            "rawProbabilities": {
+                "sell": round(float(raw_probs[0]) * 100.0, 2),
+                "hold": round(float(raw_probs[1]) * 100.0, 2),
+                "buy": round(float(raw_probs[2]) * 100.0, 2),
+            },
+            "probabilityCalibration": {
+                "method": "multiclass-temperature-scaling",
+                "temperature": round(probability_temperature, 4),
+                "status": "CALIBRATED" if abs(probability_temperature - 1.0) > 1e-6 else "IDENTITY",
+            },
             "models": {
                 "scikitLearn": {
                     "accuracy": round(item["rf_accuracy"] * 100.0, 2),
                     "balancedAccuracy": round(item.get("rf_balanced_accuracy", 0.0) * 100.0, 2),
                     "macroF1": round(item.get("rf_macro_f1", 0.0) * 100.0, 2),
-                    "weight": 0.55,
+                    "weight": round(float(item.get("ensemble_rf_weight", RF_ENSEMBLE_WEIGHT)), 4),
                 },
                 "pytorch": {
                     "accuracy": round(item["torch_accuracy"] * 100.0, 2),
                     "balancedAccuracy": round(item.get("torch_balanced_accuracy", 0.0) * 100.0, 2),
                     "macroF1": round(item.get("torch_macro_f1", 0.0) * 100.0, 2),
-                    "weight": 0.45,
+                    "weight": round(1.0 - float(item.get("ensemble_rf_weight", RF_ENSEMBLE_WEIGHT)), 4),
                 },
             },
             "focusFeatures": focus_note,
