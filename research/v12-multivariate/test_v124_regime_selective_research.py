@@ -61,8 +61,8 @@ class V124RegimeSelectiveTests(unittest.TestCase):
 
     def test_actionability_threshold_uses_calibration_labels(self):
         threshold, metrics = _select_action_threshold(
-            np.asarray([0.1, 0.2, 0.7, 0.8, 0.9]),
-            np.asarray([False, False, True, True, True]),
+            np.asarray([0.1, 0.2, 0.25, 0.15, 0.7, 0.8, 0.9, 0.75, 0.6, 0.85]),
+            np.asarray([False, False, False, False, True, True, True, True, True, True]),
         )
         self.assertGreaterEqual(threshold, 0.30)
         self.assertLessEqual(threshold, 0.85)

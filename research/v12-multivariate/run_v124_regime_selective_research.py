@@ -537,11 +537,12 @@ def _fit_selective_predict(data, core_indices, calibration_indices, evaluation_i
             action_logits, direction_logits = model(bx, bc, bm)
             action_loss = action_loss_fn(action_logits, batch_action)
             active = batch_direction_mask.bool()
-            if not active.any():
-                continue
-            direction_loss = direction_loss_fn(
-                direction_logits[active], batch_direction[active]
-            )
+            if active.any():
+                direction_loss = direction_loss_fn(
+                    direction_logits[active], batch_direction[active]
+                )
+            else:
+                direction_loss = direction_logits.new_zeros(())
             loss = action_loss + 0.75 * direction_loss
             optimizer.zero_grad()
             loss.backward()
