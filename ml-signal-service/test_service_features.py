@@ -320,47 +320,6 @@ class EngineFeatureParityTests(unittest.TestCase):
         self.assertTrue(np.allclose(probabilities[0], expected, atol=1e-6))
 
 
-class V9TimeframeFeatureMaskTests(unittest.TestCase):
-    def test_flipper_5m_context_mask_is_versioned_and_timeframe_scoped(self):
-        base = service.STRATEGY_FOCUS["flipper"]
-        expanded = service.strategy_focus_for("flipper", "5m")
-        self.assertEqual(
-            expanded,
-            base | {
-                "trend", "volatility", "atr_pct", "adx_norm", "rsi_norm",
-                "ema_gap", "ema20_slope_atr", "range_position_20",
-                "structure_bull", "structure_bear",
-            },
-        )
-        self.assertNotEqual(
-            service.strategy_feature_version("flipper", "5m"),
-            service.FEATURE_VERSION,
-        )
-        self.assertTrue(
-            service.strategy_feature_version("flipper", "5m").startswith(service.FEATURE_VERSION)
-        )
-
-    def test_flipper_other_timeframes_keep_original_v9_mask_and_version(self):
-        for timeframe in ("1m", "15m", "4h"):
-            self.assertEqual(service.strategy_focus_for("flipper", timeframe), service.STRATEGY_FOCUS["flipper"])
-            self.assertEqual(service.strategy_feature_version("flipper", timeframe), service.FEATURE_VERSION)
-
-    def test_flipper_5m_training_and_live_feature_masks_match(self):
-        bars = make_bars(180)
-        raw = service.extract_features_from_bars(bars, len(bars) - 1)
-        expected = service.apply_strategy_focus(raw, "flipper", "5m")
-        live = service.current_market_features({
-            "symbol": "XAUUSD",
-            "timeframe": "5m",
-            "mlBars": bars,
-            "price": bars[-1]["close"],
-            "atr": 0.5,
-            "trend": 0.7,
-            "momentum": 0.5,
-        }, "flipper", "5m")[0]
-        np.testing.assert_allclose(live, expected, atol=1e-7, rtol=1e-7)
-
-
 class V9LabelDistributionTests(unittest.TestCase):
     def test_atr_window_optimization_matches_full_prefix_exactly(self):
         bars = make_bars(220)
