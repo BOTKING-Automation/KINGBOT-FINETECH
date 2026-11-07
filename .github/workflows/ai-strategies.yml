@@ -6,6 +6,7 @@ on:
     paths:
       - "ml-signal-service/**"
       - "backend/scripts/v9-fetch-live-markets.mjs"
+      - "backend/src/deriv-market-feed.js"
       - "backend/src/ml-signal-client.js"
       - "backend/test/ml-signal-client.test.js"
       - "backend/src/ai-trade-gate.js"
@@ -182,6 +183,7 @@ jobs:
       - name: Node syntax check
         run: |
           node --check backend/scripts/v9-fetch-live-markets.mjs
+          node --check backend/src/deriv-market-feed.js
           node --check backend/src/ml-signal-client.js
           node --check backend/test/ml-signal-client.test.js
           node --check backend/src/ai-trade-gate.js
