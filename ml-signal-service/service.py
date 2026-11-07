@@ -100,29 +100,6 @@ STRATEGY_FOCUS = {
 
 FEATURE_VERSION = "ai-strategies-v9-real-strategy-mask-barrier6-atr0.60-fallback0.35-global-time"
 
-# A separately validated V9 challenger mask is scoped only to Flipper 5m.
-# Other Flipper timeframes retain the original V9 mask and compatibility tag.
-STRATEGY_TIMEFRAME_FOCUS = {
-    ("flipper", "5m"): STRATEGY_FOCUS["flipper"] | {
-        "trend", "volatility", "atr_pct", "adx_norm", "rsi_norm",
-        "ema_gap", "ema20_slope_atr", "range_position_20",
-        "structure_bull", "structure_bear",
-    },
-}
-
-
-def strategy_focus_for(strategy: str, timeframe: str | None = None) -> set[str] | None:
-    tf = str(timeframe or "").strip().lower()
-    return STRATEGY_TIMEFRAME_FOCUS.get((strategy, tf), STRATEGY_FOCUS.get(strategy))
-
-
-def strategy_feature_version(strategy: str, timeframe: str | None = None) -> str:
-    tf = str(timeframe or "").strip().lower()
-    if (strategy, tf) in STRATEGY_TIMEFRAME_FOCUS:
-        return FEATURE_VERSION + "-" + strategy + "-" + tf + "-context-mask-v1"
-    return FEATURE_VERSION
-
-
 REGIME_ORDER = ["trend", "range", "breakout", "reversal", "volatile"]
 REGIME_RISK_MODE = {
     "trend": "aggressive",
@@ -174,8 +151,8 @@ def restore_persisted_models() -> None:
                     record = deserialize_model_record(artifact_bytes)
                     if not isinstance(record, dict):
                         continue
-                    # Each strategy/timeframe must match its exact V9 feature mask.
-                    if record.get("feature_version") != strategy_feature_version(strategy, timeframe):
+                    # Feature/label semantics changed in v7; never load incompatible v6 weights.
+                    if record.get("feature_version") != FEATURE_VERSION:
                         continue
                     if kind == "champion":
                         MODELS[key] = record
@@ -450,13 +427,9 @@ def extract_features_from_bars(bars: list[dict[str, float]], index: int) -> list
         efficiency_10,
     ]
 
-def apply_strategy_focus(
-    features: list[float],
-    strategy: str,
-    timeframe: str | None = None,
-) -> list[float]:
-    """Apply the strategy/timeframe feature mask before scaling."""
-    focus = strategy_focus_for(strategy, timeframe)
+def apply_strategy_focus(features: list[float], strategy: str) -> list[float]:
+    """Apply a true feature mask so StandardScaler cannot undo strategy specialization."""
+    focus = STRATEGY_FOCUS.get(strategy)
     if focus is None:
         raise ValueError("ML_STRATEGY_FOCUS_NOT_CONFIGURED")
     if len(features) != len(FEATURE_NAMES):
@@ -506,9 +479,7 @@ def triple_barrier_label(
 
 
 def bars_to_training_arrays(
-    bars: list[dict[str, float]],
-    strategy: str,
-    timeframe: str | None = None,
+    bars: list[dict[str, float]], strategy: str
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     rows: list[list[float]] = []
     labels: list[int] = []
@@ -520,7 +491,7 @@ def bars_to_training_arrays(
         features = extract_features_from_bars(bars, index)
         if features is None:
             continue
-        features = apply_strategy_focus(features, strategy, timeframe)
+        features = apply_strategy_focus(features, strategy)
         current = bars[index]["close"]
         # ATR(14) depends only on the latest 14 true ranges; keep the
         # preceding close so this window is numerically identical to the full prefix.
@@ -1076,9 +1047,7 @@ def train_model(
 ) -> dict[str, Any]:
     if not MODEL_RESTORE_EVENT.wait(timeout=max(30, int(os.getenv("KINGBOT_ML_RESTORE_WAIT_SEC", "180")))):
         raise RuntimeError("ML_MODEL_RESTORE_PENDING")
-    timeframe = timeframe.lower()
-    model_feature_version = strategy_feature_version(strategy, timeframe)
-    key = f"{strategy}:{timeframe}"
+    key = f"{strategy}:{timeframe.lower()}"
     if not TRAINING_SEMAPHORE.acquire(blocking=False):
         raise RuntimeError("ML_TRAINING_CAPACITY_BUSY")
     with LOCK:
@@ -1111,7 +1080,7 @@ def train_model(
             accepted_markets += 1
             total_bar_count += len(normalized)
             X_part, y_part, weights_part, sample_times, label_end_times = bars_to_training_arrays(
-                normalized, strategy, timeframe
+                normalized, strategy
             )
             if len(X_part) < 90:
                 continue
@@ -1261,8 +1230,8 @@ def train_model(
         validation_audit = {
             "strategy": strategy,
             "timeframe": timeframe.lower(),
-            "featureVersion": model_feature_version,
-            "strategyFocus": sorted(strategy_focus_for(strategy, timeframe) or set()),
+            "featureVersion": FEATURE_VERSION,
+            "strategyFocus": sorted(STRATEGY_FOCUS[strategy]),
             "validationType": validation_type,
             "marketsAccepted": accepted_markets,
             "marketsValidated": sum(1 for row in validation_markets if row.get("accepted")),
@@ -1314,7 +1283,7 @@ def train_model(
         print("[KINGBOT ML VALIDATION]", json.dumps({
             "strategy": strategy,
             "timeframe": timeframe.lower(),
-            "featureVersion": model_feature_version,
+            "featureVersion": FEATURE_VERSION,
             "rf": rf_metrics,
             "pytorch": torch_metrics,
             "ensemble": ensemble_metrics,
@@ -1340,7 +1309,7 @@ def train_model(
         with LOCK:
             incumbent = MODELS.get(key)
             incumbent_compatible = bool(
-                incumbent and incumbent.get("feature_version") == model_feature_version
+                incumbent and incumbent.get("feature_version") == FEATURE_VERSION
             )
             incumbent_score = float(incumbent.get("selection_score", 0.0)) if incumbent_compatible else 0.0
         promote = not incumbent_compatible or candidate_score >= incumbent_score - 0.0025
@@ -1369,7 +1338,7 @@ def train_model(
             "ensemble_macro_f1": ensemble_metrics["macroF1"],
             "quality_gate": quality_gate,
             "bar_count": total_bar_count,
-            "feature_version": model_feature_version,
+            "feature_version": FEATURE_VERSION,
             "validation": {
                 "type": validation_type,
                 "trainFraction": float(train_fraction),
@@ -1481,11 +1450,7 @@ def model_status(key: str) -> dict[str, Any]:
     }
 
 
-def current_market_features(
-    market: dict[str, Any],
-    strategy: str,
-    timeframe: str | None = None,
-) -> np.ndarray:
+def current_market_features(market: dict[str, Any], strategy: str) -> np.ndarray:
     """Build live features with the exact same OHLC extractor used during training."""
     if not isinstance(market, dict):
         raise ValueError("ML_PREDICT_MARKET_DATA_INVALID")
@@ -1507,8 +1472,7 @@ def current_market_features(
     if features is None:
         raise ValueError("ML_PREDICT_OHLC_FEATURES_UNAVAILABLE")
 
-    effective_timeframe = timeframe or market.get("timeframe")
-    values = apply_strategy_focus(features, strategy, effective_timeframe)
+    values = apply_strategy_focus(features, strategy)
     array = np.asarray([values], dtype=np.float32)
     if array.shape != (1, len(FEATURE_NAMES)) or not np.isfinite(array).all():
         raise ValueError("ML_PREDICT_FEATURES_INVALID")
@@ -1533,7 +1497,7 @@ def record_feedback(
     if not isinstance(market, dict):
         raise ValueError("ML_FEEDBACK_MARKET_REQUIRED")
 
-    features = current_market_features(market, strategy, timeframe)[0].astype(float).tolist()
+    features = current_market_features(market, strategy)[0].astype(float).tolist()
     label = 1 if normalized_direction == "BUY" else -1
     if normalized_outcome in {"LOSS", "INVALIDATED"}:
         label *= -1
@@ -1587,7 +1551,7 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
     try:
         if not bool(item.get("quality_gate", False)):
             return {"ok": True, "ready": False, "status": "MODEL_QUALITY_GATE_BLOCKED", "modelKey": key}
-        X = current_market_features(market, strategy, timeframe)
+        X = current_market_features(market, strategy)
         scaled = item["scaler"].transform(X).astype(np.float32)
 
         probs = ensemble_probabilities(item["rf"], item["torch"], scaled)[0]
@@ -1606,7 +1570,7 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
             direction = 0
         risk_mode = REGIME_RISK_MODE.get(regime, "neutral")
 
-        focus = strategy_focus_for(strategy, timeframe) or set()
+        focus = STRATEGY_FOCUS.get(strategy, set())
         focus_note = ",".join(sorted(focus))
 
         return {
