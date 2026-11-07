@@ -493,7 +493,9 @@ def bars_to_training_arrays(
             continue
         features = apply_strategy_focus(features, strategy)
         current = bars[index]["close"]
-        current_atr = atr(bars[: index + 1], 14)
+        # ATR(14) depends only on the latest 14 true ranges; keep the
+        # preceding close so this window is numerically identical to the full prefix.
+        current_atr = atr(bars[max(0, index - 14): index + 1], 14)
         if current <= 0 or not current_atr or current_atr <= 0:
             continue
 
@@ -954,7 +956,7 @@ def label_sensitivity_distribution(
         f"{float(value):.2f}": [] for value in fallback_values
     }
     for index in range(60, len(bars) - FORWARD_HORIZON):
-        current_atr = atr(bars[:index + 1], 14)
+        current_atr = atr(bars[max(0, index - 14):index + 1], 14)
         if current_atr is None or current_atr <= 0:
             continue
         for value in fallback_values:
