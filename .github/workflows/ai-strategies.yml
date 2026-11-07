@@ -126,6 +126,7 @@ jobs:
               assert result["validation"]["type"] == "global-common-window-purged-holdout", result
               assert result["dataset"]["marketCoverage"]["validatedMarkets"] >= 3, result
               assert len(result["dataset"]["marketCoverage"]["symbols"]) >= 3, result
+              assert len(result["dataset"]["labelSensitivityByMarket"]) >= 3, result
               trained.append(result["key"])
               prediction = service.predict_model(
                   strategy,
