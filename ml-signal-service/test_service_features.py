@@ -278,6 +278,31 @@ class EngineFeatureParityTests(unittest.TestCase):
             service.FEATURE_VERSION,
         )
 
+    def test_global_temporal_split_supports_a_disjoint_development_window(self):
+        times = np.arange(100, dtype=np.float64)
+        ends = times + 1.0
+        train, test, cutoff = service.global_temporal_split_masks(
+            times, ends, train_fraction=0.70, test_fraction=0.85
+        )
+        self.assertTrue(np.all(times[train] < cutoff))
+        self.assertTrue(np.all(ends[train] < cutoff))
+        self.assertTrue(np.all(times[test] >= cutoff))
+        self.assertTrue(np.all(times[test] < np.quantile(times, 0.85) + 2))
+        self.assertFalse(np.any(train & test))
+        self.assertGreater(int(train.sum()), 40)
+        self.assertGreater(int(test.sum()), 10)
+
+    def test_default_global_temporal_split_is_unchanged(self):
+        times = np.arange(100, dtype=np.float64)
+        ends = times + 1.0
+        old_train, old_test, old_cutoff = service.global_temporal_split_masks(times, ends)
+        new_train, new_test, new_cutoff = service.global_temporal_split_masks(
+            times, ends, train_fraction=0.78, test_fraction=1.0
+        )
+        np.testing.assert_array_equal(old_train, new_train)
+        np.testing.assert_array_equal(old_test, new_test)
+        self.assertEqual(old_cutoff, new_cutoff)
+
     def test_validation_measures_the_live_probability_blend(self):
         features = np.zeros((2, len(service.FEATURE_NAMES)), dtype=np.float32)
         probabilities = service.ensemble_probabilities(
