@@ -34,6 +34,7 @@ from technical_pattern_features import (  # noqa: E402
     SMC_FEATURE_NAMES,
     select_feature_columns,
     compute_pattern_feature_matrix,
+    asof_pattern_lookup,
 )
 from run_v122_hold_research import _detailed_metrics  # noqa: E402
 
@@ -78,23 +79,42 @@ class CortexTransformer(nn.Module):
         return self.head(encoded[:, self.seq_len - 1])
 
 
-def _append_pattern_windows(markets_by_timeframe: dict[str, Any], strategy: str,
-                            timeframe: str, base: dict[str, Any]) -> np.ndarray:
-    """Rebuild feature windows against identical broker timestamps from V12.1."""
-    windows_by_symbol: dict[str, np.ndarray] = {}
+def _build_pattern_panels(markets_by_timeframe: dict[str, Any], strategy: str,
+                          timeframe: str, base: dict[str, Any]) -> tuple[np.ndarray, np.ndarray]:
+    """Build target-sequence and closed-bar multi-timeframe pattern context panels."""
+    series_patterns: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    for source_tf in v12.TIMEFRAMES:
+        for row in markets_by_timeframe.get(source_tf, []):
+            if not isinstance(row, dict):
+                continue
+            symbol = str(row.get("symbol") or "").upper()
+            raw = row.get("bars")
+            if symbol not in v12.SYMBOLS or not isinstance(raw, list):
+                continue
+            bars = service.normalize_market_bars(raw)
+            if len(bars) < v12.SEQ + 60 + service.FORWARD_HORIZON + 50:
+                continue
+            open_times = np.asarray([bar.get("_timestamp", np.nan) for bar in bars], dtype=np.float64)
+            if not np.isfinite(open_times).all():
+                continue
+            key = f"{symbol}|{source_tf}"
+            feature_slice = slice(60, len(bars) - service.FORWARD_HORIZON)
+            series_patterns[key] = (
+                compute_pattern_feature_matrix(bars)[feature_slice],
+                open_times[feature_slice],
+            )
+
+    target_windows: dict[str, np.ndarray] = {}
     for row in markets_by_timeframe.get(timeframe, []):
         if not isinstance(row, dict):
             continue
         symbol = str(row.get("symbol") or "").upper()
-        raw = row.get("bars")
-        if symbol not in v12.SYMBOLS or not isinstance(raw, list):
+        key = f"{symbol}|{timeframe}"
+        if key not in series_patterns:
             continue
-        bars = service.normalize_market_bars(raw)
-        if len(bars) < v12.SEQ + 60 + service.FORWARD_HORIZON + 50:
-            continue
+        bars = service.normalize_market_bars(row.get("bars"))
         _, _, _, times, _ = service.bars_to_training_arrays(bars, strategy)
-        matrix = compute_pattern_feature_matrix(bars)
-        pattern_rows = matrix[60:len(bars) - service.FORWARD_HORIZON]
+        pattern_rows = series_patterns[key][0]
         if len(pattern_rows) != len(times):
             raise ValueError("V123_PATTERN_TARGET_TIME_ALIGNMENT_INVALID")
         if len(pattern_rows) < v12.SEQ:
@@ -102,35 +122,70 @@ def _append_pattern_windows(markets_by_timeframe: dict[str, Any], strategy: str,
         windows = np.lib.stride_tricks.sliding_window_view(
             pattern_rows, window_shape=v12.SEQ, axis=0
         ).transpose(0, 2, 1)
-        windows_by_symbol[symbol] = np.ascontiguousarray(windows, dtype=np.float32)
+        target_windows[symbol] = np.ascontiguousarray(windows, dtype=np.float32)
 
     ordered_symbols = list(dict.fromkeys(base["symbols"]))
-    missing = [symbol for symbol in ordered_symbols if symbol not in windows_by_symbol]
-    if missing:
-        raise ValueError("V123_PATTERN_SERIES_MISSING:" + ",".join(missing))
-    extra = np.concatenate([windows_by_symbol[symbol] for symbol in ordered_symbols], axis=0)
-    if extra.shape[:2] != base["X"].shape[:2] or extra.shape[0] != base["X"].shape[0]:
-        raise ValueError("V123_PATTERN_PANEL_ALIGNMENT_INVALID")
-    if not np.isfinite(extra).all():
-        raise ValueError("V123_PATTERN_PANEL_NONFINITE")
-    return extra
+    missing_symbols = [symbol for symbol in ordered_symbols if symbol not in target_windows]
+    if missing_symbols:
+        raise ValueError("V123_PATTERN_SERIES_MISSING:" + ",".join(missing_symbols))
+    target_panel = np.concatenate([target_windows[symbol] for symbol in ordered_symbols], axis=0)
+    if target_panel.shape[:2] != base["X"].shape[:2] or target_panel.shape[0] != base["X"].shape[0]:
+        raise ValueError("V123_PATTERN_TARGET_PANEL_ALIGNMENT_INVALID")
 
+    # Match V12's actual feature-bearing source rows: warm-up-only bars and
+    # forward-label tail rows are not valid cross-market context observations.
+    context_panel = np.zeros(
+        (len(base["times"]), len(base["slots"]), len(PATTERN_FEATURE_NAMES)),
+        dtype=np.float32,
+    )
+    target_keys = np.asarray(
+        [f"{symbol}|{timeframe}" for symbol in base["symbols"]], dtype=object
+    )
+    decision_times = base["times"] + float(v12.TF_SECONDS[timeframe])
+    missing_mask = np.asarray(base["M"], dtype=bool)
+    for slot, key in enumerate(base["slots"]):
+        if key not in series_patterns:
+            if np.any(~missing_mask[:, slot] & (target_keys != key)):
+                raise ValueError("V123_CONTEXT_PATTERN_SERIES_MISSING:" + key)
+            continue
+        pattern_matrix, source_open_times = series_patterns[key]
+        source_tf = key.split("|")[1]
+        looked_up, present = asof_pattern_lookup(
+            pattern_matrix, source_open_times, v12.TF_SECONDS[source_tf], decision_times
+        )
+        expected = (~missing_mask[:, slot]) & (target_keys != key)
+        if not np.array_equal(present & (target_keys != key), expected):
+            raise ValueError("V123_CONTEXT_AVAILABILITY_MISMATCH:" + key)
+        context_panel[expected, slot] = looked_up[expected]
+
+    if not np.isfinite(target_panel).all() or not np.isfinite(context_panel).all():
+        raise ValueError("V123_PATTERN_PANEL_NONFINITE")
+    return target_panel, context_panel
 
 def build_v123_dataset(markets_by_timeframe: dict[str, Any], strategy: str,
                         timeframe: str) -> dict[str, Any]:
     base = v12.build_dataset(markets_by_timeframe, strategy, timeframe)
-    pattern_windows = _append_pattern_windows(markets_by_timeframe, strategy, timeframe, base)
-    variants = {
-        name: select_feature_columns(base["X"], pattern_windows, name)
+    target_patterns, context_patterns = _build_pattern_panels(
+        markets_by_timeframe, strategy, timeframe, base
+    )
+    target_variants = {
+        name: select_feature_columns(base["X"], target_patterns, name)
         for name in VARIANTS
     }
-    for name, features in variants.items():
-        if features.shape[:2] != base["X"].shape[:2] or not np.isfinite(features).all():
+    context_variants = {
+        name: select_feature_columns(base["C"], context_patterns, name)
+        for name in VARIANTS
+    }
+    for name in VARIANTS:
+        if (target_variants[name].shape[:2] != base["X"].shape[:2]
+                or context_variants[name].shape[:2] != base["C"].shape[:2]
+                or not np.isfinite(target_variants[name]).all()
+                or not np.isfinite(context_variants[name]).all()):
             raise ValueError("V123_FEATURE_VARIANT_INVALID:" + name)
-    base["variants"] = variants
+    base["variants"] = target_variants
+    base["contextVariants"] = context_variants
     base["patternFeatureNames"] = list(PATTERN_FEATURE_NAMES)
     return base
-
 
 def _class_weights(train_y: np.ndarray) -> np.ndarray:
     labels = np.asarray([service.LABEL_TO_INDEX[int(value)] for value in train_y], dtype=np.int64)
@@ -208,9 +263,10 @@ def _run_fold(data: dict[str, Any], train_fraction: float, test_fraction: float,
     variant_results: dict[str, Any] = {}
     for variant in variants:
         X = data["variants"][variant]
+        context = data["contextVariants"][variant]
         probabilities = fit_predict(
-            X[train_mask], C[train_mask], M[train_mask], A[train_mask], train_y,
-            X[eval_mask], C[eval_mask], M[eval_mask], A[eval_mask],
+            X[train_mask], context[train_mask], M[train_mask], A[train_mask], train_y,
+            X[eval_mask], context[eval_mask], M[eval_mask], A[eval_mask],
         )
         model_metrics = _detailed_metrics(eval_y, probabilities)
         delta = model_metrics["selectionScore"] - baseline_metrics["selectionScore"]
@@ -324,7 +380,7 @@ def run(input_path: Path, output_path: Path) -> int:
         "architecture": {
             "model": "Two-layer Transformer encoder, 64-dimensional embeddings, four attention heads",
             "targetSequence": "32 closed-bar target candles with appended causal SMC/TA features",
-            "crossMarketContext": "V12.2 context tokens remain unchanged; context candles are available only after close",
+            "crossMarketContext": "causal SMC/TA feature vectors are also attached to cross-market context tokens using the last source feature candle closed by the target decision time",
             "featureGroups": {
                 "smc": list(SMC_FEATURE_NAMES),
                 "candlestick": list(CANDLE_FEATURE_NAMES),
