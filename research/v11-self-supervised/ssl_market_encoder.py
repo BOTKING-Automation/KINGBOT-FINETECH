@@ -54,9 +54,11 @@ class MaskedMarketEncoder(nn.Module):
     def encode(self, values: torch.Tensor, masked_steps: torch.Tensor | None = None) -> torch.Tensor:
         if values.ndim != 3 or values.shape[1:] != (self.sequence_length, self.input_features):
             raise ValueError("V11_ENCODER_INPUT_SHAPE_INVALID")
-        hidden = self.input_projection(values) + self.position
+        hidden = self.input_projection(values)
         if masked_steps is not None:
             hidden = torch.where(masked_steps.unsqueeze(-1), self.mask_token.expand_as(hidden), hidden)
+        # Keep positional information available at masked steps for reconstruction.
+        hidden = hidden + self.position
         return self.norm(self.encoder(hidden))
 
     def reconstruct(self, values: torch.Tensor, masked_steps: torch.Tensor) -> torch.Tensor:
@@ -165,7 +167,7 @@ def pretrain_and_finetune(train_x: np.ndarray, train_y: np.ndarray, eval_x: np.n
     return probabilities
 
 
-def matched_v9_probabilities(train_x: np.ndarray, train_y: np.ndarray, eval_x: np.ndarray) -> np.ndarray:
+def matched_v9_probabilities(train_x: np.ndarray, train_y: np.ndarray, eval_x: np.ndarray, eval_y: np.ndarray) -> np.ndarray:
     from sklearn.ensemble import RandomForestClassifier
     X_train, X_eval, y = np.asarray(train_x[:, -1, :], dtype=np.float32), np.asarray(eval_x[:, -1, :], dtype=np.float32), np.asarray(train_y, dtype=np.int64)
     scaler = StandardScaler().fit(X_train)
@@ -174,7 +176,8 @@ def matched_v9_probabilities(train_x: np.ndarray, train_y: np.ndarray, eval_x: n
     rf_prob = np.zeros((len(X_eval), 3), dtype=np.float64)
     for col, cls in enumerate(rf.classes_):
         rf_prob[:, service.LABEL_TO_INDEX[int(cls)]] = rf.predict_proba(X_eval)[:, col]
-    mlp, _ = service.train_torch(X_train, y, X_eval, np.zeros(len(X_eval), dtype=np.int64), scaler,
+    # eval_y is used only for diagnostic metrics; train_torch never uses it for updates.
+    mlp, _ = service.train_torch(X_train, y, X_eval, np.asarray(eval_y, dtype=np.int64), scaler,
         np.ones(len(X_train), dtype=np.float32))
     with torch.no_grad():
         mlp_prob = torch.softmax(mlp(torch.from_numpy(scaler.transform(X_eval).astype(np.float32))), dim=1).numpy()
@@ -204,7 +207,7 @@ def run_fold(dataset: dict[str, Any], train_fraction: float, test_fraction: floa
     X, y = dataset["X"], dataset["y"]
     train_x, train_y, test_x, test_y = X[train_mask], y[train_mask], X[test_mask], y[test_mask]
     ssl = pretrain_and_finetune(train_x, train_y, test_x)
-    baseline = matched_v9_probabilities(train_x, train_y, test_x)
+    baseline = matched_v9_probabilities(train_x, train_y, test_x, test_y)
     return {"cutoffTimestamp": float(cutoff), "trainSamples": int(len(train_y)),
         "ssl": metrics(test_y, ssl), "v9MatchedBaseline": metrics(test_y, baseline)}
 
