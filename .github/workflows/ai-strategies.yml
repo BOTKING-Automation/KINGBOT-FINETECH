@@ -40,6 +40,7 @@ on:
   pull_request:
     paths:
       - "ml-signal-service/**"
+      - "backend/scripts/v9-fetch-live-markets.mjs"
       - "backend/src/ml-signal-client.js"
       - "backend/src/ai-trade-gate.js"
       - "backend/src/bot-engines.js"
