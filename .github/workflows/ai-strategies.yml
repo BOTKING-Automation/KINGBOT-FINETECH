@@ -103,13 +103,29 @@ jobs:
               low = min(close, prev) - 0.7 - (i % 3) * 0.05
               bars.append({"open": prev, "high": high, "low": low, "close": close, "volume": 100 + (i % 20), "time": 1700000000 + i * 300})
 
-          market = {"symbol": "XAUUSD", "bars": bars}
+          markets = []
+          for market_index, symbol in enumerate(["XAUUSD", "EURUSD", "GBPUSD"]):
+              price_offset = market_index * 50.0
+              symbol_bars = [
+                  {
+                      **bar,
+                      "open": bar["open"] + price_offset,
+                      "high": bar["high"] + price_offset,
+                      "low": bar["low"] + price_offset,
+                      "close": bar["close"] + price_offset,
+                  }
+                  for bar in bars
+              ]
+              markets.append({"symbol": symbol, "bars": symbol_bars})
+
           trained = []
           for strategy in ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"]:
-              result = service.train_model(strategy, "5m", [market])
+              result = service.train_model(strategy, "5m", markets)
               assert result["ready"], result
-              assert result["featureVersion"].startswith("ai-strategies-v9-real-strategy-mask-barrier6-atr0.60-fallback0.35"), result
-              assert result["validation"]["type"] == "global-timestamped-purged-holdout", result
+              assert result["featureVersion"].startswith("ai-strategies-v10-common-window-market-coverage-real-strategy-mask-barrier6-atr0.60-fallback0.35"), result
+              assert result["validation"]["type"] == "global-common-window-purged-holdout", result
+              assert result["dataset"]["marketCoverage"]["validatedMarkets"] >= 3, result
+              assert len(result["dataset"]["marketCoverage"]["symbols"]) >= 3, result
               trained.append(result["key"])
               prediction = service.predict_model(
                   strategy,
