@@ -28,6 +28,7 @@ from sklearn.preprocessing import StandardScaler
 from torch import nn
 
 from model_store import load_model_artifacts, save_model_artifact
+from probability_calibration import apply_probability_temperature, probability_calibration_metrics
 
 
 HOST = "0.0.0.0"
@@ -1079,6 +1080,7 @@ def train_model(
     test_fraction: float = 1.0,
     ensemble_rf_weight: float | None = None,
     capture_validation_probabilities: bool = False,
+    probability_temperature: float | None = None,
 ) -> dict[str, Any]:
     if not MODEL_RESTORE_EVENT.wait(timeout=max(30, int(os.getenv("KINGBOT_ML_RESTORE_WAIT_SEC", "180")))):
         raise RuntimeError("ML_MODEL_RESTORE_PENDING")
@@ -1090,6 +1092,14 @@ def train_model(
         raise ValueError("ML_ENSEMBLE_RF_WEIGHT_INVALID")
     if not isinstance(capture_validation_probabilities, bool):
         raise ValueError("ML_VALIDATION_PROBABILITY_CAPTURE_FLAG_INVALID")
+    resolved_probability_temperature = (
+        1.0 if probability_temperature is None else finite(probability_temperature, math.nan)
+    )
+    if (
+        not math.isfinite(resolved_probability_temperature)
+        or not 0.5 <= resolved_probability_temperature <= 3.0
+    ):
+        raise ValueError("ML_PROBABILITY_TEMPERATURE_INVALID")
     if not TRAINING_SEMAPHORE.acquire(blocking=False):
         raise RuntimeError("ML_TRAINING_CAPACITY_BUSY")
     with LOCK:
@@ -1326,6 +1336,15 @@ def train_model(
             rf_probability_parts, torch_probability_parts, resolved_ensemble_rf_weight
         )
         ensemble_metrics = ensemble_class_metrics(y_test, ensemble_test_probabilities)
+        calibrated_test_probabilities = apply_probability_temperature(
+            ensemble_test_probabilities, resolved_probability_temperature
+        )
+        probability_calibration = {
+            "method": "multiclass-temperature-scaling",
+            "temperature": resolved_probability_temperature,
+            "raw": probability_calibration_metrics(y_test, ensemble_test_probabilities),
+            "calibrated": probability_calibration_metrics(y_test, calibrated_test_probabilities),
+        }
         if capture_validation_probabilities:
             print("[KINGBOT ML PROBABILITY AUDIT]", json.dumps({
                 "labels": y_test.tolist(),
@@ -1402,6 +1421,8 @@ def train_model(
             },
             "selection_score": candidate_score,
             "ensemble_rf_weight": resolved_ensemble_rf_weight,
+            "probability_temperature": resolved_probability_temperature,
+            "probability_calibration": probability_calibration,
             "promotion": "CHAMPION" if promote else "CHALLENGER",
             "promoted_at": trained_at if promote else None,
             "feedbackVersion": FEEDBACK_VERSION,
@@ -1457,6 +1478,7 @@ def train_model(
                 "pytorch": torch_metrics,
                 "ensemble": ensemble_metrics,
                 "ensembleRfWeight": resolved_ensemble_rf_weight,
+                "probabilityCalibration": probability_calibration,
                 "qualityGate": quality_gate,
             },
             "regimeAware": True,
@@ -1484,6 +1506,8 @@ def model_status(key: str) -> dict[str, Any]:
         "testSamples": item.get("test_samples", 0),
         "barCount": item["bar_count"],
         "ensembleRfWeight": round(float(item.get("ensemble_rf_weight", RF_ENSEMBLE_WEIGHT)), 3),
+        "probabilityTemperature": round(float(item.get("probability_temperature", 1.0)), 4),
+        "probabilityCalibration": item.get("probability_calibration", {"method": "multiclass-temperature-scaling", "status": "IDENTITY"}),
         "rfAccuracy": round(item["rf_accuracy"] * 100.0, 2),
         "rfBalancedAccuracy": round(item.get("rf_balanced_accuracy", 0.0) * 100.0, 2),
         "rfMacroF1": round(item.get("rf_macro_f1", 0.0) * 100.0, 2),
@@ -1610,12 +1634,16 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
         X = current_market_features(market, strategy)
         scaled = item["scaler"].transform(X).astype(np.float32)
 
-        probs = ensemble_probabilities(
-        item["rf"],
-        item["torch"],
-        scaled,
-        rf_weight=item.get("ensemble_rf_weight", RF_ENSEMBLE_WEIGHT),
-    )[0]
+        raw_probs = ensemble_probabilities(
+            item["rf"],
+            item["torch"],
+            scaled,
+            rf_weight=item.get("ensemble_rf_weight", RF_ENSEMBLE_WEIGHT),
+        )[0]
+        probability_temperature = float(item.get("probability_temperature", 1.0))
+        probs = apply_probability_temperature(
+            raw_probs.reshape(1, -1), probability_temperature
+        )[0]
         best_index = int(np.argmax(probs))
         direction = int(INDEX_TO_LABEL[best_index])
         confidence = float(probs[best_index])
@@ -1653,18 +1681,28 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
                 "hold": round(float(probs[1]) * 100.0, 2),
                 "buy": round(float(probs[2]) * 100.0, 2),
             },
+            "rawProbabilities": {
+                "sell": round(float(raw_probs[0]) * 100.0, 2),
+                "hold": round(float(raw_probs[1]) * 100.0, 2),
+                "buy": round(float(raw_probs[2]) * 100.0, 2),
+            },
+            "probabilityCalibration": {
+                "method": "multiclass-temperature-scaling",
+                "temperature": round(probability_temperature, 4),
+                "status": "CALIBRATED" if abs(probability_temperature - 1.0) > 1e-6 else "IDENTITY",
+            },
             "models": {
                 "scikitLearn": {
                     "accuracy": round(item["rf_accuracy"] * 100.0, 2),
                     "balancedAccuracy": round(item.get("rf_balanced_accuracy", 0.0) * 100.0, 2),
                     "macroF1": round(item.get("rf_macro_f1", 0.0) * 100.0, 2),
-                    "weight": 0.55,
+                    "weight": round(float(item.get("ensemble_rf_weight", RF_ENSEMBLE_WEIGHT)), 4),
                 },
                 "pytorch": {
                     "accuracy": round(item["torch_accuracy"] * 100.0, 2),
                     "balancedAccuracy": round(item.get("torch_balanced_accuracy", 0.0) * 100.0, 2),
                     "macroF1": round(item.get("torch_macro_f1", 0.0) * 100.0, 2),
-                    "weight": 0.45,
+                    "weight": round(1.0 - float(item.get("ensemble_rf_weight", RF_ENSEMBLE_WEIGHT)), 4),
                 },
             },
             "focusFeatures": focus_note,
