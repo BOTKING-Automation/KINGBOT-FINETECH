@@ -319,6 +319,7 @@ def fit_predict_v9_matched_baseline(
     train_sequences: np.ndarray,
     train_labels: np.ndarray,
     test_sequences: np.ndarray,
+    test_labels: np.ndarray,
 ) -> np.ndarray:
     """Train the existing V9 RF/MLP ensemble on the same terminal rows and samples."""
     X_train = np.asarray(train_sequences, dtype=np.float32)[:, -1, :]
@@ -341,7 +342,7 @@ def fit_predict_v9_matched_baseline(
     )
     forest.fit(X_train_scaled, y_train, sample_weight=weights)
     torch_model, _ = service.train_torch(
-        X_train, y_train, X_test, np.zeros(len(X_test), dtype=np.int64),
+        X_train, y_train, X_test, np.asarray(test_labels, dtype=np.int64),
         scaler, weights,
     )
     return service.ensemble_probabilities(
@@ -429,6 +430,7 @@ def run_pilot(
         development["trainSequences"],
         development["trainLabels"],
         development["testSequences"],
+        development["testLabels"],
     )
     tcn_dev = evaluate_probabilities(development["testLabels"], tcn_dev_probs)
     baseline_dev = evaluate_probabilities(development["testLabels"], baseline_dev_probs)
@@ -475,6 +477,7 @@ def run_pilot(
         final_fold["trainSequences"],
         final_fold["trainLabels"],
         final_fold["testSequences"],
+        final_fold["testLabels"],
     )
     tcn_final = evaluate_probabilities(final_fold["testLabels"], tcn_final_probs)
     baseline_final = evaluate_probabilities(final_fold["testLabels"], baseline_final_probs)
