@@ -26,4 +26,4 @@ Preserve V9 gates: balanced accuracy >=0.36, macro-F1 >=0.34, at least 30 final 
 
 One representative timeframe per specialist is evaluated in the pilot, not all three production timeframes. A candidate still requires all-timeframe validation, regime-separated analysis, execution-aware cost backtesting and shadow evaluation. No model weights are persisted, registered, promoted or deployed.
 
-The V12 CI workflow is deliberately held until the V11 untouched-final report has been inspected, avoiding overlapping experimental training runs.
+Lightweight syntax/regression validation runs automatically. The compute-intensive five-pilot research workflow is separately gated by the run-v12-research pull-request label and is started only after the V11 report has been inspected.
