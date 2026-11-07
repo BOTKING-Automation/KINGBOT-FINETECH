@@ -39,6 +39,7 @@ class ModelArtifactRoundTripTests(unittest.TestCase):
             "timeframe": "4h",
             "samples": int(len(X)),
             "quality_gate": True,
+            "probability_temperature": 1.35,
             "selection_score": 0.51,
             "validation": {"type": "test", "balancedAccuracy": 0.5},
         }
@@ -55,6 +56,7 @@ class ModelArtifactRoundTripTests(unittest.TestCase):
         self.assertEqual(restored["strategy"], "strategic")
         self.assertEqual(restored["timeframe"], "4h")
         self.assertEqual(restored["samples"], len(X))
+        self.assertAlmostEqual(restored["probability_temperature"], 1.35)
         self.assertTrue(np.allclose(before, after, atol=1e-6, rtol=1e-6))
 
 
