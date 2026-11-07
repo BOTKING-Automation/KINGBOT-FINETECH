@@ -28,7 +28,7 @@ from sklearn.preprocessing import StandardScaler
 from torch import nn
 
 from model_store import load_model_artifacts, save_model_artifact
-from probability_calibration import apply_probability_temperature, probability_calibration_metrics
+from probability_calibration import apply_probability_temperature, fit_probability_temperature, probability_calibration_metrics
 
 
 HOST = "0.0.0.0"
