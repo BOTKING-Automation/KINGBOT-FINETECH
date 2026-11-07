@@ -298,6 +298,18 @@ class EngineFeatureParityTests(unittest.TestCase):
                 times, ends, group_slices=[(0, 100), (100, 200)]
             )
 
+    def test_training_rejects_candidates_without_minimum_market_coverage(self):
+        self.assertEqual(service.MIN_VALIDATION_MARKETS, 3)
+        with self.assertRaisesRegex(
+            ValueError,
+            "ML_TRAINING_MARKET_COVERAGE_INSUFFICIENT",
+        ):
+            service.train_model(
+                "strategic",
+                "5m",
+                [{"symbol": "XAUUSD", "bars": make_bars(240)}],
+            )
+
     def test_class_distribution_reports_buy_sell_hold_counts(self):
         distribution = service.class_distribution(
             np.asarray([-1, -1, 0, 1, 1, 1], dtype=np.int64)
