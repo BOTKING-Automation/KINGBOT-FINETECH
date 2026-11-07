@@ -238,6 +238,51 @@ class EngineFeatureParityTests(unittest.TestCase):
         bars[entry_index + 1].update({"high": entry + 0.8, "low": entry - 0.8, "close": entry})
         self.assertEqual(service.triple_barrier_label(bars, entry_index, 1.0, horizon=6, barrier_atr=0.6), 0)
 
+    def test_triple_barrier_fallback_sensitivity_controls_neutral_labels(self):
+        bars = [
+            {"open": 100.0, "high": 100.2, "low": 99.8, "close": 100.0, "volume": 100.0}
+            for _ in range(80)
+        ]
+        entry_index = 60
+        bars[entry_index]["close"] = 100.0
+        for offset in range(1, 7):
+            bars[entry_index + offset] = {
+                "open": 100.0,
+                "high": 100.55,
+                "low": 99.80,
+                "close": 100.0 + (0.45 if offset == 6 else 0.15 * offset / 6),
+                "volume": 100.0,
+            }
+
+        self.assertEqual(
+            service.triple_barrier_label(
+                bars, entry_index, 1.0, horizon=6, barrier_atr=0.6, fallback_atr=0.35
+            ),
+            1,
+        )
+        self.assertEqual(
+            service.triple_barrier_label(
+                bars, entry_index, 1.0, horizon=6, barrier_atr=0.6, fallback_atr=0.6
+            ),
+            0,
+        )
+
+    def test_label_sensitivity_distribution_is_diagnostic_and_non_empty(self):
+        bars = make_bars(180)
+        result = service.label_sensitivity_distribution(bars)
+        self.assertEqual(set(result), {"0.35", "0.45", "0.55", "0.60"})
+        for distribution in result.values():
+            self.assertGreater(distribution["samples"], 0)
+            self.assertEqual(
+                set(distribution["counts"]),
+                {"SELL", "HOLD", "BUY"},
+            )
+            self.assertAlmostEqual(
+                sum(distribution["ratios"].values()),
+                1.0,
+                places=3,
+            )
+
     def test_triple_barrier_ignores_moves_after_horizon(self):
         bars = make_bars(80)
         entry_index = 60
