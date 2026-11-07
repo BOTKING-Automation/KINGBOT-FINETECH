@@ -446,10 +446,12 @@ def triple_barrier_label(
     atr_value: float,
     horizon: int | None = None,
     barrier_atr: float | None = None,
+    fallback_atr: float | None = None,
 ) -> int:
     """Label the first directional ATR barrier touched; same-candle double hits abstain."""
     forward = FORWARD_HORIZON if horizon is None else max(1, int(horizon))
     barrier = LABEL_ATR if barrier_atr is None else max(0.1, float(barrier_atr))
+    fallback = LABEL_FALLBACK_ATR if fallback_atr is None else max(0.1, min(barrier, float(fallback_atr)))
     if atr_value <= 0 or index < 0 or index + forward >= len(bars):
         return 0
 
@@ -469,9 +471,9 @@ def triple_barrier_label(
             return -1
 
     final_move_atr = (float(bars[index + forward]["close"]) - entry) / atr_value
-    if final_move_atr >= LABEL_FALLBACK_ATR:
+    if final_move_atr >= fallback:
         return 1
-    if final_move_atr <= -LABEL_FALLBACK_ATR:
+    if final_move_atr <= -fallback:
         return -1
     return 0
 
@@ -930,6 +932,47 @@ def global_temporal_split_masks(
     return train_mask, test_mask, cutoff
 
 
+def class_distribution(labels: np.ndarray) -> dict[str, Any]:
+    """Return explicit SELL/HOLD/BUY counts and proportions for a V9 audit."""
+    values = np.asarray(labels, dtype=np.int64)
+    total = int(values.size)
+    names = {-1: "SELL", 0: "HOLD", 1: "BUY"}
+    counts = {name: int(np.sum(values == label)) for label, name in names.items()}
+    ratios = {
+        name: round(count / total, 4) if total else 0.0
+        for name, count in counts.items()
+    }
+    return {"samples": total, "counts": counts, "ratios": ratios}
+
+
+def label_sensitivity_distribution(
+    bars: list[dict[str, float]],
+    fallback_values: tuple[float, ...] = (0.35, 0.45, 0.55, 0.60),
+) -> dict[str, dict[str, Any]]:
+    """Audit the V9 triple-barrier fallback sensitivity without changing live labels."""
+    labels_by_fallback: dict[str, list[int]] = {
+        f"{float(value):.2f}": [] for value in fallback_values
+    }
+    for index in range(60, len(bars) - FORWARD_HORIZON):
+        current_atr = atr(bars[:index + 1], 14)
+        if current_atr is None or current_atr <= 0:
+            continue
+        for value in fallback_values:
+            key = f"{float(value):.2f}"
+            labels_by_fallback[key].append(
+                triple_barrier_label(
+                    bars,
+                    index,
+                    current_atr,
+                    fallback_atr=float(value),
+                )
+            )
+    return {
+        key: class_distribution(np.asarray(values, dtype=np.int64))
+        for key, values in labels_by_fallback.items()
+    }
+
+
 def ensemble_probabilities(rf: Any, torch_model: nn.Module, scaled_features: np.ndarray) -> np.ndarray:
     """Return the RF/PyTorch probability blend used during live inference."""
     rf_raw = rf.predict_proba(scaled_features)
@@ -1008,6 +1051,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "weights": weights_part,
                 "sample_times": sample_times,
                 "label_end_times": label_end_times,
+                "label_sensitivity": label_sensitivity_distribution(normalized),
             })
 
         if not market_parts:
@@ -1047,6 +1091,9 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                     "samples": count,
                     "trainSamples": train_count,
                     "testSamples": test_count,
+                    "trainClassDistribution": class_distribution(part["y"][local_train]),
+                    "testClassDistribution": class_distribution(part["y"][local_test]),
+                    "labelSensitivity": part["label_sensitivity"],
                     "splitTimestamp": split_timestamp,
                     "embargo": "label-end-before-global-cutoff",
                 })
@@ -1077,6 +1124,9 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                     "samples": len(part["X"]),
                     "trainSamples": len(X_train_part),
                     "testSamples": len(X_test_part),
+                    "trainClassDistribution": class_distribution(y_train_part),
+                    "testClassDistribution": class_distribution(y_test_part),
+                    "labelSensitivity": part["label_sensitivity"],
                     "embargoBars": int(test_start - train_end),
                 })
                 if eligible:
@@ -1125,6 +1175,27 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
 
         train_classes = sorted(set(int(v) for v in y_train))
         test_classes = sorted(set(int(v) for v in y_test))
+        train_label_distribution = class_distribution(y_train)
+        test_label_distribution = class_distribution(y_test)
+        validation_audit = {
+            "strategy": strategy,
+            "timeframe": timeframe.lower(),
+            "featureVersion": FEATURE_VERSION,
+            "strategyFocus": sorted(STRATEGY_FOCUS[strategy]),
+            "validationType": validation_type,
+            "marketsAccepted": accepted_markets,
+            "marketsValidated": sum(1 for row in validation_markets if row.get("accepted")),
+            "marketCount": len(validation_markets),
+            "barCount": total_bar_count,
+            "trainClassDistribution": train_label_distribution,
+            "testClassDistribution": test_label_distribution,
+            "perMarket": validation_markets,
+            "labelSensitivityByMarket": [
+                {"symbol": row["symbol"], "fallbacks": row.get("labelSensitivity", {})}
+                for row in validation_markets
+            ],
+        }
+        print("[KINGBOT ML AUDIT]", json.dumps(validation_audit, sort_keys=True))
         if len(train_classes) < 3:
             raise ValueError("ML_TRAINING_REQUIRES_BUY_SELL_HOLD_TRAIN_CLASSES")
         if len(test_classes) < 2:
@@ -1257,6 +1328,10 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "testSamples": int(len(X_test)),
                 "classesTrain": train_classes,
                 "classesTest": test_classes,
+                "classDistributionTrain": train_label_distribution,
+                "classDistributionTest": test_label_distribution,
+                "marketValidation": validation_markets,
+                "labelSensitivityByMarket": validation_audit["labelSensitivityByMarket"],
                 "forwardBars": FORWARD_HORIZON,
                 "labelAtr": LABEL_ATR,
                 "temporalAlignment": "GLOBAL_TIMESTAMPED" if timestamped else "PER_MARKET_FALLBACK",
