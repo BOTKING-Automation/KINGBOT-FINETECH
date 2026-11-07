@@ -155,7 +155,7 @@ def restore_persisted_models() -> None:
                     record = deserialize_model_record(artifact_bytes)
                     if not isinstance(record, dict):
                         continue
-                    # Feature/label semantics changed in v7; never load incompatible v6 weights.
+                    # Load only artifacts produced by this exact feature/label schema version.
                     if record.get("feature_version") != FEATURE_VERSION:
                         continue
                     if kind == "champion":
@@ -1159,7 +1159,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
             validation_type = "per-market-temporal-holdout-with-label-embargo"
 
         validated_markets = sum(1 for row in validation_markets if row.get("accepted"))
-        required_markets = min(MIN_VALIDATION_MARKETS, len(market_parts))
+        required_markets = MIN_VALIDATION_MARKETS
         if validated_markets < required_markets:
             raise ValueError(
                 "ML_TRAINING_MARKET_COVERAGE_INSUFFICIENT:"
