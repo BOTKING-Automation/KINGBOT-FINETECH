@@ -995,13 +995,35 @@ def ensemble_probabilities(rf: Any, torch_model: nn.Module, scaled_features: np.
     return blended / np.maximum(blended.sum(axis=1, keepdims=True), 1e-12)
 
 
-def ensemble_class_metrics(y_true: np.ndarray, probabilities: np.ndarray) -> dict[str, float]:
+def ensemble_class_metrics(y_true: np.ndarray, probabilities: np.ndarray) -> dict[str, Any]:
     predicted_indices = np.argmax(probabilities, axis=1)
     predicted = np.asarray([INDEX_TO_LABEL[int(value)] for value in predicted_indices], dtype=np.int64)
+    per_class: dict[str, dict[str, float | int]] = {}
+    confusion: list[list[int]] = []
+    for actual in LABELS:
+        confusion.append([
+            int(np.sum((y_true == actual) & (predicted == predicted_label)))
+            for predicted_label in LABELS
+        ])
+    for label, name in ((-1, "SELL"), (0, "HOLD"), (1, "BUY")):
+        true_positive = int(np.sum((y_true == label) & (predicted == label)))
+        false_positive = int(np.sum((y_true != label) & (predicted == label)))
+        false_negative = int(np.sum((y_true == label) & (predicted != label)))
+        support = int(np.sum(y_true == label))
+        precision = true_positive / max(1, true_positive + false_positive)
+        recall = true_positive / max(1, true_positive + false_negative)
+        per_class[name] = {
+            "precision": float(precision),
+            "recall": float(recall),
+            "f1": float(2.0 * precision * recall / max(1e-12, precision + recall)),
+            "support": support,
+        }
     return {
         "accuracy": float(accuracy_score(y_true, predicted)),
         "balancedAccuracy": float(balanced_accuracy_score(y_true, predicted)),
         "macroF1": float(f1_score(y_true, predicted, average="macro", zero_division=0)),
+        "perClass": per_class,
+        "confusionMatrix": {"labels": ["SELL", "HOLD", "BUY"], "counts": confusion},
     }
 
 
@@ -1231,6 +1253,15 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
 
         ensemble_test_probabilities = ensemble_probabilities(rf, torch_model, X_test_scaled)
         ensemble_metrics = ensemble_class_metrics(y_test, ensemble_test_probabilities)
+
+        print("[KINGBOT ML VALIDATION]", json.dumps({
+            "strategy": strategy,
+            "timeframe": timeframe.lower(),
+            "featureVersion": FEATURE_VERSION,
+            "rf": rf_metrics,
+            "pytorch": torch_metrics,
+            "ensemble": ensemble_metrics,
+        }, sort_keys=True))
 
         quality_gate = (
             ensemble_metrics["balancedAccuracy"] >= 0.36
