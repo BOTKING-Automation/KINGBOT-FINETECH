@@ -71,7 +71,10 @@ def build_dataset(markets_by_timeframe: dict[str, Any], strategy: str,
         raise ValueError("V12_TIMEFRAME_OR_SEQUENCE_INVALID")
     series, coverage = {}, []
     for tf in TIMEFRAMES:
-        for row in markets_by_timeframe.get(tf, []) if isinstance(markets_by_timeframe.get(tf, []), list) else []:
+        rows = markets_by_timeframe.get(tf, [])
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
             if not isinstance(row, dict):
                 continue
             symbol, raw = str(row.get("symbol") or "").upper(), row.get("bars")
