@@ -3,7 +3,7 @@ import path from "node:path";
 import { getDerivMarketFeed } from "../src/deriv-market-feed.js";
 
 const OUTPUT = process.argv[2] || "/tmp/kingbot-v9-live-markets.json";
-const HISTORY_LIMIT = Math.max(360, Math.min(1000, Number(process.env.KINGBOT_V9_HISTORY_LIMIT || 600)));
+const HISTORY_LIMIT = Math.max(360, Math.min(1000, Number(process.env.KINGBOT_V9_HISTORY_LIMIT || 1000)));
 const SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"];
 const API_BASE = "https://api.binance.com/api/v3/klines";
@@ -68,6 +68,42 @@ async function fetchBitcoinBars(timeframe) {
   }
 }
 
+async function fetchDerivBars(feed, symbol, timeframe) {
+  const merged = new Map();
+  let end = "latest";
+  let previousOldestEpoch = Infinity;
+  const maxPages = Math.max(2, Math.ceil(HISTORY_LIMIT / 450) + 1);
+
+  for (let page = 0; page < maxPages && merged.size < HISTORY_LIMIT; page++) {
+    const chunk = await feed.getHistoricalCandles(symbol, {
+      timeframe,
+      limit: 500,
+      timeoutMs: 15000,
+      end
+    });
+    if (!Array.isArray(chunk) || chunk.length < 20) {
+      if (!merged.size) throw new Error("DERIV_HISTORICAL_CANDLES_INSUFFICIENT");
+      break;
+    }
+
+    for (const bar of chunk) {
+      const timestamp = Date.parse(bar.time);
+      if (Number.isFinite(timestamp)) merged.set(timestamp, bar);
+    }
+
+    const oldestEpoch = Math.floor(Math.min(...chunk.map(bar => Date.parse(bar.time))) / 1000);
+    if (!Number.isFinite(oldestEpoch) || oldestEpoch >= previousOldestEpoch) break;
+    previousOldestEpoch = oldestEpoch;
+    end = oldestEpoch - 1;
+    if (chunk.length < 450) break;
+  }
+
+  return [...merged.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, bar]) => bar)
+    .slice(-HISTORY_LIMIT);
+}
+
 async function fetchYahoo1mBars(symbol) {
   const ticker = YAHOO_TICKERS_1M[symbol];
   if (!ticker) throw new Error("YAHOO_1M_TICKER_NOT_CONFIGURED");
@@ -119,13 +155,9 @@ async function main() {
             source = fetched.source;
           } else {
             try {
-              bars = await feed.getHistoricalCandles(symbol, {
-                timeframe,
-                limit: HISTORY_LIMIT,
-                timeoutMs: 15000
-              });
+              bars = await fetchDerivBars(feed, symbol, timeframe);
               bars = bars.slice(0, -1);
-              source = "DERIV_PUBLIC_HISTORICAL_CANDLES";
+              source = "DERIV_PUBLIC_HISTORICAL_CANDLES_PAGED";
               if (timeframe === "1m" && bars.length < 360) {
                 throw new Error("DERIV_1M_HISTORY_TOO_SHORT:" + bars.length);
               }
