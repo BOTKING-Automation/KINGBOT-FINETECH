@@ -9,6 +9,7 @@ from technical_pattern_features import (
     SMC_FEATURE_NAMES,
     compute_pattern_feature_matrix,
     select_feature_columns,
+    asof_pattern_lookup,
 )
 
 
@@ -72,6 +73,22 @@ class V123TechnicalPatternTests(unittest.TestCase):
         self.assertEqual(select_feature_columns(base, patterns, "smc_only").shape, (4, 32, 28 + len(SMC_FEATURE_NAMES)))
         self.assertEqual(select_feature_columns(base, patterns, "technical_patterns_only").shape, (4, 32, 28 + len(CANDLE_FEATURE_NAMES) + len(CHART_PATTERN_FEATURE_NAMES)))
         self.assertEqual(select_feature_columns(base, patterns, "full_cortex").shape, (4, 32, 28 + len(FEATURE_NAMES)))
+
+    def test_asof_context_uses_only_closed_feature_bars(self):
+        patterns = np.zeros((3, len(FEATURE_NAMES)), dtype=np.float32)
+        patterns[:, 0] = [0.1, 0.2, 0.3]
+        opens = np.asarray([0.0, 60.0, 120.0])
+        decisions = np.asarray([59.0, 60.0, 119.0, 120.0, 180.0])
+        values, present = asof_pattern_lookup(patterns, opens, 60, decisions)
+        np.testing.assert_array_equal(present, [False, True, True, True, True])
+        np.testing.assert_allclose(values[:, 0], [0.0, 0.1, 0.1, 0.2, 0.3])
+
+    def test_asof_context_rejects_unsorted_source_timestamps(self):
+        patterns = np.zeros((2, len(FEATURE_NAMES)), dtype=np.float32)
+        with self.assertRaises(ValueError):
+            asof_pattern_lookup(
+                patterns, np.asarray([60.0, 0.0]), 60, np.asarray([120.0])
+            )
 
     def test_invalid_ohlc_is_rejected(self):
         with self.assertRaises(ValueError):
