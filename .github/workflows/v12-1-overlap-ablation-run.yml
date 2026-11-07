@@ -1,0 +1,54 @@
+name: KINGBOT V12.1 Overlap and Context Ablation Research
+
+on:
+  push:
+    branches: [v12-1-overlap-ablation-research]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  research:
+    if: github.ref == 'refs/heads/v12-1-overlap-ablation-research' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ML dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ml-signal-service/requirements.txt
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package.json
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Validate fetcher and research suite
+        run: |
+          node --check backend/scripts/v9-fetch-live-markets.mjs
+          python -m py_compile ml-signal-service/service.py research/v12-multivariate/multivariate_transformer.py research/v12-multivariate/run_multivariate_research.py
+          python -m unittest discover -s research/v12-multivariate -p "test_*.py"
+      - name: Fetch extended closed market history
+        run: node backend/scripts/v9-fetch-live-markets.mjs /tmp/kingbot-v121-input.json
+      - name: Run V12.1 controlled ablations
+        run: python research/v12-multivariate/run_multivariate_research.py /tmp/kingbot-v121-input.json /tmp/kingbot-v121-report.json
+      - name: Upload V12.1 report and input data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kingbot-v121-overlap-ablation-research
+          path: |
+            /tmp/kingbot-v121-input.json
+            /tmp/kingbot-v121-report.json
+          if-no-files-found: warn
+          retention-days: 14
