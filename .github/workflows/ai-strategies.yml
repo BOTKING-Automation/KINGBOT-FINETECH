@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "ml-signal-service/**"
+      - "backend/scripts/v9-fetch-live-markets.mjs"
       - "backend/src/ml-signal-client.js"
       - "backend/test/ml-signal-client.test.js"
       - "backend/src/ai-trade-gate.js"
@@ -63,7 +64,7 @@ on:
 jobs:
   ai-strategies:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -158,8 +159,28 @@ jobs:
         working-directory: backend
         run: npm install --omit=dev
 
+      - name: Fetch closed real-market candles for V9
+        run: |
+          node backend/scripts/v9-fetch-live-markets.mjs /tmp/kingbot-v9-live-markets.json
+
+      - name: Run complete V9 real-market training cycle
+        run: |
+          python ml-signal-service/v9_live_training_audit.py /tmp/kingbot-v9-live-markets.json /tmp/kingbot-v9-training-report.json
+
+      - name: Upload V9 training audit and input data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kingbot-v9-real-market-training-audit
+          path: |
+            /tmp/kingbot-v9-live-markets.json
+            /tmp/kingbot-v9-training-report.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Node syntax check
         run: |
+          node --check backend/scripts/v9-fetch-live-markets.mjs
           node --check backend/src/ml-signal-client.js
           node --check backend/test/ml-signal-client.test.js
           node --check backend/src/ai-trade-gate.js
