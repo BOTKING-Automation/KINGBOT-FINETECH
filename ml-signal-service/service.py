@@ -38,6 +38,7 @@ MIN_BARS = max(120, int(os.getenv("KINGBOT_ML_MIN_BARS", "150")))
 FORWARD_HORIZON = max(1, int(os.getenv("KINGBOT_ML_FORWARD_BARS", "6")))
 LABEL_ATR = max(0.1, min(3.0, float(os.getenv("KINGBOT_ML_LABEL_ATR", "0.6"))))
 LABEL_FALLBACK_ATR = max(0.1, min(LABEL_ATR, float(os.getenv("KINGBOT_ML_LABEL_FALLBACK_ATR", "0.35"))))
+LABEL_SENSITIVITY_FALLBACKS = (0.35, 0.45, 0.55, 0.60)
 MAX_MODELS = max(10, int(os.getenv("KINGBOT_ML_MAX_MODELS", "50")))
 MAX_MARKETS = max(1, int(os.getenv("KINGBOT_ML_MAX_MARKETS", "12")))
 MIN_VALIDATION_MARKETS = min(
@@ -450,10 +451,12 @@ def triple_barrier_label(
     atr_value: float,
     horizon: int | None = None,
     barrier_atr: float | None = None,
+    fallback_atr: float | None = None,
 ) -> int:
-    """Label the first directional ATR barrier touched; same-candle double hits abstain."""
+    """Label first barrier touch; fallback marks a directional close at the time barrier."""
     forward = FORWARD_HORIZON if horizon is None else max(1, int(horizon))
     barrier = LABEL_ATR if barrier_atr is None else max(0.1, float(barrier_atr))
+    fallback = LABEL_FALLBACK_ATR if fallback_atr is None else max(0.1, float(fallback_atr))
     if atr_value <= 0 or index < 0 or index + forward >= len(bars):
         return 0
 
@@ -473,9 +476,9 @@ def triple_barrier_label(
             return -1
 
     final_move_atr = (float(bars[index + forward]["close"]) - entry) / atr_value
-    if final_move_atr >= LABEL_FALLBACK_ATR:
+    if final_move_atr >= fallback:
         return 1
-    if final_move_atr <= -LABEL_FALLBACK_ATR:
+    if final_move_atr <= -fallback:
         return -1
     return 0
 
@@ -988,6 +991,37 @@ def class_distribution(labels: np.ndarray) -> dict[str, Any]:
     }
     return {"samples": total, "counts": counts, "ratios": ratios}
 
+def label_sensitivity_distribution(
+    bars: list[dict[str, float]],
+    fallback_values: tuple[float, ...] = LABEL_SENSITIVITY_FALLBACKS,
+) -> dict[str, dict[str, Any]]:
+    """Audit SELL/HOLD/BUY balance across alternative time-barrier fallbacks.
+
+    This is diagnostic only: it does not alter labels used by the current model.
+    """
+    labels_by_fallback: dict[str, list[int]] = {
+        f"{float(value):.2f}": [] for value in fallback_values
+    }
+    for index in range(60, len(bars) - FORWARD_HORIZON):
+        current_atr = atr(bars[:index + 1], 14)
+        if current_atr is None or current_atr <= 0:
+            continue
+        for value in fallback_values:
+            key = f"{float(value):.2f}"
+            labels_by_fallback[key].append(
+                triple_barrier_label(
+                    bars,
+                    index,
+                    current_atr,
+                    fallback_atr=float(value),
+                )
+            )
+    return {
+        key: class_distribution(np.asarray(values, dtype=np.int64))
+        for key, values in labels_by_fallback.items()
+    }
+
+
 def ensemble_probabilities(rf: Any, torch_model: nn.Module, scaled_features: np.ndarray) -> np.ndarray:
     """Return the RF/PyTorch probability blend used during live inference."""
     rf_raw = rf.predict_proba(scaled_features)
@@ -1066,6 +1100,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "weights": weights_part,
                 "sample_times": sample_times,
                 "label_end_times": label_end_times,
+                "label_sensitivity": label_sensitivity_distribution(normalized),
             })
 
         if not market_parts:
@@ -1116,6 +1151,7 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                     "testSamples": test_count,
                     "trainClassDistribution": class_distribution(part["y"][local_train]),
                     "testClassDistribution": class_distribution(part["y"][local_test]),
+                    "labelSensitivity": part["label_sensitivity"],
                     "splitTimestamp": split_timestamp,
                     "embargo": "label-end-before-global-cutoff",
                 })
@@ -1355,6 +1391,10 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 "classesTest": test_classes,
                 "classDistributionTrain": train_label_distribution,
                 "classDistributionTest": test_label_distribution,
+                "labelSensitivityByMarket": [
+                    {"symbol": row["symbol"], "fallbacks": row["labelSensitivity"]}
+                    for row in validation_markets if row.get("accepted")
+                ],
                 "forwardBars": FORWARD_HORIZON,
                 "labelAtr": LABEL_ATR,
                 "temporalAlignment": "GLOBAL_TIMESTAMPED" if timestamped else "PER_MARKET_FALLBACK",
