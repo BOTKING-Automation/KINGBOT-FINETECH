@@ -986,10 +986,15 @@ def label_sensitivity_distribution(
     }
 
 
-def ensemble_probabilities(rf: Any, torch_model: nn.Module, scaled_features: np.ndarray) -> np.ndarray:
-    """Return the RF/PyTorch probability blend used during live inference."""
-    rf_raw = rf.predict_proba(scaled_features)
-    rf_aligned = np.zeros((len(scaled_features), len(LABELS)), dtype=np.float32)
+def ensemble_component_probabilities(
+    rf: Any,
+    torch_model: nn.Module,
+    scaled_features: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return class-aligned RF and PyTorch probabilities before blending."""
+    X = np.asarray(scaled_features, dtype=np.float32)
+    rf_raw = rf.predict_proba(X)
+    rf_aligned = np.zeros((len(X), len(LABELS)), dtype=np.float32)
     for column, label in enumerate(rf.classes_):
         label_index = LABEL_TO_INDEX.get(int(label))
         if label_index is not None:
@@ -998,13 +1003,41 @@ def ensemble_probabilities(rf: Any, torch_model: nn.Module, scaled_features: np.
     torch_model.eval()
     with torch.no_grad():
         torch_raw = torch.softmax(
-            torch_model(torch.from_numpy(np.asarray(scaled_features, dtype=np.float32))),
+            torch_model(torch.from_numpy(X)),
             dim=1,
         ).cpu().numpy().astype(np.float32)
+    return rf_aligned, torch_raw
 
-    blended = rf_aligned * RF_ENSEMBLE_WEIGHT + torch_raw * TORCH_ENSEMBLE_WEIGHT
+
+def blend_probability_parts(
+    rf_probabilities: np.ndarray,
+    torch_probabilities: np.ndarray,
+    rf_weight: float,
+) -> np.ndarray:
+    """Blend aligned model probabilities with a validated RF share."""
+    weight = float(rf_weight)
+    if not math.isfinite(weight) or not 0.0 <= weight <= 1.0:
+        raise ValueError("ML_ENSEMBLE_RF_WEIGHT_INVALID")
+    rf_values = np.asarray(rf_probabilities, dtype=np.float32)
+    torch_values = np.asarray(torch_probabilities, dtype=np.float32)
+    if rf_values.shape != torch_values.shape or rf_values.ndim != 2 or rf_values.shape[1] != len(LABELS):
+        raise ValueError("ML_ENSEMBLE_PROBABILITY_SHAPE_INVALID")
+    blended = rf_values * weight + torch_values * (1.0 - weight)
     return blended / np.maximum(blended.sum(axis=1, keepdims=True), 1e-12)
 
+
+def ensemble_probabilities(
+    rf: Any,
+    torch_model: nn.Module,
+    scaled_features: np.ndarray,
+    rf_weight: float | None = None,
+) -> np.ndarray:
+    """Return the RF/PyTorch blend used during training and live inference."""
+    rf_probabilities, torch_probabilities = ensemble_component_probabilities(
+        rf, torch_model, scaled_features
+    )
+    weight = RF_ENSEMBLE_WEIGHT if rf_weight is None else float(rf_weight)
+    return blend_probability_parts(rf_probabilities, torch_probabilities, weight)
 
 def ensemble_class_metrics(y_true: np.ndarray, probabilities: np.ndarray) -> dict[str, Any]:
     predicted_indices = np.argmax(probabilities, axis=1)
@@ -1044,10 +1077,19 @@ def train_model(
     markets: list[dict[str, Any]],
     train_fraction: float = 0.78,
     test_fraction: float = 1.0,
+    ensemble_rf_weight: float | None = None,
+    capture_validation_probabilities: bool = False,
 ) -> dict[str, Any]:
     if not MODEL_RESTORE_EVENT.wait(timeout=max(30, int(os.getenv("KINGBOT_ML_RESTORE_WAIT_SEC", "180")))):
         raise RuntimeError("ML_MODEL_RESTORE_PENDING")
     key = f"{strategy}:{timeframe.lower()}"
+    resolved_ensemble_rf_weight = (
+        RF_ENSEMBLE_WEIGHT if ensemble_rf_weight is None else finite(ensemble_rf_weight, math.nan)
+    )
+    if not math.isfinite(resolved_ensemble_rf_weight) or not 0.0 <= resolved_ensemble_rf_weight <= 1.0:
+        raise ValueError("ML_ENSEMBLE_RF_WEIGHT_INVALID")
+    if not isinstance(capture_validation_probabilities, bool):
+        raise ValueError("ML_VALIDATION_PROBABILITY_CAPTURE_FLAG_INVALID")
     if not TRAINING_SEMAPHORE.acquire(blocking=False):
         raise RuntimeError("ML_TRAINING_CAPACITY_BUSY")
     with LOCK:
@@ -1277,8 +1319,19 @@ def train_model(
             X_train, y_train, X_test, y_test, scaler, weights_train
         )
 
-        ensemble_test_probabilities = ensemble_probabilities(rf, torch_model, X_test_scaled)
+        rf_probability_parts, torch_probability_parts = ensemble_component_probabilities(
+            rf, torch_model, X_test_scaled
+        )
+        ensemble_test_probabilities = blend_probability_parts(
+            rf_probability_parts, torch_probability_parts, resolved_ensemble_rf_weight
+        )
         ensemble_metrics = ensemble_class_metrics(y_test, ensemble_test_probabilities)
+        if capture_validation_probabilities:
+            print("[KINGBOT ML PROBABILITY AUDIT]", json.dumps({
+                "labels": y_test.tolist(),
+                "rf": np.round(rf_probability_parts, 6).tolist(),
+                "torch": np.round(torch_probability_parts, 6).tolist(),
+            }, separators=(",", ":")))
 
         print("[KINGBOT ML VALIDATION]", json.dumps({
             "strategy": strategy,
@@ -1348,6 +1401,7 @@ def train_model(
                 "markets": validation_markets,
             },
             "selection_score": candidate_score,
+            "ensemble_rf_weight": resolved_ensemble_rf_weight,
             "promotion": "CHAMPION" if promote else "CHALLENGER",
             "promoted_at": trained_at if promote else None,
             "feedbackVersion": FEEDBACK_VERSION,
@@ -1402,6 +1456,7 @@ def train_model(
                 "rf": rf_metrics,
                 "pytorch": torch_metrics,
                 "ensemble": ensemble_metrics,
+                "ensembleRfWeight": resolved_ensemble_rf_weight,
                 "qualityGate": quality_gate,
             },
             "regimeAware": True,
@@ -1428,6 +1483,7 @@ def model_status(key: str) -> dict[str, Any]:
         "trainSamples": item.get("train_samples", 0),
         "testSamples": item.get("test_samples", 0),
         "barCount": item["bar_count"],
+        "ensembleRfWeight": round(float(item.get("ensemble_rf_weight", RF_ENSEMBLE_WEIGHT)), 3),
         "rfAccuracy": round(item["rf_accuracy"] * 100.0, 2),
         "rfBalancedAccuracy": round(item.get("rf_balanced_accuracy", 0.0) * 100.0, 2),
         "rfMacroF1": round(item.get("rf_macro_f1", 0.0) * 100.0, 2),
@@ -1554,7 +1610,12 @@ def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, 
         X = current_market_features(market, strategy)
         scaled = item["scaler"].transform(X).astype(np.float32)
 
-        probs = ensemble_probabilities(item["rf"], item["torch"], scaled)[0]
+        probs = ensemble_probabilities(
+        item["rf"],
+        item["torch"],
+        scaled,
+        rf_weight=item.get("ensemble_rf_weight", RF_ENSEMBLE_WEIGHT),
+    )[0]
         best_index = int(np.argmax(probs))
         direction = int(INDEX_TO_LABEL[best_index])
         confidence = float(probs[best_index])
