@@ -296,6 +296,13 @@ class EngineFeatureParityTests(unittest.TestCase):
 
 
 class V9LabelDistributionTests(unittest.TestCase):
+    def test_atr_window_optimization_matches_full_prefix_exactly(self):
+        bars = make_bars(220)
+        for index in range(60, len(bars)):
+            full = service.atr(bars[:index + 1], 14)
+            window = service.atr(bars[index - 14:index + 1], 14)
+            self.assertAlmostEqual(full, window, places=12)
+
     def test_class_distribution_reports_sell_hold_buy_counts_and_ratios(self):
         distribution = service.class_distribution(
             np.asarray([-1, -1, 0, 1, 1, 1], dtype=np.int64)
