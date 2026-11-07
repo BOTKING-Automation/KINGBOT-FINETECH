@@ -203,6 +203,39 @@ def compute_market_regime_features(
     return features.astype(np.float32), states
 
 
+def _align_regime_rows_to_samples(
+    full_features: np.ndarray,
+    full_states: np.ndarray,
+    all_open_times: np.ndarray,
+    sample_times: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Join raw-candle regime rows to the ML dataset's filtered sample timestamps.
+
+    The V9 feature builder may omit a candle with invalid feature/ATR values.
+    Therefore a positional [60:-horizon] slice is not guaranteed to have exactly
+    the same row count as the model samples. Align by the exact closed-candle
+    open timestamp and fail loudly if any model timestamp is absent.
+    """
+    features = np.asarray(full_features, dtype=np.float32)
+    states = np.asarray(full_states, dtype=np.int64)
+    opens = np.asarray(all_open_times, dtype=np.float64)
+    samples = np.asarray(sample_times, dtype=np.float64)
+    if (features.ndim != 2 or features.shape[1] != len(REGIME_FEATURE_NAMES)
+            or states.ndim != 1 or opens.ndim != 1 or samples.ndim != 1
+            or len(features) != len(states) or len(features) != len(opens)
+            or not np.isfinite(features).all() or not np.isfinite(opens).all()
+            or not np.isfinite(samples).all() or np.any(np.diff(opens) < 0)
+            or np.any(np.diff(samples) < 0)):
+        raise ValueError("V124_SAMPLE_ALIGNMENT_INPUT_INVALID")
+    positions = np.searchsorted(opens, samples, side="left")
+    valid = positions < len(opens)
+    matched = np.zeros(len(samples), dtype=bool)
+    matched[valid] = np.isclose(opens[positions[valid]], samples[valid], rtol=0.0, atol=1e-6)
+    if not matched.all():
+        raise ValueError("V124_SAMPLE_TIMESTAMP_NOT_FOUND")
+    return features[positions].copy(), states[positions].copy(), opens[positions].copy()
+
+
 def _closed_asof_lookup(
     feature_matrix: np.ndarray,
     open_times: np.ndarray,
@@ -251,13 +284,12 @@ def build_v124_dataset(
             if not np.isfinite(opens).all():
                 continue
             all_features, all_states = compute_market_regime_features(bars)
-            feature_slice = slice(60, len(bars) - service.FORWARD_HORIZON)
-            feature_rows, state_rows = all_features[feature_slice], all_states[feature_slice]
             _, _, _, sample_times, _ = service.bars_to_training_arrays(bars, strategy)
-            if len(feature_rows) != len(sample_times) or len(state_rows) != len(sample_times):
-                raise ValueError("V124_REGIME_FEATURE_ALIGNMENT_INVALID")
+            feature_rows, state_rows, sample_open_times = _align_regime_rows_to_samples(
+                all_features, all_states, opens, sample_times
+            )
             series[f"{symbol}|{source_tf}"] = (
-                feature_rows, opens[feature_slice], state_rows
+                feature_rows, sample_open_times, state_rows
             )
 
     target_windows, target_states = {}, {}

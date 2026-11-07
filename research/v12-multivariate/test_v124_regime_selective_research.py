@@ -10,6 +10,7 @@ from run_v124_regime_selective_research import (
     _gate_probabilities,
     _select_action_threshold,
     _select_development_variant,
+    _align_regime_rows_to_samples,
     compute_market_regime_features,
 )
 
@@ -48,6 +49,30 @@ class V124RegimeSelectiveTests(unittest.TestCase):
         extended_features, extended_states = compute_market_regime_features(extended)
         np.testing.assert_allclose(first_features, extended_features[:len(prefix)], atol=1e-7)
         np.testing.assert_array_equal(first_states, extended_states[:len(prefix)])
+
+    def test_regime_rows_align_by_sample_timestamp_when_candles_are_skipped(self):
+        full = np.zeros((6, len(REGIME_FEATURE_NAMES)), dtype=np.float32)
+        full[:, 0] = np.arange(6, dtype=np.float32)
+        states = np.arange(6, dtype=np.int64)
+        opens = np.asarray([100, 200, 300, 400, 500, 600], dtype=np.float64)
+        # Simulate the label/feature pipeline excluding raw candles at 200 and 500.
+        sample_times = np.asarray([100, 300, 400, 600], dtype=np.float64)
+        aligned, aligned_states, aligned_times = _align_regime_rows_to_samples(
+            full, states, opens, sample_times
+        )
+        np.testing.assert_array_equal(aligned[:, 0], [0, 2, 3, 5])
+        np.testing.assert_array_equal(aligned_states, [0, 2, 3, 5])
+        np.testing.assert_array_equal(aligned_times, sample_times)
+
+    def test_missing_sample_timestamp_fails_closed(self):
+        full = np.zeros((3, len(REGIME_FEATURE_NAMES)), dtype=np.float32)
+        with self.assertRaisesRegex(ValueError, "V124_SAMPLE_TIMESTAMP_NOT_FOUND"):
+            _align_regime_rows_to_samples(
+                full,
+                np.zeros(3, dtype=np.int64),
+                np.asarray([100, 200, 300], dtype=np.float64),
+                np.asarray([100, 250], dtype=np.float64),
+            )
 
     def test_context_asof_never_uses_unclosed_candle(self):
         features = np.zeros((2, len(REGIME_FEATURE_NAMES)), dtype=np.float32)
