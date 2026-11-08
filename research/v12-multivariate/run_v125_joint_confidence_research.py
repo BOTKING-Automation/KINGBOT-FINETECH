@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 _ROOT = Path(__file__).resolve().parents[2]
