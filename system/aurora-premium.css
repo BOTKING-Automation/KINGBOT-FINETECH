@@ -1,0 +1,292 @@
+/* KINGBOT FINETECH — AURORA LUXE VISUAL SYSTEM
+   Presentation-only layer. No trading, broker, API, auth or risk logic changes.
+   Apply after existing page stylesheets. */
+:root{
+  --ka-bg:#070914;
+  --ka-bg-2:#0b1020;
+  --ka-panel:#10172a;
+  --ka-panel-2:#151d35;
+  --ka-line:rgba(134,160,255,.18);
+  --ka-gold:#f6c76b;
+  --ka-cyan:#32e7ff;
+  --ka-blue:#648dff;
+  --ka-violet:#a879ff;
+  --ka-pink:#ff69d4;
+  --ka-green:#42e5ac;
+  --ka-red:#ff6f85;
+  --ka-text:#f3f5ff;
+  --ka-muted:#97a3bf;
+  --ka-glow:0 0 30px rgba(50,231,255,.10),0 0 54px rgba(168,121,255,.08);
+}
+html{background:var(--ka-bg)!important}
+body.kb-app-refresh,
+body.kb-command-page{
+  color:var(--ka-text)!important;
+  background:
+    radial-gradient(ellipse at 7% 3%,rgba(50,231,255,.16),transparent 26%),
+    radial-gradient(ellipse at 92% 4%,rgba(255,105,212,.13),transparent 27%),
+    radial-gradient(ellipse at 70% 45%,rgba(100,141,255,.095),transparent 32%),
+    radial-gradient(ellipse at 12% 86%,rgba(246,199,107,.075),transparent 29%),
+    linear-gradient(145deg,#070914 0%,#0a1020 43%,#080b18 100%)!important;
+}
+body.kb-app-refresh::selection,
+body.kb-command-page::selection{background:rgba(50,231,255,.28);color:#fff}
+
+/* Ambient grids: luminous but deliberately low contrast. */
+body.kb-terminal-page::before{
+  background-image:
+    linear-gradient(rgba(50,231,255,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(168,121,255,.045) 1px,transparent 1px)!important;
+  opacity:.62!important;
+  animation-duration:24s!important;
+}
+body.kb-terminal-page::after{
+  background:
+    radial-gradient(ellipse at 18% 12%,rgba(50,231,255,.08),transparent 45%),
+    radial-gradient(ellipse at 86% 18%,rgba(255,105,212,.07),transparent 42%),
+    repeating-linear-gradient(180deg,rgba(255,255,255,.012) 0,rgba(255,255,255,.012) 1px,transparent 1px,transparent 5px)!important;
+  opacity:.7!important;
+}
+body.kb-command-page::before{
+  background-image:
+    linear-gradient(rgba(50,231,255,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(168,121,255,.035) 1px,transparent 1px)!important;
+  mask-image:linear-gradient(180deg,#000,transparent 90%);
+}
+
+/* Premium top bars and brand marks. */
+body.kb-terminal-page .topbar,
+body.kb-command-page .topbar{
+  background:linear-gradient(100deg,rgba(8,12,27,.94),rgba(14,17,37,.91),rgba(9,13,28,.95))!important;
+  border-bottom:1px solid rgba(113,148,255,.22)!important;
+  box-shadow:0 12px 42px rgba(0,0,0,.40),0 1px 0 rgba(50,231,255,.07),0 0 34px rgba(100,141,255,.07)!important;
+  backdrop-filter:blur(22px) saturate(150%)!important;
+}
+body.kb-app-refresh .brand-mark,
+body.kb-terminal-page .brand-mark,
+body.kb-command-page .brand-mark{
+  color:#080b18!important;
+  background:linear-gradient(135deg,var(--ka-gold),#fff0be 28%,var(--ka-cyan) 58%,var(--ka-violet) 82%,var(--ka-pink))!important;
+  box-shadow:0 0 18px rgba(50,231,255,.28),0 0 36px rgba(168,121,255,.2),0 0 56px rgba(255,105,212,.12)!important;
+  animation:kaBrandGlow 5s ease-in-out infinite!important;
+}
+body.kb-terminal-page .brand-text strong,
+body.kb-command-page .brand-copy strong{color:#fff!important;text-shadow:0 0 18px rgba(50,231,255,.12)}
+body.kb-terminal-page .brand-text span,
+body.kb-command-page .brand-copy small{color:#aab7d3!important}
+
+/* Terminal navigation and status chips. */
+body.kb-terminal-page .nav a{
+  color:#9eaaca!important;
+  border:1px solid transparent;
+  border-radius:999px;
+  transition:all .22s ease;
+}
+body.kb-terminal-page .nav a:hover,
+body.kb-terminal-page .nav a.active{
+  color:#f6f8ff!important;
+  border-color:rgba(50,231,255,.28)!important;
+  background:linear-gradient(100deg,rgba(50,231,255,.10),rgba(168,121,255,.10),rgba(255,105,212,.07))!important;
+  box-shadow:0 0 22px rgba(50,231,255,.10),inset 0 0 16px rgba(168,121,255,.06)!important;
+}
+body.kb-terminal-page .live-status,
+body.kb-command-page .system-chip{
+  border-color:rgba(50,231,255,.23)!important;
+  background:linear-gradient(100deg,rgba(50,231,255,.08),rgba(168,121,255,.08))!important;
+  box-shadow:0 0 20px rgba(50,231,255,.07)!important;
+}
+body.kb-terminal-page .live-dot,
+body.kb-command-page .status-led{box-shadow:0 0 8px var(--ka-green),0 0 18px rgba(66,229,172,.42)!important}
+
+/* Reusable glass panels, metrics, engine tiles and telemetry. */
+body.kb-terminal-page :is(.panel,.metric,.sync,.account-card,.market,.risk-card,.activity-card,.signal-box,.telemetry-cell,.engine-cell,.it-panel,.history-panel,.big-status),
+body.kb-command-page :is(.panel,.metric-card,.engine-card,.hero,.side-security){
+  position:relative;
+  background:
+    linear-gradient(150deg,rgba(19,27,53,.94),rgba(9,13,29,.97)) padding-box,
+    linear-gradient(125deg,rgba(50,231,255,.42),rgba(100,141,255,.30) 35%,rgba(168,121,255,.35) 67%,rgba(246,199,107,.28)) border-box!important;
+  border:1px solid transparent!important;
+  border-radius:18px!important;
+  box-shadow:0 18px 52px rgba(0,0,0,.34),0 0 24px rgba(100,141,255,.075),inset 0 1px 0 rgba(255,255,255,.045)!important;
+  transition:transform .24s ease,box-shadow .24s ease,border-color .24s ease,filter .24s ease;
+}
+body.kb-terminal-page :is(.panel,.metric,.sync,.account-card,.market,.risk-card,.activity-card,.signal-box,.telemetry-cell,.engine-cell,.it-panel,.history-panel):hover,
+body.kb-command-page :is(.panel,.metric-card,.engine-card):hover{
+  transform:translateY(-2px);
+  box-shadow:0 22px 62px rgba(0,0,0,.42),0 0 30px rgba(50,231,255,.12),0 0 48px rgba(168,121,255,.09)!important;
+}
+body.kb-terminal-page .metric::before,
+body.kb-command-page .metric-card::before,
+body.kb-command-page .engine-card::before{
+  content:"";
+  position:absolute;inset:0 12% auto;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--ka-cyan),var(--ka-violet),var(--ka-pink),var(--ka-gold),transparent);
+  opacity:.75;
+  filter:drop-shadow(0 0 5px rgba(50,231,255,.5));
+}
+body.kb-terminal-page .panel-head,
+body.kb-terminal-page .section-head,
+body.kb-command-page .panel-head{
+  border-color:rgba(139,158,215,.14)!important;
+  background:linear-gradient(90deg,rgba(50,231,255,.035),rgba(168,121,255,.035),transparent)!important;
+}
+body.kb-terminal-page .section-title,
+body.kb-command-page .panel-head h2,
+body.kb-command-page .section-heading h2{color:#f4f6ff!important;text-shadow:0 0 16px rgba(100,141,255,.12)}
+body.kb-terminal-page .section-sub,
+body.kb-terminal-page .metric-label,
+body.kb-terminal-page .metric-note,
+body.kb-command-page .panel-head p{color:#9ca9c8!important}
+
+/* Colour-rich metric hierarchy. */
+body.kb-terminal-page .metric-value.gold{color:var(--ka-gold)!important;text-shadow:0 0 16px rgba(246,199,107,.20)}
+body.kb-terminal-page .metric-value.cyan{color:var(--ka-cyan)!important;text-shadow:0 0 16px rgba(50,231,255,.22)}
+body.kb-terminal-page .metric-value.green{color:var(--ka-green)!important;text-shadow:0 0 15px rgba(66,229,172,.18)}
+body.kb-terminal-page .metric-value.red{color:var(--ka-red)!important;text-shadow:0 0 15px rgba(255,111,133,.18)}
+body.kb-command-page .metric-value{color:#f4f5ff!important;text-shadow:0 0 16px rgba(100,141,255,.16)}
+body.kb-command-page .metric-icon{box-shadow:0 0 16px currentColor;background:rgba(50,231,255,.08)!important}
+body.kb-command-page .gold-icon{color:var(--ka-gold)!important;background:rgba(246,199,107,.10)!important}
+body.kb-command-page .green-icon{color:var(--ka-green)!important;background:rgba(66,229,172,.10)!important}
+body.kb-command-page .violet-icon{color:var(--ka-violet)!important;background:rgba(168,121,255,.11)!important}
+body.kb-command-page .red-icon{color:var(--ka-red)!important;background:rgba(255,111,133,.10)!important}
+
+/* Command centre sidebar and selected navigation. */
+body.kb-command-page .sidebar{
+  background:linear-gradient(180deg,rgba(10,15,33,.98),rgba(7,10,23,.99))!important;
+  border-right:1px solid rgba(100,141,255,.20)!important;
+  box-shadow:12px 0 44px rgba(0,0,0,.20),inset -1px 0 rgba(50,231,255,.035)!important;
+}
+body.kb-command-page .side-link{border:1px solid transparent!important;color:#a7b2d0!important;transition:all .2s ease}
+body.kb-command-page .side-link:hover{
+  color:#fff!important;
+  background:linear-gradient(100deg,rgba(50,231,255,.08),rgba(168,121,255,.075))!important;
+  border-color:rgba(50,231,255,.16)!important;
+  box-shadow:0 0 22px rgba(50,231,255,.06)!important;
+}
+body.kb-command-page .side-link.active{
+  color:#fff!important;
+  background:linear-gradient(105deg,rgba(50,231,255,.15),rgba(100,141,255,.12),rgba(168,121,255,.14),rgba(255,105,212,.07))!important;
+  border-color:rgba(50,231,255,.29)!important;
+  box-shadow:0 0 25px rgba(50,231,255,.10),inset 0 0 20px rgba(168,121,255,.055)!important;
+}
+body.kb-command-page .side-link.active .nav-icon{color:var(--ka-cyan)!important;text-shadow:0 0 12px rgba(50,231,255,.65)}
+body.kb-command-page .nav-active-dot{background:var(--ka-cyan)!important;box-shadow:0 0 9px var(--ka-cyan),0 0 18px rgba(50,231,255,.45)!important}
+
+/* Command hero: richer aurora edges and a luminous centrepiece. */
+body.kb-command-page .hero{
+  background:
+    radial-gradient(ellipse at 85% 25%,rgba(168,121,255,.16),transparent 38%),
+    radial-gradient(ellipse at 65% 85%,rgba(50,231,255,.105),transparent 38%),
+    linear-gradient(135deg,rgba(19,27,53,.97),rgba(8,13,30,.98)) padding-box,
+    linear-gradient(115deg,rgba(50,231,255,.58),rgba(100,141,255,.40),rgba(168,121,255,.48),rgba(255,105,212,.34),rgba(246,199,107,.42)) border-box!important;
+}
+body.kb-command-page .hero h1{color:#fff!important;text-shadow:0 0 26px rgba(100,141,255,.18)}
+body.kb-command-page .hero h1 span{
+  background:linear-gradient(100deg,#fff0c6,var(--ka-gold) 22%,var(--ka-cyan) 49%,var(--ka-violet) 73%,var(--ka-pink));
+  background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;
+  filter:drop-shadow(0 0 14px rgba(50,231,255,.18));
+  animation:kaGradientFlow 8s ease-in-out infinite;
+}
+body.kb-command-page .orbit-one{border-color:rgba(50,231,255,.56)!important;box-shadow:0 0 25px rgba(50,231,255,.09),inset 0 0 20px rgba(50,231,255,.05)!important}
+body.kb-command-page .orbit-two{border-color:rgba(246,199,107,.44)!important;box-shadow:0 0 26px rgba(246,199,107,.08)!important}
+body.kb-command-page .orbit-three{border-color:rgba(168,121,255,.48)!important;box-shadow:0 0 26px rgba(168,121,255,.10)!important}
+body.kb-command-page .orbit-core{
+  background:radial-gradient(circle at 35% 25%,rgba(246,199,107,.35),transparent 58%),linear-gradient(145deg,#1c2850,#11142d)!important;
+  box-shadow:0 0 28px rgba(50,231,255,.22),0 0 54px rgba(168,121,255,.16),inset 0 0 24px rgba(255,255,255,.06)!important;
+}
+
+/* Buttons: jewel-tone gradients, clear focus and high-quality hover. */
+body.kb-terminal-page :is(.btn,.action-primary,.action-secondary),
+body.kb-command-page :is(.action-primary,.action-secondary,.refresh-button,.filter-chip,.panel-link){
+  border-radius:12px!important;
+  transition:transform .2s ease,box-shadow .2s ease,filter .2s ease!important;
+}
+body.kb-terminal-page .btn.primary,
+body.kb-command-page .action-primary{
+  color:#090d1a!important;
+  background:linear-gradient(105deg,#ffe6a6,var(--ka-gold) 28%,var(--ka-cyan) 68%,#b8a2ff)!important;
+  border:1px solid rgba(255,255,255,.25)!important;
+  box-shadow:0 10px 26px rgba(50,231,255,.14),0 0 28px rgba(168,121,255,.12)!important;
+}
+body.kb-terminal-page .btn.secondary,
+body.kb-command-page .action-secondary{
+  color:#dce5ff!important;
+  background:linear-gradient(110deg,rgba(50,231,255,.09),rgba(100,141,255,.08),rgba(168,121,255,.10))!important;
+  border:1px solid rgba(137,160,255,.25)!important;
+}
+body.kb-terminal-page :is(.btn,.sync-button):hover,
+body.kb-command-page :is(.action-primary,.action-secondary,.refresh-button,.filter-chip):hover{
+  transform:translateY(-2px);
+  filter:brightness(1.12);
+  box-shadow:0 12px 32px rgba(50,231,255,.13),0 0 24px rgba(168,121,255,.12)!important;
+}
+
+/* Tables, tapes, inputs and activity strips. */
+body.kb-terminal-page :is(th,td,.position-row,.risk-row,.detail-row,.it-cell,.telemetry-cell,.sync-main,.sync-time){
+  border-color:rgba(131,151,213,.13)!important;
+}
+body.kb-terminal-page :is(input,select,textarea),
+body.kb-command-page :is(input,select,textarea){
+  color:#f2f5ff!important;
+  background:rgba(5,9,22,.88)!important;
+  border-color:rgba(114,146,255,.25)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025)!important;
+}
+body.kb-terminal-page :is(input,select,textarea):focus,
+body.kb-command-page :is(input,select,textarea):focus{
+  border-color:rgba(50,231,255,.58)!important;
+  box-shadow:0 0 0 3px rgba(50,231,255,.09),0 0 22px rgba(168,121,255,.08)!important;
+  outline:none!important;
+}
+body.kb-terminal-page :is(.panel-badge,.hero-tag,.it-chip,.state-badge),
+body.kb-command-page :is(.state-badge,.filter-chip,.system-chip){
+  border-color:rgba(100,141,255,.25)!important;
+  background:linear-gradient(100deg,rgba(50,231,255,.065),rgba(168,121,255,.075),rgba(255,105,212,.045))!important;
+  color:#cbd8ff!important;
+}
+body.kb-terminal-page a:focus-visible,
+body.kb-terminal-page button:focus-visible,
+body.kb-command-page a:focus-visible,
+body.kb-command-page button:focus-visible{
+  outline:2px solid var(--ka-cyan)!important;outline-offset:3px;
+}
+
+/* Landing page — match the same high-end aurora identity. */
+body:not(.kb-terminal-page):not(.kb-command-page){
+  background:
+    radial-gradient(ellipse at 10% 8%,rgba(50,231,255,.13),transparent 27%),
+    radial-gradient(ellipse at 91% 7%,rgba(255,105,212,.12),transparent 28%),
+    radial-gradient(ellipse at 70% 60%,rgba(168,121,255,.10),transparent 34%),
+    linear-gradient(145deg,#050814,#0b1022 52%,#070a16)!important;
+}
+body:not(.kb-terminal-page):not(.kb-command-page) :is(.bot-card,.plan,.mock,.plat,.infra-visual,.hero-image-frame){
+  border-color:rgba(110,143,255,.22)!important;
+  box-shadow:0 20px 58px rgba(0,0,0,.36),0 0 32px rgba(50,231,255,.075),0 0 48px rgba(168,121,255,.06)!important;
+}
+body:not(.kb-terminal-page):not(.kb-command-page) .hero-title{
+  background:linear-gradient(100deg,#fff1c7,var(--ka-gold) 28%,var(--ka-cyan) 55%,var(--ka-violet) 78%,var(--ka-pink));
+  background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;
+  filter:drop-shadow(0 0 18px rgba(50,231,255,.17));
+  animation:kaGradientFlow 9s ease-in-out infinite;
+}
+body:not(.kb-terminal-page):not(.kb-command-page) :is(.btn-gold,.btn-primary,.btn.gold){
+  background:linear-gradient(105deg,#ffe7ae,#eab957 35%,#62dff0 76%,#af8cff)!important;
+  color:#080c18!important;border-color:rgba(255,255,255,.22)!important;
+  box-shadow:0 10px 28px rgba(50,231,255,.13),0 0 24px rgba(168,121,255,.12)!important;
+}
+
+/* Motion has restraint and honours OS accessibility settings. */
+@keyframes kaBrandGlow{
+  0%,100%{filter:saturate(1);box-shadow:0 0 18px rgba(50,231,255,.24),0 0 36px rgba(168,121,255,.16)}
+  50%{filter:saturate(1.22);box-shadow:0 0 24px rgba(50,231,255,.36),0 0 46px rgba(255,105,212,.18)}
+}
+@keyframes kaGradientFlow{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@media(max-width:900px){
+  body.kb-terminal-page :is(.panel,.metric,.sync,.engine-cell),
+  body.kb-command-page :is(.panel,.metric-card,.engine-card){border-radius:15px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  body.kb-terminal-page *,body.kb-command-page *,body:not(.kb-terminal-page):not(.kb-command-page) *{
+    animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;
+  }
+}
