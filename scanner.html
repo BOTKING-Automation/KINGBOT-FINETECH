@@ -547,6 +547,45 @@ body.kb-scanner-page :focus-visible{outline:2px solid rgba(53,232,255,.75);outli
   }
 }
 
+
+/* Scanner dashboard finishing layer: only actual scanner outputs are rendered. */
+body.kb-scanner-page .scan-layout{align-items:start}
+body.kb-scanner-page .evidence-panel{
+  margin-top:14px;padding:15px;border:1px solid rgba(142,164,255,.14);border-radius:16px;
+  background:linear-gradient(145deg,rgba(12,20,43,.82),rgba(4,8,21,.9));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+}
+body.kb-scanner-page .evidence-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+body.kb-scanner-page .evidence-title{font:900 9px "JetBrains Mono";letter-spacing:.14em;color:#e8efff}
+body.kb-scanner-page .evidence-sub{margin-top:5px;color:#8291af;font-size:8px;line-height:1.55}
+body.kb-scanner-page .evidence-source{
+  max-width:48%;padding:6px 8px;border:1px solid rgba(255,212,125,.18);border-radius:8px;
+  color:#ffdc91;background:rgba(255,212,125,.045);font:800 7px "JetBrains Mono";
+  line-height:1.45;text-align:right;overflow-wrap:anywhere;
+}
+body.kb-scanner-page .evidence-source.verified{color:#65ebbb;border-color:rgba(70,231,173,.22);background:rgba(70,231,173,.05)}
+body.kb-scanner-page .evidence-source.unverified{color:#ffdc91}
+body.kb-scanner-page .evidence-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+body.kb-scanner-page .evidence-tile{
+  min-width:0;min-height:62px;padding:10px;border:1px solid rgba(142,164,255,.11);border-radius:11px;
+  background:linear-gradient(140deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+}
+body.kb-scanner-page .evidence-tile span{display:block;color:#8795b3;font:800 7px "JetBrains Mono";letter-spacing:.09em}
+body.kb-scanner-page .evidence-tile strong{display:block;margin-top:7px;color:#f2f5ff;font:900 10px "JetBrains Mono";overflow-wrap:anywhere}
+body.kb-scanner-page .evidence-tile strong.bullish{color:#58edbb}
+body.kb-scanner-page .evidence-tile strong.bearish{color:#ff8ba3}
+body.kb-scanner-page .evidence-tile strong.neutral,body.kb-scanner-page .evidence-tile strong.none{color:#ffdc91}
+body.kb-scanner-page .evidence-empty{grid-column:1/-1;padding:18px 12px;color:#8795b2;font-size:9px;line-height:1.7}
+body.kb-scanner-page .scanner-data-quality{grid-template-columns:repeat(3,minmax(0,1fr))}
+body.kb-scanner-page .scanner-data-quality .blocked-value{color:#ffb2c0;font-size:9px}
+body.kb-scanner-page .symbol-card.is-available::after{content:"LIVE";color:rgba(70,231,173,.7)}
+body.kb-scanner-page .symbol-card.is-unavailable::after{content:"NO FEED";color:rgba(255,212,125,.75)}
+body.kb-scanner-page .symbol-card.is-unavailable .symbol-price{color:#8490a8;text-shadow:none}
+@media(max-width:900px){body.kb-scanner-page .scanner-data-quality{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){
+  body.kb-scanner-page .evidence-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-scanner-page .evidence-source{max-width:52%}
+}
 </style>
 </head>
 <body class="kb-scanner-page">
@@ -643,11 +682,25 @@ body.kb-scanner-page :focus-visible{outline:2px solid rgba(53,232,255,.75);outli
         <div id="cortexReason" style="margin-top:7px;color:#7f8aa3;font-size:9px;line-height:1.6">CORTEX will evaluate the focused symbol through independent evidence, five AI specialists, Strategy Council and deterministic risk gates.</div>
         <div id="cortexWait" style="margin-top:8px;color:#ffd166;font-size:9px;line-height:1.6"></div>
       </div>
-      <div class="detail-grid">
+      <section class="evidence-panel" aria-label="Scanner technical evidence">
+        <div class="evidence-head">
+          <div>
+            <div class="evidence-title">TECHNICAL EVIDENCE</div>
+            <div class="evidence-sub">Focused symbol · native OHLC snapshot</div>
+          </div>
+          <span id="evidenceSource" class="evidence-source">AWAITING DATA</span>
+        </div>
+        <div id="evidenceGrid" class="evidence-grid">
+          <div class="evidence-empty">Run a scan to inspect the scanner technical evidence.</div>
+        </div>
+      </section>
+      <div class="detail-grid scanner-data-quality">
         <div class="detail"><span>SYMBOLS</span><strong id="scannedCount">—</strong></div>
-        <div class="detail"><span>QUOTES</span><strong id="availableCount">—</strong></div>
-        <div class="detail"><span>REGIME</span><strong id="regime">—</strong></div>
-        <div class="detail"><span>EXECUTION</span><strong>BLOCKED</strong></div>
+        <div class="detail"><span>LIVE QUOTES</span><strong id="availableCount">—</strong></div>
+        <div class="detail"><span>MARKET REGIME</span><strong id="regime">—</strong></div>
+        <div class="detail"><span>VERIFIED OHLC</span><strong id="verifiedCount">—</strong></div>
+        <div class="detail"><span>TV CONTEXT</span><strong id="tradingViewCount">—</strong></div>
+        <div class="detail"><span>EXECUTION AUTHORITY</span><strong class="blocked-value">NONE · BLOCKED</strong></div>
       </div>
     </div>
   </aside>
@@ -833,6 +886,8 @@ body.kb-scanner-page :focus-visible{outline:2px solid rgba(53,232,255,.75);outli
     grid.innerHTML="";
     (state.quotes.length?state.quotes:state.symbols.map(s=>({symbol:s,available:false}))).forEach(q=>{
       const card=document.createElement("button"); card.type="button"; card.className="symbol-card";
+      card.classList.add(q.available ? "is-available" : "is-unavailable");
+      card.setAttribute("aria-label",q.symbol+" quote "+(q.available ? "available" : "unavailable"));
       card.innerHTML='<div class="symbol-name"></div><div class="symbol-price"></div><div class="symbol-change"></div>';
       card.querySelector(".symbol-name").textContent=q.symbol;
       card.querySelector(".symbol-price").textContent=q.available?fmt(q.price):"—";
@@ -908,6 +963,52 @@ body.kb-scanner-page :focus-visible{outline:2px solid rgba(53,232,255,.75);outli
       qs("cortexReason").textContent=cortexErrorMessage(data.cortexError,council.reason||decision.waitFor||"CORTEX waiting for stronger evidence.");
       qs("cortexWait").textContent=decision.waitFor ? "WAIT FOR · "+decision.waitFor : "";
     }
+
+    const evidenceTarget=qs("evidenceGrid");
+    const evidenceSource=qs("evidenceSource");
+    const focusEvidence=ranked.find(x=>x.symbol===(data.cortexFocusSymbol||""))||ranked[0]||{};
+    if(evidenceTarget){
+      evidenceTarget.replaceChildren();
+      const verified=focusEvidence.technicalVerified===true;
+      if(evidenceSource){
+        evidenceSource.textContent=focusEvidence.source||data.technicalSource||"SOURCE NOT REPORTED";
+        evidenceSource.className="evidence-source "+(verified?"verified":"unverified");
+      }
+      const facts=[
+        ["BIAS",focusEvidence.bias||"—"],
+        ["TREND",focusEvidence.trend||"—"],
+        ["BOS",focusEvidence.bos||"—"],
+        ["CHOCH",focusEvidence.choch||"—"],
+        ["LIQUIDITY SWEEP",focusEvidence.liquiditySweep||"—"],
+        ["FAIR VALUE GAP",focusEvidence.fvg===true?"DETECTED":focusEvidence.fvg===false?"NOT DETECTED":"—"],
+        ["ATR 14",fmt(focusEvidence.atr14)],
+        ["SUPPORT",fmt(focusEvidence.support)],
+        ["RESISTANCE",fmt(focusEvidence.resistance)]
+      ];
+      if(!focusEvidence.symbol){
+        const empty=document.createElement("div");
+        empty.className="evidence-empty";
+        empty.textContent="No ranked technical snapshot available for the selected market set.";
+        evidenceTarget.appendChild(empty);
+      }else{
+        facts.forEach(([label,value])=>{
+          const tile=document.createElement("div");
+          tile.className="evidence-tile";
+          const name=document.createElement("span");
+          name.textContent=label;
+          const result=document.createElement("strong");
+          result.textContent=String(value??"—");
+          if(["BULLISH","BEARISH","NEUTRAL","NONE"].includes(String(value).toUpperCase())){
+            result.classList.add(String(value).toLowerCase());
+          }
+          tile.append(name,result);
+          evidenceTarget.appendChild(tile);
+        });
+      }
+    }
+    const verifiedCount=Number(data.technicalCount??data.technicalDataQuality?.verifiedSymbols??0);
+    if(qs("verifiedCount"))qs("verifiedCount").textContent=String(verifiedCount);
+    if(qs("tradingViewCount"))qs("tradingViewCount").textContent=String(data.tradingViewCount??0);
 
     const body=qs("rankingBody");
     if(!ranked.length){
