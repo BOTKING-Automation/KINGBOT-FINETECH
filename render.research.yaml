@@ -7,7 +7,6 @@ databases:
   - name: kingbot-fintech-research-db
     plan: free
     region: oregon
-    diskSizeGB: 1
 
 services:
   - type: web
