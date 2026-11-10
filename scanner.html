@@ -715,6 +715,7 @@ body.kb-scanner-page .symbol-card.is-unavailable .symbol-price{color:#8490a8;tex
 (function(){
   "use strict";
   const API=window.KINGBOT_API?.baseUrl||"https://kingbot-fintech-api-etfv.onrender.com/api";
+  const WS_API="https://kingbot-fintech-api-etfv.onrender.com/api";
   const qs=id=>document.getElementById(id);
   const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false,streamSocket:null,streamReconnectTimer:null,streamBackoffMs:1000,lastStreamMessageAt:0,streamGeneration:0};
 
@@ -763,7 +764,7 @@ body.kb-scanner-page .symbol-card.is-unavailable .symbol-price{color:#8490a8;tex
   }
 
   function websocketUrl(){
-    const url=new URL(API);
+    const url=new URL(WS_API);
     url.protocol=url.protocol==="https:"?"wss:":"ws:";
     url.pathname=url.pathname.replace(/\/$/,"")+"/ai/market-scanner/ws";
     url.searchParams.set("symbols",state.symbols.join(","));
