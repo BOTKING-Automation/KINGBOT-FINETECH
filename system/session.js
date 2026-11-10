@@ -6,7 +6,11 @@
 */
 (function(window){
 "use strict";
-const API_BASE="https://kingbot-fintech-api-etfv.onrender.com/api";
+const API_UPSTREAM="https://kingbot-fintech-api-etfv.onrender.com/api";
+const vercelHost=String(window.location.hostname||"").toLowerCase();
+const isKingbotVercelHost=vercelHost==="kingbot-finetech.vercel.app" ||
+  /^kingbot-finetech-[a-z0-9-]+-kingbottech\.vercel\.app$/.test(vercelHost);
+const API_BASE=isKingbotVercelHost ? window.location.origin+"/api" : API_UPSTREAM;
 const API_ORIGIN=API_BASE.replace(/\/api\/?$/i,"");
 const state={checked:false,checking:false,authenticated:false,user:null,error:null,checkedAt:0};
 let activeCheck=null;

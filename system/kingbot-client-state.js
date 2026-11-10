@@ -39,7 +39,12 @@
       const headers=new Headers(opts.headers||{});
       headers.set("Accept","application/json");
       if(t)headers.set("Authorization","Bearer "+t);
-      const res=await fetch(apiBase()+path,{...opts,headers,cache:"no-store"});
+      const base=apiBase();
+      const rawPath=String(path||"");
+      const normalizedPath=/\/api\/?$/i.test(base)
+        ? rawPath.replace(/^\/api(?=\/|$)/i,"")
+        : rawPath;
+      const res=await fetch(base+normalizedPath,{...opts,headers,cache:"no-store"});
       if(!res.ok)throw new Error("HTTP_"+res.status+"_"+path);
       return res.json();
     })().finally(()=>inflight.delete(key));
