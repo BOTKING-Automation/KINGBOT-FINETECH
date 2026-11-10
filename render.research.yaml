@@ -1,0 +1,79 @@
+# Isolated research environment for PR #47.
+# This is intentionally separate from production resources.
+previews:
+  generation: off
+
+databases:
+  - name: kingbot-fintech-research-db
+    plan: free
+    region: oregon
+    diskSizeGB: 1
+
+services:
+  - type: web
+    name: kingbot-ml-signal-research
+    runtime: python
+    plan: free
+    region: oregon
+    repo: https://github.com/BOTKING-Automation/KINGBOT-FINETECH
+    branch: ml-market-feed-stabilization-research
+    rootDir: ml-signal-service
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: python service.py
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    envVars:
+      - key: KINGBOT_ML_SIGNAL_SECRET
+        generateValue: true
+      - key: KINGBOT_ML_MAX_CONCURRENT_TRAINING
+        value: "1"
+      - key: KINGBOT_ML_MAX_PREDICTIONS
+        value: "4"
+
+  - type: web
+    name: kingbot-fintech-api-research
+    runtime: node
+    plan: free
+    region: oregon
+    repo: https://github.com/BOTKING-Automation/KINGBOT-FINETECH
+    branch: ml-market-feed-stabilization-research
+    rootDir: backend
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kingbot-fintech-research-db
+          property: connectionString
+      - key: BROKER_CREDENTIALS_KEY
+        generateValue: true
+      - key: WORKER_STANDBY
+        value: "1"
+      - key: KINGBOT_AI_STRATEGIES_REQUIRED
+        value: "true"
+      - key: KINGBOT_ML_SIGNAL_HOST
+        fromService:
+          name: kingbot-ml-signal-research
+          type: web
+          property: host
+      - key: KINGBOT_ML_SIGNAL_PORT
+        fromService:
+          name: kingbot-ml-signal-research
+          type: web
+          property: port
+      - key: KINGBOT_ML_SIGNAL_SECRET
+        fromService:
+          name: kingbot-ml-signal-research
+          type: web
+          envVarKey: KINGBOT_ML_SIGNAL_SECRET
+      - key: KINGBOT_ML_SIGNAL_TIMEOUT_MS
+        value: "10000"
+      - key: KINGBOT_ML_TRAIN_TIMEOUT_MS
+        value: "180000"
+      # Keep automated strategy training disabled during this isolated feed test.
+      - key: KINGBOT_ML_INITIAL_TRAIN_DELAY_MS
+        value: "86400000"
+      - key: KINGBOT_ML_RETRAIN_MS
+        value: "86400000"
