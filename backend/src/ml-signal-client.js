@@ -74,7 +74,6 @@ async function request(
 ) {
   if (!enabled()) return null;
   const deadline = Date.now() + Math.max(1000, Number(timeoutMs) || TIMEOUT_MS);
-  let retry429Count = 0;
   let retryBusyCount = 0;
   let retryUnavailableCount = 0;
 

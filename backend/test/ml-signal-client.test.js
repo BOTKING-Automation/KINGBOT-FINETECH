@@ -32,7 +32,7 @@ before(async () => {
       rateLimitRemaining -= 1;
       res.writeHead(429, {
         "content-type": "application/json",
-        "retry-after": "0.001",
+        "retry-after": "60",
       }).end(JSON.stringify({ ok: false, error: "RATE_LIMITED" }));
       return;
     }
@@ -104,6 +104,21 @@ test("ML health probe coalesces and caches successful responses", async () => {
   assert.equal(healthRequestCount, 1);
 });
 
+test("training client retries transient ML gateway 502 responses", async () => {
+  gatewayFailureRemaining = 1;
+  requestCount = 0;
+
+  const result = await trainMlStrategyModel({
+    botId: "strategic",
+    timeframe: "15m",
+    markets: [{ symbol: "XAUUSD", bars: [{ open: 1, high: 2, low: 1, close: 2 }] }],
+  });
+
+  assert.equal(result?.ok, true);
+  assert.equal(result?.ready, true);
+  assert.equal(requestCount, 2);
+});
+
 test("training client stops on HTTP 429 and shares cooldown with health probes", async () => {
   rateLimitRemaining = 1;
   requestCount = 0;
@@ -133,17 +148,3 @@ test("training client stops on HTTP 429 and shares cooldown with health probes",
   assert.equal(requestCount, 1);
 });
 
-test("training client retries transient ML gateway 502 responses", async () => {
-  gatewayFailureRemaining = 1;
-  requestCount = 0;
-
-  const result = await trainMlStrategyModel({
-    botId: "strategic",
-    timeframe: "15m",
-    markets: [{ symbol: "XAUUSD", bars: [{ open: 1, high: 2, low: 1, close: 2 }] }],
-  });
-
-  assert.equal(result?.ok, true);
-  assert.equal(result?.ready, true);
-  assert.equal(requestCount, 2);
-});
