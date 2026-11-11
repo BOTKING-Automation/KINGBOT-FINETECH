@@ -1533,17 +1533,17 @@ body.kb-scanner-page .chart-data-note{
       ?timestamp+"|"+price+"|"+receivedAt
       :null;
     if(tickKey&&tickKey===chartState.lastTickKey)return;
+    const interval=CHART_TF_SECONDS[chartState.timeframe]||300;
+    const bucket=Math.floor(timestamp/interval)*interval;
+    const bars=chartState.bars;
+    const last=bars[bars.length-1];
+    if(bucket<last.time)return;
     if(tickKey)chartState.lastTickKey=tickKey;
     const now=Date.now();
     chartState.tickTimes.push(now);
     chartState.lastTickAt=now;
     chartState.lastExchangeAgeMs=exchangeAge;
     chartState.lastPipeAgeMs=pipeAge;
-    const interval=CHART_TF_SECONDS[chartState.timeframe]||300;
-    const bucket=Math.floor(timestamp/interval)*interval;
-    const bars=chartState.bars;
-    const last=bars[bars.length-1];
-    if(bucket<last.time)return;
     let updated;
     if(bucket===last.time){
       updated={...last,high:Math.max(Number(last.high),price),low:Math.min(Number(last.low),price),close:price};
@@ -1770,8 +1770,9 @@ body.kb-scanner-page .chart-data-note{
     }
   }
 
+  setInterval(updateChartLiveMetrics,250);
+
   setInterval(()=>{
-    updateChartLiveMetrics();
     if(state.lastStreamMessageAt && Date.now()-state.lastStreamMessageAt>15000){
       setStreamState("STALE","warn");
       qs("scanState").textContent="STREAM STALE";
