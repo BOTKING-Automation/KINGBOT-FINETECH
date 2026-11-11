@@ -25,7 +25,7 @@ Copy-Item .env.local.example .env.local
 notepad .env.local
 ```
 
-Replace all `REPLACE_WITH_PRIVATE_RANDOM_SECRET` values with separate, unique secrets. Use at least 32 characters for the session and encryption values. Do not reuse production secrets. Keep:
+Replace all `REPLACE_WITH_PRIVATE_RANDOM_SECRET` values with separate, unique local secrets of at least 32 characters. These are for a fresh local database only. Do not paste secrets into chat or commit `.env.local`. Keep:
 
 ```text
 KINGBOT_WORKER_STANDBY=1
@@ -72,7 +72,7 @@ The script writes a PostgreSQL custom-format dump into `backups\` and reports it
 
 The suspended Render database is not automatically copied into this local database. Do not change production `DATABASE_URL`, do not use the research database as a substitute, and do not overwrite local PostgreSQL with Supabase data.
 
-First request temporary access or an export from Render Support through the Render Dashboard. If Render requires the original database to be upgraded before export, pause and review the quoted cost before approving. Once an export is available, keep the original export unchanged, verify its file size and SHA-256 hash, restore it into a separate local database, and compare table/row counts before any application uses it.
+First request temporary access or an export from Render Support through the Render Dashboard. If Render requires the original database to be upgraded before export, pause and review the quoted cost before approving. Once an export is available, keep the original export unchanged, verify its file size and SHA-256 hash, restore it into a separate local database, and compare table/row counts before any application uses it. If the restored database contains encrypted broker credentials, the local `BROKER_CREDENTIALS_KEY` must be set to the exact original production key or those secrets will not decrypt. Retrieve that key directly from the Render Dashboard and enter it locally; never send it in chat or commit it. Keep the execution worker disabled during this review.
 
 Supabase contains some KINGBOT records but has not been established as a complete backup of the original Render database.
 
