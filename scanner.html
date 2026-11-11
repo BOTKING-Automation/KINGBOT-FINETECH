@@ -1014,6 +1014,18 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
   }
 }
 
+
+/* CORTEX pattern-recognition layer */
+body.kb-scanner-page .chart-pattern-panel{border-color:rgba(231,196,122,.18);background:linear-gradient(145deg,rgba(231,196,122,.035),rgba(255,255,255,.012))}
+body.kb-scanner-page .chart-pattern-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}
+body.kb-scanner-page .chart-pattern-item{min-width:0;padding:8px;border:1px solid rgba(159,178,210,.11);border-radius:7px;background:rgba(255,255,255,.018)}
+body.kb-scanner-page .chart-pattern-item strong{display:block;color:#e7edf5;font:800 7px "JetBrains Mono";letter-spacing:.025em;line-height:1.5}
+body.kb-scanner-page .chart-pattern-item small{display:block;margin-top:5px;color:#8795a9;font:700 6px "JetBrains Mono";line-height:1.55}
+body.kb-scanner-page .chart-pattern-item.confirmed{border-color:rgba(88,215,167,.24)}
+body.kb-scanner-page .chart-pattern-item.developing{border-color:rgba(231,196,122,.19)}
+body.kb-scanner-page .chart-pattern-item.invalidated{opacity:.68}
+body.kb-scanner-page .chart-pattern-note{display:block;color:#748299;font:700 6px/1.7 "JetBrains Mono";margin-top:7px}
+@media(max-width:620px){body.kb-scanner-page .chart-pattern-list{grid-template-columns:1fr}}
 </style>
 </head>
 <body class="kb-scanner-page">
@@ -1094,6 +1106,7 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
           <label class="chart-layer"><input id="chartLayerStructure" type="checkbox" checked> STRUCTURE</label>
           <label class="chart-layer"><input id="chartLayerZones" type="checkbox" checked> SMC ZONES</label>
           <label class="chart-layer"><input id="chartLayerRisk" type="checkbox" checked> RISK MAP</label>
+          <label class="chart-layer"><input id="chartLayerPatterns" type="checkbox" checked> PATTERNS</label>
         </div>
       </div>
       <div class="chart-live-row">
@@ -1135,6 +1148,12 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
         <div class="chart-stat"><span>TARGET 2</span><strong id="chartTarget2">—</strong></div>
         <div class="chart-stat"><span>SUPPORT</span><strong id="chartSupport">—</strong></div>
         <div class="chart-stat"><span>RESISTANCE</span><strong id="chartResistance">—</strong></div>
+      </div>
+      <div class="chart-ai-note chart-pattern-panel">
+        <strong>PRICE ACTION / PATTERN RECOGNITION</strong>
+        <span id="chartPatternSummary">Waiting for verified completed candles.</span>
+        <div id="chartPatternList" class="chart-pattern-list"></div>
+        <small class="chart-pattern-note">Completed OHLC only · active candle excluded · quality score is heuristic, not probability.</small>
       </div>
       <div class="chart-ai-note"><strong>AI DECISION / STRUCTURE</strong><span id="chartReason">Waiting for verified OHLC and the first scanner analysis.</span></div>
       <div class="chart-ai-note"><strong>CORTEX COUNCIL / RISK GATE</strong><span id="chartCouncilState">Waiting for the full specialist council decision.</span></div>
@@ -1217,6 +1236,7 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
 </main>
 <div id="toast" class="toast"></div>
 <script src="https://unpkg.com/lightweight-charts@5.3.0/dist/lightweight-charts.standalone.production.js"></script>
+<script src="system/cortex-pattern-engine.js"></script>
 <script src="system/session.js"></script>
 <script src="system/auth-gate.js"></script>
 <script src="system/access-control.js"></script>
@@ -1294,7 +1314,7 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
   }
 
   function chartLayerEnabled(name){
-    const map={ema:"chartLayerEma",structure:"chartLayerStructure",zones:"chartLayerZones",risk:"chartLayerRisk"};
+    const map={ema:"chartLayerEma",structure:"chartLayerStructure",zones:"chartLayerZones",risk:"chartLayerRisk",patterns:"chartLayerPatterns"};
     const element=qs(map[name]);
     return element?element.checked:true;
   }
@@ -1333,7 +1353,7 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
     const ema20=instance.addSeries(LW.LineSeries,{color:"#34e8b1",lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
     const ema50=instance.addSeries(LW.LineSeries,{color:"#f4c85a",lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
     const overlay=qs("chartOverlay");
-    const chartState={instance,candles,ema20,ema50,overlay,markerPlugin:null,priceLines:[],bars:[],zones:[],symbol:null,timeframe:null,signal:null,technical:null,lastTickAt:0,resizeObserver:null,ema20Value:null,ema50Value:null,ema20Previous:null,ema50Previous:null,emaTime:null,frameScheduled:false,pendingLiveBar:null,pendingNewBucket:false,pendingFollowLatest:false,tickTimes:[],lastTickKey:null,lastTickReceivedAt:0,lastExchangeAgeMs:null,lastPipeAgeMs:null,lastOverlayPaintAt:0};
+    const chartState={instance,candles,ema20,ema50,overlay,markerPlugin:null,priceLines:[],bars:[],zones:[],symbol:null,timeframe:null,signal:null,technical:null,lastTickAt:0,resizeObserver:null,ema20Value:null,ema50Value:null,ema20Previous:null,ema50Previous:null,emaTime:null,frameScheduled:false,pendingLiveBar:null,pendingNewBucket:false,pendingFollowLatest:false,tickTimes:[],lastTickKey:null,lastTickReceivedAt:0,lastExchangeAgeMs:null,lastPipeAgeMs:null,lastOverlayPaintAt:0,patterns:[],patternResult:null};
     state.chart=chartState;
     const resize=()=>{
       if(!state.chart||state.chart!==chartState)return;
@@ -1580,6 +1600,79 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
     return zones;
   }
 
+  function refreshChartPatternAnalysis(){
+    const chartState=state.chart;
+    if(!chartState)return null;
+    const engine=window.KINGBOT_CORTEX_PATTERNS;
+    if(!engine||state.chartPayload?.metadata?.verifiedOhlc!==true){
+      chartState.patternResult={ok:false,reason:engine?"VERIFIED_OHLC_REQUIRED":"PATTERN_ENGINE_UNAVAILABLE",barCount:0,patterns:[]};
+      chartState.patterns=[];renderChartPatternPanel();return chartState.patternResult;
+    }
+    chartState.patternResult=engine.analyze(chartState.bars,chartState.timeframe,Date.now());
+    chartState.patterns=chartState.patternResult.patterns||[];
+    renderChartPatternPanel();return chartState.patternResult;
+  }
+
+  function renderChartPatternPanel(){
+    const result=state.chart?.patternResult,summary=qs("chartPatternSummary"),list=qs("chartPatternList");
+    if(!summary||!list)return;
+    list.replaceChildren();
+    if(!result){summary.textContent="Waiting for verified completed candles.";return;}
+    if(!result.ok){
+      summary.textContent=result.reason==="PATTERN_ENGINE_UNAVAILABLE"?"Pattern engine is unavailable.":"Verified OHLC required before pattern analysis.";
+      return;
+    }
+    const count=result.patternCount||0;
+    summary.textContent=count?count+" formation"+(count===1?"":"s")+" · "+result.barCount+" closed candles analysed.":"No qualifying formation in "+result.barCount+" completed candles.";
+    (result.patterns||[]).slice(0,6).forEach(pattern=>{
+      const item=document.createElement("div");item.className="chart-pattern-item "+String(pattern.state||"").toLowerCase();
+      const title=document.createElement("strong");title.textContent=pattern.name+" · "+pattern.state;
+      const meta=document.createElement("small");meta.textContent=pattern.direction+" · QUALITY "+pattern.qualityScore+"/100";
+      item.append(title,meta);item.title=pattern.summary||"";list.appendChild(item);
+    });
+  }
+
+  function drawChartPatternOverlays(ctx,width,height,chartState,timeScale){
+    if(!chartLayerEnabled("patterns")||!chartState.patterns?.length)return;
+    const visible=timeScale.getVisibleLogicalRange();if(!visible)return;
+    const indexByTime=new Map(chartState.bars.map((bar,index)=>[bar.time,index]));
+    const xAt=time=>{const index=indexByTime.get(time);if(index===undefined||index<visible.from||index>visible.to)return null;return timeScale.logicalToCoordinate(index);};
+    const yAt=price=>{const y=chartState.candles.priceToCoordinate(Number(price));return Number.isFinite(y)?y:null;};
+    chartState.patterns.slice(0,6).forEach(pattern=>{
+      const color=pattern.direction==="BULLISH"?"#58d7a7":pattern.direction==="BEARISH"?"#f0788c":"#e7c47a";
+      ctx.save();ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=pattern.state==="CONFIRMED"?1.8:1.15;
+      ctx.setLineDash(pattern.state==="DEVELOPING"?[5,4]:pattern.state==="INVALIDATED"?[2,4]:[]);
+      (pattern.lines||[]).forEach(line=>{
+        const x1=xAt(line.fromTime),x2=xAt(line.toTime),y1=yAt(line.fromPrice),y2=yAt(line.toPrice);
+        if(x1===null||x2===null||y1===null||y2===null)return;
+        ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+      });
+      ctx.setLineDash([3,4]);
+      (pattern.levels||[]).forEach(level=>{
+        if(!["neckline","trigger","target","invalidation"].includes(level.role))return;
+        const x1=xAt(level.fromTime??pattern.startTime),x2=xAt(level.toTime??pattern.endTime),y=yAt(level.price);
+        if(x1===null||x2===null||y===null)return;
+        ctx.globalAlpha=level.role==="invalidation"?.48:.76;ctx.beginPath();ctx.moveTo(x1,y);ctx.lineTo(x2,y);ctx.stroke();
+      });
+      ctx.globalAlpha=1;ctx.setLineDash([]);
+      (pattern.points||[]).forEach(point=>{
+        const x=xAt(point.time),y=yAt(point.price);if(x===null||y===null)return;
+        ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();
+      });
+      const anchor=(pattern.points||[]).slice(-1)[0];
+      if(anchor){
+        const x=xAt(anchor.time),y=yAt(anchor.price);
+        if(x!==null&&y!==null){
+          const label=pattern.name.toUpperCase()+" / "+pattern.state;ctx.font='800 8px "JetBrains Mono",monospace';
+          const w=ctx.measureText(label).width+12,left=Math.max(3,Math.min(width-w-3,x+8)),top=Math.max(4,Math.min(height-18,y-20));
+          ctx.fillStyle="rgba(5,10,18,.92)";ctx.fillRect(left,top,w,15);ctx.strokeStyle=color;ctx.lineWidth=1;ctx.strokeRect(left,top,w,15);
+          ctx.fillStyle=color;ctx.fillText(label,left+6,top+10.5);
+        }
+      }
+      ctx.restore();
+    });
+  }
+
   function drawChartZones(){
     const chartState=state.chart;
     const canvas=chartState?.overlay;
@@ -1598,12 +1691,14 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
     if(!ctx)return;
     ctx.setTransform(ratio,0,0,ratio,0,0);
     ctx.clearRect(0,0,width,height);
-    if(!chartLayerEnabled("zones")||!chartState.zones?.length)return;
+    const showZones=chartLayerEnabled("zones")&&Boolean(chartState.zones?.length);
+    const showPatterns=chartLayerEnabled("patterns")&&Boolean(chartState.patterns?.length);
+    if(!showZones&&!showPatterns)return;
     const timeScale=chartState.instance.timeScale();
     const visible=timeScale.getVisibleLogicalRange();
     if(!visible)return;
     const barIndexByTime=new Map(chartState.bars.map((bar,index)=>[bar.time,index]));
-    chartState.zones.forEach(zone=>{
+    if(showZones)chartState.zones.forEach(zone=>{
       const startIndex=barIndexByTime.get(zone.startTime);
       const endIndex=barIndexByTime.get(zone.endTime);
       if(startIndex===undefined||endIndex===undefined)return;
@@ -1636,6 +1731,7 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
       ctx.fillText(zone.label,x1+10,Math.max(14,y1+14));
       ctx.restore();
     });
+    if(showPatterns)drawChartPatternOverlays(ctx,width,height,chartState,timeScale);
   }
 
   function refreshChartLayers(){
@@ -1645,6 +1741,7 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
     chartState.signal=current.signal;
     chartState.technical=current.technical;
     chartState.zones=buildChartZones();
+    refreshChartPatternAnalysis();
     chartState.priceLines.forEach(line=>{
       try{chartState.candles.removePriceLine(line);}catch{}
     });
@@ -1758,6 +1855,9 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
       state.chartPayload=null;
       chartState.bars=[];
       chartState.zones=[];
+      chartState.patterns=[];
+      chartState.patternResult=null;
+      renderChartPatternPanel();
       chartState.priceLines.forEach(line=>{try{chartState.candles.removePriceLine(line);}catch{}});
       chartState.priceLines=[];
       chartState.candles.setData([]);
@@ -1831,6 +1931,7 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
       const now=Date.now();
       if(newBucket||now-chartState.lastOverlayPaintAt>=250){
         chartState.zones=buildChartZones();
+        if(newBucket)refreshChartPatternAnalysis();
         drawChartZones();
         chartState.lastOverlayPaintAt=now;
       }
@@ -2421,7 +2522,7 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
     connectScannerStream();
     loadChart().catch(()=>{});
   });
-  ["chartLayerEma","chartLayerStructure","chartLayerZones","chartLayerRisk"].forEach(id=>{
+  ["chartLayerEma","chartLayerStructure","chartLayerZones","chartLayerRisk","chartLayerPatterns"].forEach(id=>{
     qs(id)?.addEventListener("change",()=>{
       if(id==="chartLayerEma")setChartIndicators();
       refreshChartLayers();
