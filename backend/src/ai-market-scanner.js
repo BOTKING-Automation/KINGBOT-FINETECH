@@ -320,6 +320,89 @@ export function deriveTechnicalFromBars(bars) {
     barTime:last.datetime||null,receivedAt:new Date().toISOString()
   };
 }
+
+function chartEpochSeconds(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    if (numeric > 1e12) return Math.floor(numeric / 1000);
+    if (numeric > 1e9) return Math.floor(numeric);
+  }
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed / 1000) : null;
+}
+
+export function buildScannerChartPayload(rows, { symbol, timeframe = DEFAULT_TF, source = "Deriv public historical candles" } = {}) {
+  const byTime = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const time = chartEpochSeconds(row?.time ?? row?.datetime ?? row?.timestamp);
+    const open = Number(row?.open);
+    const high = Number(row?.high);
+    const low = Number(row?.low);
+    const close = Number(row?.close);
+    const volume = Number(row?.volume ?? row?.tick_count ?? 0);
+    if (
+      !Number.isSafeInteger(time) || time <= 0 ||
+      ![open, high, low, close].every(Number.isFinite) ||
+      open <= 0 || low <= 0 ||
+      high < Math.max(open, close) ||
+      low > Math.min(open, close) ||
+      high < low
+    ) continue;
+    byTime.set(time, {
+      time,
+      open,
+      high,
+      low,
+      close,
+      volume: Number.isFinite(volume) && volume >= 0 ? volume : 0
+    });
+  }
+
+  const bars = [...byTime.values()].sort((a, b) => a.time - b.time).slice(-500);
+  if (bars.length < 80) throw new Error("INSUFFICIENT_HISTORICAL_CANDLES");
+
+  const technical = deriveTechnicalFromBars(
+    bars.map(bar => ({ ...bar, datetime: new Date(bar.time * 1000).toISOString() }))
+  );
+  if (!technical) throw new Error("CHART_TECHNICAL_ANALYSIS_UNAVAILABLE");
+
+  const nativeSignal = technicalEngine(technical);
+  const signalContext = {
+    ...technical,
+    ...nativeSignal,
+    symbol: String(symbol || "").trim().toUpperCase(),
+    timeframe: cleanTimeframe(timeframe),
+    price: technical.price,
+    technicalVerified: true
+  };
+  const pendingOrderZones = predictPendingOrderZones(signalContext);
+
+  return {
+    ok: true,
+    scanner: "KINGBOT AI MARKET SCANNER",
+    mode: "chart",
+    symbol: signalContext.symbol,
+    timeframe: signalContext.timeframe,
+    source: String(source || "Deriv public historical candles"),
+    executionAuthority: "NONE",
+    brokerRequired: false,
+    generatedAt: new Date().toISOString(),
+    bars,
+    technical,
+    signal: {
+      ...nativeSignal,
+      pendingOrderZones
+    },
+    metadata: {
+      barsCount: bars.length,
+      lastBarTime: new Date(bars[bars.length - 1].time * 1000).toISOString(),
+      verifiedOhlc: true,
+      provider: "deriv-public"
+    }
+  };
+}
+
 async function fetchTwelveDataTechnical(twelveData, symbols, timeframe) {
   if(!twelveData?.enabled)return [];
   return Promise.all(symbols.map(async symbol=>{
@@ -1362,6 +1445,64 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
       }
     });
   });
+
+
+  const chartLimiter = rateLimit({
+    windowMs:60*1000,
+    limit:Number(process.env.AI_SCANNER_CHART_REQUESTS_PER_MINUTE || 24),
+    standardHeaders:"draft-8",
+    legacyHeaders:false,
+    message:{ok:false,error:"Chart history request limit reached. Wait a moment and retry."}
+  });
+
+  const chartHandler=async(req,res)=>{
+    const requestedSymbol=String(req.query?.symbol || "").trim().toUpperCase();
+    const symbol=cleanSymbols(requestedSymbol)[0];
+    if(!requestedSymbol || !symbol){
+      return res.status(400).json({ok:false,error:"CHART_SYMBOL_REQUIRED",executionAuthority:"NONE"});
+    }
+    const timeframe=cleanTimeframe(req.query?.timeframe || DEFAULT_TF);
+    const limit=Math.max(120,Math.min(500,Math.floor(Number(req.query?.limit) || 300)));
+    try{
+      // This chart endpoint deliberately uses the existing free Deriv public
+      // candle feed only. It does not require customer broker credentials,
+      // TradingView webhooks, or a paid market-data subscription.
+      const bars=await publicDerivFeed.getHistoricalCandles(symbol,{
+        timeframe,
+        limit,
+        timeoutMs:10000
+      });
+      const payload=buildScannerChartPayload(bars,{
+        symbol,
+        timeframe,
+        source:"Deriv public historical candles"
+      });
+      const feedStatus=publicDerivFeed.status(symbol);
+      return res.json({
+        ...payload,
+        marketData:{
+          provider:"Deriv public market feed",
+          connected:Boolean(feedStatus.connected),
+          brokerIndependent:true
+        }
+      });
+    }catch(error){
+      const reason=String(error?.message || "DERIV_PUBLIC_CHART_DATA_UNAVAILABLE").slice(0,160);
+      console.warn("[KINGBOT SCANNER CHART]",symbol,timeframe,reason);
+      return res.status(503).json({
+        ok:false,
+        error:"SCANNER_CHART_DATA_UNAVAILABLE",
+        reason,
+        symbol,
+        timeframe,
+        executionAuthority:"NONE",
+        brokerRequired:false
+      });
+    }
+  };
+
+  app.get("/api/ai/market-scanner/chart",chartLimiter,chartHandler);
+  app.get("/api/market-scanner/chart",chartLimiter,chartHandler);
 
   const scanHandler=async(req,res)=>{ await runMarketScan({pool,twelveData,req,res}); };
   app.get("/api/ai/market-scanner",limiter,scanHandler);
