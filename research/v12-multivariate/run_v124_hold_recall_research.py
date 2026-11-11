@@ -46,6 +46,17 @@ FOCAL_GAMMA = 1.5
 EFFECTIVE_BETA = 0.999
 
 
+def unchanged_acceptance_gates() -> dict[str, Any]:
+    """Return the V12 acceptance thresholds without redefining or weakening them."""
+    return {
+        "balancedAccuracy": v12.MIN_BA,
+        "macroF1": v12.MIN_F1,
+        "minimumFinalSamples": v12.MIN_N,
+        "nonzeroRecall": ["SELL", "HOLD", "BUY"],
+        "finalSelectionScoreDeltaVsV9": v12.MIN_DELTA,
+    }
+
+
 def _labels(train_y: np.ndarray) -> np.ndarray:
     return np.asarray(
         [service.LABEL_TO_INDEX[int(value)] for value in train_y],
@@ -338,13 +349,7 @@ def run(input_path: Path, output_path: Path) -> int:
             "forwardLabelPurging": True,
             "matchedBaseline": "V9 RF+PyTorch 55/45 on the identical fold rows; recomputed per fold",
             "selection": "Only profiles passing unchanged development quality gates and delta >= -0.01 are eligible; best development selection score wins, HOLD recall is a tie-break only.",
-            "unchangedGates": {
-                "balancedAccuracy": v12.MIN_BA,
-                "macroF1": v12.MIN_MACRO_F1,
-                "minimumFinalSamples": v12.MIN_N,
-                "nonzeroRecall": ["SELL", "HOLD", "BUY"],
-                "finalSelectionScoreDeltaVsV9": v12.MIN_DELTA,
-            },
+            "unchangedGates": unchanged_acceptance_gates(),
             "promotion": "No model persistence, registry, production inference or execution promotion.",
         },
         "dataFetch": {
