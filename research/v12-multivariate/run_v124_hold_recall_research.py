@@ -159,7 +159,8 @@ def _matched_v9(data: dict[str, Any], train_mask: np.ndarray,
 
 
 def _run_loss_fold(data: dict[str, Any], train_fraction: float,
-                   test_fraction: float) -> dict[str, Any]:
+                   test_fraction: float,
+                   profiles: tuple[str, ...] = LOSS_PROFILES) -> dict[str, Any]:
     train_mask, eval_mask, cutoff = v123._fold_masks(
         data, train_fraction, test_fraction
     )
@@ -174,7 +175,9 @@ def _run_loss_fold(data: dict[str, Any], train_fraction: float,
     context = data["contextVariants"]["full_cortex"]
 
     profiles: dict[str, Any] = {}
-    for profile in LOSS_PROFILES:
+    if not profiles or any(profile not in LOSS_PROFILES for profile in profiles):
+        raise ValueError("V124_LOSS_PROFILE_SELECTION_INVALID")
+    for profile in profiles:
         probabilities = fit_predict(
             target[train_mask], C[train_mask], M[train_mask], A[train_mask],
             train_y, target[eval_mask], C[eval_mask], M[eval_mask],
@@ -227,7 +230,8 @@ def run_pilot(strategy: str, timeframe: str,
     )
     development = _run_loss_fold(data, 0.70, 0.85)
     selected = select_development_profile(development)
-    final_fold = _run_loss_fold(data, 0.85, 1.0) if selected else None
+    # Final data is run only once for the single profile frozen by development.
+    final_fold = _run_loss_fold(data, 0.85, 1.0, (selected,)) if selected else None
     final_result = final_fold["profiles"][selected] if final_fold else None
     final_delta = (
         float(final_result["selectionScoreDeltaVsV9"])
