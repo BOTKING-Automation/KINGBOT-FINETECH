@@ -1404,7 +1404,10 @@ function registerPublicDerivChartStream(server) {
       return;
     }
 
-    const client = { ws, symbol: null, unsubscribe: null, closed: false, isAlive: true };
+    const client = {
+      ws, symbol: null, pendingSymbol: null, unsubscribe: null,
+      subscriptionGeneration: 0, closed: false, isAlive: true
+    };
     clients.add(client);
     send(client, {
       type: "hello",
@@ -1417,6 +1420,8 @@ function registerPublicDerivChartStream(server) {
     const cleanup = () => {
       if (client.closed) return;
       client.closed = true;
+      client.subscriptionGeneration += 1;
+      client.pendingSymbol = null;
       clearInterval(client.heartbeat);
       unsubscribe(client);
       clients.delete(client);
@@ -1453,13 +1458,17 @@ function registerPublicDerivChartStream(server) {
         send(client, { type: "chart_error", error: "CHART_SYMBOL_INVALID" });
         return;
       }
-      if (client.symbol === symbol && typeof client.unsubscribe === "function") {
-        send(client, { type: "subscribed", symbol, provider: "Deriv public market feed" });
+      if (client.symbol === symbol && (
+        client.pendingSymbol === symbol || typeof client.unsubscribe === "function"
+      )) {
+        send(client, { type: "subscribed", symbol, provider: "Deriv public market feed", pending:client.pendingSymbol===symbol });
         return;
       }
 
       unsubscribe(client);
       client.symbol = symbol;
+      client.pendingSymbol = symbol;
+      const subscriptionGeneration = ++client.subscriptionGeneration;
       // Compare the raw Deriv identifiers against the exact symbol that the
       // same feed normalized for history/tick subscription. Keep the browser
       // market label canonical so FRX-prefixed and broker aliases stay aligned.
@@ -1474,7 +1483,14 @@ function registerPublicDerivChartStream(server) {
           canonicalSymbol === symbol
         );
         const price = finite(quote?.price);
-        if (client.symbol !== symbol || !matchesFeedSymbol || price === null || price <= 0) return;
+        if (
+          client.closed ||
+          client.symbol !== symbol ||
+          client.subscriptionGeneration !== subscriptionGeneration ||
+          !matchesFeedSymbol ||
+          price === null ||
+          price <= 0
+        ) return;
         send(client, {
           type: "quote",
           quote: {
@@ -1492,10 +1508,15 @@ function registerPublicDerivChartStream(server) {
           streamAt: new Date().toISOString()
         });
       }).then(stop => {
-        if (client.closed || client.symbol !== symbol) {
+        if (
+          client.closed ||
+          client.symbol !== symbol ||
+          client.subscriptionGeneration !== subscriptionGeneration
+        ) {
           try { stop(); } catch {}
           return;
         }
+        client.pendingSymbol = null;
         client.unsubscribe = stop;
         send(client, {
           type: "subscribed",
@@ -1504,6 +1525,8 @@ function registerPublicDerivChartStream(server) {
           brokerIndependent: true
         });
       }).catch(error => {
+        if (client.closed || client.subscriptionGeneration !== subscriptionGeneration) return;
+        client.pendingSymbol = null;
         send(client, {
           type: "chart_error",
           symbol,
