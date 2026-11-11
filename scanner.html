@@ -586,6 +586,95 @@ body.kb-scanner-page .symbol-card.is-unavailable .symbol-price{color:#8490a8;tex
   body.kb-scanner-page .evidence-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   body.kb-scanner-page .evidence-source{max-width:52%}
 }
+
+/* CORTEX LIVE CHART — verified OHLC, signal levels and structural overlays */
+body.kb-scanner-page .chart-workspace{
+  display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,.62fr);gap:12px;
+  margin-top:10px;align-items:stretch
+}
+body.kb-scanner-page .chart-main,body.kb-scanner-page .chart-intelligence{
+  min-width:0;border:1px solid rgba(142,164,255,.13);border-radius:17px;
+  background:linear-gradient(145deg,rgba(10,16,38,.92),rgba(3,7,18,.96));
+  box-shadow:0 18px 52px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.025)
+}
+body.kb-scanner-page .chart-main{padding:13px}
+body.kb-scanner-page .chart-toolbar{
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-bottom:10px
+}
+body.kb-scanner-page .chart-toolbar-left,body.kb-scanner-page .chart-toolbar-right{
+  display:flex;gap:7px;align-items:center;flex-wrap:wrap
+}
+body.kb-scanner-page .chart-select{
+  min-height:36px;padding:8px 10px;border:1px solid rgba(142,164,255,.16);border-radius:9px;
+  color:#eef3ff;background:#081127;font:800 8px "JetBrains Mono";outline:none
+}
+body.kb-scanner-page .chart-layer{
+  display:inline-flex;align-items:center;gap:5px;padding:7px 8px;border:1px solid rgba(142,164,255,.12);
+  border-radius:8px;color:#a7b4ce;background:rgba(255,255,255,.018);font:800 7px "JetBrains Mono";
+  cursor:pointer;user-select:none
+}
+body.kb-scanner-page .chart-layer input{width:11px;height:11px;accent-color:#30dff3}
+body.kb-scanner-page .chart-live-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:3px 2px 8px}
+body.kb-scanner-page .chart-live-state{display:inline-flex;align-items:center;gap:7px;color:#6be7ba;font:800 7px "JetBrains Mono";letter-spacing:.08em}
+body.kb-scanner-page .chart-live-state:before{content:"";width:6px;height:6px;border-radius:50%;background:#40e7ae;box-shadow:0 0 12px rgba(64,231,174,.7)}
+body.kb-scanner-page .chart-live-state.warn{color:#ffd166}
+body.kb-scanner-page .chart-live-state.warn:before{background:#ffd166;box-shadow:0 0 12px rgba(255,209,102,.55)}
+body.kb-scanner-page .chart-live-state.bad{color:#ff8299}
+body.kb-scanner-page .chart-live-state.bad:before{background:#ff5578;box-shadow:0 0 12px rgba(255,85,120,.55)}
+body.kb-scanner-page .chart-price{color:#f7f9ff;font:900 12px "JetBrains Mono";font-variant-numeric:tabular-nums}
+body.kb-scanner-page #marketChart{
+  position:relative;width:100%;height:470px;overflow:hidden;border:1px solid rgba(142,164,255,.10);
+  border-radius:12px;background:#050a18
+}
+body.kb-scanner-page #chartOverlay{
+  position:absolute;inset:0;width:100%;height:100%;z-index:6;pointer-events:none
+}
+body.kb-scanner-page .chart-legend{
+  display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:9px 2px 0;color:#7786a5;
+  font:800 7px "JetBrains Mono"
+}
+body.kb-scanner-page .chart-legend span{display:inline-flex;align-items:center;gap:5px}
+body.kb-scanner-page .chart-legend i{display:inline-block;width:12px;height:2px;border-radius:4px}
+body.kb-scanner-page .chart-attribution{margin-top:8px;color:#71809f;font-size:7px;line-height:1.6}
+body.kb-scanner-page .chart-attribution a{color:#8ea8d9;text-decoration:underline;text-underline-offset:2px}
+body.kb-scanner-page .chart-intelligence{padding:14px;display:flex;flex-direction:column;gap:10px}
+body.kb-scanner-page .chart-ai-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+body.kb-scanner-page .chart-ai-title{color:#9aabc9;font:900 8px "JetBrains Mono";letter-spacing:.14em}
+body.kb-scanner-page .chart-ai-symbol{margin-top:7px;color:#fff;font:900 20px Orbitron;letter-spacing:.04em}
+body.kb-scanner-page .chart-signal-badge{
+  padding:7px 8px;border:1px solid rgba(255,209,102,.2);border-radius:8px;color:#ffd98a;
+  background:rgba(255,209,102,.05);font:900 7px "JetBrains Mono";text-align:center;white-space:nowrap
+}
+body.kb-scanner-page .chart-signal-badge.bull{color:#68efb7;border-color:rgba(70,231,173,.2);background:rgba(70,231,173,.05)}
+body.kb-scanner-page .chart-signal-badge.bear{color:#ff8da3;border-color:rgba(255,85,120,.22);background:rgba(255,85,120,.05)}
+body.kb-scanner-page .chart-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+body.kb-scanner-page .chart-stat{
+  min-width:0;padding:10px;border:1px solid rgba(142,164,255,.10);border-radius:10px;background:rgba(255,255,255,.018)
+}
+body.kb-scanner-page .chart-stat span{display:block;color:#8290ad;font:800 7px "JetBrains Mono";letter-spacing:.06em}
+body.kb-scanner-page .chart-stat strong{display:block;margin-top:6px;color:#f2f5ff;font:900 10px "JetBrains Mono";overflow-wrap:anywhere}
+body.kb-scanner-page .chart-stat strong.good{color:#68efb7}
+body.kb-scanner-page .chart-stat strong.bad{color:#ff8da3}
+body.kb-scanner-page .chart-ai-note{
+  padding:11px;border:1px solid rgba(34,230,255,.12);border-radius:10px;
+  background:linear-gradient(145deg,rgba(34,230,255,.045),rgba(166,108,255,.025));
+  color:#aebbd5;font-size:8px;line-height:1.7;overflow-wrap:anywhere
+}
+body.kb-scanner-page .chart-ai-note strong{display:block;margin-bottom:5px;color:#54dff1;font:900 7px "JetBrains Mono";letter-spacing:.1em}
+body.kb-scanner-page .chart-data-note{
+  margin-top:auto;padding-top:10px;border-top:1px solid rgba(142,164,255,.09);
+  color:#72809e;font:700 7px/1.7 "JetBrains Mono"
+}
+@media(max-width:1000px){body.kb-scanner-page .chart-workspace{grid-template-columns:1fr}}
+@media(max-width:620px){
+  body.kb-scanner-page #marketChart{height:350px}
+  body.kb-scanner-page .chart-main{padding:9px}
+  body.kb-scanner-page .chart-toolbar{align-items:flex-start}
+  body.kb-scanner-page .chart-toolbar-right{width:100%}
+  body.kb-scanner-page .chart-layer{padding:6px}
+  body.kb-scanner-page .chart-live-row{align-items:flex-start;flex-direction:column}
+}
+
 </style>
 </head>
 <body class="kb-scanner-page">
@@ -633,6 +722,67 @@ body.kb-scanner-page .symbol-card.is-unavailable .symbol-price{color:#8490a8;tex
 <section class="section">
   <div class="section-title">LIVE QUOTE UNIVERSE</div>
   <div id="symbolGrid" class="symbol-grid" style="margin-top:10px"></div>
+</section>
+
+
+<section class="section" id="cortexLiveChartSection">
+  <div class="section-title">CORTEX LIVE MARKET CHART</div>
+  <div class="section-sub">Verified OHLC candles with KINGBOT’s live technical structure, risk map and AI decision context. Analysis-only; no broker connection required.</div>
+  <div class="chart-workspace">
+    <article class="chart-main">
+      <div class="chart-toolbar">
+        <div class="chart-toolbar-left">
+          <select id="chartSymbol" class="chart-select" aria-label="Chart market">
+            <option value="XAUUSD">XAUUSD</option>
+          </select>
+          <button id="chartRefresh" class="btn" type="button">REFRESH OHLC</button>
+        </div>
+        <div class="chart-toolbar-right">
+          <label class="chart-layer"><input id="chartLayerEma" type="checkbox" checked> EMA 20/50</label>
+          <label class="chart-layer"><input id="chartLayerStructure" type="checkbox" checked> STRUCTURE</label>
+          <label class="chart-layer"><input id="chartLayerZones" type="checkbox" checked> SMC ZONES</label>
+          <label class="chart-layer"><input id="chartLayerRisk" type="checkbox" checked> RISK MAP</label>
+        </div>
+      </div>
+      <div class="chart-live-row">
+        <span id="chartDataState" class="chart-live-state warn">WAITING FOR VERIFIED OHLC</span>
+        <span id="chartLastPrice" class="chart-price">—</span>
+      </div>
+      <div id="marketChart" role="img" aria-label="KINGBOT live candlestick chart with technical and risk overlays">
+        <canvas id="chartOverlay" aria-hidden="true"></canvas>
+      </div>
+      <div class="chart-legend">
+        <span><i style="background:#34e8b1"></i> EMA 20</span>
+        <span><i style="background:#f4c85a"></i> EMA 50</span>
+        <span><i style="background:#5fd8ff"></i> ENTRY / BOS</span>
+        <span><i style="background:#ff6e89"></i> STOP / BEARISH</span>
+        <span><i style="background:#a98cff"></i> SMC ZONES</span>
+      </div>
+      <div class="chart-attribution">Charting engine: <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener noreferrer">Lightweight Charts™</a> (open-source). Market candles are supplied by KINGBOT’s existing free public Deriv feed; this is not a paid TradingView data or webhook connection.</div>
+    </article>
+    <aside class="chart-intelligence" aria-label="Cortex chart signal details">
+      <div class="chart-ai-head">
+        <div>
+          <div class="chart-ai-title">CORTEX / SIGNAL MAP</div>
+          <div id="chartAiSymbol" class="chart-ai-symbol">XAUUSD</div>
+        </div>
+        <span id="chartSignalBadge" class="chart-signal-badge">WAITING</span>
+      </div>
+      <div class="chart-stat-grid">
+        <div class="chart-stat"><span>DIRECTION</span><strong id="chartBias">—</strong></div>
+        <div class="chart-stat"><span>MODEL SCORE</span><strong id="chartScore">—</strong></div>
+        <div class="chart-stat"><span>ENTRY REFERENCE</span><strong id="chartEntry">—</strong></div>
+        <div class="chart-stat"><span>STOP LOSS</span><strong id="chartStop">—</strong></div>
+        <div class="chart-stat"><span>TARGET 1</span><strong id="chartTarget1">—</strong></div>
+        <div class="chart-stat"><span>TARGET 2</span><strong id="chartTarget2">—</strong></div>
+        <div class="chart-stat"><span>SUPPORT</span><strong id="chartSupport">—</strong></div>
+        <div class="chart-stat"><span>RESISTANCE</span><strong id="chartResistance">—</strong></div>
+      </div>
+      <div class="chart-ai-note"><strong>AI DECISION / STRUCTURE</strong><span id="chartReason">Waiting for verified OHLC and the first scanner analysis.</span></div>
+      <div class="chart-ai-note"><strong>FIVE-SPECIALIST CORTEX</strong><span id="chartSpecialist">CORTEX decision context will appear when this symbol is the active focus market.</span></div>
+      <div class="chart-data-note" id="chartProvenance">No chart data loaded. Signal drawings remain disabled until valid candles are returned.</div>
+    </aside>
+  </div>
 </section>
 
 <section class="section scan-layout">
@@ -707,6 +857,7 @@ body.kb-scanner-page .symbol-card.is-unavailable .symbol-price{color:#8490a8;tex
 </section>
 </main>
 <div id="toast" class="toast"></div>
+<script src="https://unpkg.com/lightweight-charts@5.3.0/dist/lightweight-charts.standalone.production.js"></script>
 <script src="system/session.js"></script>
 <script src="system/auth-gate.js"></script>
 <script src="system/access-control.js"></script>
