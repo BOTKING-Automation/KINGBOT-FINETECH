@@ -1,0 +1,17 @@
+FROM python:3.13.5-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+COPY ml-signal-service/requirements.txt ./requirements.txt
+RUN python -m pip install --upgrade pip \
+    && python -m pip install -r requirements.txt
+
+COPY ml-signal-service/service.py ./service.py
+COPY ml-signal-service/model_store.py ./model_store.py
+
+EXPOSE 10001
+
+CMD ["python", "service.py"]
