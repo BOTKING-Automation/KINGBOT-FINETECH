@@ -996,7 +996,7 @@ body.kb-scanner-page .chart-data-note{
     const ema20=instance.addSeries(LW.LineSeries,{color:"#34e8b1",lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
     const ema50=instance.addSeries(LW.LineSeries,{color:"#f4c85a",lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
     const overlay=qs("chartOverlay");
-    const chartState={instance,candles,ema20,ema50,overlay,markerPlugin:null,priceLines:[],bars:[],zones:[],symbol:null,timeframe:null,signal:null,technical:null,lastTickAt:0,resizeObserver:null,ema20Value:null,ema50Value:null,ema20Previous:null,ema50Previous:null,emaTime:null,frameScheduled:false,pendingLiveBar:null,pendingNewBucket:false,pendingFollowLatest:false,tickTimes:[],lastTickKey:null,lastExchangeAgeMs:null,lastPipeAgeMs:null,lastOverlayPaintAt:0};
+    const chartState={instance,candles,ema20,ema50,overlay,markerPlugin:null,priceLines:[],bars:[],zones:[],symbol:null,timeframe:null,signal:null,technical:null,lastTickAt:0,resizeObserver:null,ema20Value:null,ema50Value:null,ema20Previous:null,ema50Previous:null,emaTime:null,frameScheduled:false,pendingLiveBar:null,pendingNewBucket:false,pendingFollowLatest:false,tickTimes:[],lastTickKey:null,lastTickReceivedAt:0,lastExchangeAgeMs:null,lastPipeAgeMs:null,lastOverlayPaintAt:0};
     state.chart=chartState;
     const resize=()=>{
       if(!state.chart||state.chart!==chartState)return;
@@ -1555,7 +1555,9 @@ body.kb-scanner-page .chart-data-note{
     const bars=chartState.bars;
     const last=bars[bars.length-1];
     if(bucket<last.time)return;
+    if(Number.isFinite(receivedAt)&&receivedAt>0&&receivedAt<chartState.lastTickReceivedAt)return;
     if(tickKey)chartState.lastTickKey=tickKey;
+    if(Number.isFinite(receivedAt)&&receivedAt>0)chartState.lastTickReceivedAt=receivedAt;
     const now=Date.now();
     chartState.tickTimes.push(now);
     chartState.lastTickAt=now;
