@@ -1,0 +1,64 @@
+name: KINGBOT Cortex Live Chart CI
+
+on:
+  push:
+    branches: [feature/cortex-live-chart-overlays]
+    paths:
+      - "scanner.html"
+      - "backend/src/ai-market-scanner.js"
+      - "backend/test/scanner-chart-payload.test.js"
+      - ".github/workflows/cortex-live-chart.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scanner.html"
+      - "backend/src/ai-market-scanner.js"
+      - "backend/test/scanner-chart-payload.test.js"
+      - ".github/workflows/cortex-live-chart.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  chart-validation:
+    name: Chart source, payload and freshness validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install backend runtime dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+
+      - name: Check backend and test syntax
+        run: |
+          node --check backend/src/ai-market-scanner.js
+          node --check backend/test/scanner-chart-payload.test.js
+
+      - name: Check scanner page JavaScript syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          html = Path("scanner.html").read_text(encoding="utf-8")
+          start = html.rfind("<script>")
+          if start < 0:
+              raise SystemExit("Scanner inline script was not found.")
+          start += len("<script>")
+          end = html.find("</script>", start)
+          if end < 0:
+              raise SystemExit("Scanner inline script closing tag was not found.")
+          Path("/tmp/kingbot-scanner-inline.js").write_text(html[start:end], encoding="utf-8")
+          PY
+          node --check /tmp/kingbot-scanner-inline.js
+
+      - name: Validate chart payload, OHLC filtering and freshness
+        working-directory: backend
+        run: node --test test/scanner-chart-payload.test.js

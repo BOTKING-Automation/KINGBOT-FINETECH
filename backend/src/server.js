@@ -775,7 +775,12 @@ app.use((_req, res) => {
   res.status(404).json({ ok: false, error: "Route not found." });
 });
 
-ensureAuthSchema(pool).then(() => ensureAuditIntegritySchema(pool)).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => ensureFintechOpsSchema(pool)).then(() => ensureGlobalRiskSchema(pool)).then(() => ensureGoldSignalsSchema(pool)).then(() => ensureAiMarketScannerSchema(pool)).then(() => ensureIntelligenceOrchestratorSchema(pool)).then(() => partners.ensureSchema()).then(() => eventBus.ensureSchema()).then(() => ensureUserMemorySchema(pool)).then(() => ensureCommercialLedgerSchema(pool)).then(() => ensureMlArtifactsSchema(pool)).then(() => {
+ensureAuthSchema(pool).then(() => ensureAuditIntegritySchema(pool)).then(() => ensureSubscriptionSchema(pool)).then(() => ensureBotEngineSchema(pool)).then(() => ensureBotRuntimeSchema(pool)).then(() => broker.ensureSchema()).then(() => ensureMt5BridgeSchema(pool)).then(() => ensureMt5HostingSchema(pool)).then(() => ensureFintechOpsSchema(pool)).then(() => ensureGlobalRiskSchema(pool)).then(() => ensureGoldSignalsSchema(pool)).then(() => ensureAiMarketScannerSchema(pool)).then(() => ensureIntelligenceOrchestratorSchema(pool)).then(() => partners.ensureSchema()).then(() => eventBus.ensureSchema()).then(() => ensureUserMemorySchema(pool)).then(() => ensureCommercialLedgerSchema(pool)).then(() => {
+  // The isolated CORTEX chart preview serves public Deriv market data only.
+  // It intentionally has no customer, broker, or model-artifact database.
+  if (String(process.env.KINGBOT_CORTEX_CHART_PREVIEW || "").trim() === "1") return;
+  return ensureMlArtifactsSchema(pool);
+}).then(() => {
   eventBus.start().catch(error => console.warn("[KINGBOT EVENT BUS] startup deferred:",error?.message||error));
   httpServer.listen(PORT, () => {
     console.log(`KINGBOT FINTECH backend listening on port ${PORT}`);

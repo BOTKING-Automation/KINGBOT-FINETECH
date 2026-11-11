@@ -320,6 +320,103 @@ export function deriveTechnicalFromBars(bars) {
     barTime:last.datetime||null,receivedAt:new Date().toISOString()
   };
 }
+
+function chartEpochSeconds(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    if (numeric > 1e12) return Math.floor(numeric / 1000);
+    if (numeric > 1e9) return Math.floor(numeric);
+  }
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed / 1000) : null;
+}
+
+export function buildScannerChartPayload(rows, { symbol, timeframe = DEFAULT_TF, source = "Deriv public historical candles" } = {}) {
+  const byTime = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const time = chartEpochSeconds(row?.time ?? row?.datetime ?? row?.timestamp);
+    const open = Number(row?.open);
+    const high = Number(row?.high);
+    const low = Number(row?.low);
+    const close = Number(row?.close);
+    const volume = Number(row?.volume ?? row?.tick_count ?? 0);
+    if (
+      !Number.isSafeInteger(time) || time <= 0 ||
+      ![open, high, low, close].every(Number.isFinite) ||
+      open <= 0 || low <= 0 ||
+      high < Math.max(open, close) ||
+      low > Math.min(open, close) ||
+      high < low
+    ) continue;
+    byTime.set(time, {
+      time,
+      open,
+      high,
+      low,
+      close,
+      volume: Number.isFinite(volume) && volume >= 0 ? volume : 0
+    });
+  }
+
+  const bars = [...byTime.values()].sort((a, b) => a.time - b.time).slice(-500);
+  if (bars.length < 80) throw new Error("INSUFFICIENT_HISTORICAL_CANDLES");
+
+  const technical = deriveTechnicalFromBars(
+    bars.map(bar => ({ ...bar, datetime: new Date(bar.time * 1000).toISOString() }))
+  );
+  if (!technical) throw new Error("CHART_TECHNICAL_ANALYSIS_UNAVAILABLE");
+
+  const nativeSignal = technicalEngine(technical);
+  const signalContext = {
+    ...technical,
+    ...nativeSignal,
+    symbol: String(symbol || "").trim().toUpperCase(),
+    timeframe: cleanTimeframe(timeframe),
+    price: technical.price,
+    technicalVerified: true
+  };
+  const pendingOrderZones = predictPendingOrderZones(signalContext);
+
+  const intervalSeconds = ({
+    "1m":60,"3m":180,"5m":300,"15m":900,"30m":1800,
+    "1h":3600,"2h":7200,"4h":14400,"1d":86400,"1w":604800
+  })[cleanTimeframe(timeframe)] || 300;
+  const lastBar = bars[bars.length - 1];
+  const lastBarCloseMs = (lastBar.time + intervalSeconds) * 1000;
+  const ageSinceCloseMs = Math.max(0, Date.now() - lastBarCloseMs);
+  const freshnessLimitMs = Math.max(2 * intervalSeconds * 1000, 10 * 60 * 1000);
+  const candleFresh = ageSinceCloseMs <= freshnessLimitMs;
+
+  return {
+    ok: true,
+    scanner: "KINGBOT AI MARKET SCANNER",
+    mode: "chart",
+    symbol: signalContext.symbol,
+    timeframe: signalContext.timeframe,
+    source: String(source || "Deriv public historical candles"),
+    executionAuthority: "NONE",
+    brokerRequired: false,
+    generatedAt: new Date().toISOString(),
+    bars,
+    technical,
+    signal: {
+      ...nativeSignal,
+      pendingOrderZones
+    },
+    metadata: {
+      barsCount: bars.length,
+      lastBarTime: new Date(lastBar.time * 1000).toISOString(),
+      lastBarCloseTime: new Date(lastBarCloseMs).toISOString(),
+      ageSinceCloseMs,
+      freshnessLimitMs,
+      candleFresh,
+      verifiedOhlc: true,
+      provider: "deriv-public"
+    }
+  };
+}
+
 async function fetchTwelveDataTechnical(twelveData, symbols, timeframe) {
   if(!twelveData?.enabled)return [];
   return Promise.all(symbols.map(async symbol=>{
@@ -1268,8 +1365,190 @@ class AiMarketScannerStream {
   }
 }
 
+
+function registerPublicDerivChartStream(server) {
+  const maxClients = Math.max(1, Math.min(50, Number(process.env.AI_SCANNER_CHART_WS_MAX_CLIENTS || 30)));
+  const clients = new Set();
+  const wss = new WebSocketServer({
+    server,
+    path: "/api/ai/market-scanner/chart/ws",
+    maxPayload: 2048,
+    perMessageDeflate: false
+  });
+
+  const send = (client, payload) => {
+    if (!client || client.closed || client.ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      client.ws.send(JSON.stringify(payload));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const unsubscribe = client => {
+    if (!client) return;
+    const stop = client.unsubscribe;
+    client.unsubscribe = null;
+    if (typeof stop === "function") {
+      try { stop(); } catch {}
+    }
+  };
+
+  wss.on("connection", ws => {
+    if (clients.size >= maxClients) {
+      try {
+        ws.send(JSON.stringify({ type: "chart_error", error: "CHART_STREAM_CAPACITY_REACHED" }));
+        ws.close(1013, "Chart stream capacity reached");
+      } catch {}
+      return;
+    }
+
+    const client = {
+      ws, symbol: null, pendingSymbol: null, unsubscribe: null,
+      subscriptionGeneration: 0, closed: false, isAlive: true
+    };
+    clients.add(client);
+    send(client, {
+      type: "hello",
+      stream: "KINGBOT DERIV CHART TICKS",
+      provider: "Deriv public market feed",
+      brokerRequired: false,
+      executionAuthority: "NONE"
+    });
+
+    const cleanup = () => {
+      if (client.closed) return;
+      client.closed = true;
+      client.subscriptionGeneration += 1;
+      client.pendingSymbol = null;
+      clearInterval(client.heartbeat);
+      unsubscribe(client);
+      clients.delete(client);
+    };
+
+    ws.on("pong", () => { client.isAlive = true; });
+    client.heartbeat = setInterval(() => {
+      if (client.closed) return clearInterval(client.heartbeat);
+      if (!client.isAlive) {
+        try { ws.terminate(); } catch {}
+        cleanup();
+        return;
+      }
+      client.isAlive = false;
+      try { ws.ping(); } catch { cleanup(); }
+    }, 30000);
+
+    ws.on("message", raw => {
+      let message;
+      try { message = JSON.parse(String(raw || "")); }
+      catch {
+        send(client, { type: "chart_error", error: "INVALID_CHART_STREAM_MESSAGE" });
+        return;
+      }
+      const type = String(message?.type || "").toLowerCase();
+      if (type !== "subscribe") {
+        send(client, { type: "chart_error", error: "CHART_STREAM_SUBSCRIBE_REQUIRED" });
+        return;
+      }
+
+      const symbol = scannerCanonicalSymbol(message.symbol || "");
+      const allowed = cleanSymbols(symbol);
+      if (!symbol || !allowed.includes(symbol)) {
+        send(client, { type: "chart_error", error: "CHART_SYMBOL_INVALID" });
+        return;
+      }
+      if (client.symbol === symbol && (
+        client.pendingSymbol === symbol || typeof client.unsubscribe === "function"
+      )) {
+        send(client, { type: "subscribed", symbol, provider: "Deriv public market feed", pending:client.pendingSymbol===symbol });
+        return;
+      }
+
+      unsubscribe(client);
+      client.symbol = symbol;
+      client.pendingSymbol = symbol;
+      const subscriptionGeneration = ++client.subscriptionGeneration;
+      // Compare the raw Deriv identifiers against the exact symbol that the
+      // same feed normalized for history/tick subscription. Keep the browser
+      // market label canonical so FRX-prefixed and broker aliases stay aligned.
+      const expectedDerivSymbol = String(publicDerivFeed.normalize(symbol) || "").trim().toUpperCase();
+      void publicDerivFeed.onTick(symbol, quote => {
+        const rawSymbol = String(quote?.symbol || "").trim().toUpperCase();
+        const brokerSymbol = String(quote?.brokerSymbol || "").trim().toUpperCase();
+        const canonicalSymbol = scannerCanonicalSymbol(rawSymbol || brokerSymbol);
+        const matchesFeedSymbol = Boolean(expectedDerivSymbol) && (
+          rawSymbol === expectedDerivSymbol ||
+          brokerSymbol === expectedDerivSymbol ||
+          canonicalSymbol === symbol
+        );
+        const price = finite(quote?.price);
+        if (
+          client.closed ||
+          client.symbol !== symbol ||
+          client.subscriptionGeneration !== subscriptionGeneration ||
+          !matchesFeedSymbol ||
+          price === null ||
+          price <= 0
+        ) return;
+        send(client, {
+          type: "quote",
+          quote: {
+            symbol,
+            price,
+            bid: finite(quote.bid),
+            ask: finite(quote.ask),
+            epoch: finite(quote.epoch),
+            time: quote.time || null,
+            timestamp: finite(quote.epoch) !== null ? Number(quote.epoch) * 1000 : null,
+            ageMs: Math.max(0, Date.now() - Number(quote.receivedAt || Date.now())),
+            receivedAt: quote.receivedAt || Date.now(),
+            source: quote.source || "deriv-shared-live-feed"
+          },
+          streamAt: new Date().toISOString()
+        });
+      }).then(stop => {
+        if (
+          client.closed ||
+          client.symbol !== symbol ||
+          client.subscriptionGeneration !== subscriptionGeneration
+        ) {
+          try { stop(); } catch {}
+          return;
+        }
+        client.pendingSymbol = null;
+        client.unsubscribe = stop;
+        send(client, {
+          type: "subscribed",
+          symbol,
+          provider: "Deriv public market feed",
+          brokerIndependent: true
+        });
+      }).catch(error => {
+        if (client.closed || client.subscriptionGeneration !== subscriptionGeneration) return;
+        client.pendingSymbol = null;
+        send(client, {
+          type: "chart_error",
+          symbol,
+          error: String(error?.message || "DERIV_PUBLIC_CHART_STREAM_UNAVAILABLE").slice(0, 160)
+        });
+      });
+    });
+
+    ws.on("close", cleanup);
+    ws.on("error", cleanup);
+  });
+
+  wss.on("error", error => {
+    console.error("[KINGBOT CHART WS]", error?.message || error);
+  });
+
+  return { wss, clients };
+}
+
 export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server, cortexRunner = null }) {
   const stream = new AiMarketScannerStream({ server, pool, twelveData, cortexRunner });
+  const chartStream = registerPublicDerivChartStream(server);
   startAiStrategyModelTraining(twelveData);
   void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
 
@@ -1358,10 +1637,70 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
         path:"/api/ai/market-scanner/ws",
         scanIntervalMs:stream.scanIntervalMs,
         clients:stream.clients.size,
+        chartClients:chartStream.clients.size,
+        chartPath:"/api/ai/market-scanner/chart/ws",
         channels:stream.channels.size
       }
     });
   });
+
+
+  const chartLimiter = rateLimit({
+    windowMs:60*1000,
+    limit:Number(process.env.AI_SCANNER_CHART_REQUESTS_PER_MINUTE || 24),
+    standardHeaders:"draft-8",
+    legacyHeaders:false,
+    message:{ok:false,error:"Chart history request limit reached. Wait a moment and retry."}
+  });
+
+  const chartHandler=async(req,res)=>{
+    const requestedSymbol=String(req.query?.symbol || "").trim().toUpperCase();
+    const symbol=cleanSymbols(requestedSymbol)[0];
+    if(!requestedSymbol || !symbol){
+      return res.status(400).json({ok:false,error:"CHART_SYMBOL_REQUIRED",executionAuthority:"NONE"});
+    }
+    const timeframe=cleanTimeframe(req.query?.timeframe || DEFAULT_TF);
+    const limit=Math.max(120,Math.min(500,Math.floor(Number(req.query?.limit) || 300)));
+    try{
+      // This chart endpoint deliberately uses the existing free Deriv public
+      // candle feed only. It does not require customer broker credentials,
+      // TradingView webhooks, or a paid market-data subscription.
+      const bars=await publicDerivFeed.getHistoricalCandles(symbol,{
+        timeframe,
+        limit,
+        timeoutMs:10000
+      });
+      const payload=buildScannerChartPayload(bars,{
+        symbol,
+        timeframe,
+        source:"Deriv public historical candles"
+      });
+      const feedStatus=publicDerivFeed.status(symbol);
+      return res.json({
+        ...payload,
+        marketData:{
+          provider:"Deriv public market feed",
+          connected:Boolean(feedStatus.connected),
+          brokerIndependent:true
+        }
+      });
+    }catch(error){
+      const reason=String(error?.message || "DERIV_PUBLIC_CHART_DATA_UNAVAILABLE").slice(0,160);
+      console.warn("[KINGBOT SCANNER CHART]",symbol,timeframe,reason);
+      return res.status(503).json({
+        ok:false,
+        error:"SCANNER_CHART_DATA_UNAVAILABLE",
+        reason,
+        symbol,
+        timeframe,
+        executionAuthority:"NONE",
+        brokerRequired:false
+      });
+    }
+  };
+
+  app.get("/api/ai/market-scanner/chart",chartLimiter,chartHandler);
+  app.get("/api/market-scanner/chart",chartLimiter,chartHandler);
 
   const scanHandler=async(req,res)=>{ await runMarketScan({pool,twelveData,req,res}); };
   app.get("/api/ai/market-scanner",limiter,scanHandler);
