@@ -661,6 +661,17 @@ body.kb-scanner-page .chart-ai-note{
   color:#aebbd5;font-size:8px;line-height:1.7;overflow-wrap:anywhere
 }
 body.kb-scanner-page .chart-ai-note strong{display:block;margin-bottom:5px;color:#54dff1;font:900 7px "JetBrains Mono";letter-spacing:.1em}
+body.kb-scanner-page .chart-specialists{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:9px}
+body.kb-scanner-page .chart-specialist-card{
+  min-width:0;padding:8px;border:1px solid rgba(142,164,255,.10);border-radius:8px;background:rgba(255,255,255,.018)
+}
+body.kb-scanner-page .chart-specialist-card strong{display:block;color:#dce6fb;font:900 7px "JetBrains Mono";letter-spacing:.04em;overflow-wrap:anywhere}
+body.kb-scanner-page .chart-specialist-card span{display:block;margin-top:5px;color:#8e9bb7;font:800 7px "JetBrains Mono"}
+body.kb-scanner-page .chart-specialist-card small{display:block;margin-top:5px;color:#7b89a6;font-size:7px;line-height:1.5}
+body.kb-scanner-page .chart-specialist-card.buy{border-color:rgba(70,231,173,.24)}
+body.kb-scanner-page .chart-specialist-card.buy span{color:#67eab7}
+body.kb-scanner-page .chart-specialist-card.sell{border-color:rgba(255,101,132,.24)}
+body.kb-scanner-page .chart-specialist-card.sell span{color:#ff8da3}
 body.kb-scanner-page .chart-data-note{
   margin-top:auto;padding-top:10px;border-top:1px solid rgba(142,164,255,.09);
   color:#72809e;font:700 7px/1.7 "JetBrains Mono"
@@ -779,7 +790,8 @@ body.kb-scanner-page .chart-data-note{
         <div class="chart-stat"><span>RESISTANCE</span><strong id="chartResistance">—</strong></div>
       </div>
       <div class="chart-ai-note"><strong>AI DECISION / STRUCTURE</strong><span id="chartReason">Waiting for verified OHLC and the first scanner analysis.</span></div>
-      <div class="chart-ai-note"><strong>FIVE-SPECIALIST CORTEX</strong><span id="chartSpecialist">CORTEX decision context will appear when this symbol is the active focus market.</span></div>
+      <div class="chart-ai-note"><strong>CORTEX COUNCIL / RISK GATE</strong><span id="chartCouncilState">Waiting for the full specialist council decision.</span></div>
+      <div class="chart-ai-note"><strong>FIVE-SPECIALIST CORTEX</strong><span id="chartSpecialist">CORTEX decision context will appear when this symbol is the active focus market.</span><div id="chartSpecialistGrid" class="chart-specialists"></div></div>
       <div class="chart-data-note" id="chartProvenance">No chart data loaded. Signal drawings remain disabled until valid candles are returned.</div>
     </aside>
   </div>
@@ -1051,6 +1063,42 @@ body.kb-scanner-page .chart-data-note{
       +(state.chartPayload?.metadata?.candleFresh===false?" | HISTORICAL OHLC ONLY · LIVE SIGNAL OVERLAYS PAUSED UNTIL A FRESH CANDLE CLOSES.":"");
     const cortex=state.latestScan?.cortex;
     const focus=String(state.latestScan?.cortexFocusSymbol||cortex?.market?.symbol||"").toUpperCase();
+    const council=cortex?.strategyCouncil||{};
+    const cortexMatches=Boolean(cortex&&focus===symbol);
+    const specialistGrid=qs("chartSpecialistGrid");
+    if(specialistGrid){
+      specialistGrid.replaceChildren();
+      if(cortexMatches&&Array.isArray(cortex.specialists)){
+        cortex.specialists.forEach(item=>{
+          const direction=String(item.direction||"WAIT").toUpperCase();
+          const tile=document.createElement("div");
+          tile.className="chart-specialist-card"+(direction==="BUY"?" buy":direction==="SELL"?" sell":"");
+          const name=document.createElement("strong");
+          name.textContent=String(item.botId||"SPECIALIST").replaceAll("-"," ").toUpperCase();
+          const vote=document.createElement("span");
+          vote.textContent=direction+" · "+String(item.confidence??0)+"/100"+(item.strategyMatch?" · QUALIFIED":" · WAIT");
+          const reason=document.createElement("small");
+          const detail=Array.isArray(item.missingConditions)&&item.missingConditions.length
+            ?item.missingConditions.slice(0,1).join("; ")
+            :Array.isArray(item.conditions)&&item.conditions.length?item.conditions.slice(0,1).join("; "):"No specialist evidence detail.";
+          reason.textContent=detail;
+          tile.append(name,vote,reason);
+          specialistGrid.appendChild(tile);
+        });
+      }
+    }
+    const councilState=String(council.state||"WAIT").toUpperCase();
+    const riskBlocks=Array.isArray(cortex?.riskCouncil?.blocks)?cortex.riskCouncil.blocks:[];
+    const riskFlags=Array.isArray(cortex?.riskCouncil?.flags)?cortex.riskCouncil.flags:[];
+    const plan=cortex?.tradePlan;
+    const councilText=cortexMatches
+      ?("COUNCIL "+councilState+" · BUY "+String(council.bullishVotes??0)+" / SELL "+String(council.bearishVotes??0)+" / WAIT "+String(council.waitVotes??0)
+        +" · Primary "+String(council.primarySpecialist?.botId||"none")
+        +" · Risk "+(riskBlocks.length?"BLOCKED: "+riskBlocks.join(", "):"CLEAR")
+        +(riskFlags.length?" · Flags: "+riskFlags.join(", "):"")
+        +(plan?.ok?" · Advisory plan "+String(plan.side)+" / "+String(plan.riskReward)+"R":" · No CORTEX trade plan"))
+      : "CORTEX decision context is for "+(focus||"another focus market")+". Run a full scan with "+symbol+" selected to populate this council view.";
+    if(qs("chartCouncilState"))qs("chartCouncilState").textContent=councilText;
     const primary=cortex?.strategyCouncil?.primarySpecialist;
     const specialist=qs("chartSpecialist");
     if(specialist){
@@ -1120,7 +1168,17 @@ body.kb-scanner-page .chart-data-note{
     if(chartLayerEnabled("structure")){
       const bias=String(signal.bias||"").toUpperCase();
       const active=String(signal.signal||"").toUpperCase();
-      add(last.time,bias==="BEARISH"?"aboveBar":"belowBar",bias==="BEARISH"?"#ff7a94":"#53e6b3",bias==="BEARISH"?"arrowDown":"arrowUp",active==="ENTRY_CONFIRMING"?"SETUP":"WATCH");
+      const position=bias==="BEARISH"?"aboveBar":bias==="BULLISH"?"belowBar":"inBar";
+      const color=bias==="BEARISH"?"#ff7a94":bias==="BULLISH"?"#53e6b3":"#ffd166";
+      const shape=bias==="BEARISH"?"arrowDown":bias==="BULLISH"?"arrowUp":"circle";
+      add(last.time,position,color,shape,active==="ENTRY_CONFIRMING"?"TECH OK":"WATCH");
+      const cortex=state.latestScan?.cortex;
+      const focus=String(state.latestScan?.cortexFocusSymbol||cortex?.market?.symbol||"").toUpperCase();
+      const plan=cortex?.tradePlan;
+      const councilState=String(cortex?.strategyCouncil?.state||"").toUpperCase();
+      if(focus===chartState.symbol&&plan?.ok===true&&["BUY","SELL"].includes(councilState)){
+        add(last.time,plan.side==="SELL"?"aboveBar":"belowBar",plan.side==="SELL"?"#ff5578":"#38d9b0",plan.side==="SELL"?"arrowDown":"arrowUp","CORTEX "+String(plan.side||councilState));
+      }
     }
     return markers.sort((a,b)=>a.time-b.time);
   }
@@ -1232,12 +1290,22 @@ body.kb-scanner-page .chart-data-note{
       const actionable=String(signal.signal||"").toUpperCase()==="ENTRY_CONFIRMING";
       if(directional){
         addChartPriceLine(signal.entry,"ENTRY"+(actionable?"":" REF"),"#5fd8ff",LW.LineStyle.Dashed,2);
-        if(Number.isFinite(Number(signal.sl)))addChartPriceLine(signal.sl,"STOP","#ff6e89",LW.LineStyle.Solid,2);
-        if(Number.isFinite(Number(signal.tp1)))addChartPriceLine(signal.tp1,"TP1","#4edda9",LW.LineStyle.Dotted,1);
-        if(Number.isFinite(Number(signal.tp2)))addChartPriceLine(signal.tp2,"TP2","#8ce9c7",LW.LineStyle.Dotted,1);
+        if(Number.isFinite(Number(signal.sl)))addChartPriceLine(signal.sl,(actionable?"":"REF ")+"STOP","#ff6e89",LW.LineStyle.Solid,2);
+        if(Number.isFinite(Number(signal.tp1)))addChartPriceLine(signal.tp1,(actionable?"":"REF ")+"TP1","#4edda9",LW.LineStyle.Dotted,1);
+        if(Number.isFinite(Number(signal.tp2)))addChartPriceLine(signal.tp2,(actionable?"":"REF ")+"TP2","#8ce9c7",LW.LineStyle.Dotted,1);
       }
       addChartPriceLine(signal.support??technical.support,"SUPPORT","#38d7ad",LW.LineStyle.Dotted,1);
       addChartPriceLine(signal.resistance??technical.resistance,"RESISTANCE","#f0b85b",LW.LineStyle.Dotted,1);
+      const planCortex=state.latestScan?.cortex;
+      const planFocus=String(state.latestScan?.cortexFocusSymbol||planCortex?.market?.symbol||"").toUpperCase();
+      const planCouncil=String(planCortex?.strategyCouncil?.state||"").toUpperCase();
+      const plan=planCortex?.tradePlan;
+      if(planFocus===chartState.symbol&&plan?.ok===true&&["BUY","SELL"].includes(planCouncil)){
+        const planSide=String(plan.side||planCouncil).toUpperCase();
+        addChartPriceLine(planCortex.market?.price,"CORTEX "+planSide+" PLAN ENTRY","#8edfff",LW.LineStyle.Solid,2);
+        addChartPriceLine(plan.stopLoss,"CORTEX PLAN STOP","#ff5578",LW.LineStyle.Solid,2);
+        addChartPriceLine(plan.takeProfit,"CORTEX PLAN TARGET","#7debc2",LW.LineStyle.Solid,2);
+      }
       const pending=signal.pendingOrderZones||technical.pendingOrderZones;
       const buyStop=pending?.buyStopTriggers?.[0]?.trigger;
       const sellStop=pending?.sellStopTriggers?.[0]?.trigger;
@@ -1292,6 +1360,8 @@ body.kb-scanner-page .chart-data-note{
       chartState.zones=buildChartZones();
       chartState.instance.timeScale().fitContent();
       refreshChartLayers();
+      const initialQuote=state.quotes.find(quote=>String(quote.symbol||"").toUpperCase()===symbol&&quote.available!==false);
+      if(initialQuote)updateLiveChartQuote(initialQuote);
       if(qs("chartLastPrice"))qs("chartLastPrice").textContent=chartPriceText(chartState.bars.at(-1)?.close);
       setChartState(data.metadata?.candleFresh
         ? "LIVE OHLC · "+String(data.metadata?.barsCount||chartState.bars.length)+" BARS"
@@ -1695,6 +1765,7 @@ body.kb-scanner-page .chart-data-note{
       const data=await request(path,{method:"GET"});
       state.quotes=data.quotes||[];
       renderQuotes();
+      state.quotes.forEach(updateLiveChartQuote);
       qs("marketState").textContent=(data.quoteCount||0)>0?"LIVE FEED":"TECHNICAL FEED";
       qs("marketState").className="good";
       qs("aiState").textContent=data.provider==="xai"?"KINGBOT CORTEX ONLINE":(data.provider==="none"?"ENGINE ONLINE":"AI ONLINE");
