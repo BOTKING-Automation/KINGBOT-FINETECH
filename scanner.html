@@ -867,7 +867,7 @@ body.kb-scanner-page .chart-data-note{
   "use strict";
   const API=window.KINGBOT_API?.baseUrl||"https://kingbot-fintech-api-etfv.onrender.com/api";
   const qs=id=>document.getElementById(id);
-  const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false,streamSocket:null,streamReconnectTimer:null,streamBackoffMs:1000,lastStreamMessageAt:0,streamGeneration:0};
+  const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false,streamSocket:null,streamReconnectTimer:null,streamBackoffMs:1000,lastStreamMessageAt:0,streamGeneration:0,chart:null,chartPayload:null,latestScan:null,chartLoadSequence:0};
 
   function toast(text,tone){
     const el=qs("toast"); if(!el)return;
@@ -893,6 +893,468 @@ body.kb-scanner-page .chart-data-note{
 
   function fmt(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:5}):"—";}
 
+
+  const CHART_TF_SECONDS={"1m":60,"3m":180,"5m":300,"15m":900,"30m":1800,"1h":3600,"2h":7200,"4h":14400,"1d":86400,"1w":604800};
+
+  function chartTimeSeconds(value){
+    if(value===null||value===undefined||String(value).trim()==="")return null;
+    const numeric=Number(value);
+    if(Number.isFinite(numeric)&&numeric>0){
+      if(numeric>1e12)return Math.floor(numeric/1000);
+      if(numeric>1e9)return Math.floor(numeric);
+    }
+    const parsed=Date.parse(String(value));
+    return Number.isFinite(parsed)&&parsed>0?Math.floor(parsed/1000):null;
+  }
+
+  function emaChartPoints(bars,period){
+    if(!Array.isArray(bars)||bars.length<period)return [];
+    const multiplier=2/(period+1);
+    let value=bars.slice(0,period).reduce((sum,item)=>sum+Number(item.close),0)/period;
+    const points=[{time:bars[period-1].time,value}];
+    for(let i=period;i<bars.length;i++){
+      value=Number(bars[i].close)*multiplier+value*(1-multiplier);
+      points.push({time:bars[i].time,value});
+    }
+    return points;
+  }
+
+  function chartSelectedSymbol(){
+    return String(qs("chartSymbol")?.value||state.symbols[0]||"XAUUSD").trim().toUpperCase();
+  }
+
+  function chartLayerEnabled(name){
+    const map={ema:"chartLayerEma",structure:"chartLayerStructure",zones:"chartLayerZones",risk:"chartLayerRisk"};
+    const element=qs(map[name]);
+    return element?element.checked:true;
+  }
+
+  function setChartState(text,tone){
+    const el=qs("chartDataState");
+    if(!el)return;
+    el.textContent=text;
+    el.className="chart-live-state"+(tone?" "+tone:"");
+  }
+
+  function ensureChart(){
+    if(state.chart?.instance)return state.chart;
+    const LW=window.LightweightCharts;
+    const host=qs("marketChart");
+    if(!LW||!host){
+      setChartState("CHART LIBRARY UNAVAILABLE","bad");
+      return null;
+    }
+    const width=Math.max(320,Math.floor(host.clientWidth||900));
+    const height=Math.max(300,Math.floor(host.clientHeight||470));
+    const instance=LW.createChart(host,{
+      width,height,
+      layout:{background:{type:LW.ColorType.Solid,color:"#050a18"},textColor:"#9eabc6",fontFamily:"JetBrains Mono, monospace",fontSize:10},
+      grid:{vertLines:{color:"rgba(143,171,255,.055)"},horzLines:{color:"rgba(143,171,255,.075)"}},
+      rightPriceScale:{borderColor:"rgba(143,171,255,.13)",scaleMargins:{top:.10,bottom:.12}},
+      timeScale:{borderColor:"rgba(143,171,255,.13)",timeVisible:true,secondsVisible:false,rightOffset:8,barSpacing:8},
+      crosshair:{mode:LW.CrosshairMode.Normal,vertLine:{color:"rgba(34,230,255,.28)",width:1,style:LW.LineStyle.Dashed},horzLine:{color:"rgba(34,230,255,.22)",width:1,style:LW.LineStyle.Dashed}},
+      handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false},
+      handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true}
+    });
+    const candles=instance.addSeries(LW.CandlestickSeries,{
+      upColor:"#2be2a4",downColor:"#ff5f7c",borderUpColor:"#2be2a4",borderDownColor:"#ff5f7c",
+      wickUpColor:"#2be2a4",wickDownColor:"#ff5f7c",priceLineVisible:false,lastValueVisible:true
+    });
+    const ema20=instance.addSeries(LW.LineSeries,{color:"#34e8b1",lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+    const ema50=instance.addSeries(LW.LineSeries,{color:"#f4c85a",lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+    const overlay=qs("chartOverlay");
+    const chartState={instance,candles,ema20,ema50,overlay,markerPlugin:null,priceLines:[],bars:[],zones:[],symbol:null,timeframe:null,signal:null,technical:null,lastTickAt:0,resizeObserver:null};
+    state.chart=chartState;
+    const resize=()=>{
+      if(!state.chart||state.chart!==chartState)return;
+      const w=Math.max(320,Math.floor(host.clientWidth||900));
+      const h=Math.max(300,Math.floor(host.clientHeight||470));
+      instance.applyOptions({width:w,height:h});
+      drawChartZones();
+    };
+    if(typeof ResizeObserver!=="undefined"){
+      chartState.resizeObserver=new ResizeObserver(resize);
+      chartState.resizeObserver.observe(host);
+    }else{
+      window.addEventListener("resize",resize);
+    }
+    instance.timeScale().subscribeVisibleLogicalRangeChange(()=>drawChartZones());
+    return chartState;
+  }
+
+  function populateChartSymbols(){
+    const select=qs("chartSymbol");
+    if(!select)return;
+    const current=chartSelectedSymbol();
+    const symbols=[...new Set([...state.symbols,...state.quotes.map(q=>q.symbol).filter(Boolean)])].slice(0,24);
+    select.replaceChildren();
+    symbols.forEach(symbol=>{
+      const option=document.createElement("option");
+      option.value=symbol;
+      option.textContent=symbol;
+      select.appendChild(option);
+    });
+    select.value=symbols.includes(current)?current:(symbols[0]||"XAUUSD");
+  }
+
+  function currentChartSignal(){
+    const symbol=state.chart?.symbol||chartSelectedSymbol();
+    const scanRows=Array.isArray(state.latestScan?.technical)?state.latestScan.technical:[];
+    const scanned=scanRows.find(item=>String(item.symbol||"").toUpperCase()===symbol&&item.technicalVerified!==false&&item.source!=="none");
+    const payload=state.chartPayload;
+    const base=payload&&payload.symbol===symbol?payload.signal:null;
+    return {
+      technical:{...(payload?.technical||{}),...(scanned||{})},
+      signal:{...(base||{}),...(scanned||{})},
+      scanned:Boolean(scanned)
+    };
+  }
+
+  function chartPriceText(value){
+    const number=Number(value);
+    return Number.isFinite(number)&&number>0?number.toLocaleString(undefined,{maximumFractionDigits:6}):"—";
+  }
+
+  function renderChartSignal(){
+    const symbol=state.chart?.symbol||chartSelectedSymbol();
+    const current=currentChartSignal();
+    const signal=current.signal||{};
+    const technical=current.technical||{};
+    const bias=String(signal.bias||technical.trend||"NEUTRAL").toUpperCase();
+    const stateLabel=String(signal.signal||"WAIT").replaceAll("_"," ");
+    const badge=qs("chartSignalBadge");
+    if(badge){
+      badge.textContent=stateLabel;
+      badge.className="chart-signal-badge"+(bias==="BULLISH"?" bull":bias==="BEARISH"?" bear":"");
+    }
+    if(qs("chartAiSymbol"))qs("chartAiSymbol").textContent=symbol;
+    if(qs("chartBias")){
+      qs("chartBias").textContent=bias;
+      qs("chartBias").className=bias==="BULLISH"?"good":bias==="BEARISH"?"bad":"";
+    }
+    if(qs("chartScore"))qs("chartScore").textContent=signal.score==null?"—":String(signal.score)+"/100";
+    if(qs("chartEntry"))qs("chartEntry").textContent=chartPriceText(signal.entry);
+    if(qs("chartStop"))qs("chartStop").textContent=chartPriceText(signal.sl);
+    if(qs("chartTarget1"))qs("chartTarget1").textContent=chartPriceText(signal.tp1);
+    if(qs("chartTarget2"))qs("chartTarget2").textContent=chartPriceText(signal.tp2);
+    if(qs("chartSupport"))qs("chartSupport").textContent=chartPriceText(signal.support??technical.support);
+    if(qs("chartResistance"))qs("chartResistance").textContent=chartPriceText(signal.resistance??technical.resistance);
+    const reasons=[];
+    if(signal.reason)reasons.push(String(signal.reason));
+    else if(signal.technicalAnalysis)reasons.push(Array.isArray(signal.technicalAnalysis)?signal.technicalAnalysis.join(" · "):String(signal.technicalAnalysis));
+    if(signal.waitFor)reasons.push("WAIT FOR · "+signal.waitFor);
+    if(signal.invalidation)reasons.push("INVALIDATION · "+signal.invalidation);
+    if(technical.bos&&String(technical.bos).toUpperCase()!=="NONE")reasons.push("BOS · "+technical.bos);
+    if(technical.choch&&String(technical.choch).toUpperCase()!=="NONE")reasons.push("CHOCH · "+technical.choch);
+    if(qs("chartReason"))qs("chartReason").textContent=reasons.length?reasons.join(" | "):"Waiting for the scanner to return a verified directional setup.";
+    const cortex=state.latestScan?.cortex;
+    const focus=String(state.latestScan?.cortexFocusSymbol||cortex?.market?.symbol||"").toUpperCase();
+    const primary=cortex?.strategyCouncil?.primarySpecialist;
+    const specialist=qs("chartSpecialist");
+    if(specialist){
+      if(cortex&&focus===symbol&&primary){
+        specialist.textContent=String(primary.name||primary.botId||"Specialist")+" · "+String(primary.direction||"WAIT")+" · "+String(primary.confidence??0)+"/100. "+String(cortex.strategyCouncil?.reason||cortex.decision?.waitFor||"");
+      }else if(cortex&&focus&&focus!==symbol){
+        specialist.textContent="CORTEX is currently focused on "+focus+". Select that chart market to inspect its specialist decision context, or run a new full scan with "+symbol+" as focus.";
+      }else{
+        specialist.textContent="CORTEX multi-specialist context is not available for this symbol yet. Native verified OHLC analysis is shown above.";
+      }
+    }
+    const provenance=qs("chartProvenance");
+    if(provenance){
+      const meta=state.chartPayload?.metadata;
+      const orderBlock=technical.orderBlock;
+      const pending=signal.pendingOrderZones||technical.pendingOrderZones;
+      const notes=[];
+      if(meta)notes.push(String(meta.barsCount)+" verified candles · last bar "+String(meta.lastBarTime||"time unavailable"));
+      if(orderBlock)notes.push("OB mapped from OHLC");
+      if(technical.fairValueGapDirection&&technical.fairValueGapDirection!=="NONE")notes.push("FVG "+technical.fairValueGapDirection);
+      if(pending)notes.push("Pending-order bands are structural inference, not broker orders");
+      notes.push("Execution authority NONE · analysis only");
+      provenance.textContent=notes.join(" · ");
+    }
+  }
+
+  function addChartPriceLine(price,title,color,style,width){
+    const chartState=state.chart;
+    const number=Number(price);
+    if(!chartState||!Number.isFinite(number)||number<=0)return;
+    try{
+      const line=chartState.candles.createPriceLine({
+        price:number,color,lineWidth:width||1,lineStyle:style??window.LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible:true,title
+      });
+      chartState.priceLines.push(line);
+    }catch{}
+  }
+
+  function buildChartMarkers(){
+    const chartState=state.chart;
+    if(!chartState?.bars?.length)return [];
+    const bars=chartState.bars;
+    const last=bars[bars.length-1];
+    const technical=currentChartSignal().technical||{};
+    const signal=currentChartSignal().signal||{};
+    const markers=[];
+    const add=(time,position,color,shape,label)=>{
+      if(Number.isSafeInteger(time)&&bars.some(bar=>bar.time===time)){
+        markers.push({time,position,color,shape,text:label});
+      }
+    };
+    const bos=String(technical.bos||technical.bosDirection||"NONE").toUpperCase();
+    const choch=String(technical.choch||"NONE").toUpperCase();
+    const liquidity=String(technical.liquiditySweepDirection||technical.liquiditySweep||"NONE").toUpperCase();
+    if(chartLayerEnabled("structure")){
+      if(bos!=="NONE")add(last.time,bos==="BEARISH"?"aboveBar":"belowBar",bos==="BEARISH"?"#ff7892":"#5fe6bd","arrow"+(bos==="BEARISH"?"Down":"Up"),"BOS");
+      if(choch!=="NONE")add(last.time,choch==="BEARISH"?"aboveBar":"belowBar",choch==="BEARISH"?"#ff91a5":"#80e9ff","circle","CH");
+      if(liquidity!=="NONE")add(last.time,liquidity==="BEARISH"?"aboveBar":"belowBar","#c19aff","square","LIQ");
+    }
+    if(chartLayerEnabled("zones")&&technical.orderBlock){
+      const index=Math.max(0,bars.length-Math.min(bars.length,100)+Number(technical.orderBlock.index||0));
+      const obBar=bars[Math.min(bars.length-1,index)]||last;
+      add(obBar.time,technical.orderBlock.direction==="BEARISH"?"aboveBar":"belowBar","#b69aff","square","OB");
+    }
+    if(chartLayerEnabled("structure")){
+      const bias=String(signal.bias||"").toUpperCase();
+      const active=String(signal.signal||"").toUpperCase();
+      add(last.time,bias==="BEARISH"?"aboveBar":"belowBar",bias==="BEARISH"?"#ff7a94":"#53e6b3",bias==="BEARISH"?"arrowDown":"arrowUp",active==="ENTRY_CONFIRMING"?"SETUP":"WATCH");
+    }
+    return markers.sort((a,b)=>a.time-b.time);
+  }
+
+  function buildChartZones(){
+    const chartState=state.chart;
+    if(!chartState?.bars?.length)return [];
+    const bars=chartState.bars;
+    const technical=currentChartSignal().technical||{};
+    const signal=currentChartSignal().signal||{};
+    const zones=[];
+    const push=(label,startTime,endTime,high,low,fill,stroke)=>{
+      const top=Number(high),bottom=Number(low);
+      if(Number.isFinite(top)&&Number.isFinite(bottom)&&top>0&&bottom>0&&top!==bottom){
+        zones.push({label,startTime,endTime,high:Math.max(top,bottom),low:Math.min(top,bottom),fill,stroke});
+      }
+    };
+    if(chartLayerEnabled("zones")){
+      const ob=technical.orderBlock;
+      if(ob){
+        const offset=bars.length-Math.min(bars.length,100);
+        const index=Math.max(0,Math.min(bars.length-1,offset+Number(ob.index||0)));
+        push("ORDER BLOCK",bars[index]?.time||bars[Math.max(0,bars.length-20)].time,bars[bars.length-1].time,ob.high,ob.low,"rgba(166,132,255,.12)","rgba(183,154,255,.65)");
+      }
+      const third=bars.length>=3?bars[bars.length-3]:null;
+      const last=bars[bars.length-1];
+      const fvgDirection=String(technical.fairValueGapDirection||"").toUpperCase();
+      if(third&&fvgDirection==="BULLISH"&&last.low>third.high){
+        push("BULLISH FVG",third.time,last.time,last.low,third.high,"rgba(57,220,174,.12)","rgba(77,235,190,.6)");
+      }else if(third&&fvgDirection==="BEARISH"&&last.high<third.low){
+        push("BEARISH FVG",third.time,last.time,third.low,last.high,"rgba(255,93,126,.11)","rgba(255,117,145,.62)");
+      }
+      const pending=signal.pendingOrderZones||technical.pendingOrderZones;
+      const from=bars[Math.max(0,bars.length-45)].time;
+      const buy=pending?.buyLimitZones?.[0]?.zone;
+      const sell=pending?.sellLimitZones?.[0]?.zone;
+      if(Array.isArray(buy)&&buy.length>=2)push("INFERRED BUY ZONE",from,bars[bars.length-1].time,buy[1],buy[0],"rgba(49,207,153,.07)","rgba(49,207,153,.34)");
+      if(Array.isArray(sell)&&sell.length>=2)push("INFERRED SELL ZONE",from,bars[bars.length-1].time,sell[1],sell[0],"rgba(255,117,145,.07)","rgba(255,117,145,.34)");
+    }
+    return zones;
+  }
+
+  function drawChartZones(){
+    const chartState=state.chart;
+    const canvas=chartState?.overlay;
+    const host=qs("marketChart");
+    if(!canvas||!host)return;
+    const width=Math.max(1,host.clientWidth);
+    const height=Math.max(1,host.clientHeight);
+    const ratio=Math.max(1,Number(window.devicePixelRatio)||1);
+    if(canvas.width!==Math.round(width*ratio)||canvas.height!==Math.round(height*ratio)){
+      canvas.width=Math.round(width*ratio);
+      canvas.height=Math.round(height*ratio);
+      canvas.style.width=width+"px";
+      canvas.style.height=height+"px";
+    }
+    const ctx=canvas.getContext("2d");
+    if(!ctx)return;
+    ctx.setTransform(ratio,0,0,ratio,0,0);
+    ctx.clearRect(0,0,width,height);
+    if(!chartLayerEnabled("zones")||!chartState.zones?.length)return;
+    chartState.zones.forEach(zone=>{
+      const start=chartState.instance.timeScale().timeToCoordinate(zone.startTime);
+      const end=chartState.instance.timeScale().timeToCoordinate(zone.endTime);
+      const yTop=chartState.candles.priceToCoordinate(zone.high);
+      const yBottom=chartState.candles.priceToCoordinate(zone.low);
+      if(yTop===null||yBottom===null)return;
+      const x1=Math.max(0,Math.min(width-1,start===null?0:start));
+      const x2=Math.max(x1+2,Math.min(width,end===null?width:end));
+      const y1=Math.max(0,Math.min(height-1,Math.min(yTop,yBottom)));
+      const y2=Math.max(y1+2,Math.min(height,Math.max(yTop,yBottom)));
+      if(x2<=x1||y2<=y1)return;
+      ctx.save();
+      ctx.fillStyle=zone.fill;
+      ctx.strokeStyle=zone.stroke;
+      ctx.lineWidth=1;
+      ctx.setLineDash([4,4]);
+      ctx.fillRect(x1,y1,x2-x1,y2-y1);
+      ctx.strokeRect(x1,y1,x2-x1,y2-y1);
+      ctx.setLineDash([]);
+      ctx.font='800 9px "JetBrains Mono", monospace';
+      const labelWidth=ctx.measureText(zone.label).width+12;
+      ctx.fillStyle="rgba(3,7,18,.88)";
+      ctx.fillRect(x1+4,Math.max(3,y1+3),labelWidth,15);
+      ctx.fillStyle=zone.stroke;
+      ctx.fillText(zone.label,x1+10,Math.max(14,y1+14));
+      ctx.restore();
+    });
+  }
+
+  function refreshChartLayers(){
+    const chartState=state.chart;
+    if(!chartState?.bars?.length)return;
+    const current=currentChartSignal();
+    chartState.signal=current.signal;
+    chartState.technical=current.technical;
+    chartState.zones=buildChartZones();
+    chartState.priceLines.forEach(line=>{
+      try{chartState.candles.removePriceLine(line);}catch{}
+    });
+    chartState.priceLines=[];
+    const signal=current.signal||{};
+    const technical=current.technical||{};
+    const LW=window.LightweightCharts;
+    if(chartLayerEnabled("risk")){
+      const bias=String(signal.bias||"").toUpperCase();
+      const directional=bias==="BULLISH"||bias==="BEARISH";
+      const actionable=String(signal.signal||"").toUpperCase()==="ENTRY_CONFIRMING";
+      if(directional){
+        addChartPriceLine(signal.entry,"ENTRY"+(actionable?"":" REF"),"#5fd8ff",LW.LineStyle.Dashed,2);
+        if(Number.isFinite(Number(signal.sl)))addChartPriceLine(signal.sl,"STOP","#ff6e89",LW.LineStyle.Solid,2);
+        if(Number.isFinite(Number(signal.tp1)))addChartPriceLine(signal.tp1,"TP1","#4edda9",LW.LineStyle.Dotted,1);
+        if(Number.isFinite(Number(signal.tp2)))addChartPriceLine(signal.tp2,"TP2","#8ce9c7",LW.LineStyle.Dotted,1);
+      }
+      addChartPriceLine(signal.support??technical.support,"SUPPORT","#38d7ad",LW.LineStyle.Dotted,1);
+      addChartPriceLine(signal.resistance??technical.resistance,"RESISTANCE","#f0b85b",LW.LineStyle.Dotted,1);
+      const pending=signal.pendingOrderZones||technical.pendingOrderZones;
+      const buyStop=pending?.buyStopTriggers?.[0]?.trigger;
+      const sellStop=pending?.sellStopTriggers?.[0]?.trigger;
+      if(buyStop)addChartPriceLine(buyStop,"INFERRED BUY STOP","#58d8c3",LW.LineStyle.Dashed,1);
+      if(sellStop)addChartPriceLine(sellStop,"INFERRED SELL STOP","#d89aff",LW.LineStyle.Dashed,1);
+    }
+    if(chartState.markerPlugin){
+      try{chartState.markerPlugin.setMarkers(buildChartMarkers());}catch{}
+    }else if(typeof LW.createSeriesMarkers==="function"){
+      try{chartState.markerPlugin=LW.createSeriesMarkers(chartState.candles,buildChartMarkers());}catch{}
+    }
+    drawChartZones();
+    renderChartSignal();
+  }
+
+  function setChartIndicators(){
+    const chartState=state.chart;
+    if(!chartState?.bars?.length)return;
+    if(chartLayerEnabled("ema")){
+      chartState.ema20.setData(emaChartPoints(chartState.bars,20));
+      chartState.ema50.setData(emaChartPoints(chartState.bars,50));
+      chartState.ema20.applyOptions({visible:true});
+      chartState.ema50.applyOptions({visible:true});
+    }else{
+      chartState.ema20.applyOptions({visible:false});
+      chartState.ema50.applyOptions({visible:false});
+    }
+  }
+
+  async function loadChart(){
+    const symbol=chartSelectedSymbol();
+    const timeframe=String(qs("timeframe")?.value||"5m");
+    const sequence=++state.chartLoadSequence;
+    const chartState=ensureChart();
+    if(!chartState)return;
+    setChartState("LOADING "+symbol+" "+timeframe.toUpperCase(),"warn");
+    if(qs("chartLastPrice"))qs("chartLastPrice").textContent="—";
+    try{
+      const query="/ai/market-scanner/chart?symbol="+encodeURIComponent(symbol)+"&timeframe="+encodeURIComponent(timeframe)+"&limit=300";
+      const data=await request(query,{method:"GET"});
+      if(sequence!==state.chartLoadSequence||symbol!==chartSelectedSymbol())return;
+      if(!Array.isArray(data.bars)||data.bars.length<80)throw new Error("INSUFFICIENT_VERIFIED_CHART_HISTORY");
+      chartState.symbol=symbol;
+      chartState.timeframe=timeframe;
+      chartState.bars=data.bars.slice(-500);
+      state.chartPayload=data;
+      chartState.candles.setData(chartState.bars);
+      chartState.ema20.setData(emaChartPoints(chartState.bars,20));
+      chartState.ema50.setData(emaChartPoints(chartState.bars,50));
+      const scanCurrent=currentChartSignal();
+      chartState.signal=scanCurrent.signal||data.signal;
+      chartState.technical=scanCurrent.technical||data.technical;
+      chartState.zones=buildChartZones();
+      chartState.instance.timeScale().fitContent();
+      refreshChartLayers();
+      if(qs("chartLastPrice"))qs("chartLastPrice").textContent=chartPriceText(chartState.bars.at(-1)?.close);
+      setChartState("VERIFIED OHLC · "+String(data.metadata?.barsCount||chartState.bars.length)+" BARS","good");
+      const statePrice=chartState.bars.at(-1)?.close;
+      if(Number.isFinite(Number(statePrice)))renderChartSignal();
+    }catch(error){
+      if(sequence!==state.chartLoadSequence)return;
+      state.chartPayload=null;
+      chartState.bars=[];
+      chartState.zones=[];
+      chartState.priceLines.forEach(line=>{try{chartState.candles.removePriceLine(line);}catch{}});
+      chartState.priceLines=[];
+      chartState.candles.setData([]);
+      chartState.ema20.setData([]);
+      chartState.ema50.setData([]);
+      if(chartState.markerPlugin){try{chartState.markerPlugin.setMarkers([]);}catch{}}
+      drawChartZones();
+      setChartState("OHLC UNAVAILABLE · DRAWINGS DISABLED","bad");
+      if(qs("chartProvenance"))qs("chartProvenance").textContent=String(error?.message||"Verified candle history is unavailable.")+" · No synthetic signal map was drawn.";
+      toast("Chart unavailable: "+String(error?.message||"market feed error"),"bad");
+    }
+  }
+
+  function updateLiveChartQuote(incoming){
+    const chartState=state.chart;
+    if(!chartState?.bars?.length||!incoming)return;
+    const symbol=String(incoming.symbol||"").trim().toUpperCase();
+    if(symbol!==chartState.symbol||incoming.available===false)return;
+    const price=Number(incoming.price);
+    if(!Number.isFinite(price)||price<=0)return;
+    const timestamp=chartTimeSeconds(incoming.timestamp??incoming.epoch??incoming.time);
+    if(!timestamp)return;
+    const ageMs=Number(incoming.ageMs);
+    const measuredAge=Number.isFinite(ageMs)?ageMs:Date.now()-timestamp*1000;
+    if(measuredAge>120000||measuredAge< -30000)return;
+    const interval=CHART_TF_SECONDS[chartState.timeframe]||300;
+    const bucket=Math.floor(timestamp/interval)*interval;
+    const bars=chartState.bars;
+    const last=bars[bars.length-1];
+    if(bucket<last.time)return;
+    let updated;
+    if(bucket===last.time){
+      updated={...last,high:Math.max(Number(last.high),price),low:Math.min(Number(last.low),price),close:price};
+      bars[bars.length-1]=updated;
+    }else{
+      updated={time:bucket,open:price,high:price,low:price,close:price,volume:0};
+      bars.push(updated);
+      if(bars.length>500)bars.shift();
+      if(chartState.instance.timeScale().scrollPosition()===0)chartState.instance.timeScale().scrollToRealTime();
+    }
+    try{
+      chartState.candles.update(updated);
+      chartState.lastTickAt=Date.now();
+      setChartIndicators();
+      chartState.zones=buildChartZones();
+      drawChartZones();
+      if(qs("chartLastPrice"))qs("chartLastPrice").textContent=chartPriceText(price);
+      setChartState("LIVE TICK · DERIVED FROM VERIFIED MARKET FEED","good");
+    }catch{}
+  }
+
+  function syncChartFromScan(data){
+    state.latestScan=data;
+    if(!state.chart?.bars?.length)return;
+    refreshChartLayers();
+  }
+
   function setStreamState(label,tone=""){
     const el=qs("streamState");
     if(!el)return;
@@ -908,6 +1370,7 @@ body.kb-scanner-page .chart-data-note{
     if(index>=0)state.quotes[index]={...state.quotes[index],...next};
     else state.quotes=[...state.quotes,next];
     renderQuotes();
+    updateLiveChartQuote(next);
     qs("marketState").textContent="LIVE WS";
     qs("marketState").className="good";
     qs("lastScan").textContent="LIVE";
@@ -1043,6 +1506,13 @@ body.kb-scanner-page .chart-data-note{
       card.querySelector(".symbol-name").textContent=q.symbol;
       card.querySelector(".symbol-price").textContent=q.available?fmt(q.price):"—";
       card.querySelector(".symbol-change").textContent=q.available?("Spread "+fmt(q.spread)):(q.error||"NO QUOTE");
+      card.addEventListener("click",()=>{
+        const select=qs("chartSymbol");
+        if(select&&[...select.options].some(option=>option.value===q.symbol)){
+          select.value=q.symbol;
+          loadChart().catch(()=>{});
+        }
+      });
       grid.appendChild(card);
     });
   }
@@ -1052,6 +1522,7 @@ body.kb-scanner-page .chart-data-note{
   }
 
   function renderScan(data){
+    state.latestScan=data;
     qs("scannedCount").textContent=String((data.symbols||[]).length);
     qs("availableCount").textContent=String(data.quoteCount??(data.quotes||[]).filter(q=>q.available).length);
     qs("analysisMeta").textContent=(data.provider||"KINGBOT NATIVE")+" · "+(data.model||"KINGBOT-CORTEX-1")+" · "+(data.technicalSource||"native OHLC");
@@ -1164,6 +1635,7 @@ body.kb-scanner-page .chart-data-note{
     const body=qs("rankingBody");
     if(!ranked.length){
       body.innerHTML='<tr><td colspan="5"><div class="empty">NO VERIFIED TECHNICAL SNAPSHOTS YET</div></td></tr>';
+      syncChartFromScan(data);
       return;
     }
     const qmap=Object.fromEntries((data.quotes||[]).map(q=>[q.symbol,q]));
@@ -1173,6 +1645,7 @@ body.kb-scanner-page .chart-data-note{
       const rationale=String(r.reason||r.rationale||"—").replace(/[<>]/g,"");
       return '<tr><td class="mono">'+r.symbol+'</td><td><span class="bias '+bias+'">'+bias+'</span></td><td class="mono">'+fmt(q.price??r.entry)+'</td><td class="mono">'+fmt(q.spread)+'</td><td>'+rationale+'</td></tr>';
     }).join("");
+    syncChartFromScan(data);
   }
 
   async function checkStatus(){
@@ -1244,7 +1717,7 @@ body.kb-scanner-page .chart-data-note{
     try{
       state.busy=true; qs("scanState").textContent="SCANNING"; qs("scanNow").disabled=true;
       listFromInput();
-      const focusSymbol=state.symbols[0]||"XAUUSD";
+      const focusSymbol=chartSelectedSymbol()||state.symbols[0]||"XAUUSD";
       const path="/ai/market-scanner?symbols="+encodeURIComponent(state.symbols.join(","))+"&timeframe="+encodeURIComponent(qs("timeframe").value)+"&focusSymbol="+encodeURIComponent(focusSymbol);
 
       const data=await request(path,{method:"GET"});
@@ -1261,8 +1734,23 @@ body.kb-scanner-page .chart-data-note{
 
   qs("applySymbols")?.addEventListener("click",()=>{
     listFromInput();
+    populateChartSymbols();
     stopScannerStream();
     syncQuotes().catch(()=>{}).finally(()=>connectScannerStream());
+    loadChart().catch(()=>{});
+  });
+  qs("chartSymbol")?.addEventListener("change",()=>loadChart().catch(()=>{}));
+  qs("chartRefresh")?.addEventListener("click",()=>loadChart().catch(()=>{}));
+  qs("timeframe")?.addEventListener("change",()=>{
+    stopScannerStream();
+    connectScannerStream();
+    loadChart().catch(()=>{});
+  });
+  ["chartLayerEma","chartLayerStructure","chartLayerZones","chartLayerRisk"].forEach(id=>{
+    qs(id)?.addEventListener("change",()=>{
+      if(id==="chartLayerEma")setChartIndicators();
+      refreshChartLayers();
+    });
   });
   qs("refreshQuotes")?.addEventListener("click",()=>syncQuotes().catch(()=>{}));
   qs("scanNow")?.addEventListener("click",runScan);
@@ -1273,14 +1761,18 @@ body.kb-scanner-page .chart-data-note{
       const current=state.symbols.filter(s=>!s.startsWith("R_")&&!s.startsWith("1HZ")&&!/^BOOM|^CRASH|^JUMP|^STEP|^RANGE|^DEX/i.test(s));
       state.symbols=[...new Set([...current,...symbols])].slice(0,12);
       qs("symbols").value=state.symbols.join(",");
+      populateChartSymbols();
       await syncQuotes();
+      await loadChart();
       toast("Deriv synthetic market universe loaded.","good");
     }catch(error){toast(error?.message||"Synthetic market discovery failed.","bad");}
   });
 
   (async()=>{
-    listFromInput(); renderQuotes();
+    listFromInput(); renderQuotes(); populateChartSymbols();
+    ensureChart();
     await checkStatus();
+    loadChart().catch(()=>{});
     syncQuotes().catch(()=>{}).finally(()=>connectScannerStream());
   })();
 
