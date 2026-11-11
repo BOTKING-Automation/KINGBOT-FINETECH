@@ -770,7 +770,7 @@ body.kb-scanner-page .chart-data-note{
       <div class="chart-live-metrics" aria-live="polite">
         <span>TICK RATE <b id="chartTickRate">0.0/s</b></span>
         <span>VENUE AGE <b id="chartTickAge">—</b></span>
-        <span>PIPE <b id="chartTickPipe">—</b></span>
+        <span>PIPE AGE <b id="chartTickPipe">—</b></span>
         <span>LAST TICK <b id="chartTickTime">—</b></span>
       </div>
       <div id="marketChart" role="img" aria-label="KINGBOT live candlestick chart with technical and risk overlays">
@@ -1529,14 +1529,17 @@ body.kb-scanner-page .chart-data-note{
     const timestamp=chartTimeSeconds(incoming.timestamp??incoming.epoch??incoming.time);
     if(!timestamp)return;
     const exchangeAgeValue=Number(incoming.exchangeAgeMs);
+    const clientVenueAge=Math.max(0,Date.now()-timestamp*1000);
     const exchangeAge=Number.isFinite(exchangeAgeValue)
-      ?exchangeAgeValue
-      :Math.max(0,Date.now()-timestamp*1000);
+      ?Math.max(0,exchangeAgeValue,clientVenueAge)
+      :clientVenueAge;
     const receivedAt=Number(incoming.receivedAt);
     const pipeAgeValue=Number(incoming.transportAgeMs??incoming.ageMs);
+    const clientPipelineAge=Number.isFinite(receivedAt)&&receivedAt>0
+      ?Math.max(0,Date.now()-receivedAt):null;
     const pipeAge=Number.isFinite(pipeAgeValue)
-      ?Math.max(0,pipeAgeValue)
-      :Number.isFinite(receivedAt)&&receivedAt>0?Math.max(0,Date.now()-receivedAt):null;
+      ?Math.max(0,pipeAgeValue,clientPipelineAge??0)
+      :clientPipelineAge;
     if(exchangeAge>120000||(pipeAge!==null&&pipeAge>10000))return;
     if(!chartState?.bars?.length||chartState.symbol!==symbol){
       const previous=state.pendingChartQuotes.get(symbol);
