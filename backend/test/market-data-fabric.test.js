@@ -115,3 +115,80 @@ test("snapshot exposes provider and verification counts", async () => {
   assert.equal(snapshot.verifiedCount, 2);
   assert.equal(snapshot.executionAuthority, undefined);
 });
+
+
+test("rejects an otherwise valid provider price when its exchange timestamp is missing", async () => {
+  const fabric = new MarketDataFabric({
+    twelveData: {
+      enabled: true,
+      async latestQuotes() {
+        return [{ symbol: "EURUSD", price: 1.1, available: true, timestamp: null }];
+      }
+    },
+    derivFeed: {
+      async getQuote() { throw new Error("NO_DERIV"); }
+    },
+    goldFeed: { async getQuote() { throw new Error("NO_GOLD"); } },
+    massiveApiKey: ""
+  });
+
+  const quote = await fabric.getQuote("EURUSD");
+  assert.equal(quote.ok, false);
+  assert.equal(quote.verified, false);
+  assert.equal(quote.executionAuthority, "NONE");
+  assert.ok(quote.failures.some(item =>
+    item.provider === "twelve-data" && item.error === "QUOTE_TIMESTAMP_MISSING"
+  ));
+});
+
+test("rejects materially future-dated provider quotes", async () => {
+  const fabric = new MarketDataFabric({
+    twelveData: {
+      enabled: true,
+      async latestQuotes() {
+        return [{
+          symbol: "EURUSD",
+          price: 1.1,
+          available: true,
+          timestamp: Date.now() + 120000
+        }];
+      }
+    },
+    derivFeed: {
+      async getQuote() { throw new Error("NO_DERIV"); }
+    },
+    goldFeed: { async getQuote() { throw new Error("NO_GOLD"); },
+    },
+    massiveApiKey: ""
+  });
+
+  const quote = await fabric.getQuote("EURUSD");
+  assert.equal(quote.ok, false);
+  assert.ok(quote.failures.some(item =>
+    item.provider === "twelve-data" && item.error === "QUOTE_TIMESTAMP_IN_FUTURE"
+  ));
+});
+
+test("parses ISO exchange timestamps without substituting server time", async () => {
+  const fabric = new MarketDataFabric({
+    goldFeed: {
+      async getQuote() {
+        return {
+          symbol: "XAUUSD",
+          price: 4142.25,
+          timestamp: new Date().toISOString(),
+          source: "test-gold-iso",
+          provider: "gold-api.com"
+        };
+      }
+    },
+    twelveData: { enabled: false },
+    derivFeed: { async getQuote() { throw new Error("DERIV_SHOULD_NOT_BE_USED"); } }
+  });
+
+  const quote = await fabric.getQuote("XAUUSD");
+  assert.equal(quote.ok, true);
+  assert.equal(quote.verified, true);
+  assert.equal(quote.provider, "gold-api.com");
+  assert.ok(Number.isFinite(Date.parse(quote.timestamp)));
+});
