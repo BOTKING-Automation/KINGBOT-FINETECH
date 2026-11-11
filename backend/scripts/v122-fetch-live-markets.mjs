@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { getDerivMarketFeed } from "../src/deriv-market-feed.js";
+import { getDerivHistoryChunkWithRetry } from "./deriv-history-retry.mjs";
 
 const OUTPUT = process.argv[2] || "/tmp/kingbot-v122-input.json";
 const HISTORY_LIMIT = Math.max(360, Math.min(3000, Number(process.env.KINGBOT_V122_HISTORY_LIMIT || process.env.KINGBOT_V9_HISTORY_LIMIT || 2500)));
@@ -155,7 +156,7 @@ async function fetchDerivBars(feed, symbol, timeframe) {
   for (let page = 0; page < maxPages && merged.size < HISTORY_LIMIT; page++) {
     let chunk;
     try {
-      chunk = await feed.getHistoricalCandles(symbol, {
+      chunk = await getDerivHistoryChunkWithRetry(feed, symbol, {
         timeframe,
         limit: 500,
         timeoutMs: 15000,
