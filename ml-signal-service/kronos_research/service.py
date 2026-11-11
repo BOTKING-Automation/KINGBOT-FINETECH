@@ -32,7 +32,7 @@ MAX_SAMPLES = 9
 MAX_BODY_BYTES = 2_000_000
 TIMEFRAME_MINUTES = {"5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440}
 
-HOST = os.getenv("HOST", "0.0.0.0")
+HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "10002"))
 ENABLED = os.getenv("KINGBOT_KRONOS_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
 SECRET = os.getenv("KINGBOT_KRONOS_SECRET", "").strip()
