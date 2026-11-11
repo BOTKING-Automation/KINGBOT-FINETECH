@@ -54,6 +54,30 @@ The default stack runs the API in worker-standby mode. The dedicated execution w
 
 Do not enable the execution profile until the database has been restored and reviewed, the bot runtime records have been checked, and a demo-only test has been explicitly approved. A restored production database could contain prior broker mappings or bot configuration. Do not assume that bringing up a worker is harmless.
 
+## Optional Kronos forecasting research service
+
+Kronos is isolated from KINGBOT's production strategy-model store and decision engine. It is off by default and is not included in the default `up` command.
+
+Add these variables to `.env.local` before enabling it. Use a unique local secret; never reuse a production or broker key:
+
+```text
+KINGBOT_KRONOS_ENABLED=1
+KINGBOT_KRONOS_SECRET=<unique random secret of at least 32 characters>
+KINGBOT_KRONOS_TORCH_THREADS=2
+```
+
+Start only the research service:
+
+```powershell
+docker compose --env-file .env.local -f compose.local.yaml --profile research up -d --build kronos-research
+```
+
+Check `http://localhost:10002/health`. The first forecast downloads pinned Kronos-small and tokenizer weights into the persistent `kingbot_kronos_cache` volume. The service is bound to `127.0.0.1:10002`; do not expose it publicly.
+
+`POST http://localhost:10002/forecast` requires `Authorization: Bearer <KINGBOT_KRONOS_SECRET>`. The payload contract and strict timestamp/OHLC requirements are documented in `ml-signal-service/kronos_research/README.md`. The trusted market-data/calendar layer must supply future timestamps, including FX sessions, weekends and holidays.
+
+This service returns forecast research only. It has no database, no broker credentials, no access to the execution worker, no BUY/SELL signal or order API, and no write path into existing champion models. Leave it disabled unless conducting an approved research experiment. Stopping the service preserves cached weights; `docker compose down -v` deletes named volumes and must not be used unless data deletion is intended.
+
 ## Database persistence and backups
 
 PostgreSQL data is held in the named Docker volume `kingbot_pgdata`. Normal restarts and `docker compose down` preserve that volume.
