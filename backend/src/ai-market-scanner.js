@@ -1460,14 +1460,25 @@ function registerPublicDerivChartStream(server) {
 
       unsubscribe(client);
       client.symbol = symbol;
+      // Compare the raw Deriv identifiers against the exact symbol that the
+      // same feed normalized for history/tick subscription. Keep the browser
+      // market label canonical so FRX-prefixed and broker aliases stay aligned.
+      const expectedDerivSymbol = String(publicDerivFeed.normalize(symbol) || "").trim().toUpperCase();
       void publicDerivFeed.onTick(symbol, quote => {
-        const quoteSymbol = scannerCanonicalSymbol(quote?.symbol || quote?.brokerSymbol || "");
+        const rawSymbol = String(quote?.symbol || "").trim().toUpperCase();
+        const brokerSymbol = String(quote?.brokerSymbol || "").trim().toUpperCase();
+        const canonicalSymbol = scannerCanonicalSymbol(rawSymbol || brokerSymbol);
+        const matchesFeedSymbol = Boolean(expectedDerivSymbol) && (
+          rawSymbol === expectedDerivSymbol ||
+          brokerSymbol === expectedDerivSymbol ||
+          canonicalSymbol === symbol
+        );
         const price = finite(quote?.price);
-        if (quoteSymbol !== client.symbol || price === null || price <= 0) return;
+        if (client.symbol !== symbol || !matchesFeedSymbol || price === null || price <= 0) return;
         send(client, {
           type: "quote",
           quote: {
-            symbol: quoteSymbol,
+            symbol,
             price,
             bid: finite(quote.bid),
             ask: finite(quote.ask),
