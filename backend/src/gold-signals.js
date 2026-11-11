@@ -342,7 +342,6 @@ export async function ensureGoldSignalsSchema(pool){
 }
 
 export function registerGoldSignals(app,{pool,rateLimit,twelveData}={}){
-  void ensureGoldSignalsSchema(pool).catch(error=>console.error("[KINGBOT GOLD SIGNALS SCHEMA]",error?.message||error));
   const userLimiter=rateLimit({windowMs:60*1000,limit:120,standardHeaders:"draft-8",legacyHeaders:false});
   const adminLimiter=rateLimit({windowMs:60*1000,limit:180,standardHeaders:"draft-8",legacyHeaders:false});
 
