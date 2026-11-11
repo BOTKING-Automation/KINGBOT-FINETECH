@@ -11,10 +11,19 @@ from run_v124_hold_recall_research import (
     _batch_loss,
     class_weight_vector,
     select_development_profile,
+    unchanged_acceptance_gates,
 )
 
 
 class V124HoldRecallResearchTests(unittest.TestCase):
+    def test_unchanged_acceptance_gates_match_v12_baseline(self):
+        gates = unchanged_acceptance_gates()
+        self.assertEqual(gates["balancedAccuracy"], 0.36)
+        self.assertEqual(gates["macroF1"], 0.34)
+        self.assertEqual(gates["minimumFinalSamples"], 30)
+        self.assertEqual(gates["nonzeroRecall"], ["SELL", "HOLD", "BUY"])
+        self.assertEqual(gates["finalSelectionScoreDeltaVsV9"], 0.005)
+
     def test_all_class_weight_profiles_are_finite_positive_and_training_only(self):
         train_y = np.asarray([-1] * 80 + [0] * 20 + [1] * 60, dtype=np.int64)
         for profile in LOSS_PROFILES:
