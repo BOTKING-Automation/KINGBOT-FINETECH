@@ -38,7 +38,10 @@ jobs:
         run: npm install --omit=dev
       - name: Validate V12.4 code and research tests
         run: |
+          node --check backend/scripts/deriv-history-retry.mjs
+          node --check backend/scripts/deriv-history-retry.test.mjs
           node --check backend/scripts/v122-fetch-live-markets.mjs
+          node --test backend/scripts/deriv-history-retry.test.mjs
           python -m py_compile             ml-signal-service/service.py             research/v12-multivariate/multivariate_transformer.py             research/v12-multivariate/technical_pattern_features.py             research/v12-multivariate/run_v122_hold_research.py             research/v12-multivariate/run_v123_cortex_research.py             research/v12-multivariate/run_v124_hold_recall_research.py             research/v12-multivariate/test_v124_hold_recall_research.py
           python -m unittest discover -s research/v12-multivariate -p "test_*.py"
       - name: Fetch closed multi-market history from free public sources
