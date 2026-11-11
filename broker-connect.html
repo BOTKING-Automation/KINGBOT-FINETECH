@@ -50,6 +50,17 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
 .connection-diagnostics{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:10px}.diag{padding:7px 8px;border:1px solid rgba(255,255,255,.05);border-radius:7px;background:rgba(255,255,255,.012)}.diag b{display:block;color:#64738a;font:800 5.5px "JetBrains Mono"}.diag span{display:block;margin-top:3px;color:#a0adbf;font:800 6px "JetBrains Mono"}.diag.ok span{color:var(--green)}.diag.build span{color:var(--gold)}
 .mt5-cloud-banner{position:relative;display:grid;grid-template-columns:1.4fr .8fr;gap:12px;align-items:center;margin:0 0 14px;padding:15px 16px;border:1px solid rgba(25,230,255,.18);border-radius:16px;background:linear-gradient(135deg,rgba(8,19,35,.98),rgba(7,10,24,.98));box-shadow:0 14px 38px rgba(0,0,0,.24),inset 0 0 32px rgba(25,230,255,.025);overflow:hidden}.mt5-cloud-banner:before{content:"";position:absolute;right:-50px;top:-75px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(25,230,255,.14),transparent 68%);pointer-events:none}.mt5-cloud-kicker{color:#19e6ff;font:900 7px "JetBrains Mono";letter-spacing:.14em}.mt5-cloud-title{margin-top:5px;font:900 14px Orbitron}.mt5-cloud-title span{color:#19e6ff}.mt5-cloud-copy{margin-top:5px;color:#728199;font:600 7px "JetBrains Mono";line-height:1.55;max-width:760px}.mt5-cloud-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.mt5-cloud-pills span{padding:5px 7px;border:1px solid rgba(255,255,255,.06);border-radius:7px;background:rgba(255,255,255,.018);color:#718099;font:800 5.8px "JetBrains Mono"}.mt5-cloud-state{position:relative;z-index:1;justify-self:end;width:min(240px,100%);padding:12px;border:1px solid rgba(35,247,163,.13);border-radius:12px;background:rgba(35,247,163,.022)}.mt5-cloud-state b{display:block;color:#23f7a3;font:900 7px "JetBrains Mono";letter-spacing:.1em}.mt5-cloud-state span{display:block;margin-top:5px;color:#8090a8;font:600 6.5px "JetBrains Mono";line-height:1.5}@media(max-width:1000px){.mt5-cloud-banner{grid-template-columns:1fr}.mt5-cloud-state{justify-self:stretch;width:auto}}.mt5-vps-panel{margin-top:12px;padding:14px;border:1px solid rgba(155,92,255,.18);border-radius:12px;background:linear-gradient(145deg,rgba(18,12,34,.76),rgba(5,9,18,.9));box-shadow:inset 0 0 24px rgba(155,92,255,.025)}
 +.mt5-vps-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}.mt5-vps-title{font:900 8px "JetBrains Mono";letter-spacing:.08em;color:#9b5cff}.mt5-vps-copy{margin-top:5px;color:#8190a8;font:600 6.5px "JetBrains Mono";line-height:1.55;max-width:670px}.mt5-vps-badge{padding:5px 7px;border:1px solid rgba(155,92,255,.16);border-radius:7px;color:#c1a1ff;background:rgba(155,92,255,.03);font:800 5.6px "JetBrains Mono"}.mt5-vps-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}.mt5-vps-field{min-width:0}.mt5-vps-field.full{grid-column:1/-1}.mt5-vps-field label{display:block;margin-bottom:5px;color:#7b89a0;font:800 6px "JetBrains Mono"}.mt5-vps-field input,.mt5-vps-field select{width:100%;height:37px;border:1px solid rgba(255,255,255,.08);border-radius:8px;background:#030811;color:#edf4ff;padding:0 9px;outline:none;font:700 7.5px "JetBrains Mono"}.mt5-vps-field input:focus,.mt5-vps-field select:focus{border-color:rgba(155,92,255,.34);box-shadow:0 0 0 2px rgba(155,92,255,.05)}.mt5-vps-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.mt5-vps-status{margin-top:8px;color:#6f7e97;font:700 6px "JetBrains Mono";line-height:1.55}.mt5-vps-command{display:none;margin-top:9px}.mt5-vps-command.show{display:block}.mt5-vps-command textarea{width:100%;min-height:82px;resize:vertical;border:1px solid rgba(35,247,163,.12);border-radius:8px;background:#02070d;color:#9beecb;padding:9px;font:700 6.5px "JetBrains Mono";outline:none}.mt5-vps-security{margin-top:8px;padding:9px;border:1px solid rgba(35,247,163,.1);border-radius:8px;background:rgba(35,247,163,.018);color:#71829a;font:600 5.8px "JetBrains Mono";line-height:1.55}.mt5-vps-security strong{color:#9ce8c5}@media(max-width:650px){.mt5-vps-fields{grid-template-columns:1fr}.mt5-vps-field.full{grid-column:auto}}
+.access-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:0 0 14px}
+.access-mode{position:relative;display:flex;flex-direction:column;min-height:142px;padding:14px;border:1px solid rgba(255,255,255,.075);border-radius:14px;background:linear-gradient(145deg,rgba(7,15,28,.97),rgba(3,8,16,.99));overflow:hidden}
+.access-mode:before{content:"";position:absolute;inset:0 auto 0 0;width:2px;background:var(--access-accent,var(--cyan));box-shadow:0 0 16px var(--access-accent,var(--cyan))}
+.access-mode.analysis{--access-accent:var(--cyan)}.access-mode.demo{--access-accent:var(--green)}.access-mode.live{--access-accent:var(--gold)}
+.access-mode-kicker{color:var(--access-accent);font:900 6.5px "JetBrains Mono";letter-spacing:.12em}
+.access-mode h2{margin:8px 0 5px;color:#eaf2ff;font:900 11px Orbitron;letter-spacing:.01em}
+.access-mode p{margin:0 0 12px;color:#75839b;font:600 7px "JetBrains Mono";line-height:1.55}
+.access-mode-action{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:32px;margin-top:auto;padding:8px 10px;border:1px solid color-mix(in srgb,var(--access-accent) 28%,transparent);border-radius:8px;background:color-mix(in srgb,var(--access-accent) 7%,transparent);color:var(--access-accent);font:900 7px "JetBrains Mono";text-decoration:none;cursor:pointer}
+.access-mode-action:hover{background:color-mix(in srgb,var(--access-accent) 13%,transparent);filter:brightness(1.08)}
+.access-mode-note{grid-column:1/-1;margin-top:-4px;color:#65738b;font:600 6.5px "JetBrains Mono";line-height:1.55}
+@media(max-width:800px){.access-modes{grid-template-columns:1fr}.access-mode{min-height:0}}
 @media(max-width:1000px){.control-strip{grid-template-columns:1fr}.connection-diagnostics{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){.intel-grid{grid-template-columns:1fr 1fr 1fr}.connection-diagnostics{grid-template-columns:1fr 1fr}}
 
@@ -89,6 +100,28 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
   </section>
 
 
+  <section class="access-modes" aria-label="Choose KINGBOT access mode">
+    <article class="access-mode analysis">
+      <div class="access-mode-kicker">01 · NO BROKER REQUIRED</div>
+      <h2>ANALYSIS ONLY</h2>
+      <p>Explore the market scanner, charts, technical context and KINGBOT Cortex analysis without connecting a personal trading account.</p>
+      <a class="access-mode-action" href="scanner.html">OPEN MARKET ANALYSIS <span aria-hidden="true">↗</span></a>
+    </article>
+    <article class="access-mode demo">
+      <div class="access-mode-kicker">02 · BROKER DEMO ACCOUNT</div>
+      <h2>DEMO AUTOMATION</h2>
+      <p>Choose a supported broker and authorize its DEMO account. Broker connection and account verification are required before execution.</p>
+      <button class="access-mode-action" type="button" data-access-mode="DEMO">CHOOSE DEMO BROKER <span aria-hidden="true">→</span></button>
+    </article>
+    <article class="access-mode live">
+      <div class="access-mode-kicker">03 · REAL ACCOUNT</div>
+      <h2>LIVE AUTOMATION</h2>
+      <p>Connect a supported REAL account. Selecting this option only opens live setup; separate explicit live authorization remains mandatory.</p>
+      <button class="access-mode-action" type="button" data-access-mode="LIVE">CONFIGURE LIVE ACCOUNT <span aria-hidden="true">→</span></button>
+    </article>
+    <p class="access-mode-note">MARKET DATA AND EXECUTION ARE SEPARATE: KINGBOT can provide analysis from configured market-data sources without using the client's broker. A broker is connected only when the client chooses automated execution.</p>
+  </section>
+
   <section class="mt5-cloud-banner" aria-label="KINGBOT MT5 cloud hosting">
     <div>
       <div class="mt5-cloud-kicker">NEW · PHONE-FIRST MT5 HOSTING</div>
@@ -110,7 +143,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
         <button class="mode-btn active" type="button" data-exec="DEMO">DEMO · BROKER MT5</button>
         <button class="mode-btn" type="button" data-exec="LIVE">LIVE / REAL</button>
       </div>
-      <div class="mode-copy" id="modeCopy">DEMO mode uses the selected Deriv MT5 broker account with broker-side virtual funds and live market execution. It is not a KINGBOT paper simulator.</div>
+      <div class="mode-copy" id="modeCopy">DEMO mode uses the selected supported broker DEMO account with broker-side virtual funds and live market execution. It is not a KINGBOT paper simulator.</div>
     </div>
     <div class="intel-panel">
       <div class="intel-label">SMART ROUTING INTELLIGENCE</div>
@@ -1067,6 +1100,13 @@ applyExecutionMode();
   search.addEventListener("input",applyFilters);
 })();
 
+document.querySelectorAll("[data-access-mode]").forEach(button=>button.addEventListener("click",()=>{
+  const mode=button.dataset.accessMode==="LIVE"?"LIVE":"DEMO";
+  const target=document.querySelector('#modeSwitch [data-exec="'+mode+'"]');
+  if(target)target.click();
+  const brokerSection=document.querySelector(".network");
+  if(brokerSection)brokerSection.scrollIntoView({behavior:"smooth",block:"start"});
+}));
 $("deployMt5Cloud")?.addEventListener("click",deployMt5ToCloud);
 void refreshConnectionLock();
 void restoreDerivOAuthReturn();
