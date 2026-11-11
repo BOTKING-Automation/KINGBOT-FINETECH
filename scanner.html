@@ -879,7 +879,7 @@ body.kb-scanner-page .chart-data-note{
   "use strict";
   const API=window.KINGBOT_API?.baseUrl||"https://kingbot-fintech-api-etfv.onrender.com/api";
   const qs=id=>document.getElementById(id);
-  const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false,streamSocket:null,streamReconnectTimer:null,streamBackoffMs:1000,lastStreamMessageAt:0,streamGeneration:0,chart:null,chartPayload:null,latestScan:null,chartLoadSequence:0};
+  const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false,streamSocket:null,streamReconnectTimer:null,streamBackoffMs:1000,lastStreamMessageAt:0,streamGeneration:0,chart:null,chartPayload:null,latestScan:null,chartLoadSequence:0,chartStreamSocket:null,chartStreamReconnectTimer:null,chartStreamBackoffMs:1000,chartStreamGeneration:0};
 
   function toast(text,tone){
     const el=qs("toast"); if(!el)return;
@@ -1338,6 +1338,7 @@ body.kb-scanner-page .chart-data-note{
   async function loadChart(){
     const symbol=chartSelectedSymbol();
     const timeframe=String(qs("timeframe")?.value||"5m");
+    stopChartStream();
     const sequence=++state.chartLoadSequence;
     const chartState=ensureChart();
     if(!chartState)return;
@@ -1364,8 +1365,9 @@ body.kb-scanner-page .chart-data-note{
       if(initialQuote)updateLiveChartQuote(initialQuote);
       if(qs("chartLastPrice"))qs("chartLastPrice").textContent=chartPriceText(chartState.bars.at(-1)?.close);
       setChartState(data.metadata?.candleFresh
-        ? "LIVE OHLC · "+String(data.metadata?.barsCount||chartState.bars.length)+" BARS"
+        ? "VERIFIED OHLC · "+String(data.metadata?.barsCount||chartState.bars.length)+" BARS"
         : "HISTORICAL OHLC · SIGNALS PAUSED",data.metadata?.candleFresh?"good":"warn");
+      connectChartStream();
       const statePrice=chartState.bars.at(-1)?.close;
       if(Number.isFinite(Number(statePrice)))renderChartSignal();
     }catch(error){
@@ -1390,7 +1392,8 @@ body.kb-scanner-page .chart-data-note{
     const chartState=state.chart;
     if(!chartState?.bars?.length||!incoming)return;
     const symbol=String(incoming.symbol||"").trim().toUpperCase();
-    if(symbol!==chartState.symbol||incoming.available===false)return;
+    const source=String(incoming.source||"").toLowerCase();
+    if(!source.startsWith("deriv-")||symbol!==chartState.symbol||incoming.available===false)return;
     const price=Number(incoming.price);
     if(!Number.isFinite(price)||price<=0)return;
     const timestamp=chartTimeSeconds(incoming.timestamp??incoming.epoch??incoming.time);
@@ -1460,6 +1463,77 @@ body.kb-scanner-page .chart-data-note{
     url.searchParams.set("symbols",state.symbols.join(","));
     url.searchParams.set("timeframe",qs("timeframe")?.value||"5m");
     return url.toString();
+  }
+
+
+  function chartWebsocketUrl(){
+    const url=new URL(API);
+    url.protocol=url.protocol==="https:"?"wss:":"ws:";
+    url.pathname=url.pathname.replace(/\/$/,"")+"/ai/market-scanner/chart/ws";
+    url.search="";
+    return url.toString();
+  }
+
+  function stopChartStream(){
+    state.chartStreamGeneration+=1;
+    clearTimeout(state.chartStreamReconnectTimer);
+    state.chartStreamReconnectTimer=null;
+    const ws=state.chartStreamSocket;
+    state.chartStreamSocket=null;
+    if(ws){
+      try{ws.onclose=null;ws.close(1000,"chart reconfigure");}catch{}
+    }
+  }
+
+  function scheduleChartStream(){
+    clearTimeout(state.chartStreamReconnectTimer);
+    const delay=Math.min(15000,Math.max(1500,state.chartStreamBackoffMs));
+    state.chartStreamReconnectTimer=setTimeout(()=>connectChartStream(),delay);
+    state.chartStreamBackoffMs=Math.min(15000,Math.round(state.chartStreamBackoffMs*1.8));
+  }
+
+  function connectChartStream(){
+    stopChartStream();
+    const generation=state.chartStreamGeneration;
+    const symbol=chartSelectedSymbol();
+    try{
+      const ws=new WebSocket(chartWebsocketUrl());
+      state.chartStreamSocket=ws;
+      ws.onopen=()=>{
+        if(generation!==state.chartStreamGeneration){try{ws.close();}catch{};return;}
+        state.chartStreamBackoffMs=1000;
+        try{ws.send(JSON.stringify({type:"subscribe",symbol}));}catch{}
+      };
+      ws.onmessage=event=>{
+        if(generation!==state.chartStreamGeneration)return;
+        let message;
+        try{message=JSON.parse(String(event.data||""));}catch{return;}
+        const type=String(message?.type||"").toLowerCase();
+        if(type==="subscribed"){
+          setChartState(state.chartPayload?.metadata?.candleFresh===true
+            ?"LIVE DERIV TICK STREAM · "+symbol
+            :"DERIV TICK STREAM · HISTORICAL SIGNALS PAUSED",
+            state.chartPayload?.metadata?.candleFresh===true?"good":"warn");
+          return;
+        }
+        if(type==="quote"&&message.quote){
+          updateLiveChartQuote(message.quote);
+          return;
+        }
+        if(type==="chart_error"){
+          setChartState("DERIV TICK STREAM · "+String(message.error||"UNAVAILABLE"),"warn");
+        }
+      };
+      ws.onerror=()=>setChartState("DERIV TICK STREAM RECONNECTING","warn");
+      ws.onclose=()=>{
+        if(generation!==state.chartStreamGeneration)return;
+        setChartState("DERIV TICK STREAM RECONNECTING","warn");
+        scheduleChartStream();
+      };
+    }catch(error){
+      setChartState("DERIV TICK STREAM UNAVAILABLE","warn");
+      scheduleChartStream();
+    }
   }
 
   function stopScannerStream(){
@@ -1854,7 +1928,7 @@ body.kb-scanner-page .chart-data-note{
     syncQuotes().catch(()=>{}).finally(()=>connectScannerStream());
   })();
 
-  window.addEventListener("beforeunload",()=>stopScannerStream());
+  window.addEventListener("beforeunload",()=>{stopScannerStream();stopChartStream();});
 })();
 </script>
 </body>
