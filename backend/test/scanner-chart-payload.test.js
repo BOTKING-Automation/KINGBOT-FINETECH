@@ -34,6 +34,7 @@ test("chart payload sorts and normalizes verified OHLC candles", () => {
   assert.equal(payload.brokerRequired, false);
   assert.equal(payload.metadata.verifiedOhlc, true);
   assert.equal(payload.metadata.barsCount, 140);
+  assert.equal(payload.metadata.candleFresh, false);
   assert.ok(Number.isFinite(payload.technical.ema20));
   assert.ok(payload.signal);
   assert.ok(["ENTRY_CONFIRMING", "WAIT", "NO_TRADE"].includes(payload.signal.signal));
@@ -63,4 +64,18 @@ test("chart payload deduplicates repeated candle timestamps", () => {
   const payload = buildScannerChartPayload(rows, { symbol: "GBPUSD", timeframe: "1h" });
   assert.equal(payload.bars.length, 100);
   assert.equal(payload.bars.at(-1).close, rows[99].close + 0.01);
+});
+
+test("chart payload marks a current timeframe candle as fresh", () => {
+  const intervalSeconds = 300;
+  const currentBucket = Math.floor(Date.now() / (intervalSeconds * 1000)) * intervalSeconds;
+  const bars = makeBars(120).map((bar, index) => ({
+    ...bar,
+    time: new Date((currentBucket - (119 - index) * intervalSeconds) * 1000).toISOString(),
+  }));
+
+  const payload = buildScannerChartPayload(bars, { symbol: "XAUUSD", timeframe: "5m" });
+  assert.equal(payload.metadata.candleFresh, true);
+  assert.equal(payload.metadata.ageSinceCloseMs, 0);
+  assert.equal(payload.metadata.verifiedOhlc, true);
 });
