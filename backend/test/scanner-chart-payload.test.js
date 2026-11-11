@@ -140,4 +140,6 @@ test("scanner live chart batches candle painting and keeps quote cards increment
     "chart WebSocket must subscribe before the REST history request resolves");
   assert.match(scannerPage, /pendingChartQuotes:new Map\(\)/);
   assert.match(scannerPage, /receivedAt<chartState\.lastTickReceivedAt/);
+  assert.match(scannerPage, /Date\.now\(\)-receivedAt/);
+  assert.match(scannerPage, /Date\.now\(\)-timestamp\*1000/);
 });
