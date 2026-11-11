@@ -1358,8 +1358,10 @@ body.kb-scanner-page .chart-data-note{
     const points50=emaChartPoints(chartState.bars,50);
     chartState.ema20Value=points20.at(-1)?.value??null;
     chartState.ema50Value=points50.at(-1)?.value??null;
-    chartState.ema20Previous=chartState.ema20Value;
-    chartState.ema50Previous=chartState.ema50Value;
+    // Seed the active candle from the preceding EMA point so every incoming
+    // tick recalculates against the prior closed bar, not the previous tick.
+    chartState.ema20Previous=points20.at(-2)?.value??chartState.ema20Value;
+    chartState.ema50Previous=points50.at(-2)?.value??chartState.ema50Value;
     chartState.emaTime=chartState.bars.at(-1)?.time??null;
     if(chartLayerEnabled("ema")){
       chartState.ema20.setData(points20);
