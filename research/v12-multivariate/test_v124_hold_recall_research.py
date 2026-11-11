@@ -32,6 +32,21 @@ class V124HoldRecallResearchTests(unittest.TestCase):
         square_root_ratio = float(square_root.max() / square_root.min())
         self.assertLess(square_root_ratio, inverse_ratio)
 
+    def test_effective_number_weights_upweight_rare_classes(self):
+        train_y = np.asarray([-1] * 100 + [0] * 10 + [1] * 50, dtype=np.int64)
+        mapped = np.asarray(
+            [research.service.LABEL_TO_INDEX[int(value)] for value in train_y],
+            dtype=np.int64,
+        )
+        counts = np.bincount(mapped, minlength=3)
+        rare_class = int(np.argmin(counts))
+        common_class = int(np.argmax(counts))
+        for profile in ("effective_number_ce", "effective_number_focal"):
+            weights = class_weight_vector(train_y, profile)
+            self.assertGreater(
+                float(weights[rare_class]), float(weights[common_class])
+            )
+
     def test_effective_number_focal_loss_has_finite_gradients(self):
         logits = torch.tensor(
             [[2.0, 0.2, -0.5], [0.1, 1.4, 0.2], [-0.4, 0.1, 1.8]],
