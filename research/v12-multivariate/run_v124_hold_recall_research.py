@@ -67,10 +67,12 @@ def class_weight_vector(train_y: np.ndarray, profile: str) -> np.ndarray:
     elif profile == "sqrt_inverse_frequency_ce":
         weights = np.sqrt(len(labels) / counts)
     else:
-        effective = (1.0 - EFFECTIVE_BETA) / (
+        # Cui et al. effective-number class-balanced weight:
+        # alpha_c = (1 - beta) / (1 - beta ** n_c).
+        # Rare classes therefore receive larger weights than frequent classes.
+        weights = (1.0 - EFFECTIVE_BETA) / (
             1.0 - np.power(EFFECTIVE_BETA, counts)
         )
-        weights = 1.0 / np.maximum(effective, 1e-12)
 
     weights = weights / max(float(weights.mean()), 1e-12)
     if not np.isfinite(weights).all() or np.any(weights <= 0):
