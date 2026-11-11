@@ -1366,6 +1366,28 @@ class AiMarketScannerStream {
 }
 
 
+export function buildScannerChartStreamQuote(symbol, quote, nowMs = Date.now()) {
+  const price = finite(quote?.price);
+  const epoch = finite(quote?.epoch);
+  const receivedAt = finite(quote?.receivedAt) ?? nowMs;
+  const exchangeAgeMs = epoch !== null ? Math.max(0, nowMs - epoch * 1000) : null;
+  const transportAgeMs = Math.max(0, nowMs - receivedAt);
+  return {
+    symbol: scannerCanonicalSymbol(symbol || quote?.symbol || quote?.brokerSymbol || ""),
+    price,
+    bid: finite(quote?.bid),
+    ask: finite(quote?.ask),
+    epoch,
+    time: quote?.time || null,
+    timestamp: epoch !== null ? epoch * 1000 : null,
+    exchangeAgeMs,
+    transportAgeMs,
+    ageMs: transportAgeMs,
+    receivedAt,
+    source: String(quote?.source || "deriv-shared-live-feed")
+  };
+}
+
 function registerPublicDerivChartStream(server) {
   const maxClients = Math.max(1, Math.min(50, Number(process.env.AI_SCANNER_CHART_WS_MAX_CLIENTS || 30)));
   const clients = new Set();
@@ -1493,18 +1515,7 @@ function registerPublicDerivChartStream(server) {
         ) return;
         send(client, {
           type: "quote",
-          quote: {
-            symbol,
-            price,
-            bid: finite(quote.bid),
-            ask: finite(quote.ask),
-            epoch: finite(quote.epoch),
-            time: quote.time || null,
-            timestamp: finite(quote.epoch) !== null ? Number(quote.epoch) * 1000 : null,
-            ageMs: Math.max(0, Date.now() - Number(quote.receivedAt || Date.now())),
-            receivedAt: quote.receivedAt || Date.now(),
-            source: quote.source || "deriv-shared-live-feed"
-          },
+          quote: buildScannerChartStreamQuote(symbol, quote),
           streamAt: new Date().toISOString()
         });
       }).then(stop => {
