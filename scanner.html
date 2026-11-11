@@ -1023,9 +1023,10 @@ body.kb-scanner-page .chart-data-note{
     const bias=String(signal.bias||technical.trend||"NEUTRAL").toUpperCase();
     const stateLabel=String(signal.signal||"WAIT").replaceAll("_"," ");
     const badge=qs("chartSignalBadge");
+    const candleFresh=state.chartPayload?.metadata?.candleFresh===true;
     if(badge){
-      badge.textContent=stateLabel;
-      badge.className="chart-signal-badge"+(bias==="BULLISH"?" bull":bias==="BEARISH"?" bear":"");
+      badge.textContent=candleFresh?stateLabel:"STALE DATA";
+      badge.className="chart-signal-badge"+(candleFresh&&bias==="BULLISH"?" bull":candleFresh&&bias==="BEARISH"?" bear":"");
     }
     if(qs("chartAiSymbol"))qs("chartAiSymbol").textContent=symbol;
     if(qs("chartBias")){
@@ -1046,7 +1047,8 @@ body.kb-scanner-page .chart-data-note{
     if(signal.invalidation)reasons.push("INVALIDATION · "+signal.invalidation);
     if(technical.bos&&String(technical.bos).toUpperCase()!=="NONE")reasons.push("BOS · "+technical.bos);
     if(technical.choch&&String(technical.choch).toUpperCase()!=="NONE")reasons.push("CHOCH · "+technical.choch);
-    if(qs("chartReason"))qs("chartReason").textContent=reasons.length?reasons.join(" | "):"Waiting for the scanner to return a verified directional setup.";
+    if(qs("chartReason"))qs("chartReason").textContent=(reasons.length?reasons.join(" | "):"Waiting for the scanner to return a verified directional setup.")
+      +(state.chartPayload?.metadata?.candleFresh===false?" | HISTORICAL OHLC ONLY · LIVE SIGNAL OVERLAYS PAUSED UNTIL A FRESH CANDLE CLOSES.":"");
     const cortex=state.latestScan?.cortex;
     const focus=String(state.latestScan?.cortexFocusSymbol||cortex?.market?.symbol||"").toUpperCase();
     const primary=cortex?.strategyCouncil?.primarySpecialist;
@@ -1093,6 +1095,7 @@ body.kb-scanner-page .chart-data-note{
     if(!chartState?.bars?.length)return [];
     const bars=chartState.bars;
     const last=bars[bars.length-1];
+    if(state.chartPayload?.metadata?.candleFresh!==true)return [];
     const technical=currentChartSignal().technical||{};
     const signal=currentChartSignal().signal||{};
     const markers=[];
@@ -1126,6 +1129,7 @@ body.kb-scanner-page .chart-data-note{
     const chartState=state.chart;
     if(!chartState?.bars?.length)return [];
     const bars=chartState.bars;
+    if(state.chartPayload?.metadata?.candleFresh!==true)return [];
     const technical=currentChartSignal().technical||{};
     const signal=currentChartSignal().signal||{};
     const zones=[];
@@ -1222,7 +1226,7 @@ body.kb-scanner-page .chart-data-note{
     const signal=current.signal||{};
     const technical=current.technical||{};
     const LW=window.LightweightCharts;
-    if(chartLayerEnabled("risk")){
+    if(chartLayerEnabled("risk")&&state.chartPayload?.metadata?.candleFresh===true){
       const bias=String(signal.bias||"").toUpperCase();
       const directional=bias==="BULLISH"||bias==="BEARISH";
       const actionable=String(signal.signal||"").toUpperCase()==="ENTRY_CONFIRMING";
@@ -1281,8 +1285,7 @@ body.kb-scanner-page .chart-data-note{
       chartState.bars=data.bars.slice(-500);
       state.chartPayload=data;
       chartState.candles.setData(chartState.bars);
-      chartState.ema20.setData(emaChartPoints(chartState.bars,20));
-      chartState.ema50.setData(emaChartPoints(chartState.bars,50));
+      setChartIndicators();
       const scanCurrent=currentChartSignal();
       chartState.signal=scanCurrent.signal||data.signal;
       chartState.technical=scanCurrent.technical||data.technical;
@@ -1290,7 +1293,9 @@ body.kb-scanner-page .chart-data-note{
       chartState.instance.timeScale().fitContent();
       refreshChartLayers();
       if(qs("chartLastPrice"))qs("chartLastPrice").textContent=chartPriceText(chartState.bars.at(-1)?.close);
-      setChartState("VERIFIED OHLC · "+String(data.metadata?.barsCount||chartState.bars.length)+" BARS","good");
+      setChartState(data.metadata?.candleFresh
+        ? "LIVE OHLC · "+String(data.metadata?.barsCount||chartState.bars.length)+" BARS"
+        : "HISTORICAL OHLC · SIGNALS PAUSED",data.metadata?.candleFresh?"good":"warn");
       const statePrice=chartState.bars.at(-1)?.close;
       if(Number.isFinite(Number(statePrice)))renderChartSignal();
     }catch(error){
@@ -1345,7 +1350,9 @@ body.kb-scanner-page .chart-data-note{
       chartState.zones=buildChartZones();
       drawChartZones();
       if(qs("chartLastPrice"))qs("chartLastPrice").textContent=chartPriceText(price);
-      setChartState("LIVE TICK · DERIVED FROM VERIFIED MARKET FEED","good");
+      setChartState(state.chartPayload?.metadata?.candleFresh===true
+        ? "LIVE TICK · VERIFIED MARKET FEED"
+        : "LIVE PRICE · SIGNAL MAP STALE",state.chartPayload?.metadata?.candleFresh===true?"good":"warn");
     }catch{}
   }
 
