@@ -1377,7 +1377,6 @@ body.kb-scanner-page .chart-data-note{
   async function loadChart(){
     const symbol=chartSelectedSymbol();
     const timeframe=String(qs("timeframe")?.value||"5m");
-    stopChartStream();
     const sequence=++state.chartLoadSequence;
     const chartState=ensureChart();
     if(!chartState)return;
