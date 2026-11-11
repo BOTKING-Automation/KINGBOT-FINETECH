@@ -3,6 +3,7 @@ import { getDerivMarketFeed } from "./deriv-market-feed.js";
 
 const DEFAULT_FRESHNESS_MS = Math.max(15000, Number(process.env.KINGBOT_MARKET_DATA_MAX_AGE_MS || 120000));
 const REQUEST_TIMEOUT_MS = Math.max(1000, Number(process.env.KINGBOT_MARKET_DATA_TIMEOUT_MS || 4500));
+const FUTURE_TIMESTAMP_TOLERANCE_MS = Math.max(0, Math.min(120000, Number(process.env.KINGBOT_MARKET_DATA_FUTURE_SKEW_MS || 30000)));
 
 const CRYPTO_QUOTES = {
   BTCUSD: "BTCUSDT",
@@ -72,21 +73,44 @@ export function classifyMarketSymbol(symbol) {
 }
 
 function timestampMs(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
   const n = finite(value);
-  if (n === null) return null;
-  return n > 1e15 ? n / 1e6 : n;
+  if (n !== null) {
+    if (n > 1e17) return n / 1e6; // nanoseconds -> milliseconds
+    if (n > 1e14) return n / 1e3; // microseconds -> milliseconds
+    if (n > 1e12) return n;       // milliseconds
+    if (n > 1e9) return n * 1000; // seconds -> milliseconds
+    return null;
+  }
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function normalizeQuote({ symbol, category, price, bid = null, ask = null, change = null, volume = null, high = null, low = null, timestamp = null, source, provider, freshnessMaxAgeMs = DEFAULT_FRESHNESS_MS, raw = null }) {
   const normalized = normalizeMarketSymbol(symbol);
-  const ts = timestampMs(timestamp) || Date.now();
-  const age = Math.max(0, Date.now() - ts);
-  const fresh = age <= freshnessMaxAgeMs && Number.isFinite(Number(price)) && Number(price) > 0;
+  const ts = timestampMs(timestamp);
+  const deltaMs = ts === null ? null : Date.now() - ts;
+  const ageMs = deltaMs === null ? null : Math.max(0, deltaMs);
+  const priceValue = finite(price);
+  const timestampMissing = ts === null;
+  const timestampInFuture = deltaMs !== null && deltaMs < -FUTURE_TIMESTAMP_TOLERANCE_MS;
+  const timestampStale = deltaMs !== null && deltaMs > freshnessMaxAgeMs;
+  const priceInvalid = priceValue === null || priceValue <= 0;
+  const freshnessError = timestampMissing
+    ? "QUOTE_TIMESTAMP_MISSING"
+    : timestampInFuture
+      ? "QUOTE_TIMESTAMP_IN_FUTURE"
+      : timestampStale
+        ? "QUOTE_STALE"
+        : priceInvalid
+          ? "QUOTE_PRICE_INVALID"
+          : null;
+  const fresh = freshnessError === null;
 
   return {
     symbol: normalized,
     category,
-    price: finite(price),
+    price: priceValue,
     bid: finite(bid),
     ask: finite(ask),
     spread: finite(bid) !== null && finite(ask) !== null ? finite(ask) - finite(bid) : null,
@@ -94,14 +118,15 @@ function normalizeQuote({ symbol, category, price, bid = null, ask = null, chang
     volume: finite(volume),
     high: finite(high),
     low: finite(low),
-    timestamp: new Date(ts).toISOString(),
-    ageMs: age,
+    timestamp: ts === null ? null : new Date(ts).toISOString(),
+    ageMs,
     freshnessMaxAgeMs,
     available: fresh,
     verified: fresh,
     source,
     provider,
-    quality: fresh ? "VERIFIED" : "STALE",
+    quality: fresh ? "VERIFIED" : (timestampMissing || timestampInFuture ? "UNVERIFIED" : "STALE"),
+    freshnessError,
     executionAuthorized: false,
     executionAuthority: "NONE",
     raw: raw || undefined
@@ -174,12 +199,14 @@ async function readBinance(symbol) {
 async function readTwelveData(symbol, twelveData) {
   if (!twelveData?.enabled) throw new Error("TWELVE_DATA_NOT_CONFIGURED");
   const rows = await twelveData.latestQuotes([symbol], { allowRestFallback: true, restTimeoutMs: 1800 });
-  const quote = rows.find(row => normalizeMarketSymbol(row?.symbol) === normalizeMarketSymbol(symbol) && row?.available);
-  if (!quote || !(Number(quote.price) > 0)) throw new Error("TWELVE_DATA_QUOTE_UNAVAILABLE");
+  const quote = rows.find(row => normalizeMarketSymbol(row?.symbol) === normalizeMarketSymbol(symbol));
+  if (!quote) throw new Error("TWELVE_DATA_QUOTE_UNAVAILABLE");
+  if (quote.available === false) throw new Error(String(quote.error || "TWELVE_DATA_QUOTE_UNAVAILABLE"));
+  if (!(Number(quote.price) > 0)) throw new Error("TWELVE_DATA_QUOTE_UNAVAILABLE");
   return {
     ...quote,
     symbol,
-    timestamp: quote.timestamp || Date.now(),
+    timestamp: quote.timestamp,
     provider: "twelve-data"
   };
 }
@@ -323,7 +350,7 @@ export class MarketDataFabric {
             failedProviders: failures
           };
         }
-        failures.push({ provider, error: "STALE_QUOTE" });
+        failures.push({ provider, error: quote.freshnessError || "STALE_QUOTE" });
       } catch (error) {
         failures.push({ provider, error: String(error?.message || "PROVIDER_UNAVAILABLE").slice(0, 160) });
       }

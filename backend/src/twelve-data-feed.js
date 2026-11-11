@@ -7,6 +7,35 @@ function finite(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+const QUOTE_MAX_AGE_MS = Math.max(15000, Number(process.env.KINGBOT_MARKET_DATA_MAX_AGE_MS || 120000));
+const FUTURE_TIMESTAMP_TOLERANCE_MS = Math.max(0, Math.min(120000, Number(process.env.KINGBOT_MARKET_DATA_FUTURE_SKEW_MS || 30000)));
+
+function timestampMs(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const n = finite(value);
+  if (n !== null) {
+    if (n > 1e17) return n / 1e6;
+    if (n > 1e14) return n / 1e3;
+    if (n > 1e12) return n;
+    if (n > 1e9) return n * 1000;
+    return null;
+  }
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function quoteTimestamp(payload) {
+  return timestampMs(payload?.timestamp) ?? timestampMs(payload?.datetime) ?? timestampMs(payload?.time);
+}
+
+function quoteFreshnessError(timestamp) {
+  if (timestamp === null) return "TWELVE_DATA_QUOTE_TIMESTAMP_MISSING";
+  const ageMs = Date.now() - timestamp;
+  if (ageMs < -FUTURE_TIMESTAMP_TOLERANCE_MS) return "TWELVE_DATA_QUOTE_TIMESTAMP_IN_FUTURE";
+  if (ageMs > QUOTE_MAX_AGE_MS) return "TWELVE_DATA_QUOTE_STALE";
+  return null;
+}
+
 function normalizeSymbol(symbol) {
   const raw = String(symbol || "").trim().toUpperCase();
   const map = {
@@ -98,7 +127,7 @@ export class TwelveDataFeed {
           ask: finite(data?.ask),
           spread: finite(data?.bid) !== null && finite(data?.ask) !== null ? finite(data?.ask) - finite(data?.bid) : null,
           volume: finite(data?.day_volume ?? data?.volume),
-          timestamp: finite(data?.timestamp) ? Number(data.timestamp) * 1000 : Date.now(),
+          timestamp: quoteTimestamp(data),
           source: "Twelve Data WebSocket",
           available: true,
           receivedAt: Date.now()
@@ -214,7 +243,10 @@ export class TwelveDataFeed {
         const bid = finite(data?.bid);
         const ask = finite(data?.ask);
         const price = finite(data?.close ?? data?.price ?? (bid !== null && ask !== null ? (bid + ask) / 2 : null));
-        if (price === null) throw new Error("TWELVE_DATA_QUOTE_EMPTY");
+        if (!(price > 0)) throw new Error("TWELVE_DATA_QUOTE_EMPTY");
+        const timestamp = quoteTimestamp(data);
+        const freshnessError = quoteFreshnessError(timestamp);
+        if (freshnessError) throw new Error(freshnessError);
         return {
           symbol: kingbotSymbol(tdSymbol),
           twelveDataSymbol: tdSymbol,
@@ -222,7 +254,8 @@ export class TwelveDataFeed {
           bid,
           ask,
           spread: bid !== null && ask !== null ? ask - bid : null,
-          timestamp: finite(data?.timestamp) ? Number(data.timestamp) * 1000 : Date.now(),
+          timestamp,
+          ageMs: Math.max(0, Date.now() - timestamp),
           time: data?.datetime || null,
           source: "Twelve Data REST quote",
           available: true
@@ -258,9 +291,20 @@ export class TwelveDataFeed {
         symbol: kingbotSymbol(tdSymbol),
         twelveDataSymbol: tdSymbol,
         available: false,
-        source: "Twelve Data WebSocket"
+        source: "Twelve Data WebSocket",
+        error: "TWELVE_DATA_QUOTE_UNAVAILABLE"
       };
-      return { ...quote, available: true };
+      const timestamp = timestampMs(quote.timestamp);
+      const freshnessError = quoteFreshnessError(timestamp) ||
+        (!(Number(quote.price) > 0) ? "TWELVE_DATA_QUOTE_PRICE_INVALID" : null);
+      const deltaMs = timestamp === null ? null : Date.now() - timestamp;
+      return {
+        ...quote,
+        timestamp,
+        ageMs: deltaMs === null ? null : Math.max(0, deltaMs),
+        available: freshnessError === null,
+        ...(freshnessError ? { error: freshnessError } : {})
+      };
     });
   }
 

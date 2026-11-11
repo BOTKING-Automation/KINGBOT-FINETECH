@@ -7,6 +7,15 @@ const finite = (value) => {
   return Number.isFinite(n) ? n : null;
 };
 
+function freshQuoteSnapshot(quote, maxAgeMs) {
+  const price = finite(quote?.price);
+  const epoch = finite(quote?.epoch);
+  if (price === null || price <= 0 || epoch === null) return null;
+  const ageMs = Date.now() - epoch * 1000;
+  if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > maxAgeMs) return null;
+  return { ...quote, ageMs: Math.round(ageMs) };
+}
+
 export class DerivMarketFeed {
   constructor({maxAgeMs=5000,connectTimeoutMs=10000}={}) {
     this.maxAgeMs = Math.max(1000, Number(maxAgeMs)||5000);
@@ -41,7 +50,10 @@ export class DerivMarketFeed {
       AUDUSD:"frxAUDUSD",
       USDCAD:"frxUSDCAD",
       USDCHF:"frxUSDCHF",
-      NZDUSD:"frxNZDUSD"
+      NZDUSD:"frxNZDUSD",
+      EURGBP:"frxEURGBP",
+      EURJPY:"frxEURJPY",
+      GBPJPY:"frxGBPJPY"
     };
     // Browser/broker catalog symbols such as frxXAUUSD become FRXXAUUSD
     // after upper-casing. Strip exactly one FRX prefix before alias lookup.
@@ -480,30 +492,43 @@ export class DerivMarketFeed {
 
   async getQuote(symbol,{maxAgeMs=this.maxAgeMs,timeoutMs=8000}={}) {
     const s = await this.subscribe(symbol);
+    const useFresh = quote => freshQuoteSnapshot(quote,maxAgeMs);
 
     const cached = this.ticks.get(s);
-    const age = cached ? Date.now()-cached.receivedAt : Infinity;
-    if (cached && age <= maxAgeMs) return {...cached,ageMs:Math.max(0,age)};
+    const freshCached = useFresh(cached);
+    if (freshCached) return freshCached;
 
-    // A persistent subscription can remain connected while its stream becomes
-    // stale. Request a fresh one-shot tick before failing the trading cycle.
+    // A persistent subscription can remain connected while its tick becomes stale.
+    // Try a new tick response first, then Deriv's one-shot latest-tick history path.
     try {
       const snapshot = await this.requestSnapshot(s,{timeoutMs:Math.min(4500,timeoutMs)});
-      if (snapshot?.price !== undefined) {
-        return {...snapshot,ageMs:Math.max(0,Date.now()-snapshot.receivedAt)};
-      }
+      const fresh = useFresh(snapshot);
+      if (fresh) return fresh;
     } catch {}
 
-    // If the socket is unhealthy, rebuild it once and retry the snapshot.
+    try {
+      const latest = await this.getLatestAvailableQuote(s,{timeoutMs:Math.min(4500,timeoutMs)});
+      const fresh = useFresh(latest);
+      if (fresh) return fresh;
+    } catch {}
+
+    // If the socket is unhealthy, rebuild it once and repeat both read paths.
     try {
       await this.forceReconnect();
       await this.subscribe(s);
       const snapshot = await this.requestSnapshot(s,{timeoutMs:Math.min(4500,timeoutMs)});
-      if (snapshot?.price !== undefined) {
-        return {...snapshot,ageMs:Math.max(0,Date.now()-snapshot.receivedAt)};
-      }
+      const fresh = useFresh(snapshot);
+      if (fresh) return fresh;
     } catch {}
 
+    try {
+      const latest = await this.getLatestAvailableQuote(s,{timeoutMs:Math.min(4500,timeoutMs)});
+      const fresh = useFresh(latest);
+      if (fresh) return fresh;
+    } catch {}
+
+    // Keep waiting for the next live tick; never resolve this wait with an
+    // old history tick or a quote whose exchange timestamp is missing.
     return new Promise((resolve,reject)=>{
       const timer = setTimeout(()=>{
         const list = this.waiters.get(s)||[];
@@ -511,7 +536,19 @@ export class DerivMarketFeed {
         reject(new Error("DERIV_MARKET_QUOTE_STALE"));
       },Math.max(2000,Number(timeoutMs)||8000));
       const entry = {
-        resolve:(tick)=>{clearTimeout(timer);resolve({...tick,ageMs:Math.max(0,Date.now()-tick.receivedAt)});},
+        resolve:(tick)=>{
+          const fresh = useFresh(tick);
+          if (!fresh) {
+            const list = this.waiters.get(s)||[];
+            if (!list.includes(entry)) {
+              list.push(entry);
+              this.waiters.set(s,list);
+            }
+            return;
+          }
+          clearTimeout(timer);
+          resolve(fresh);
+        },
         reject:(error)=>{clearTimeout(timer);reject(error);}
       };
       const list = this.waiters.get(s)||[];

@@ -813,6 +813,8 @@ async function trainAiStrategyModels(twelveData){
   if(!status.configured)return {configured:false,trained:0,reason:"ML_SERVICE_NOT_CONFIGURED"};
   let trained=0;
   let botsReady=0;
+  let rateLimited=false;
+  let rateLimitRetryAfterMs=0;
   const reports=[];
   for(const botId of AI_STRATEGY_BOTS){
     const timeframes=trainingTimeframes(botId);
@@ -857,21 +859,34 @@ async function trainAiStrategyModels(twelveData){
           reports.push(failure);
           botReports.push(failure);
           console.warn("[KINGBOT ML TRAIN]",botId,timeframe,failure.error);
+          if(/HTTP_429|RATE_LIMITED/i.test(String(failure.error))){
+            rateLimited=true;
+            rateLimitRetryAfterMs=Number(result?.retryAfterMs)||0;
+            break;
+          }
         }
       }catch(error){
         const failure={botId,timeframe,ok:false,error:String(error?.message||"TRAINING_FAILED").slice(0,500)};
         reports.push(failure);
         botReports.push(failure);
         console.warn("[KINGBOT ML TRAIN]",botId,timeframe,failure.error);
+        if(/HTTP_429|RATE_LIMITED/i.test(String(failure.error))){
+          rateLimited=true;
+          rateLimitRetryAfterMs=Number(error?.retryAfterMs)||0;
+          break;
+        }
       }
     }
     if(botTrained===timeframes.length)botsReady++;
+    if(rateLimited)break;
   }
   return {
     configured:true,
     trained,
     targetModels:AI_STRATEGY_BOTS.reduce((n,botId)=>n+trainingTimeframes(botId).length,0),
     botsReady,
+    rateLimited,
+    retryAfterMs:rateLimited?Math.max(1000,rateLimitRetryAfterMs):0,
     reports,
     historyLimit:TRAINING_HISTORY_LIMIT,
     trainingMode:"STRATEGY_SPECIFIC_MULTI_TIMEFRAME"
@@ -903,9 +918,14 @@ function startAiStrategyModelTraining(twelveData){
     const trained = Number(lastTrainingResult?.trained||0);
     const target = Number(lastTrainingResult?.targetModels||0);
     if(target>0 && trained<target){
-      const hasRateLimit = (lastTrainingResult?.reports||[]).some(item=>/HTTP_429/.test(String(item?.error||"")));
+      const hasRateLimit = Boolean(lastTrainingResult?.rateLimited) ||
+        (lastTrainingResult?.reports||[]).some(item=>/HTTP_429|RATE_LIMITED/i.test(String(item?.error||"")));
       const retryDelay = hasRateLimit
-        ? Math.max(retryMs,Number(process.env.KINGBOT_ML_429_RETRY_MS||10*60*1000))
+        ? Math.max(
+            retryMs,
+            Number(lastTrainingResult?.retryAfterMs)||0,
+            Number(process.env.KINGBOT_ML_429_RETRY_MS||10*60*1000)
+          )
         : retryMs;
       setTimeout(()=>void run(),retryDelay);
     }
@@ -1271,7 +1291,6 @@ class AiMarketScannerStream {
 export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server, cortexRunner = null }) {
   const stream = new AiMarketScannerStream({ server, pool, twelveData, cortexRunner });
   startAiStrategyModelTraining(twelveData);
-  void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
 
   const limiter = rateLimit({
     windowMs:60*1000, limit:Number(process.env.AI_SCANNER_MAX_REQUESTS_PER_MINUTE || 6),
