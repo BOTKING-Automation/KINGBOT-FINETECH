@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
-import { buildScannerChartPayload } from "../src/ai-market-scanner.js";
+import { buildScannerChartPayload, buildScannerChartStreamQuote } from "../src/ai-market-scanner.js";
+
+const scannerPage = readFileSync(new URL("../../scanner.html", import.meta.url), "utf8");
 
 function makeBars(count = 140) {
   return Array.from({ length: count }, (_, index) => {
@@ -78,4 +82,55 @@ test("chart payload marks a current timeframe candle as fresh", () => {
   assert.equal(payload.metadata.candleFresh, true);
   assert.equal(payload.metadata.ageSinceCloseMs, 0);
   assert.equal(payload.metadata.verifiedOhlc, true);
+});
+
+
+test("chart stream quote separates venue age from server-to-client pipeline age", () => {
+  const payload = buildScannerChartStreamQuote("XAUUSD", {
+    price: 4142.25,
+    bid: 4142.20,
+    ask: 4142.30,
+    epoch: 1700000000,
+    receivedAt: 1700000000850,
+    time: "2023-11-14T22:13:20.000Z",
+    source: "deriv-shared-live-feed"
+  }, 1700000001200);
+
+  assert.equal(payload.symbol, "XAUUSD");
+  assert.equal(payload.timestamp, 1700000000000);
+  assert.equal(payload.exchangeAgeMs, 1200);
+  assert.equal(payload.transportAgeMs, 350);
+  assert.equal(payload.ageMs, 350);
+  assert.equal(payload.price, 4142.25);
+});
+
+test("chart stream does not invent an exchange timestamp when provider time is missing", () => {
+  const payload = buildScannerChartStreamQuote("EURUSD", {
+    price: 1.1725,
+    receivedAt: 1700000000100,
+    source: "deriv-shared-live-feed"
+  }, 1700000000200);
+
+  assert.equal(payload.timestamp, null);
+  assert.equal(payload.exchangeAgeMs, null);
+  assert.equal(payload.transportAgeMs, 100);
+});
+
+test("scanner live chart batches candle painting and keeps quote cards incremental", () => {
+  const start = scannerPage.indexOf("  function updateLiveChartQuote(incoming){");
+  const end = scannerPage.indexOf("\n  function syncChartFromScan", start);
+  assert.ok(start >= 0 && end > start, "live chart quote handler must exist");
+  const handler = scannerPage.slice(start, end);
+
+  assert.match(scannerPage, /function scheduleChartLiveFrame\(chartState\)/);
+  assert.match(scannerPage, /window\.requestAnimationFrame/);
+  assert.match(scannerPage, /id="chartTickRate"/);
+  assert.match(scannerPage, /id="chartTickAge"/);
+  assert.match(scannerPage, /id="chartTickPipe"/);
+  assert.doesNotMatch(handler, /setChartIndicators\(\)|buildChartZones\(\)|drawChartZones\(\)/);
+  assert.match(scannerPage, /function scheduleQuoteCardUpdate\(quote\)/);
+  assert.doesNotMatch(scannerPage.slice(
+    scannerPage.indexOf("  function mergeLiveQuote(incoming){"),
+    scannerPage.indexOf("\n  function websocketUrl", scannerPage.indexOf("  function mergeLiveQuote(incoming){"))
+  ), /renderQuotes\(\)/);
 });
