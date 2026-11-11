@@ -378,6 +378,16 @@ export function buildScannerChartPayload(rows, { symbol, timeframe = DEFAULT_TF,
   };
   const pendingOrderZones = predictPendingOrderZones(signalContext);
 
+  const intervalSeconds = ({
+    "1m":60,"3m":180,"5m":300,"15m":900,"30m":1800,
+    "1h":3600,"2h":7200,"4h":14400,"1d":86400,"1w":604800
+  })[cleanTimeframe(timeframe)] || 300;
+  const lastBar = bars[bars.length - 1];
+  const lastBarCloseMs = (lastBar.time + intervalSeconds) * 1000;
+  const ageSinceCloseMs = Math.max(0, Date.now() - lastBarCloseMs);
+  const freshnessLimitMs = Math.max(2 * intervalSeconds * 1000, 10 * 60 * 1000);
+  const candleFresh = ageSinceCloseMs <= freshnessLimitMs;
+
   return {
     ok: true,
     scanner: "KINGBOT AI MARKET SCANNER",
@@ -396,7 +406,11 @@ export function buildScannerChartPayload(rows, { symbol, timeframe = DEFAULT_TF,
     },
     metadata: {
       barsCount: bars.length,
-      lastBarTime: new Date(bars[bars.length - 1].time * 1000).toISOString(),
+      lastBarTime: new Date(lastBar.time * 1000).toISOString(),
+      lastBarCloseTime: new Date(lastBarCloseMs).toISOString(),
+      ageSinceCloseMs,
+      freshnessLimitMs,
+      candleFresh,
       verifiedOhlc: true,
       provider: "deriv-public"
     }
