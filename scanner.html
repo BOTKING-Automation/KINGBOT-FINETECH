@@ -622,6 +622,13 @@ body.kb-scanner-page .chart-live-state.warn:before{background:#ffd166;box-shadow
 body.kb-scanner-page .chart-live-state.bad{color:#ff8299}
 body.kb-scanner-page .chart-live-state.bad:before{background:#ff5578;box-shadow:0 0 12px rgba(255,85,120,.55)}
 body.kb-scanner-page .chart-price{color:#f7f9ff;font:900 12px "JetBrains Mono";font-variant-numeric:tabular-nums}
+body.kb-scanner-page .chart-live-metrics{
+  display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 2px 8px;
+  color:#8290ad;font:800 7px "JetBrains Mono";letter-spacing:.06em
+}
+body.kb-scanner-page .chart-live-metrics span{display:inline-flex;gap:5px;align-items:center}
+body.kb-scanner-page .chart-live-metrics b{color:#c9d7f2;font-weight:900;font-variant-numeric:tabular-nums}
+body.kb-scanner-page #chartTickRate{color:#67eab7}
 body.kb-scanner-page #marketChart{
   position:relative;width:100%;height:470px;overflow:hidden;border:1px solid rgba(142,164,255,.10);
   border-radius:12px;background:#050a18
@@ -678,6 +685,7 @@ body.kb-scanner-page .chart-data-note{
 }
 @media(max-width:1000px){body.kb-scanner-page .chart-workspace{grid-template-columns:1fr}}
 @media(max-width:620px){
+  body.kb-scanner-page .chart-live-metrics{gap:8px;font-size:6px}
   body.kb-scanner-page #marketChart{height:350px}
   body.kb-scanner-page .chart-main{padding:9px}
   body.kb-scanner-page .chart-toolbar{align-items:flex-start}
@@ -758,6 +766,12 @@ body.kb-scanner-page .chart-data-note{
       <div class="chart-live-row">
         <span id="chartDataState" class="chart-live-state warn">WAITING FOR VERIFIED OHLC</span>
         <span id="chartLastPrice" class="chart-price">—</span>
+      </div>
+      <div class="chart-live-metrics" aria-live="polite">
+        <span>TICK RATE <b id="chartTickRate">0.0/s</b></span>
+        <span>VENUE AGE <b id="chartTickAge">—</b></span>
+        <span>PIPE AGE <b id="chartTickPipe">—</b></span>
+        <span>LAST TICK <b id="chartTickTime">—</b></span>
       </div>
       <div id="marketChart" role="img" aria-label="KINGBOT live candlestick chart with technical and risk overlays">
         <canvas id="chartOverlay" aria-hidden="true"></canvas>
@@ -886,7 +900,7 @@ body.kb-scanner-page .chart-data-note{
     :"https://kingbot-fintech-api-etfv.onrender.com/api";
   const API=window.KINGBOT_API?.baseUrl||previewApi;
   const qs=id=>document.getElementById(id);
-  const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false,streamSocket:null,streamReconnectTimer:null,streamBackoffMs:1000,lastStreamMessageAt:0,streamGeneration:0,chart:null,chartPayload:null,latestScan:null,chartLoadSequence:0,chartStreamSocket:null,chartStreamReconnectTimer:null,chartStreamBackoffMs:1000,chartStreamGeneration:0};
+  const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false,streamSocket:null,streamReconnectTimer:null,streamBackoffMs:1000,lastStreamMessageAt:0,streamGeneration:0,chart:null,chartPayload:null,latestScan:null,chartLoadSequence:0,chartStreamSocket:null,chartStreamReconnectTimer:null,chartStreamBackoffMs:1000,chartStreamGeneration:0,pendingChartQuotes:new Map(),pendingQuoteCards:new Map(),quoteCardsFrame:0};
 
   function toast(text,tone){
     const el=qs("toast"); if(!el)return;
@@ -982,7 +996,7 @@ body.kb-scanner-page .chart-data-note{
     const ema20=instance.addSeries(LW.LineSeries,{color:"#34e8b1",lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
     const ema50=instance.addSeries(LW.LineSeries,{color:"#f4c85a",lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
     const overlay=qs("chartOverlay");
-    const chartState={instance,candles,ema20,ema50,overlay,markerPlugin:null,priceLines:[],bars:[],zones:[],symbol:null,timeframe:null,signal:null,technical:null,lastTickAt:0,resizeObserver:null};
+    const chartState={instance,candles,ema20,ema50,overlay,markerPlugin:null,priceLines:[],bars:[],zones:[],symbol:null,timeframe:null,signal:null,technical:null,lastTickAt:0,resizeObserver:null,ema20Value:null,ema50Value:null,ema20Previous:null,ema50Previous:null,emaTime:null,frameScheduled:false,pendingLiveBar:null,pendingNewBucket:false,pendingFollowLatest:false,tickTimes:[],lastTickKey:null,lastTickReceivedAt:0,lastExchangeAgeMs:null,lastPipeAgeMs:null,lastOverlayPaintAt:0};
     state.chart=chartState;
     const resize=()=>{
       if(!state.chart||state.chart!==chartState)return;
@@ -1340,9 +1354,18 @@ body.kb-scanner-page .chart-data-note{
   function setChartIndicators(){
     const chartState=state.chart;
     if(!chartState?.bars?.length)return;
+    const points20=emaChartPoints(chartState.bars,20);
+    const points50=emaChartPoints(chartState.bars,50);
+    chartState.ema20Value=points20.at(-1)?.value??null;
+    chartState.ema50Value=points50.at(-1)?.value??null;
+    // Seed the active candle from the preceding EMA point so every incoming
+    // tick recalculates against the prior closed bar, not the previous tick.
+    chartState.ema20Previous=points20.at(-2)?.value??chartState.ema20Value;
+    chartState.ema50Previous=points50.at(-2)?.value??chartState.ema50Value;
+    chartState.emaTime=chartState.bars.at(-1)?.time??null;
     if(chartLayerEnabled("ema")){
-      chartState.ema20.setData(emaChartPoints(chartState.bars,20));
-      chartState.ema50.setData(emaChartPoints(chartState.bars,50));
+      chartState.ema20.setData(points20);
+      chartState.ema50.setData(points50);
       chartState.ema20.applyOptions({visible:true});
       chartState.ema50.applyOptions({visible:true});
     }else{
@@ -1354,12 +1377,14 @@ body.kb-scanner-page .chart-data-note{
   async function loadChart(){
     const symbol=chartSelectedSymbol();
     const timeframe=String(qs("timeframe")?.value||"5m");
-    stopChartStream();
     const sequence=++state.chartLoadSequence;
     const chartState=ensureChart();
     if(!chartState)return;
     setChartState("LOADING "+symbol+" "+timeframe.toUpperCase(),"warn");
     if(qs("chartLastPrice"))qs("chartLastPrice").textContent="—";
+    // Subscribe before history returns; ticks are buffered and replayed into
+    // the first verified candle frame instead of waiting on the REST response.
+    connectChartStream();
     try{
       const query="/ai/market-scanner/chart?symbol="+encodeURIComponent(symbol)+"&timeframe="+encodeURIComponent(timeframe)+"&limit=300";
       const data=await request(query,{method:"GET"});
@@ -1377,13 +1402,18 @@ body.kb-scanner-page .chart-data-note{
       chartState.zones=buildChartZones();
       chartState.instance.timeScale().fitContent();
       refreshChartLayers();
-      const initialQuote=state.quotes.find(quote=>String(quote.symbol||"").toUpperCase()===symbol&&quote.available!==false);
-      if(initialQuote)updateLiveChartQuote(initialQuote);
+      const pendingQuote=state.pendingChartQuotes.get(symbol);
+      if(pendingQuote){
+        state.pendingChartQuotes.delete(symbol);
+        updateLiveChartQuote(pendingQuote);
+      }else{
+        const initialQuote=state.quotes.find(quote=>String(quote.symbol||"").toUpperCase()===symbol&&quote.available!==false);
+        if(initialQuote)updateLiveChartQuote(initialQuote);
+      }
       if(qs("chartLastPrice"))qs("chartLastPrice").textContent=chartPriceText(chartState.bars.at(-1)?.close);
       setChartState(data.metadata?.candleFresh
         ? "VERIFIED OHLC · "+String(data.metadata?.barsCount||chartState.bars.length)+" BARS"
         : "HISTORICAL OHLC · SIGNALS PAUSED",data.metadata?.candleFresh?"good":"warn");
-      connectChartStream();
       const statePrice=chartState.bars.at(-1)?.close;
       if(Number.isFinite(Number(statePrice)))renderChartSignal();
     }catch(error){
@@ -1404,45 +1434,152 @@ body.kb-scanner-page .chart-data-note{
     }
   }
 
+  function updateLiveChartEma(chartState,bar){
+    if(chartState.emaTime!==bar.time){
+      chartState.ema20Previous=chartState.ema20Value;
+      chartState.ema50Previous=chartState.ema50Value;
+      chartState.emaTime=bar.time;
+    }
+    const alpha20=2/21,alpha50=2/51;
+    if(chartState.ema20Previous!==null&&Number.isFinite(chartState.ema20Previous)){
+      chartState.ema20Value=bar.close*alpha20+chartState.ema20Previous*(1-alpha20);
+      if(chartLayerEnabled("ema"))chartState.ema20.update({time:bar.time,value:chartState.ema20Value});
+    }
+    if(chartState.ema50Previous!==null&&Number.isFinite(chartState.ema50Previous)){
+      chartState.ema50Value=bar.close*alpha50+chartState.ema50Previous*(1-alpha50);
+      if(chartLayerEnabled("ema"))chartState.ema50.update({time:bar.time,value:chartState.ema50Value});
+    }
+  }
+
+  function updateChartLiveMetrics(now=Date.now()){
+    const chartState=state.chart;
+    if(!chartState)return;
+    chartState.tickTimes=chartState.tickTimes.filter(at=>now-at<=5000);
+    const rateWindow=chartState.tickTimes.length
+      ?Math.max(1,Math.min(5,(now-chartState.tickTimes[0])/1000))
+      :1;
+    const tickRate=chartState.tickTimes.length/rateWindow;
+    if(qs("chartTickRate"))qs("chartTickRate").textContent=tickRate.toFixed(1)+"/s";
+    if(chartState.lastTickAt){
+      const elapsed=Math.max(0,now-chartState.lastTickAt);
+      const venueAge=Number.isFinite(chartState.lastExchangeAgeMs)?chartState.lastExchangeAgeMs+elapsed:null;
+      const pipeAge=Number.isFinite(chartState.lastPipeAgeMs)?chartState.lastPipeAgeMs+elapsed:null;
+      if(qs("chartTickAge"))qs("chartTickAge").textContent=venueAge===null?"—":Math.round(venueAge)+"ms";
+      if(qs("chartTickPipe"))qs("chartTickPipe").textContent=pipeAge===null?"—":Math.round(pipeAge)+"ms";
+      if(qs("chartTickTime")){
+        const date=new Date(chartState.lastTickAt);
+        qs("chartTickTime").textContent=date.toLocaleTimeString([],{hour12:false})+"."+String(date.getMilliseconds()).padStart(3,"0");
+      }
+    }else{
+      if(qs("chartTickAge"))qs("chartTickAge").textContent="—";
+      if(qs("chartTickPipe"))qs("chartTickPipe").textContent="—";
+      if(qs("chartTickTime"))qs("chartTickTime").textContent="WAITING";
+    }
+  }
+
+  function flushChartLiveFrame(expectedChart){
+    const chartState=state.chart;
+    if(!chartState||chartState!==expectedChart)return;
+    chartState.frameScheduled=false;
+    const updated=chartState.pendingLiveBar;
+    if(!updated)return;
+    chartState.pendingLiveBar=null;
+    const newBucket=chartState.pendingNewBucket;
+    chartState.pendingNewBucket=false;
+    const followLatest=chartState.pendingFollowLatest;
+    chartState.pendingFollowLatest=false;
+    try{
+      chartState.candles.update(updated);
+      updateLiveChartEma(chartState,updated);
+      const now=Date.now();
+      if(newBucket||now-chartState.lastOverlayPaintAt>=250){
+        chartState.zones=buildChartZones();
+        drawChartZones();
+        chartState.lastOverlayPaintAt=now;
+      }
+      if(newBucket&&followLatest)chartState.instance.timeScale().scrollToRealTime();
+      if(qs("chartLastPrice"))qs("chartLastPrice").textContent=chartPriceText(updated.close);
+      const nextState=state.chartPayload?.metadata?.candleFresh===true
+        ?"LIVE TICK · VERIFIED MARKET FEED"
+        :"LIVE PRICE · SIGNAL MAP STALE";
+      if(qs("chartDataState")?.textContent!==nextState){
+        setChartState(nextState,state.chartPayload?.metadata?.candleFresh===true?"good":"warn");
+      }
+    }catch{}
+    updateChartLiveMetrics();
+  }
+
+  function scheduleChartLiveFrame(chartState){
+    if(chartState.frameScheduled)return;
+    chartState.frameScheduled=true;
+    const requestFrame=window.requestAnimationFrame
+      ?window.requestAnimationFrame.bind(window)
+      :callback=>window.setTimeout(callback,16);
+    requestFrame(()=>flushChartLiveFrame(chartState));
+  }
+
   function updateLiveChartQuote(incoming){
     const chartState=state.chart;
-    if(!chartState?.bars?.length||!incoming)return;
+    if(!incoming)return;
     const symbol=String(incoming.symbol||"").trim().toUpperCase();
     const source=String(incoming.source||"").toLowerCase();
-    if(!source.startsWith("deriv-")||symbol!==chartState.symbol||incoming.available===false)return;
+    if(!source.startsWith("deriv-")||symbol!==chartSelectedSymbol()||incoming.available===false)return;
     const price=Number(incoming.price);
     if(!Number.isFinite(price)||price<=0)return;
     const timestamp=chartTimeSeconds(incoming.timestamp??incoming.epoch??incoming.time);
     if(!timestamp)return;
-    const ageMs=Number(incoming.ageMs);
-    const measuredAge=Number.isFinite(ageMs)?ageMs:Date.now()-timestamp*1000;
-    if(measuredAge>120000||measuredAge< -30000)return;
+    const exchangeAgeValue=Number(incoming.exchangeAgeMs);
+    const clientVenueAge=Math.max(0,Date.now()-timestamp*1000);
+    const exchangeAge=Number.isFinite(exchangeAgeValue)
+      ?Math.max(0,exchangeAgeValue,clientVenueAge)
+      :clientVenueAge;
+    const receivedAt=Number(incoming.receivedAt);
+    const pipeAgeValue=Number(incoming.transportAgeMs??incoming.ageMs);
+    const clientPipelineAge=Number.isFinite(receivedAt)&&receivedAt>0
+      ?Math.max(0,Date.now()-receivedAt):null;
+    const pipeAge=Number.isFinite(pipeAgeValue)
+      ?Math.max(0,pipeAgeValue,clientPipelineAge??0)
+      :clientPipelineAge;
+    if(exchangeAge>120000||(pipeAge!==null&&pipeAge>10000))return;
+    if(!chartState?.bars?.length||chartState.symbol!==symbol){
+      const previous=state.pendingChartQuotes.get(symbol);
+      const previousAt=Number(previous?.receivedAt||0);
+      if(!previous||!Number.isFinite(receivedAt)||receivedAt>=previousAt){
+        state.pendingChartQuotes.set(symbol,incoming);
+      }
+      return;
+    }
+    const tickKey=Number.isFinite(receivedAt)&&receivedAt>0
+      ?timestamp+"|"+price+"|"+receivedAt
+      :null;
+    if(tickKey&&tickKey===chartState.lastTickKey)return;
     const interval=CHART_TF_SECONDS[chartState.timeframe]||300;
     const bucket=Math.floor(timestamp/interval)*interval;
     const bars=chartState.bars;
     const last=bars[bars.length-1];
     if(bucket<last.time)return;
+    if(Number.isFinite(receivedAt)&&receivedAt>0&&receivedAt<chartState.lastTickReceivedAt)return;
+    if(tickKey)chartState.lastTickKey=tickKey;
+    if(Number.isFinite(receivedAt)&&receivedAt>0)chartState.lastTickReceivedAt=receivedAt;
+    const now=Date.now();
+    chartState.tickTimes.push(now);
+    chartState.lastTickAt=now;
+    chartState.lastExchangeAgeMs=exchangeAge;
+    chartState.lastPipeAgeMs=pipeAge;
     let updated;
     if(bucket===last.time){
       updated={...last,high:Math.max(Number(last.high),price),low:Math.min(Number(last.low),price),close:price};
       bars[bars.length-1]=updated;
     }else{
+      const followLatest=chartState.instance.timeScale().scrollPosition()===0;
       updated={time:bucket,open:price,high:price,low:price,close:price,volume:0};
       bars.push(updated);
       if(bars.length>500)bars.shift();
-      if(chartState.instance.timeScale().scrollPosition()===0)chartState.instance.timeScale().scrollToRealTime();
+      chartState.pendingNewBucket=true;
+      chartState.pendingFollowLatest=followLatest;
     }
-    try{
-      chartState.candles.update(updated);
-      chartState.lastTickAt=Date.now();
-      setChartIndicators();
-      chartState.zones=buildChartZones();
-      drawChartZones();
-      if(qs("chartLastPrice"))qs("chartLastPrice").textContent=chartPriceText(price);
-      setChartState(state.chartPayload?.metadata?.candleFresh===true
-        ? "LIVE TICK · VERIFIED MARKET FEED"
-        : "LIVE PRICE · SIGNAL MAP STALE",state.chartPayload?.metadata?.candleFresh===true?"good":"warn");
-    }catch{}
+    chartState.pendingLiveBar=updated;
+    scheduleChartLiveFrame(chartState);
   }
 
   function syncChartFromScan(data){
@@ -1465,7 +1602,7 @@ body.kb-scanner-page .chart-data-note{
     const index=state.quotes.findIndex(q=>String(q?.symbol||"").toUpperCase()===symbol);
     if(index>=0)state.quotes[index]={...state.quotes[index],...next};
     else state.quotes=[...state.quotes,next];
-    renderQuotes();
+    scheduleQuoteCardUpdate(next);
     updateLiveChartQuote(next);
     qs("marketState").textContent="LIVE WS";
     qs("marketState").className="good";
@@ -1655,6 +1792,8 @@ body.kb-scanner-page .chart-data-note{
     }
   }
 
+  setInterval(updateChartLiveMetrics,250);
+
   setInterval(()=>{
     if(state.lastStreamMessageAt && Date.now()-state.lastStreamMessageAt>15000){
       setStreamState("STALE","warn");
@@ -1667,6 +1806,7 @@ body.kb-scanner-page .chart-data-note{
     grid.innerHTML="";
     (state.quotes.length?state.quotes:state.symbols.map(s=>({symbol:s,available:false}))).forEach(q=>{
       const card=document.createElement("button"); card.type="button"; card.className="symbol-card";
+      card.dataset.symbol=q.symbol;
       card.classList.add(q.available ? "is-available" : "is-unavailable");
       card.setAttribute("aria-label",q.symbol+" quote "+(q.available ? "available" : "unavailable"));
       card.innerHTML='<div class="symbol-name"></div><div class="symbol-price"></div><div class="symbol-change"></div>';
@@ -1681,6 +1821,36 @@ body.kb-scanner-page .chart-data-note{
         }
       });
       grid.appendChild(card);
+    });
+  }
+
+  function patchQuoteCard(quote){
+    const grid=qs("symbolGrid");
+    if(!grid)return;
+    const symbol=String(quote?.symbol||"").toUpperCase();
+    const card=[...grid.children].find(item=>item.dataset.symbol===symbol);
+    if(!card){renderQuotes();return;}
+    const available=quote.available!==false;
+    card.classList.toggle("is-available",available);
+    card.classList.toggle("is-unavailable",!available);
+    card.setAttribute("aria-label",symbol+" quote "+(available?"available":"unavailable"));
+    const price=card.querySelector(".symbol-price");
+    const change=card.querySelector(".symbol-change");
+    if(price)price.textContent=available?fmt(quote.price):"—";
+    if(change)change.textContent=available?("Spread "+fmt(quote.spread)):(quote.error||"NO QUOTE");
+  }
+
+  function scheduleQuoteCardUpdate(quote){
+    state.pendingQuoteCards.set(String(quote.symbol||"").toUpperCase(),quote);
+    if(state.quoteCardsFrame)return;
+    const requestFrame=window.requestAnimationFrame
+      ?window.requestAnimationFrame.bind(window)
+      :callback=>window.setTimeout(callback,16);
+    state.quoteCardsFrame=requestFrame(()=>{
+      state.quoteCardsFrame=0;
+      const pending=[...state.pendingQuoteCards.values()];
+      state.pendingQuoteCards.clear();
+      pending.forEach(patchQuoteCard);
     });
   }
 
