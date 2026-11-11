@@ -95,6 +95,7 @@ class V124HoldRecallResearchTests(unittest.TestCase):
         train_mask = np.asarray([True, True, True, False, False])
         eval_mask = np.asarray([False, False, False, True, True])
         matrix = np.ones((5, 2), dtype=np.float32)
+        context_matrix = np.full((5, 2), 7.0, dtype=np.float32)
         data = {
             "C": matrix,
             "M": matrix,
@@ -103,6 +104,9 @@ class V124HoldRecallResearchTests(unittest.TestCase):
             "variants": {
                 "baseline": matrix,
                 "full_cortex": matrix,
+            },
+            "contextVariants": {
+                "full_cortex": context_matrix,
             },
         }
         metrics = {
@@ -131,6 +135,12 @@ class V124HoldRecallResearchTests(unittest.TestCase):
         fit.assert_called_once()
         self.assertEqual(
             fit.call_args.kwargs["loss_profile"], "effective_number_ce"
+        )
+        np.testing.assert_array_equal(
+            fit.call_args.args[1], context_matrix[train_mask]
+        )
+        np.testing.assert_array_equal(
+            fit.call_args.args[6], context_matrix[eval_mask]
         )
         self.assertEqual(result["testSamples"], 2)
 
