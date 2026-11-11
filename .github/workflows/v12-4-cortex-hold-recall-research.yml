@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: kingbot-v124-cortex-hold-recall
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   research:
