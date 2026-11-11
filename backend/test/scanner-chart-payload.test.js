@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { buildScannerChartPayload, buildScannerChartStreamQuote } from "../src/ai-market-scanner.js";
