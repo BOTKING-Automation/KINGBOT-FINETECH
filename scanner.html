@@ -781,7 +781,7 @@ body.kb-scanner-page .chart-data-note{
       </div>
       <div class="chart-stat-grid">
         <div class="chart-stat"><span>DIRECTION</span><strong id="chartBias">—</strong></div>
-        <div class="chart-stat"><span>MODEL SCORE</span><strong id="chartScore">—</strong></div>
+        <div class="chart-stat"><span>CONFLUENCE SCORE</span><strong id="chartScore">—</strong></div>
         <div class="chart-stat"><span>ENTRY REFERENCE</span><strong id="chartEntry">—</strong></div>
         <div class="chart-stat"><span>STOP LOSS</span><strong id="chartStop">—</strong></div>
         <div class="chart-stat"><span>TARGET 1</span><strong id="chartTarget1">—</strong></div>
@@ -1037,7 +1037,7 @@ body.kb-scanner-page .chart-data-note{
     const badge=qs("chartSignalBadge");
     const candleFresh=state.chartPayload?.metadata?.candleFresh===true;
     if(badge){
-      badge.textContent=candleFresh?stateLabel:"STALE DATA";
+      badge.textContent=candleFresh?"TECH · "+stateLabel:"STALE DATA";
       badge.className="chart-signal-badge"+(candleFresh&&bias==="BULLISH"?" bull":candleFresh&&bias==="BEARISH"?" bear":"");
     }
     if(qs("chartAiSymbol"))qs("chartAiSymbol").textContent=symbol;
@@ -1287,12 +1287,11 @@ body.kb-scanner-page .chart-data-note{
     if(chartLayerEnabled("risk")&&state.chartPayload?.metadata?.candleFresh===true){
       const bias=String(signal.bias||"").toUpperCase();
       const directional=bias==="BULLISH"||bias==="BEARISH";
-      const actionable=String(signal.signal||"").toUpperCase()==="ENTRY_CONFIRMING";
       if(directional){
-        addChartPriceLine(signal.entry,"ENTRY"+(actionable?"":" REF"),"#5fd8ff",LW.LineStyle.Dashed,2);
-        if(Number.isFinite(Number(signal.sl)))addChartPriceLine(signal.sl,(actionable?"":"REF ")+"STOP","#ff6e89",LW.LineStyle.Solid,2);
-        if(Number.isFinite(Number(signal.tp1)))addChartPriceLine(signal.tp1,(actionable?"":"REF ")+"TP1","#4edda9",LW.LineStyle.Dotted,1);
-        if(Number.isFinite(Number(signal.tp2)))addChartPriceLine(signal.tp2,(actionable?"":"REF ")+"TP2","#8ce9c7",LW.LineStyle.Dotted,1);
+        addChartPriceLine(signal.entry,"TECH ENTRY REF","#5fd8ff",LW.LineStyle.Dashed,1);
+        if(Number.isFinite(Number(signal.sl)))addChartPriceLine(signal.sl,"TECH STOP REF","#ff6e89",LW.LineStyle.Dotted,1);
+        if(Number.isFinite(Number(signal.tp1)))addChartPriceLine(signal.tp1,"TECH TP1 REF","#4edda9",LW.LineStyle.Dotted,1);
+        if(Number.isFinite(Number(signal.tp2)))addChartPriceLine(signal.tp2,"TECH TP2 REF","#8ce9c7",LW.LineStyle.Dotted,1);
       }
       addChartPriceLine(signal.support??technical.support,"SUPPORT","#38d7ad",LW.LineStyle.Dotted,1);
       addChartPriceLine(signal.resistance??technical.resistance,"RESISTANCE","#f0b85b",LW.LineStyle.Dotted,1);
