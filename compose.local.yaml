@@ -1,0 +1,126 @@
+name: kingbot-local
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kingbot_local
+      POSTGRES_USER: ${KINGBOT_DB_USER:-kingbot}
+      POSTGRES_PASSWORD: ${KINGBOT_DB_PASSWORD:?Set KINGBOT_DB_PASSWORD in .env.local}
+    volumes:
+      - kingbot_pgdata:/var/lib/postgresql
+      - ./backups:/backups
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    restart: unless-stopped
+    command: ["node", "backend/src/server.js"]
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: development
+      PORT: "10000"
+      DATABASE_URL: "postgresql://${KINGBOT_DB_USER:-kingbot}:${KINGBOT_DB_PASSWORD:?Set KINGBOT_DB_PASSWORD in .env.local}@db:5432/kingbot_local"
+      PGSSLMODE: disable
+      FRONTEND_ORIGIN: http://localhost:8080
+      FRONTEND_ORIGINS: http://localhost:8080
+      WORKER_STANDBY: "1"
+      KINGBOT_ML_SIGNAL_URL: http://ml-signal:10001
+      KINGBOT_ML_SIGNAL_SECRET: ${KINGBOT_ML_SIGNAL_SECRET:?Set KINGBOT_ML_SIGNAL_SECRET in .env.local}
+      KINGBOT_ML_SIGNAL_TIMEOUT_MS: "10000"
+      KINGBOT_ML_TRAIN_TIMEOUT_MS: "180000"
+      KINGBOT_ML_TRAIN_SPACING_MS: "2500"
+      KINGBOT_ML_RETRY_MS: "300000"
+      KINGBOT_ML_429_RETRY_MS: "600000"
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env.local}
+      BROKER_CREDENTIALS_KEY: ${BROKER_CREDENTIALS_KEY:?Set BROKER_CREDENTIALS_KEY in .env.local}
+    ports:
+      - "127.0.0.1:10000:10000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:10000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  ml-signal:
+    build:
+      context: .
+      dockerfile: ml-signal-service/Dockerfile.local
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      PORT: "10001"
+      KINGBOT_ML_SIGNAL_SECRET: ${KINGBOT_ML_SIGNAL_SECRET:?Set KINGBOT_ML_SIGNAL_SECRET in .env.local}
+      KINGBOT_ML_ARTIFACTS_URL: http://api:10000/api/ml-artifacts
+      KINGBOT_ML_ARTIFACT_TIMEOUT_SEC: "60"
+      KINGBOT_ML_MIN_BARS: "150"
+      KINGBOT_ML_FORWARD_BARS: "6"
+      KINGBOT_ML_LABEL_ATR: "0.6"
+      KINGBOT_ML_LABEL_FALLBACK_ATR: "0.35"
+    expose:
+      - "10001"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:10001/health', timeout=4)"]
+      interval: 20s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
+  worker:
+    profiles: ["execution"]
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    restart: unless-stopped
+    command: ["node", "backend/src/worker-web.js"]
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: development
+      PORT: "10002"
+      DATABASE_URL: "postgresql://${KINGBOT_DB_USER:-kingbot}:${KINGBOT_DB_PASSWORD:?Set KINGBOT_DB_PASSWORD in .env.local}@db:5432/kingbot_local"
+      PGSSLMODE: disable
+      WORKER_STANDBY: ${KINGBOT_WORKER_STANDBY:-1}
+      KINGBOT_ML_SIGNAL_HOST: ml-signal
+      KINGBOT_ML_SIGNAL_PORT: "10001"
+      KINGBOT_ML_SIGNAL_SECRET: ${KINGBOT_ML_SIGNAL_SECRET:?Set KINGBOT_ML_SIGNAL_SECRET in .env.local}
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      ml-signal:
+        condition: service_healthy
+
+  frontend:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./:/usr/share/nginx/html:ro
+      - ./docker/nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  kingbot_pgdata:
