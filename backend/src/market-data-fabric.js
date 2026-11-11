@@ -199,12 +199,14 @@ async function readBinance(symbol) {
 async function readTwelveData(symbol, twelveData) {
   if (!twelveData?.enabled) throw new Error("TWELVE_DATA_NOT_CONFIGURED");
   const rows = await twelveData.latestQuotes([symbol], { allowRestFallback: true, restTimeoutMs: 1800 });
-  const quote = rows.find(row => normalizeMarketSymbol(row?.symbol) === normalizeMarketSymbol(symbol) && row?.available);
-  if (!quote || !(Number(quote.price) > 0)) throw new Error("TWELVE_DATA_QUOTE_UNAVAILABLE");
+  const quote = rows.find(row => normalizeMarketSymbol(row?.symbol) === normalizeMarketSymbol(symbol));
+  if (!quote) throw new Error("TWELVE_DATA_QUOTE_UNAVAILABLE");
+  if (quote.available === false) throw new Error(String(quote.error || "TWELVE_DATA_QUOTE_UNAVAILABLE"));
+  if (!(Number(quote.price) > 0)) throw new Error("TWELVE_DATA_QUOTE_UNAVAILABLE");
   return {
     ...quote,
     symbol,
-    timestamp: quote.timestamp || Date.now(),
+    timestamp: quote.timestamp,
     provider: "twelve-data"
   };
 }
