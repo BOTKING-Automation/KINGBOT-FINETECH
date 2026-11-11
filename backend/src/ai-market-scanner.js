@@ -1365,8 +1365,156 @@ class AiMarketScannerStream {
   }
 }
 
+
+function registerPublicDerivChartStream(server) {
+  const maxClients = Math.max(1, Math.min(50, Number(process.env.AI_SCANNER_CHART_WS_MAX_CLIENTS || 30)));
+  const clients = new Set();
+  const wss = new WebSocketServer({
+    server,
+    path: "/api/ai/market-scanner/chart/ws",
+    maxPayload: 2048,
+    perMessageDeflate: false
+  });
+
+  const send = (client, payload) => {
+    if (!client || client.closed || client.ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      client.ws.send(JSON.stringify(payload));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const unsubscribe = client => {
+    if (!client) return;
+    const stop = client.unsubscribe;
+    client.unsubscribe = null;
+    if (typeof stop === "function") {
+      try { stop(); } catch {}
+    }
+  };
+
+  wss.on("connection", ws => {
+    if (clients.size >= maxClients) {
+      try {
+        ws.send(JSON.stringify({ type: "chart_error", error: "CHART_STREAM_CAPACITY_REACHED" }));
+        ws.close(1013, "Chart stream capacity reached");
+      } catch {}
+      return;
+    }
+
+    const client = { ws, symbol: null, unsubscribe: null, closed: false, isAlive: true };
+    clients.add(client);
+    send(client, {
+      type: "hello",
+      stream: "KINGBOT DERIV CHART TICKS",
+      provider: "Deriv public market feed",
+      brokerRequired: false,
+      executionAuthority: "NONE"
+    });
+
+    const cleanup = () => {
+      if (client.closed) return;
+      client.closed = true;
+      clearInterval(client.heartbeat);
+      unsubscribe(client);
+      clients.delete(client);
+    };
+
+    ws.on("pong", () => { client.isAlive = true; });
+    client.heartbeat = setInterval(() => {
+      if (client.closed) return clearInterval(client.heartbeat);
+      if (!client.isAlive) {
+        try { ws.terminate(); } catch {}
+        cleanup();
+        return;
+      }
+      client.isAlive = false;
+      try { ws.ping(); } catch { cleanup(); }
+    }, 30000);
+
+    ws.on("message", raw => {
+      let message;
+      try { message = JSON.parse(String(raw || "")); }
+      catch {
+        send(client, { type: "chart_error", error: "INVALID_CHART_STREAM_MESSAGE" });
+        return;
+      }
+      const type = String(message?.type || "").toLowerCase();
+      if (type !== "subscribe") {
+        send(client, { type: "chart_error", error: "CHART_STREAM_SUBSCRIBE_REQUIRED" });
+        return;
+      }
+
+      const symbol = scannerCanonicalSymbol(message.symbol || "");
+      const allowed = cleanSymbols(symbol);
+      if (!symbol || !allowed.includes(symbol)) {
+        send(client, { type: "chart_error", error: "CHART_SYMBOL_INVALID" });
+        return;
+      }
+      if (client.symbol === symbol && typeof client.unsubscribe === "function") {
+        send(client, { type: "subscribed", symbol, provider: "Deriv public market feed" });
+        return;
+      }
+
+      unsubscribe(client);
+      client.symbol = symbol;
+      void publicDerivFeed.onTick(symbol, quote => {
+        const quoteSymbol = scannerCanonicalSymbol(quote?.symbol || quote?.brokerSymbol || "");
+        const price = finite(quote?.price);
+        if (quoteSymbol !== client.symbol || price === null || price <= 0) return;
+        send(client, {
+          type: "quote",
+          quote: {
+            symbol: quoteSymbol,
+            price,
+            bid: finite(quote.bid),
+            ask: finite(quote.ask),
+            epoch: finite(quote.epoch),
+            time: quote.time || null,
+            timestamp: finite(quote.epoch) !== null ? Number(quote.epoch) * 1000 : null,
+            ageMs: Math.max(0, Date.now() - Number(quote.receivedAt || Date.now())),
+            receivedAt: quote.receivedAt || Date.now(),
+            source: quote.source || "deriv-shared-live-feed"
+          },
+          streamAt: new Date().toISOString()
+        });
+      }).then(stop => {
+        if (client.closed || client.symbol !== symbol) {
+          try { stop(); } catch {}
+          return;
+        }
+        client.unsubscribe = stop;
+        send(client, {
+          type: "subscribed",
+          symbol,
+          provider: "Deriv public market feed",
+          brokerIndependent: true
+        });
+      }).catch(error => {
+        send(client, {
+          type: "chart_error",
+          symbol,
+          error: String(error?.message || "DERIV_PUBLIC_CHART_STREAM_UNAVAILABLE").slice(0, 160)
+        });
+      });
+    });
+
+    ws.on("close", cleanup);
+    ws.on("error", cleanup);
+  });
+
+  wss.on("error", error => {
+    console.error("[KINGBOT CHART WS]", error?.message || error);
+  });
+
+  return { wss, clients };
+}
+
 export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server, cortexRunner = null }) {
   const stream = new AiMarketScannerStream({ server, pool, twelveData, cortexRunner });
+  const chartStream = registerPublicDerivChartStream(server);
   startAiStrategyModelTraining(twelveData);
   void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
 
@@ -1455,6 +1603,8 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
         path:"/api/ai/market-scanner/ws",
         scanIntervalMs:stream.scanIntervalMs,
         clients:stream.clients.size,
+        chartClients:chartStream.clients.size,
+        chartPath:"/api/ai/market-scanner/chart/ws",
         channels:stream.channels.size
       }
     });
