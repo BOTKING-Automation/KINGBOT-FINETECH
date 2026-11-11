@@ -164,7 +164,7 @@ def _run_loss_fold(data: dict[str, Any], train_fraction: float,
     train_mask, eval_mask, cutoff = v123._fold_masks(
         data, train_fraction, test_fraction
     )
-    C, M, A, y = (data[key] for key in ("C", "M", "A", "y"))
+    M, A, y = (data[key] for key in ("M", "A", "y"))
     train_y, eval_y = y[train_mask], y[eval_mask]
 
     v9_probabilities = _matched_v9(
@@ -172,6 +172,7 @@ def _run_loss_fold(data: dict[str, Any], train_fraction: float,
     )
     v9_metrics = _detailed_metrics(eval_y, v9_probabilities)
     target = data["variants"]["full_cortex"]
+    context = data["contextVariants"]["full_cortex"]
     requested_profiles = tuple(profiles)
     if (
         not requested_profiles
@@ -183,8 +184,8 @@ def _run_loss_fold(data: dict[str, Any], train_fraction: float,
     profile_results: dict[str, Any] = {}
     for profile in requested_profiles:
         probabilities = fit_predict(
-            target[train_mask], C[train_mask], M[train_mask], A[train_mask],
-            train_y, target[eval_mask], C[eval_mask], M[eval_mask],
+            target[train_mask], context[train_mask], M[train_mask], A[train_mask],
+            train_y, target[eval_mask], context[eval_mask], M[eval_mask],
             A[eval_mask], loss_profile=profile,
         )
         metrics = _detailed_metrics(eval_y, probabilities)
