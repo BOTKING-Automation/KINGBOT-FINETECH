@@ -1291,7 +1291,6 @@ class AiMarketScannerStream {
 export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, server, cortexRunner = null }) {
   const stream = new AiMarketScannerStream({ server, pool, twelveData, cortexRunner });
   startAiStrategyModelTraining(twelveData);
-  void ensureScannerSchema(pool).catch(e => console.error("[KINGBOT TV SCHEMA]", e?.message || e));
 
   const limiter = rateLimit({
     windowMs:60*1000, limit:Number(process.env.AI_SCANNER_MAX_REQUESTS_PER_MINUTE || 6),
