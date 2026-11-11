@@ -9,7 +9,7 @@ const sleep = (milliseconds) =>
 
 export function isDerivHistoryRateLimitError(error) {
   const message = String(error?.message || error || "");
-  return /rate[\\s_-]*limit|too many requests/i.test(message);
+  return /rate[\s_-]*limit|too many requests/i.test(message);
 }
 
 /**
