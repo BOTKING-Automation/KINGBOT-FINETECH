@@ -2,6 +2,9 @@ import unittest
 
 import numpy as np
 import torch
+from unittest.mock import patch
+
+import run_v124_hold_recall_research as research
 
 from run_v124_hold_recall_research import (
     LOSS_PROFILES,
@@ -85,6 +88,52 @@ class V124HoldRecallResearchTests(unittest.TestCase):
         self.assertEqual(
             select_development_profile(development), "effective_number_ce"
         )
+
+
+    def test_loss_fold_honors_selected_profile_subset(self):
+        labels = np.asarray([-1, 0, 1, -1, 0], dtype=np.int64)
+        train_mask = np.asarray([True, True, True, False, False])
+        eval_mask = np.asarray([False, False, False, True, True])
+        matrix = np.ones((5, 2), dtype=np.float32)
+        data = {
+            "C": matrix,
+            "M": matrix,
+            "A": matrix,
+            "y": labels,
+            "variants": {
+                "baseline": matrix,
+                "full_cortex": matrix,
+            },
+        }
+        metrics = {
+            "classRecall": {"SELL": 0.5, "HOLD": 0.2, "BUY": 0.5},
+            "selectionScore": 0.4,
+            "qualityGate": True,
+        }
+        probabilities = np.full((2, 3), 1.0 / 3.0, dtype=np.float32)
+
+        with (
+            patch.object(
+                research.v123, "_fold_masks",
+                return_value=(train_mask, eval_mask, 1234.0),
+            ),
+            patch.object(research, "_matched_v9", return_value=probabilities),
+            patch.object(research, "_detailed_metrics", return_value=metrics),
+            patch.object(research, "fit_predict", return_value=probabilities) as fit,
+        ):
+            result = research._run_loss_fold(
+                data, 0.70, 0.85, ("effective_number_ce",)
+            )
+
+        self.assertEqual(
+            list(result["profiles"]), ["effective_number_ce"]
+        )
+        fit.assert_called_once()
+        self.assertEqual(
+            fit.call_args.kwargs["loss_profile"], "effective_number_ce"
+        )
+        self.assertEqual(result["testSamples"], 2)
+
 
 
 if __name__ == "__main__":
