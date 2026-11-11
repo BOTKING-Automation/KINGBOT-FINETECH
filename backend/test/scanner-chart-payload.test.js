@@ -126,6 +126,8 @@ test("scanner live chart batches candle painting and keeps quote cards increment
   assert.match(scannerPage, /id="chartTickRate"/);
   assert.match(scannerPage, /id="chartTickAge"/);
   assert.match(scannerPage, /id="chartTickPipe"/);
+  assert.match(scannerPage, /const API=isCortexPreviewHost\?previewApi/);
+  assert.match(scannerPage, /kingbot-cortex-chart-preview\\.onrender\\.com/);
   assert.doesNotMatch(handler, /setChartIndicators\(\)|buildChartZones\(\)|drawChartZones\(\)/);
   assert.match(scannerPage, /function scheduleQuoteCardUpdate\(quote\)/);
   assert.doesNotMatch(scannerPage.slice(
