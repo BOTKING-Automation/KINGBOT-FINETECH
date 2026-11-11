@@ -877,7 +877,14 @@ body.kb-scanner-page .chart-data-note{
 <script>
 (function(){
   "use strict";
-  const API=window.KINGBOT_API?.baseUrl||"https://kingbot-fintech-api-etfv.onrender.com/api";
+  const cortexPreviewHosts=new Set([
+    "kingbot-finetech-git-feature-cortex-live-cha-fce734-kingbottech.vercel.app",
+    "kingbot-finetech-6fpc8nygn-kingbottech.vercel.app"
+  ]);
+  const previewApi=cortexPreviewHosts.has(String(location.hostname||"").toLowerCase())
+    ?"https://kingbot-cortex-chart-preview.onrender.com/api"
+    :"https://kingbot-fintech-api-etfv.onrender.com/api";
+  const API=window.KINGBOT_API?.baseUrl||previewApi;
   const qs=id=>document.getElementById(id);
   const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false,streamSocket:null,streamReconnectTimer:null,streamBackoffMs:1000,lastStreamMessageAt:0,streamGeneration:0,chart:null,chartPayload:null,latestScan:null,chartLoadSequence:0,chartStreamSocket:null,chartStreamReconnectTimer:null,chartStreamBackoffMs:1000,chartStreamGeneration:0};
 
