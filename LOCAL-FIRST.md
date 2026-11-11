@@ -43,7 +43,10 @@ Open:
 
 - Frontend: http://localhost:8080
 - API health: http://localhost:10000/api/health
-- ML service health: http://localhost:10001/health
+- ML service health (internal container check):
+  ```powershell
+  docker compose --env-file .env.local -f compose.local.yaml exec ml-signal python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:10001/health').read().decode())"
+  ```
 - Local PostgreSQL: localhost:5433 (database `kingbot_local`)
 
 The local frontend uses the same Firebase project configuration as the existing frontend. In Firebase Authentication settings, make sure `localhost` is an authorized domain before testing sign-in.
