@@ -900,7 +900,7 @@ body.kb-scanner-page .chart-data-note{
     :"https://kingbot-fintech-api-etfv.onrender.com/api";
   const API=window.KINGBOT_API?.baseUrl||previewApi;
   const qs=id=>document.getElementById(id);
-  const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false,streamSocket:null,streamReconnectTimer:null,streamBackoffMs:1000,lastStreamMessageAt:0,streamGeneration:0,chart:null,chartPayload:null,latestScan:null,chartLoadSequence:0,chartStreamSocket:null,chartStreamReconnectTimer:null,chartStreamBackoffMs:1000,chartStreamGeneration:0,pendingQuoteCards:new Map(),quoteCardsFrame:0};
+  const state={symbols:["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"],quotes:[],busy:false,streamSocket:null,streamReconnectTimer:null,streamBackoffMs:1000,lastStreamMessageAt:0,streamGeneration:0,chart:null,chartPayload:null,latestScan:null,chartLoadSequence:0,chartStreamSocket:null,chartStreamReconnectTimer:null,chartStreamBackoffMs:1000,chartStreamGeneration:0,pendingChartQuotes:new Map(),pendingQuoteCards:new Map(),quoteCardsFrame:0};
 
   function toast(text,tone){
     const el=qs("toast"); if(!el)return;
@@ -1383,6 +1383,9 @@ body.kb-scanner-page .chart-data-note{
     if(!chartState)return;
     setChartState("LOADING "+symbol+" "+timeframe.toUpperCase(),"warn");
     if(qs("chartLastPrice"))qs("chartLastPrice").textContent="—";
+    // Subscribe before history returns; ticks are buffered and replayed into
+    // the first verified candle frame instead of waiting on the REST response.
+    connectChartStream();
     try{
       const query="/ai/market-scanner/chart?symbol="+encodeURIComponent(symbol)+"&timeframe="+encodeURIComponent(timeframe)+"&limit=300";
       const data=await request(query,{method:"GET"});
@@ -1400,13 +1403,18 @@ body.kb-scanner-page .chart-data-note{
       chartState.zones=buildChartZones();
       chartState.instance.timeScale().fitContent();
       refreshChartLayers();
-      const initialQuote=state.quotes.find(quote=>String(quote.symbol||"").toUpperCase()===symbol&&quote.available!==false);
-      if(initialQuote)updateLiveChartQuote(initialQuote);
+      const pendingQuote=state.pendingChartQuotes.get(symbol);
+      if(pendingQuote){
+        state.pendingChartQuotes.delete(symbol);
+        updateLiveChartQuote(pendingQuote);
+      }else{
+        const initialQuote=state.quotes.find(quote=>String(quote.symbol||"").toUpperCase()===symbol&&quote.available!==false);
+        if(initialQuote)updateLiveChartQuote(initialQuote);
+      }
       if(qs("chartLastPrice"))qs("chartLastPrice").textContent=chartPriceText(chartState.bars.at(-1)?.close);
       setChartState(data.metadata?.candleFresh
         ? "VERIFIED OHLC · "+String(data.metadata?.barsCount||chartState.bars.length)+" BARS"
         : "HISTORICAL OHLC · SIGNALS PAUSED",data.metadata?.candleFresh?"good":"warn");
-      connectChartStream();
       const statePrice=chartState.bars.at(-1)?.close;
       if(Number.isFinite(Number(statePrice)))renderChartSignal();
     }catch(error){
@@ -1513,10 +1521,10 @@ body.kb-scanner-page .chart-data-note{
 
   function updateLiveChartQuote(incoming){
     const chartState=state.chart;
-    if(!chartState?.bars?.length||!incoming)return;
+    if(!incoming)return;
     const symbol=String(incoming.symbol||"").trim().toUpperCase();
     const source=String(incoming.source||"").toLowerCase();
-    if(!source.startsWith("deriv-")||symbol!==chartState.symbol||incoming.available===false)return;
+    if(!source.startsWith("deriv-")||symbol!==chartSelectedSymbol()||incoming.available===false)return;
     const price=Number(incoming.price);
     if(!Number.isFinite(price)||price<=0)return;
     const timestamp=chartTimeSeconds(incoming.timestamp??incoming.epoch??incoming.time);
@@ -1531,6 +1539,14 @@ body.kb-scanner-page .chart-data-note{
       ?Math.max(0,pipeAgeValue)
       :Number.isFinite(receivedAt)&&receivedAt>0?Math.max(0,Date.now()-receivedAt):null;
     if(exchangeAge>120000||(pipeAge!==null&&pipeAge>10000))return;
+    if(!chartState?.bars?.length||chartState.symbol!==symbol){
+      const previous=state.pendingChartQuotes.get(symbol);
+      const previousAt=Number(previous?.receivedAt||0);
+      if(!previous||!Number.isFinite(receivedAt)||receivedAt>=previousAt){
+        state.pendingChartQuotes.set(symbol,incoming);
+      }
+      return;
+    }
     const tickKey=Number.isFinite(receivedAt)&&receivedAt>0
       ?timestamp+"|"+price+"|"+receivedAt
       :null;
