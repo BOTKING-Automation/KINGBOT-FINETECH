@@ -132,4 +132,11 @@ test("scanner live chart batches candle painting and keeps quote cards increment
     scannerPage.indexOf("  function mergeLiveQuote(incoming){"),
     scannerPage.indexOf("\n  function websocketUrl", scannerPage.indexOf("  function mergeLiveQuote(incoming){"))
   ), /renderQuotes\(\)/);
+
+  const loadStart = scannerPage.indexOf("  async function loadChart(){");
+  const chartSubscribe = scannerPage.indexOf("    connectChartStream();", loadStart);
+  const historyRequest = scannerPage.indexOf("await request(query", loadStart);
+  assert.ok(loadStart >= 0 && chartSubscribe > loadStart && historyRequest > chartSubscribe,
+    "chart WebSocket must subscribe before the REST history request resolves");
+  assert.match(scannerPage, /pendingChartQuotes:new Map\(\)/);
 });
