@@ -172,12 +172,16 @@ def _run_loss_fold(data: dict[str, Any], train_fraction: float,
     )
     v9_metrics = _detailed_metrics(eval_y, v9_probabilities)
     target = data["variants"]["full_cortex"]
-    context = data["contextVariants"]["full_cortex"]
-
-    profiles: dict[str, Any] = {}
-    if not profiles or any(profile not in LOSS_PROFILES for profile in profiles):
+    requested_profiles = tuple(profiles)
+    if (
+        not requested_profiles
+        or len(set(requested_profiles)) != len(requested_profiles)
+        or any(profile not in LOSS_PROFILES for profile in requested_profiles)
+    ):
         raise ValueError("V124_LOSS_PROFILE_SELECTION_INVALID")
-    for profile in profiles:
+
+    profile_results: dict[str, Any] = {}
+    for profile in requested_profiles:
         probabilities = fit_predict(
             target[train_mask], C[train_mask], M[train_mask], A[train_mask],
             train_y, target[eval_mask], C[eval_mask], M[eval_mask],
@@ -186,7 +190,7 @@ def _run_loss_fold(data: dict[str, Any], train_fraction: float,
         metrics = _detailed_metrics(eval_y, probabilities)
         hold_recall = float(metrics["classRecall"].get("HOLD", 0.0))
         delta = float(metrics["selectionScore"] - v9_metrics["selectionScore"])
-        profiles[profile] = {
+        profile_results[profile] = {
             "model": metrics,
             "holdRecall": hold_recall,
             "selectionScoreDeltaVsV9": delta,
@@ -201,7 +205,7 @@ def _run_loss_fold(data: dict[str, Any], train_fraction: float,
         "trainSamples": int(train_mask.sum()),
         "testSamples": int(eval_mask.sum()),
         "v9MatchedBaseline": v9_metrics,
-        "profiles": profiles,
+        "profiles": profile_results,
     }
 
 
