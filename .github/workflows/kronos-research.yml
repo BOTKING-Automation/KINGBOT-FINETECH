@@ -1,0 +1,40 @@
+name: KINGBOT Kronos Research Validation
+
+on:
+  pull_request:
+    branches:
+      - local-first-runtime
+    paths:
+      - "ml-signal-service/kronos_research/**"
+      - ".github/workflows/kronos-research.yml"
+  push:
+    branches:
+      - v12-5-kronos-foundation-research
+    paths:
+      - "ml-signal-service/kronos_research/**"
+      - ".github/workflows/kronos-research.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Compile service and vendored source
+        run: |
+          python -m py_compile \
+            ml-signal-service/kronos_research/service.py \
+            ml-signal-service/kronos_research/test_service.py \
+            ml-signal-service/kronos_research/vendor/model/__init__.py \
+            ml-signal-service/kronos_research/vendor/model/kronos.py \
+            ml-signal-service/kronos_research/vendor/model/module.py
+      - name: Run request-validation and forecast-aggregation tests
+        working-directory: ml-signal-service/kronos_research
+        run: python -m unittest -v test_service.py
