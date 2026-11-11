@@ -84,6 +84,33 @@ services:
       retries: 12
       start_period: 90s
 
+  # Optional forecasting experiment only. Not part of the default local runtime.
+  kronos-research:
+    profiles: ["research"]
+    build:
+      context: ./ml-signal-service/kronos_research
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      HOST: 0.0.0.0
+      PORT: "10002"
+      KINGBOT_KRONOS_ENABLED: ${KINGBOT_KRONOS_ENABLED:-0}
+      KINGBOT_KRONOS_SECRET: ${KINGBOT_KRONOS_SECRET:-}
+      KINGBOT_KRONOS_TORCH_THREADS: ${KINGBOT_KRONOS_TORCH_THREADS:-2}
+      HF_HOME: /models/cache
+    ports:
+      - "127.0.0.1:10002:10002"
+    volumes:
+      - kingbot_kronos_cache:/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:10002/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   worker:
     profiles: ["execution"]
     build:
@@ -124,3 +151,4 @@ services:
 
 volumes:
   kingbot_pgdata:
+  kingbot_kronos_cache:
