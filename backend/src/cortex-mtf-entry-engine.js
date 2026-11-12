@@ -297,17 +297,11 @@ export function toCouncilMultiTimeframe(frames = {}, entryDecision = {}) {
     : entryDecision.entryEligible === true
       ? (side === "BUY" ? "BUY_CANDIDATE" : side === "SELL" ? "SELL_CANDIDATE" : "WAIT_CONFIRMATION")
       : entryDecision.signal === "NO_TRADE" ? "CONFLICTED" : "WAIT_CONFIRMATION";
-  const regime = byTimeframe["4h"] || null;
-  const setup = byTimeframe["15m"] || null;
-  const execution = byTimeframe["5m"] || null;
   const lowerTimeframesAgree = ["15m", "5m"].every(timeframe =>
     String(byTimeframe[timeframe]?.trend || "NEUTRAL").toUpperCase() === higherTimeframeBias
   );
   return {
     timeframes,
-    regime,
-    setup,
-    execution,
     requiredTimeframes: REQUIRED_TIMEFRAMES,
     higherTimeframeBias,
     lowerTimeframeBias: lowerTimeframesAgree ? higherTimeframeBias : "MIXED",
