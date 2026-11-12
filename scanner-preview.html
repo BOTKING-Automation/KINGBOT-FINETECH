@@ -1028,6 +1028,25 @@ body.kb-scanner-page .chart-pattern-item.developing{border-color:rgba(231,196,12
 body.kb-scanner-page .chart-pattern-item.invalidated{opacity:.68}
 body.kb-scanner-page .chart-pattern-note{display:block;color:#748299;font:700 6px/1.7 "JetBrains Mono";margin-top:7px}
 @media(max-width:620px){body.kb-scanner-page .chart-pattern-list{grid-template-columns:1fr}}
+
+/* CORTEX top-down multi-timeframe decision panel */
+body.kb-scanner-page .chart-mtf-panel{border-color:rgba(105,217,232,.20);background:linear-gradient(145deg,rgba(105,217,232,.035),rgba(255,255,255,.012))}
+body.kb-scanner-page .chart-mtf-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:9px}
+body.kb-scanner-page .chart-mtf-cell{min-width:0;padding:8px 7px;border:1px solid rgba(159,178,210,.12);border-radius:7px;background:rgba(255,255,255,.018)}
+body.kb-scanner-page .chart-mtf-cell strong{display:block;color:#e8edf5;font:800 7px "JetBrains Mono"}
+body.kb-scanner-page .chart-mtf-cell span{display:block;margin-top:5px;color:#9aa8bc;font:700 6px "JetBrains Mono"}
+body.kb-scanner-page .chart-mtf-cell small{display:block;margin-top:4px;color:#718198;font:700 6px "JetBrains Mono"}
+body.kb-scanner-page .chart-mtf-cell.bull{border-color:rgba(88,215,167,.25)}
+body.kb-scanner-page .chart-mtf-cell.bear{border-color:rgba(240,120,140,.25)}
+body.kb-scanner-page .chart-mtf-cell.stale{border-color:rgba(231,196,122,.22);opacity:.72}
+body.kb-scanner-page .chart-entry-gates{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+body.kb-scanner-page .chart-entry-gate{padding:5px 6px;border:1px solid rgba(159,178,210,.13);border-radius:5px;color:#91a0b5;background:rgba(255,255,255,.018);font:700 6px "JetBrains Mono"}
+body.kb-scanner-page .chart-entry-gate.pass{border-color:rgba(88,215,167,.23);color:#6fd5ad}
+body.kb-scanner-page .chart-entry-gate.fail{border-color:rgba(240,120,140,.23);color:#e58a9b}
+body.kb-scanner-page .chart-mtf-policy{display:block;margin-top:8px;color:#748299;font:700 6px/1.7 "JetBrains Mono"}
+@media(max-width:900px){body.kb-scanner-page .chart-mtf-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:620px){body.kb-scanner-page .chart-mtf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 </style>
 </head>
 <body class="kb-scanner-page">
@@ -1159,6 +1178,13 @@ body.kb-scanner-page .chart-pattern-note{display:block;color:#748299;font:700 6p
         <span id="chartPatternSummary">Waiting for verified completed candles.</span>
         <div id="chartPatternList" class="chart-pattern-list"></div>
         <small class="chart-pattern-note">Completed OHLC only · active candle excluded · quality score is heuristic, not probability.</small>
+      </div>
+      <div class="chart-ai-note chart-mtf-panel">
+        <strong>TOP-DOWN MULTI-TIMEFRAME VALIDATION</strong>
+        <span id="chartMtfSummary">Waiting for verified 1D / 4H / 1H / 15M / 5M candles.</span>
+        <div id="chartMtfGrid" class="chart-mtf-grid"></div>
+        <div id="chartEntryGates" class="chart-entry-gates"></div>
+        <small id="chartMtfPolicy" class="chart-mtf-policy">No entry is qualified by a single timeframe. The 5M execution trigger, live spread, structural risk and reward-to-risk gates must all pass.</small>
       </div>
       <div class="chart-ai-note"><strong>AI DECISION / STRUCTURE</strong><span id="chartReason">Waiting for verified OHLC and the first scanner analysis.</span></div>
       <div class="chart-ai-note"><strong>CORTEX COUNCIL / RISK GATE</strong><span id="chartCouncilState">Waiting for the full specialist council decision.</span></div>
@@ -1395,10 +1421,15 @@ body.kb-scanner-page .chart-pattern-note{display:block;color:#748299;font:700 6p
     const scanned=scanRows.find(item=>String(item.symbol||"").toUpperCase()===symbol&&item.technicalVerified!==false&&item.source!=="none");
     const payload=state.chartPayload;
     const base=payload&&payload.symbol===symbol?payload.signal:null;
+    const signal={...(base||{}),...(scanned||{})};
+    // The chart's strict MTF decision is authoritative over any single-TF scan row.
+    if(payload?.entryDecision&&payload.symbol===symbol)Object.assign(signal,payload.entryDecision);
     return {
       technical:{...(payload?.technical||{}),...(scanned||{})},
-      signal:{...(base||{}),...(scanned||{})},
-      scanned:Boolean(scanned)
+      signal,
+      scanned:Boolean(scanned),
+      multiTimeframe:payload?.multiTimeframe||null,
+      entryDecision:payload?.entryDecision||null
     };
   }
 
@@ -1407,7 +1438,55 @@ body.kb-scanner-page .chart-pattern-note{display:block;color:#748299;font:700 6p
     return Number.isFinite(number)&&number>0?number.toLocaleString(undefined,{maximumFractionDigits:6}):"—";
   }
 
+  function renderChartMtf(){
+    const payload=state.chartPayload;
+    const mtf=payload?.multiTimeframe;
+    const decision=payload?.entryDecision;
+    const summary=qs("chartMtfSummary");
+    const grid=qs("chartMtfGrid");
+    const gates=qs("chartEntryGates");
+    if(!summary||!grid||!gates)return;
+    grid.replaceChildren();gates.replaceChildren();
+    if(!mtf?.frames){summary.textContent="Multi-timeframe history has not loaded.";return;}
+    const order=["1d","4h","1h","15m","5m"],frames=mtf.frames;
+    order.forEach(timeframe=>{
+      const frame=frames[timeframe]||{},technical=frame.technical||{};
+      const direction=String(technical.trend||"NEUTRAL").toUpperCase();
+      const structure=String(technical.structure||"UNKNOWN").toUpperCase();
+      const fresh=frame.fresh===true,cell=document.createElement("div");
+      cell.className="chart-mtf-cell"+(fresh&&direction==="BULLISH"?" bull":fresh&&direction==="BEARISH"?" bear":!fresh?" stale":"");
+      const title=document.createElement("strong");title.textContent=timeframe.toUpperCase()+" · "+(fresh?direction:"UNVERIFIED");
+      const detail=document.createElement("span");detail.textContent="STRUCTURE "+structure;
+      const adx=Number(technical.adx14??technical.adx);
+      const meta=document.createElement("small");meta.textContent="ADX "+(Number.isFinite(adx)?adx.toFixed(1):"—")+" · "+Number(frame.barCount||0)+" BARS";
+      cell.append(title,detail,meta);grid.appendChild(cell);
+    });
+    const ready=decision?.entryEligible===true;
+    summary.textContent=ready
+      ?decision.side+" · "+decision.executionTimeframe+" execution · "+decision.confluenceScore+"/100 gates passed · RR "+Number(decision.riskReward||0).toFixed(2)
+      :(decision?.signal||"WAIT")+" · "+(decision?.reason||"Waiting for timeframe agreement.");
+    const labels={
+      higherTimeframeAgreement:"HTF ALIGN",higherTimeframeTrendStrength:"TREND STRENGTH",
+      marketStructureAlignment:"STRUCTURE",setupMomentum:"15M SETUP",executionStrength:"5M ADX",
+      executionMomentum:"5M MOMENTUM",rsiDiscipline:"RSI BAND",confirmedExecutionTrigger:"5M TRIGGER",
+      freshTwoSidedQuote:"LIVE BID/ASK",spreadCost:"SPREAD",noChasing:"NO CHASE",
+      structuralStop:"STRUCTURAL SL",rewardToRisk:"MIN 1.8R"
+    };
+    Object.entries(decision?.gates||{}).forEach(([key,passed])=>{
+      if(!(key in labels))return;
+      const chip=document.createElement("span");
+      chip.className="chart-entry-gate "+(passed?"pass":"fail");
+      chip.textContent=(passed?"PASS ":"BLOCK ")+labels[key];
+      gates.appendChild(chip);
+    });
+    if(!Object.keys(decision?.gates||{}).length){
+      const chip=document.createElement("span");chip.className="chart-entry-gate fail";
+      chip.textContent="BLOCK MTF DATA UNAVAILABLE";gates.appendChild(chip);
+    }
+  }
+
   function renderChartSignal(){
+    renderChartMtf();
     const symbol=state.chart?.symbol||chartSelectedSymbol();
     const current=currentChartSignal();
     const signal=current.signal||{};
@@ -1417,7 +1496,7 @@ body.kb-scanner-page .chart-pattern-note{display:block;color:#748299;font:700 6p
     const badge=qs("chartSignalBadge");
     const candleFresh=state.chartPayload?.metadata?.candleFresh===true;
     if(badge){
-      badge.textContent=candleFresh?"TECH · "+stateLabel:"STALE DATA";
+      badge.textContent=candleFresh?(signal.entryEligible?"MTF · "+stateLabel:"MTF · "+stateLabel):"STALE DATA";
       badge.className="chart-signal-badge"+(candleFresh&&bias==="BULLISH"?" bull":candleFresh&&bias==="BEARISH"?" bear":"");
     }
     if(qs("chartAiSymbol"))qs("chartAiSymbol").textContent=symbol;
@@ -1425,7 +1504,7 @@ body.kb-scanner-page .chart-pattern-note{display:block;color:#748299;font:700 6p
       qs("chartBias").textContent=bias;
       qs("chartBias").className=bias==="BULLISH"?"good":bias==="BEARISH"?"bad":"";
     }
-    if(qs("chartScore"))qs("chartScore").textContent=signal.score==null?"—":String(signal.score)+"/100";
+    if(qs("chartScore"))qs("chartScore").textContent=(signal.confluenceScore??signal.score)==null?"—":String(signal.confluenceScore??signal.score)+"/100";
     if(qs("chartEntry"))qs("chartEntry").textContent=chartPriceText(signal.entry);
     if(qs("chartStop"))qs("chartStop").textContent=chartPriceText(signal.sl);
     if(qs("chartTarget1"))qs("chartTarget1").textContent=chartPriceText(signal.tp1);
