@@ -185,7 +185,7 @@ export function evaluateCortexMultiTimeframeEntry({ frames = {}, quote = null } 
     higherTimeframeTrendStrength:trendStrength,marketStructureAlignment:structureAlignment,
     setupMomentum:setupStrength,executionStrength,executionMomentum:momentumAlignment,
     rsiDiscipline:rsiInTradeableBand,confirmedExecutionTrigger:executionTrigger,
-    freshTwoSidedQuote:quoteFresh,spreadCost:spreadAcceptable,noChasing,
+    freshTwoSidedQuote:quoteFresh,spreadCost:spreadAcceptable,noChasing:noChase,
     structuralStop:riskBounded,rewardToRisk:rewardToRiskAcceptable
   };
   const blockedReasons=Object.entries(gates).filter(([,passed])=>!passed).map(([key])=>{
