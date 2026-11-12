@@ -239,9 +239,11 @@ async function fetchCachedCortexHistory(symbol,timeframe) {
 async function getCortexDerivQuote(symbol) {
   try {
     const quote=await publicDerivFeed.getQuote(symbol,{maxAgeMs:2500,timeoutMs:2500});
+    const nowMs=Date.now();
     const epoch=optionalFinite(quote?.epoch);
-    const quoteAge=optionalFinite(quote?.ageMs);
-    const ageMs=quoteAge ?? (epoch!==null?Math.max(0,Date.now()-epoch*1000):null);
+    const receivedAt=optionalFinite(quote?.receivedAt);
+    const venueAgeMs=epoch!==null?Math.max(0,nowMs-epoch*1000):null;
+    const transportAgeMs=receivedAt!==null?Math.max(0,nowMs-receivedAt):optionalFinite(quote?.ageMs);
     const price=optionalFinite(quote?.price);
     const bid=optionalFinite(quote?.bid),ask=optionalFinite(quote?.ask);
     const providerSpread=optionalFinite(quote?.spread);
@@ -249,7 +251,12 @@ async function getCortexDerivQuote(symbol) {
       symbol,available:price!==null&&price>0,
       price,bid,ask,
       spread:providerSpread ?? (bid!==null&&ask!==null?ask-bid:null),
-      ageMs,epoch,source:quote?.source||"Deriv public live feed"
+      ageMs:venueAgeMs,
+      venueAgeMs,
+      transportAgeMs,
+      timestampVerified:epoch!==null,
+      epoch,receivedAt,
+      source:quote?.source||"Deriv public live feed"
     };
   } catch(error) {
     return {symbol,available:false,price:null,bid:null,ask:null,spread:null,ageMs:null,error:String(error?.message||"DERIV_QUOTE_UNAVAILABLE").slice(0,120)};
