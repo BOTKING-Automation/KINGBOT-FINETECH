@@ -149,9 +149,10 @@ export function evaluateCortexMultiTimeframeEntry({ frames = {}, quote = null } 
   const executionTrigger=Boolean(atr&&atr>0&&(breakAndDisplace||retestAndHold||sweepReversal));
 
   const quotePrice=number(quote?.price),bid=number(quote?.bid),ask=number(quote?.ask);
-  const quoteAge=number(quote?.ageMs??quote?.quoteAgeMs);
-  const quoteFresh=quote?.available===true&&quotePrice!==null&&quotePrice>0&&
-    bid!==null&&ask!==null&&bid>0&&ask>=bid&&quoteAge!==null&&quoteAge>=0&&quoteAge<=2500;
+  const quoteAge=number(quote?.venueAgeMs??quote?.ageMs??quote?.quoteAgeMs);
+  const quoteFresh=quote?.available===true&&quote.timestampVerified===true&&
+    quotePrice!==null&&quotePrice>0&&bid!==null&&ask!==null&&
+    bid>0&&ask>=bid&&quoteAge!==null&&quoteAge>=0&&quoteAge<=2500;
   const spread=bid!==null&&ask!==null?ask-bid:null;
   const entry=direction==="BULLISH"?ask:bid;
   const spreadAtrRatio=spread!==null&&atr!==null&&atr>0?spread/atr:null;
