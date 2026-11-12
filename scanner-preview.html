@@ -1014,8 +1014,6 @@ body.kb-scanner-page .bad{color:var(--terminal-red)!important}
   }
 }
 
-body.kb-scanner-page .preview-ribbon{position:relative;z-index:1000;padding:9px 16px;text-align:center;background:linear-gradient(90deg,rgba(105,217,232,.10),rgba(169,155,223,.09),rgba(231,196,122,.09));border-bottom:1px solid rgba(159,178,210,.17);color:#cbd8e6;font:800 7px "JetBrains Mono",monospace;letter-spacing:.15em}
-@media(max-width:620px){body.kb-scanner-page .preview-ribbon{font-size:6px;letter-spacing:.08em;padding:8px 7px}}
 
 /* CORTEX pattern-recognition layer */
 body.kb-scanner-page .chart-pattern-panel{border-color:rgba(231,196,122,.18);background:linear-gradient(145deg,rgba(231,196,122,.035),rgba(255,255,255,.012))}
@@ -1047,12 +1045,78 @@ body.kb-scanner-page .chart-mtf-policy{display:block;margin-top:8px;color:#74829
 @media(max-width:900px){body.kb-scanner-page .chart-mtf-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:620px){body.kb-scanner-page .chart-mtf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
+
+/* CORTEX live signal hierarchy and high-contrast chart annotations */
+body.kb-scanner-page #marketChart{
+  height:min(72vh,700px);min-height:560px;
+  border:1px solid rgba(159,178,210,.17);
+  background:linear-gradient(180deg,#070d17,#080e19);
+}
+body.kb-scanner-page #chartOverlay{z-index:6;pointer-events:none}
+body.kb-scanner-page .chart-signal-overlay{
+  position:absolute;z-index:8;top:13px;left:13px;
+  display:grid;gap:5px;width:min(276px,calc(100% - 26px));
+  padding:11px 13px;border:1px solid rgba(231,196,122,.30);
+  border-left:3px solid #e7c47a;border-radius:8px;
+  background:rgba(7,12,20,.94);box-shadow:0 10px 28px rgba(0,0,0,.34);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  pointer-events:none;
+}
+body.kb-scanner-page .chart-signal-kicker{
+  color:#9caabe;font:800 7px "JetBrains Mono";letter-spacing:.15em;
+}
+body.kb-scanner-page .chart-signal-overlay strong{
+  color:#f2d99f;font:900 15px Orbitron,sans-serif;letter-spacing:.025em;line-height:1.25;
+  font-variant-numeric:tabular-nums;
+}
+body.kb-scanner-page .chart-signal-overlay small{
+  color:#a8b4c5;font:700 7px/1.55 "JetBrains Mono";letter-spacing:.015em;
+}
+body.kb-scanner-page .chart-signal-overlay.buy{
+  border-color:rgba(88,215,167,.42);border-left-color:#58d7a7;
+  background:rgba(5,20,19,.95);
+}
+body.kb-scanner-page .chart-signal-overlay.buy strong{color:#73e6b7}
+body.kb-scanner-page .chart-signal-overlay.sell{
+  border-color:rgba(240,120,140,.43);border-left-color:#f0788c;
+  background:rgba(25,10,18,.95);
+}
+body.kb-scanner-page .chart-signal-overlay.sell strong{color:#ff91a4}
+body.kb-scanner-page .chart-signal-overlay.blocked{
+  border-color:rgba(240,120,140,.30);border-left-color:#f0788c;
+  background:rgba(20,11,18,.94);
+}
+body.kb-scanner-page .chart-signal-overlay.blocked strong{color:#f39aaa}
+body.kb-scanner-page .chart-signal-overlay.waiting strong{color:#f0d28c}
+body.kb-scanner-page .chart-signal-badge{
+  min-width:112px;padding:9px 11px;border-radius:7px;
+  font-size:8px;letter-spacing:.07em;font-variant-numeric:tabular-nums;
+}
+body.kb-scanner-page .chart-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+body.kb-scanner-page .chart-stat strong{font-size:10px;font-variant-numeric:tabular-nums}
+body.kb-scanner-page .chart-stat strong.good{color:#73e6b7}
+body.kb-scanner-page .chart-stat strong.bad{color:#ff91a4}
+body.kb-scanner-page .chart-legend{gap:15px;font-size:7px}
+body.kb-scanner-page .chart-legend i{width:17px;height:3px}
+body.kb-scanner-page .chart-pattern-item strong{font-size:7px}
+@media(max-width:900px){
+  body.kb-scanner-page #marketChart{height: min(68vh,640px);min-height:500px}
+}
+@media(max-width:620px){
+  body.kb-scanner-page #marketChart{height:430px;min-height:390px}
+  body.kb-scanner-page .chart-signal-overlay{top:9px;left:9px;width:min(224px,calc(100% - 18px));padding:9px 10px}
+  body.kb-scanner-page .chart-signal-overlay strong{font-size:12px}
+  body.kb-scanner-page .chart-signal-overlay small{font-size:6px}
+  body.kb-scanner-page .chart-signal-badge{min-width:0;padding:7px 8px;font-size:7px}
+}
+
+</style>
+<style>
+.preview-safety-banner{position:relative;z-index:30;width:100%;padding:9px 14px;text-align:center;background:linear-gradient(90deg,#221a0b,#17202a,#221a0b);border-bottom:1px solid rgba(231,196,122,.42);color:#f0d69b;font:800 9px "JetBrains Mono",monospace;letter-spacing:.1em}
 </style>
 </head>
 <body class="kb-scanner-page">
-<div role="note" class="preview-ribbon">
-  ISOLATED CORTEX PREVIEW · PUBLIC MARKET DATA · NO BROKER · NO ORDER EXECUTION
-</div>
+<div class="preview-safety-banner" role="note">ISOLATED CORTEX PREVIEW · PUBLIC MARKET DATA · NO BROKER · NO ORDER EXECUTION</div>
 <div data-kingbot-navigation></div>
 <main class="wrap">
 <header class="terminal-masthead" aria-label="KINGBOT market intelligence terminal">
@@ -1145,13 +1209,19 @@ body.kb-scanner-page .chart-mtf-policy{display:block;margin-top:8px;color:#74829
       </div>
       <div id="marketChart" role="img" aria-label="KINGBOT live candlestick chart with technical and risk overlays">
         <canvas id="chartOverlay" aria-hidden="true"></canvas>
+        <div id="chartSignalOverlay" class="chart-signal-overlay waiting" aria-live="polite">
+          <span class="chart-signal-kicker">CORTEX · LIVE DECISION</span>
+          <strong id="chartOverlaySignal">WAIT / ANALYSIS</strong>
+          <small id="chartOverlayDetail">Waiting for verified multi-timeframe alignment.</small>
+        </div>
       </div>
       <div class="chart-legend">
         <span><i style="background:#34e8b1"></i> EMA 20</span>
         <span><i style="background:#f4c85a"></i> EMA 50</span>
-        <span><i style="background:#5fd8ff"></i> ENTRY / BOS</span>
-        <span><i style="background:#ff6e89"></i> STOP / BEARISH</span>
-        <span><i style="background:#a98cff"></i> SMC ZONES</span>
+        <span><i style="background:#69d9e8"></i> QUALIFIED ENTRY</span>
+        <span><i style="background:#f0788c"></i> STOP LOSS</span>
+        <span><i style="background:#58d7a7"></i> TARGETS</span>
+        <span><i style="background:#a99bdf"></i> SMC / PATTERNS</span>
       </div>
       <div class="chart-attribution">Charting engine: <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener noreferrer">Lightweight Charts™</a> (open-source). Market candles are supplied by KINGBOT’s existing free public Deriv feed; this is not a paid TradingView data or webhook connection.</div>
     </article>
@@ -1495,9 +1565,27 @@ body.kb-scanner-page .chart-mtf-policy{display:block;margin-top:8px;color:#74829
     const stateLabel=String(signal.signal||"WAIT").replaceAll("_"," ");
     const badge=qs("chartSignalBadge");
     const candleFresh=state.chartPayload?.metadata?.candleFresh===true;
+    const entryQualified=signal.entryEligible===true&&["BUY","SELL"].includes(String(signal.side||"").toUpperCase())&&
+      candleFresh&&state.chartPayload?.metadata?.multiTimeframeReady===true;
     if(badge){
-      badge.textContent=candleFresh?(signal.entryEligible?"MTF · "+stateLabel:"MTF · "+stateLabel):"STALE DATA";
-      badge.className="chart-signal-badge"+(candleFresh&&bias==="BULLISH"?" bull":candleFresh&&bias==="BEARISH"?" bear":"");
+      badge.textContent=!candleFresh?"STALE DATA":entryQualified
+        ?"MTF · "+String(signal.side).toUpperCase()+" QUALIFIED"
+        :signal.signal==="NO_TRADE"?"MTF · NO TRADE":"MTF · WAIT";
+      badge.className="chart-signal-badge"+(entryQualified&&signal.side==="BUY"?" bull":entryQualified&&signal.side==="SELL"?" bear":"");
+    }
+    const overlay=qs("chartSignalOverlay"),overlayTitle=qs("chartOverlaySignal"),overlayDetail=qs("chartOverlayDetail");
+    if(overlay&&overlayTitle&&overlayDetail){
+      const blocked=signal.signal==="NO_TRADE";
+      overlay.className="chart-signal-overlay "+(entryQualified?(signal.side==="BUY"?"buy":"sell"):blocked?"blocked":"waiting");
+      overlayTitle.textContent=entryQualified
+        ?String(signal.side).toUpperCase()+" SETUP QUALIFIED"
+        :!candleFresh?"LIVE SIGNALS PAUSED":blocked?"NO TRADE · FILTERED":"WAIT · NO VALID ENTRY";
+      const reasons=Array.isArray(signal.blockedReasons)?signal.blockedReasons:[];
+      overlayDetail.textContent=entryQualified
+        ?"1D / 4H / 1H / 15M aligned · 5M trigger confirmed"
+        :!candleFresh?"Chart data is stale or not yet confirmed."
+        :reasons.length?reasons.slice(0,2).join(" · ")
+        :String(signal.waitFor||signal.reason||"Waiting for verified market structure.").slice(0,150);
     }
     if(qs("chartAiSymbol"))qs("chartAiSymbol").textContent=symbol;
     if(qs("chartBias")){
@@ -1591,7 +1679,7 @@ body.kb-scanner-page .chart-mtf-policy{display:block;margin-top:8px;color:#74829
     try{
       const line=chartState.candles.createPriceLine({
         price:number,color,lineWidth:width||1,lineStyle:style??window.LightweightCharts.LineStyle.Dashed,
-        axisLabelVisible:true,title
+        axisLabelVisible:false,title:""
       });
       chartState.priceLines.push(line);
     }catch{}
@@ -1625,18 +1713,10 @@ body.kb-scanner-page .chart-mtf-policy{display:block;margin-top:8px;color:#74829
       add(obBar.time,technical.orderBlock.direction==="BEARISH"?"aboveBar":"belowBar","#b69aff","square","OB");
     }
     if(chartLayerEnabled("structure")){
-      const bias=String(signal.bias||"").toUpperCase();
-      const active=String(signal.signal||"").toUpperCase();
-      const position=bias==="BEARISH"?"aboveBar":bias==="BULLISH"?"belowBar":"inBar";
-      const color=bias==="BEARISH"?"#ff7a94":bias==="BULLISH"?"#53e6b3":"#ffd166";
-      const shape=bias==="BEARISH"?"arrowDown":bias==="BULLISH"?"arrowUp":"circle";
-      add(last.time,position,color,shape,active==="ENTRY_CONFIRMING"?"TECH OK":"WATCH");
-      const cortex=state.latestScan?.cortex;
-      const focus=String(state.latestScan?.cortexFocusSymbol||cortex?.market?.symbol||"").toUpperCase();
-      const plan=cortex?.tradePlan;
-      const councilState=String(cortex?.strategyCouncil?.state||"").toUpperCase();
-      if(focus===chartState.symbol&&plan?.ok===true&&["BUY","SELL"].includes(councilState)){
-        add(last.time,plan.side==="SELL"?"aboveBar":"belowBar",plan.side==="SELL"?"#ff5578":"#38d9b0",plan.side==="SELL"?"arrowDown":"arrowUp","CORTEX "+String(plan.side||councilState));
+      const qualified=signal.entryEligible===true&&["BUY","SELL"].includes(String(signal.side||"").toUpperCase());
+      if(qualified){
+        const side=String(signal.side).toUpperCase();
+        add(last.time,side==="SELL"?"aboveBar":"belowBar",side==="SELL"?"#ff8298":"#68e3b4",side==="SELL"?"arrowDown":"arrowUp","CORTEX "+side);
       }
     }
     return markers.sort((a,b)=>a.time-b.time);
@@ -1717,39 +1797,126 @@ body.kb-scanner-page .chart-mtf-policy{display:block;margin-top:8px;color:#74829
     if(!chartLayerEnabled("patterns")||!chartState.patterns?.length)return;
     const visible=timeScale.getVisibleLogicalRange();if(!visible)return;
     const indexByTime=new Map(chartState.bars.map((bar,index)=>[bar.time,index]));
-    const xAt=time=>{const index=indexByTime.get(time);if(index===undefined||index<visible.from||index>visible.to)return null;return timeScale.logicalToCoordinate(index);};
-    const yAt=price=>{const y=chartState.candles.priceToCoordinate(Number(price));return Number.isFinite(y)?y:null;};
-    chartState.patterns.slice(0,6).forEach(pattern=>{
-      const color=pattern.direction==="BULLISH"?"#58d7a7":pattern.direction==="BEARISH"?"#f0788c":"#e7c47a";
-      ctx.save();ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=pattern.state==="CONFIRMED"?1.8:1.15;
-      ctx.setLineDash(pattern.state==="DEVELOPING"?[5,4]:pattern.state==="INVALIDATED"?[2,4]:[]);
+    const xAt=time=>{
+      const index=indexByTime.get(time);
+      if(index===undefined||index<visible.from||index>visible.to)return null;
+      return timeScale.logicalToCoordinate(index);
+    };
+    const yAt=price=>{
+      const y=chartState.candles.priceToCoordinate(Number(price));
+      return Number.isFinite(y)?y:null;
+    };
+    // Keep the chart focused: invalidated patterns remain in the inspector,
+    // while only the three strongest active/confirmed formations are drawn.
+    const visiblePatterns=chartState.patterns
+      .filter(pattern=>pattern.state!=="INVALIDATED")
+      .slice(0,3);
+    const labelRows=[];
+    visiblePatterns.forEach(pattern=>{
+      const color=pattern.direction==="BULLISH"?"#68e3b4":pattern.direction==="BEARISH"?"#ff8298":"#e7c47a";
+      ctx.save();
+      ctx.strokeStyle=color;ctx.fillStyle=color;
+      ctx.lineWidth=pattern.state==="CONFIRMED"?2.35:1.65;
+      ctx.shadowColor=color;ctx.shadowBlur=pattern.state==="CONFIRMED"?7:3;
+      ctx.setLineDash(pattern.state==="DEVELOPING"?[7,5]:[]);
       (pattern.lines||[]).forEach(line=>{
         const x1=xAt(line.fromTime),x2=xAt(line.toTime),y1=yAt(line.fromPrice),y2=yAt(line.toPrice);
         if(x1===null||x2===null||y1===null||y2===null)return;
         ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
       });
-      ctx.setLineDash([3,4]);
       (pattern.levels||[]).forEach(level=>{
         if(!["neckline","trigger","target","invalidation"].includes(level.role))return;
         const x1=xAt(level.fromTime??pattern.startTime),x2=xAt(level.toTime??pattern.endTime),y=yAt(level.price);
         if(x1===null||x2===null||y===null)return;
-        ctx.globalAlpha=level.role==="invalidation"?.48:.76;ctx.beginPath();ctx.moveTo(x1,y);ctx.lineTo(x2,y);ctx.stroke();
+        const levelColor=level.role==="target"?"#65dcae":level.role==="invalidation"?"#f0788c":
+          level.role==="trigger"?"#69d9e8":"#e7c47a";
+        ctx.save();ctx.strokeStyle=levelColor;ctx.lineWidth=level.role==="trigger"?1.8:1.2;
+        ctx.globalAlpha=.88;ctx.setLineDash(level.role==="invalidation"?[2,5]:[5,4]);
+        ctx.beginPath();ctx.moveTo(x1,y);ctx.lineTo(x2,y);ctx.stroke();ctx.restore();
       });
-      ctx.globalAlpha=1;ctx.setLineDash([]);
+      ctx.shadowBlur=pattern.state==="CONFIRMED"?5:2;
+      ctx.setLineDash([]);
       (pattern.points||[]).forEach(point=>{
         const x=xAt(point.time),y=yAt(point.price);if(x===null||y===null)return;
-        ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle="rgba(5,10,18,.92)";ctx.lineWidth=1.4;ctx.stroke();
       });
       const anchor=(pattern.points||[]).slice(-1)[0];
       if(anchor){
         const x=xAt(anchor.time),y=yAt(anchor.price);
         if(x!==null&&y!==null){
-          const label=pattern.name.toUpperCase()+" / "+pattern.state;ctx.font='800 8px "JetBrains Mono",monospace';
-          const w=ctx.measureText(label).width+12,left=Math.max(3,Math.min(width-w-3,x+8)),top=Math.max(4,Math.min(height-18,y-20));
-          ctx.fillStyle="rgba(5,10,18,.92)";ctx.fillRect(left,top,w,15);ctx.strokeStyle=color;ctx.lineWidth=1;ctx.strokeRect(left,top,w,15);
-          ctx.fillStyle=color;ctx.fillText(label,left+6,top+10.5);
+          const label=pattern.name.toUpperCase()+" · "+pattern.state;
+          ctx.font='800 8px "JetBrains Mono",monospace';
+          const w=Math.min(196,ctx.measureText(label).width+16);
+          labelRows.push({label,color,x:Math.max(6,Math.min(width-w-8,x+10)),y:Math.max(13,Math.min(height-13,y-20)),w});
         }
       }
+      ctx.restore();
+    });
+    // Avoid pattern-name tags stacking on top of each other around the same pivot.
+    labelRows.sort((a,b)=>a.y-b.y);
+    for(let i=1;i<labelRows.length;i++){
+      if(labelRows[i].y-labelRows[i-1].y<22)labelRows[i].y=labelRows[i-1].y+22;
+    }
+    if(labelRows.length&&labelRows[labelRows.length-1].y>height-12){
+      const shift=labelRows[labelRows.length-1].y-(height-12);
+      labelRows.forEach(row=>row.y-=shift);
+    }
+    labelRows.forEach(row=>{
+      ctx.save();ctx.font='800 8px "JetBrains Mono",monospace';
+      ctx.fillStyle="rgba(5,10,18,.96)";ctx.strokeStyle=row.color;ctx.lineWidth=1.25;
+      ctx.fillRect(row.x,row.y-12,row.w,18);ctx.strokeRect(row.x,row.y-12,row.w,18);
+      ctx.fillStyle=row.color;ctx.fillText(row.label,row.x+8,row.y);
+      ctx.restore();
+    });
+  }
+
+  function drawChartSignalLevels(ctx,width,height,chartState){
+    if(!chartLayerEnabled("risk")||state.chartPayload?.metadata?.candleFresh!==true||
+      state.chartPayload?.metadata?.multiTimeframeReady!==true)return;
+    const signal=currentChartSignal().signal||{};
+    if(signal.entryEligible!==true||!["BUY","SELL"].includes(String(signal.side||"").toUpperCase()))return;
+    const levels=[
+      {key:"ENTRY",price:Number(signal.entry),color:"#69d9e8",width:2.4,dash:[]},
+      {key:"STOP LOSS",price:Number(signal.sl),color:"#f0788c",width:2,dash:[7,4]},
+      {key:"TARGET 1",price:Number(signal.tp1),color:"#58d7a7",width:1.9,dash:[5,4]},
+      {key:"TARGET 2",price:Number(signal.tp2),color:"#9bd9b9",width:1.7,dash:[2,4]}
+    ].filter(level=>Number.isFinite(level.price)&&level.price>0);
+    if(!levels.length)return;
+    const plotRight=Math.max(130,width-78),labelWidth=Math.min(122,Math.max(104,plotRight-20));
+    const yRows=levels.map(level=>({...level,y:chartState.candles.priceToCoordinate(level.price)}))
+      .filter(level=>Number.isFinite(level.y)&&level.y>=5&&level.y<=height-5)
+      .sort((a,b)=>a.y-b.y);
+    if(!yRows.length)return;
+    const top=12,bottom=height-12,labelGap=25;
+    let previous=top-labelGap;
+    yRows.forEach(level=>{
+      level.labelY=Math.max(level.y,previous+labelGap);
+      previous=level.labelY;
+    });
+    const overflow=yRows[yRows.length-1].labelY-bottom;
+    if(overflow>0)yRows.forEach(level=>level.labelY-=overflow);
+    yRows.forEach(level=>{
+      ctx.save();
+      ctx.globalAlpha=level.key==="ENTRY"?1:.94;
+      ctx.strokeStyle=level.color;ctx.fillStyle=level.color;ctx.lineWidth=level.width;
+      ctx.setLineDash(level.dash);
+      ctx.shadowColor=level.color;ctx.shadowBlur=level.key==="ENTRY"?8:3;
+      ctx.beginPath();ctx.moveTo(8,level.y);ctx.lineTo(plotRight,level.y);ctx.stroke();
+      ctx.setLineDash([]);
+      if(Math.abs(level.labelY-level.y)>3){
+        ctx.globalAlpha=.65;ctx.lineWidth=1;ctx.beginPath();
+        ctx.moveTo(plotRight-8,level.y);ctx.lineTo(plotRight-8,level.labelY);ctx.stroke();
+      }
+      const left=plotRight-labelWidth-4,topY=Math.max(3,Math.min(height-29,level.labelY-13));
+      ctx.globalAlpha=1;ctx.shadowBlur=0;
+      ctx.fillStyle="rgba(5,10,18,.97)";ctx.strokeStyle=level.color;ctx.lineWidth=1.3;
+      ctx.fillRect(left,topY,labelWidth,25);ctx.strokeRect(left,topY,labelWidth,25);
+      ctx.fillStyle=level.color;ctx.font='800 7px "JetBrains Mono",monospace';
+      ctx.fillText(level.key,left+7,topY+9);
+      ctx.fillStyle="#f3f6fb";ctx.font='900 9px "JetBrains Mono",monospace';
+      const priceText=chartPriceText(level.price);
+      ctx.fillText(priceText,left+7,topY+20);
       ctx.restore();
     });
   }
@@ -1774,11 +1941,13 @@ body.kb-scanner-page .chart-mtf-policy{display:block;margin-top:8px;color:#74829
     ctx.clearRect(0,0,width,height);
     const showZones=chartLayerEnabled("zones")&&Boolean(chartState.zones?.length);
     const showPatterns=chartLayerEnabled("patterns")&&Boolean(chartState.patterns?.length);
-    if(!showZones&&!showPatterns)return;
     const timeScale=chartState.instance.timeScale();
     const visible=timeScale.getVisibleLogicalRange();
     if(!visible)return;
     const barIndexByTime=new Map(chartState.bars.map((bar,index)=>[bar.time,index]));
+    const showSignalLevels=chartLayerEnabled("risk")&&state.chartPayload?.metadata?.candleFresh===true&&
+      state.chartPayload?.metadata?.multiTimeframeReady===true&&currentChartSignal().signal?.entryEligible===true;
+    if(!showZones&&!showPatterns&&!showSignalLevels)return;
     if(showZones)chartState.zones.forEach(zone=>{
       const startIndex=barIndexByTime.get(zone.startTime);
       const endIndex=barIndexByTime.get(zone.endTime);
@@ -1813,6 +1982,7 @@ body.kb-scanner-page .chart-mtf-policy{display:block;margin-top:8px;color:#74829
       ctx.restore();
     });
     if(showPatterns)drawChartPatternOverlays(ctx,width,height,chartState,timeScale);
+    drawChartSignalLevels(ctx,width,height,chartState);
   }
 
   function refreshChartLayers(){
@@ -1833,24 +2003,14 @@ body.kb-scanner-page .chart-mtf-policy{display:block;margin-top:8px;color:#74829
     if(chartLayerEnabled("risk")&&state.chartPayload?.metadata?.candleFresh===true){
       const bias=String(signal.bias||"").toUpperCase();
       const directional=bias==="BULLISH"||bias==="BEARISH";
-      if(directional){
-        addChartPriceLine(signal.entry,"TECH ENTRY REF","#5fd8ff",LW.LineStyle.Dashed,1);
-        if(Number.isFinite(Number(signal.sl)))addChartPriceLine(signal.sl,"TECH STOP REF","#ff6e89",LW.LineStyle.Dotted,1);
-        if(Number.isFinite(Number(signal.tp1)))addChartPriceLine(signal.tp1,"TECH TP1 REF","#4edda9",LW.LineStyle.Dotted,1);
-        if(Number.isFinite(Number(signal.tp2)))addChartPriceLine(signal.tp2,"TECH TP2 REF","#8ce9c7",LW.LineStyle.Dotted,1);
+      if(directional&&signal.entryEligible===true){
+        addChartPriceLine(signal.entry,"CORTEX ENTRY","#69d9e8",LW.LineStyle.Solid,2);
+        if(Number.isFinite(Number(signal.sl)))addChartPriceLine(signal.sl,"CORTEX STOP","#f0788c",LW.LineStyle.Dashed,2);
+        if(Number.isFinite(Number(signal.tp1)))addChartPriceLine(signal.tp1,"CORTEX TP1","#58d7a7",LW.LineStyle.Dashed,2);
+        if(Number.isFinite(Number(signal.tp2)))addChartPriceLine(signal.tp2,"CORTEX TP2","#9bd9b9",LW.LineStyle.Dotted,2);
       }
       addChartPriceLine(signal.support??technical.support,"SUPPORT","#38d7ad",LW.LineStyle.Dotted,1);
       addChartPriceLine(signal.resistance??technical.resistance,"RESISTANCE","#f0b85b",LW.LineStyle.Dotted,1);
-      const planCortex=state.latestScan?.cortex;
-      const planFocus=String(state.latestScan?.cortexFocusSymbol||planCortex?.market?.symbol||"").toUpperCase();
-      const planCouncil=String(planCortex?.strategyCouncil?.state||"").toUpperCase();
-      const plan=planCortex?.tradePlan;
-      if(planFocus===chartState.symbol&&plan?.ok===true&&["BUY","SELL"].includes(planCouncil)){
-        const planSide=String(plan.side||planCouncil).toUpperCase();
-        addChartPriceLine(planCortex.market?.price,"CORTEX "+planSide+" PLAN ENTRY","#8edfff",LW.LineStyle.Solid,2);
-        addChartPriceLine(plan.stopLoss,"CORTEX PLAN STOP","#ff5578",LW.LineStyle.Solid,2);
-        addChartPriceLine(plan.takeProfit,"CORTEX PLAN TARGET","#7debc2",LW.LineStyle.Solid,2);
-      }
       const pending=signal.pendingOrderZones||technical.pendingOrderZones;
       const buyStop=pending?.buyStopTriggers?.[0]?.trigger;
       const sellStop=pending?.sellStopTriggers?.[0]?.trigger;
