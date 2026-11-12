@@ -185,7 +185,7 @@ async function readTwelveData(symbol, twelveData) {
   return {
     ...quote,
     symbol,
-    timestamp: quote.timestamp || Date.now(),
+    timestamp: quote.timestamp || null,
     provider: "twelve-data"
   };
 }
@@ -254,7 +254,7 @@ async function readDeriv(symbol, derivFeed) {
     price: quote.price,
     bid: quote.bid,
     ask: quote.ask,
-    timestamp: finite(quote.epoch) !== null ? Number(quote.epoch) * 1000 : Date.now(),
+    timestamp: finite(quote.epoch) !== null ? Number(quote.epoch) * 1000 : null,
     source: quote.source || "Deriv public live feed",
     provider: "deriv"
   };
