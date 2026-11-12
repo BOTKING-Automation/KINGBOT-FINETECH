@@ -137,8 +137,8 @@ export class DerivMarketFeed {
       const tick = {
         symbol,
         brokerSymbol: rawSymbol,
-        bid: finite(data.tick.bid) ?? quote,
-        ask: finite(data.tick.ask) ?? quote,
+        bid: finite(data.tick.bid),
+        ask: finite(data.tick.ask),
         price: quote,
         epoch,
         time: epoch !== null ? new Date(epoch*1000).toISOString() : new Date().toISOString(),
@@ -307,8 +307,8 @@ export class DerivMarketFeed {
               const tick = {
                 symbol:this.normalize(rawSymbol),
                 brokerSymbol:rawSymbol,
-                bid:finite(value.tick.bid) ?? quote,
-                ask:finite(value.tick.ask) ?? quote,
+                bid:finite(value.tick.bid),
+                ask:finite(value.tick.ask),
                 price:quote,
                 epoch,
                 time:epoch!==null?new Date(epoch*1000).toISOString():new Date().toISOString(),
