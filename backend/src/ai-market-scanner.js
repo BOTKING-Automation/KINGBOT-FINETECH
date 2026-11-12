@@ -39,6 +39,10 @@ function finite(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
+function optionalFinite(value) {
+  if (value === null || value === undefined || value === "") return null;
+  return finite(value);
+}
 function cleanTimeframe(value) {
   const v = String(value || DEFAULT_TF).trim().toLowerCase();
   return /^(1m|3m|5m|15m|30m|1h|2h|4h|1d|1w)$/.test(v) ? v : DEFAULT_TF;
@@ -216,12 +220,16 @@ async function fetchCachedCortexHistory(symbol,timeframe) {
 async function getCortexDerivQuote(symbol) {
   try {
     const quote=await publicDerivFeed.getQuote(symbol,{maxAgeMs:2500,timeoutMs:2500});
-    const epoch=finite(quote?.epoch);
-    const ageMs=finite(quote?.ageMs) ?? (epoch!==null?Math.max(0,Date.now()-epoch*1000):null);
+    const epoch=optionalFinite(quote?.epoch);
+    const quoteAge=optionalFinite(quote?.ageMs);
+    const ageMs=quoteAge ?? (epoch!==null?Math.max(0,Date.now()-epoch*1000):null);
+    const price=optionalFinite(quote?.price);
+    const bid=optionalFinite(quote?.bid),ask=optionalFinite(quote?.ask);
+    const providerSpread=optionalFinite(quote?.spread);
     return {
-      symbol,available:finite(quote?.price)!==null&&Number(quote.price)>0,
-      price:finite(quote?.price),bid:finite(quote?.bid),ask:finite(quote?.ask),
-      spread:finite(quote?.spread) ?? (finite(quote?.bid)!==null&&finite(quote?.ask)!==null?Number(quote.ask)-Number(quote.bid):null),
+      symbol,available:price!==null&&price>0,
+      price,bid,ask,
+      spread:providerSpread ?? (bid!==null&&ask!==null?ask-bid:null),
       ageMs,epoch,source:quote?.source||"Deriv public live feed"
     };
   } catch(error) {
@@ -731,7 +739,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
       focusMultiTimeframe = await buildCortexMultiTimeframeForSymbol(focus,{
         quote:focusQuote?{
           ...focusQuote,
-          ageMs:finite(focusQuote.ageMs ?? focusQuote.quoteAgeMs)
+          ageMs:optionalFinite(focusQuote.ageMs ?? focusQuote.quoteAgeMs)
         }:null
       });
       technical = technical.map(item => item.symbol === focus ? {
