@@ -16,16 +16,25 @@ function frameDirection(frame) {
   const direction = String(frame?.technical?.trend || frame?.direction || "").toUpperCase();
   return DIRECTIONAL.has(direction) ? direction : "NEUTRAL";
 }
-function frameFresh(frame) {
-  if (!frame || frame.ok === false || frame.fresh === false) return false;
+const TIMEFRAME_SECONDS = { "1d":86400, "4h":14400, "1h":3600, "15m":900, "5m":300 };
+
+function frameFresh(frame, expectedTimeframe) {
+  if (!frame || frame.ok !== true || frame.fresh !== true) return false;
+  if (String(frame.timeframe || "").toLowerCase() !== expectedTimeframe) return false;
   const age = number(frame.ageSinceCloseMs), limit = number(frame.freshnessLimitMs);
-  return age !== null && limit !== null && age >= 0 && age <= limit && Number(frame.barCount || 0) >= 80;
+  const openedAt = Date.parse(String(frame.lastClosedBarTime || ""));
+  const closedAt = Date.parse(String(frame.lastBarCloseTime || ""));
+  const intervalMs = (TIMEFRAME_SECONDS[expectedTimeframe] || 0) * 1000;
+  if (!intervalMs || !Number.isFinite(openedAt) || !Number.isFinite(closedAt)) return false;
+  if (Math.abs((closedAt - openedAt) - intervalMs) > 1000) return false;
+  return age !== null && limit !== null && limit > 0 && age >= 0 && age <= limit && Number(frame.barCount || 0) >= 80;
 }
 function closedCandleDirection(frame, direction) {
   const bar = frame?.lastClosedBar;
   const open = number(bar?.open), close = number(bar?.close);
   const high = number(bar?.high), low = number(bar?.low);
-  if ([open, close, high, low].some(value => value === null) || high < low) return false;
+  if ([open, close, high, low].some(value => value === null) || high < low ||
+      high < Math.max(open, close) || low > Math.min(open, close)) return false;
   const range = Math.max(high - low, 1e-12);
   const bodyRatio = Math.abs(close - open) / range;
   if (direction === "BULLISH") return close > open && bodyRatio >= 0.45 && close >= low + range * 0.68;
@@ -60,7 +69,7 @@ function baseResult(signal, bias, reason, frames, gates = {}, blockedReasons = [
 export function evaluateCortexMultiTimeframeEntry({ frames = {}, quote = null } = {}) {
   const frameRows = Object.fromEntries(REQUIRED_TIMEFRAMES.map(timeframe => [timeframe, frames[timeframe] || null]));
   const missing = REQUIRED_TIMEFRAMES.filter(timeframe => !frameRows[timeframe]);
-  const stale = REQUIRED_TIMEFRAMES.filter(timeframe => frameRows[timeframe] && !frameFresh(frameRows[timeframe]));
+  const stale = REQUIRED_TIMEFRAMES.filter(timeframe => frameRows[timeframe] && !frameFresh(frameRows[timeframe], timeframe));
   const summary = REQUIRED_TIMEFRAMES.map(timeframe => {
     const frame = frameRows[timeframe], technical = frame?.technical || {};
     return {
@@ -70,7 +79,7 @@ export function evaluateCortexMultiTimeframeEntry({ frames = {}, quote = null } 
       momentum:number(technical.momentum),
       lastClosedBarTime:frame?.lastClosedBarTime||null,
       ageSinceCloseMs:number(frame?.ageSinceCloseMs),
-      fresh:frameFresh(frame),barCount:Number(frame?.barCount||0),error:frame?.reason||null
+      fresh:frameFresh(frame, timeframe),barCount:Number(frame?.barCount||0),error:frame?.reason||null
     };
   });
   const allFramesFresh = missing.length === 0 && stale.length === 0;
