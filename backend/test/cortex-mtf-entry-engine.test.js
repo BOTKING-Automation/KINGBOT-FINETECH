@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { evaluateCortexMultiTimeframeEntry } from "../src/cortex-mtf-entry-engine.js";
+import { evaluateCortexMultiTimeframeEntry, toCouncilMultiTimeframe, applyCortexCouncilApproval } from "../src/cortex-mtf-entry-engine.js";
 
 const TIMEFRAME_MS = { "1d":86400000, "4h":14400000, "1h":3600000, "15m":900000, "5m":300000 };
 
@@ -111,4 +111,73 @@ test("negative quote age and malformed closed-candle OHLC are rejected",()=>{
   }));
   assert.equal(malformed.entryEligible,false);
   assert.equal(malformed.gates.confirmedExecutionTrigger,false);
+});
+
+
+test("specialist adapter preserves all five verified timeframe frames", () => {
+  const frames = Object.fromEntries(["1d","4h","1h","15m","5m"].map(timeframe => [
+    timeframe,
+    {
+      ok:true,fresh:true,barCount:120,ageSinceCloseMs:1000,lastClosedBarTime:"2026-11-12T08:00:00.000Z",
+      technical:{
+        trend:"BULLISH",structure:"bullish",atr14:2,rsi14:60,adx14:25,momentum:0.7,
+        ema20:101,ema50:99,bos:"BULLISH",displacementDirection:"BULLISH"
+      }
+    }
+  ]));
+  const adapted = toCouncilMultiTimeframe(frames,{entryEligible:true,side:"BUY",signal:"ENTRY_CONFIRMING",gates:{confirmedExecutionTrigger:true}});
+  assert.equal(adapted.timeframes.length,5);
+  assert.equal(adapted.regime.timeframe,"4h");
+  assert.equal(adapted.setup.timeframe,"15m");
+  assert.equal(adapted.execution.timeframe,"5m");
+  assert.equal(adapted.setupState,"BUY_CANDIDATE");
+  assert.equal(adapted.timeframes.every(frame=>frame.available&&frame.atr===2),true);
+});
+
+test("stale timeframe evidence is passed to the Council as unavailable", () => {
+  const frames = Object.fromEntries(["1d","4h","1h","15m","5m"].map(timeframe => [
+    timeframe,{ok:true,fresh:true,barCount:120,technical:{trend:"BULLISH",structure:"bullish",atr14:2}}
+  ]));
+  frames["4h"]={ok:true,fresh:false,barCount:120,technical:{trend:"BULLISH",structure:"bullish",atr14:2}};
+  const adapted=toCouncilMultiTimeframe(frames,{entryEligible:false,signal:"WAIT"});
+  assert.equal(adapted.regime.available,false);
+  assert.equal(adapted.setupState,"DATA_INSUFFICIENT");
+});
+
+test("technical BUY is downgraded when Strategy Council disagrees", () => {
+  const candidate={entryEligible:true,signal:"ENTRY_CONFIRMING",side:"BUY",entry:100,sl:98,tp1:102,tp2:104,blockedReasons:[]};
+  const result=applyCortexCouncilApproval(candidate,{
+    strategyCouncil:{state:"SELL"},routing:{direction:"SELL",selectedEngine:"smc-pro"},
+    tradePlan:{ok:true},riskCouncil:{blocks:[]}
+  });
+  assert.equal(result.signal,"WAIT");
+  assert.equal(result.entryEligible,false);
+  assert.equal(result.entry,null);
+  assert.equal(result.councilApproval.approved,false);
+});
+
+test("technical BUY is downgraded when council specialist or risk validation is missing", () => {
+  const candidate={entryEligible:true,signal:"ENTRY_CONFIRMING",side:"BUY",entry:100,sl:98,tp1:102,tp2:104,blockedReasons:[]};
+  const noPlan=applyCortexCouncilApproval(candidate,{
+    strategyCouncil:{state:"BUY"},routing:{direction:"BUY",selectedEngine:"strategic"},
+    tradePlan:null,riskCouncil:{blocks:[]}
+  });
+  assert.equal(noPlan.entryEligible,false);
+  const riskBlocked=applyCortexCouncilApproval(candidate,{
+    strategyCouncil:{state:"BUY"},routing:{direction:"BUY",selectedEngine:"strategic"},
+    tradePlan:{ok:true},riskCouncil:{blocks:["STALE_MARKET_DATA"]}
+  });
+  assert.equal(riskBlocked.entryEligible,false);
+  assert.ok(riskBlocked.blockedReasons.some(value=>String(value).includes("STALE_MARKET_DATA")));
+});
+
+test("a matching Council route and clean risk review can approve an MTF candidate", () => {
+  const candidate={entryEligible:true,signal:"ENTRY_CONFIRMING",side:"BUY",entry:100,sl:98,tp1:102,tp2:104,blockedReasons:[]};
+  const result=applyCortexCouncilApproval(candidate,{
+    strategyCouncil:{state:"BUY"},routing:{direction:"BUY",selectedEngine:"strategic"},
+    tradePlan:{ok:true},riskCouncil:{blocks:[]}
+  });
+  assert.equal(result.entryEligible,true);
+  assert.equal(result.councilApproval.approved,true);
+  assert.equal(result.councilApproval.selectedEngine,"strategic");
 });
