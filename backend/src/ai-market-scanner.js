@@ -10,12 +10,15 @@ import { WebSocketServer, WebSocket } from "ws";
 import { getBotDefinitions } from "./bot-engines.js";
 import { trainMlStrategyModel, mlSignalServiceStatus, probeMlSignalService } from "./ml-signal-client.js";
 import { calculateMarketIndicators } from "./worker-market-perception.js";
+import { CORTEX_MTF_TIMEFRAMES, evaluateCortexMultiTimeframeEntry } from "./cortex-mtf-entry-engine.js";
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
 const publicGoldPriceFeed = getGoldPriceFeed();
 const publicDerivFeed = getDerivMarketFeed();
 const publicDerivTechnicalCache = new Map();
+const cortexMtfHistoryCache = new Map();
+const CORTEX_MTF_HISTORY_CACHE_MS = Math.max(5000, Number(process.env.KINGBOT_CORTEX_MTF_CACHE_MS || 15000));
 const PUBLIC_TECHNICAL_CACHE_MS = Math.max(5000, Number(process.env.KINGBOT_SCANNER_TECHNICAL_CACHE_MS || 15000));
 
 function cleanSymbols(value) {
@@ -47,13 +50,18 @@ function bool(v) {
 
 function technicalEngine(snapshot) {
   if (!snapshot) return {
-    signal: "DATA_INSUFFICIENT",
+    signal: "WAIT",
     bias: "DATA_INSUFFICIENT",
     score: 0,
-    waitFor: "A fresh technical OHLC snapshot is not available yet.",
-    reason: "KINGBOT requires fresh verified OHLC/technical market data before technical analysis. TradingView is optional visualization/context, not a required data source.",
+    entryEligible: false,
+    entry: null,
+    sl: null,
+    tp1: null,
+    tp2: null,
+    waitFor: "A fresh verified OHLC snapshot is required.",
+    reason: "Single-timeframe data is insufficient for an entry decision. CORTEX requires the full 1d/4h/1h/15m/5m evidence stack.",
     technicalAnalysis: [],
-    invalidation: "No valid technical market data.",
+    invalidation: "No valid technical market data."
   };
 
   const price = finite(snapshot.close ?? snapshot.price);
@@ -62,86 +70,194 @@ function technicalEngine(snapshot) {
   const rsi = finite(snapshot.rsi14 ?? snapshot.rsi);
   const macd = finite(snapshot.macd);
   const macdSignal = finite(snapshot.macdSignal ?? snapshot.macd_signal);
-  const atr = finite(snapshot.atr14 ?? snapshot.atr);
-  const support = finite(snapshot.support);
-  const resistance = finite(snapshot.resistance);
   const trend = String(snapshot.trend || "").toUpperCase();
-  const bos = String(snapshot.bos || "").toUpperCase();
+  const structure = String(snapshot.structure || "").toUpperCase();
+  const bos = String(snapshot.bos || snapshot.bosDirection || "").toUpperCase();
   const choch = String(snapshot.choch || "").toUpperCase();
-  const liquidity = String(snapshot.liquiditySweep || snapshot.liquidity_sweep || "").toUpperCase();
-  const fvg = bool(snapshot.fvg);
+  const liquidity = String(snapshot.liquiditySweepDirection || snapshot.liquiditySweep || "").toUpperCase();
+  const displacement = String(snapshot.displacementDirection || "").toUpperCase();
+  const fvg = String(snapshot.fairValueGapDirection || "").toUpperCase();
+
   const longEvidence = [
-    trend === "BULLISH", bos === "BULLISH", choch === "BULLISH", liquidity === "BULLISH",
+    trend === "BULLISH",
+    structure === "BULLISH",
+    bos === "BULLISH",
+    choch === "BULLISH",
+    liquidity === "BULLISH",
+    displacement === "BULLISH",
+    fvg === "BULLISH",
     ema20 !== null && ema50 !== null && ema20 > ema50,
     rsi !== null && rsi >= 50 && rsi <= 70,
-    macd !== null && macdSignal !== null && macd > macdSignal,
-    fvg
+    macd !== null && macdSignal !== null && macd > macdSignal
   ];
   const shortEvidence = [
-    trend === "BEARISH", bos === "BEARISH", choch === "BEARISH", liquidity === "BEARISH",
+    trend === "BEARISH",
+    structure === "BEARISH",
+    bos === "BEARISH",
+    choch === "BEARISH",
+    liquidity === "BEARISH",
+    displacement === "BEARISH",
+    fvg === "BEARISH",
     ema20 !== null && ema50 !== null && ema20 < ema50,
-    rsi !== null && rsi < 50 && rsi >= 30,
-    macd !== null && macdSignal !== null && macd < macdSignal,
-    fvg
+    rsi !== null && rsi >= 30 && rsi <= 50,
+    macd !== null && macdSignal !== null && macd < macdSignal
   ];
   const longScore = longEvidence.filter(Boolean).length;
   const shortScore = shortEvidence.filter(Boolean).length;
-  const bias = longScore === shortScore ? "NEUTRAL" : longScore > shortScore ? "BULLISH" : "BEARISH";
-  const score = Math.round(Math.max(longScore, shortScore) / 8 * 100);
+  const bias = longScore - shortScore >= 2 ? "BULLISH"
+    : shortScore - longScore >= 2 ? "BEARISH" : "NEUTRAL";
+  const score = Math.round(Math.max(longScore, shortScore) / 10 * 100);
 
   const analysis = [];
-  if (trend) analysis.push(`Trend: ${trend}`);
-  if (bos) analysis.push(`BOS: ${bos}`);
-  if (choch) analysis.push(`CHOCH: ${choch}`);
-  if (liquidity) analysis.push(`Liquidity sweep: ${liquidity}`);
-  if (ema20 !== null && ema50 !== null) analysis.push(`EMA20/EMA50: ${ema20 > ema50 ? "bullish alignment" : "bearish alignment"}`);
-  if (rsi !== null) analysis.push(`RSI(14): ${rsi.toFixed(2)}`);
-  if (macd !== null && macdSignal !== null) analysis.push(`MACD: ${macd > macdSignal ? "bullish" : "bearish"}`);
-  if (fvg) analysis.push("FVG: detected");
-
-  let signal = "WAIT";
-  let waitFor = bias === "BULLISH"
-    ? "Wait for bullish confirmation/close above the trigger level."
-    : bias === "BEARISH"
-      ? "Wait for bearish confirmation/close below the trigger level."
-      : "Wait for structure and momentum to align.";
-  if (score >= 75 && bias !== "NEUTRAL") signal = "ENTRY_CONFIRMING";
-  if (score < 50) signal = "NO_TRADE";
-
-  let entry = price;
-  let sl = null;
-  let tp1 = null;
-  let tp2 = null;
-  if (price !== null && atr !== null) {
-    const risk = atr * 1.25;
-    if (bias === "BULLISH") {
-      sl = price - risk; tp1 = price + risk * 1.5; tp2 = price + risk * 2.5;
-    } else if (bias === "BEARISH") {
-      sl = price + risk; tp1 = price - risk * 1.5; tp2 = price - risk * 2.5;
-    }
-  }
-  if (support !== null && resistance !== null && price !== null) {
-    if (bias === "BULLISH" && price <= support) waitFor = "Wait for reclaim/confirmation above support.";
-    if (bias === "BEARISH" && price >= resistance) waitFor = "Wait for rejection/confirmation below resistance.";
-  }
+  if (trend) analysis.push("Trend: " + trend);
+  if (structure) analysis.push("Market structure: " + structure);
+  if (bos && bos !== "NONE") analysis.push("BOS: " + bos);
+  if (choch && choch !== "NONE") analysis.push("CHoCH: " + choch);
+  if (liquidity && liquidity !== "NONE") analysis.push("Liquidity sweep: " + liquidity);
+  if (displacement && displacement !== "NONE") analysis.push("Displacement: " + displacement);
+  if (fvg && fvg !== "NONE") analysis.push("FVG: " + fvg);
+  if (ema20 !== null && ema50 !== null) analysis.push("EMA20/EMA50: " + (ema20 > ema50 ? "bullish alignment" : "bearish alignment"));
+  if (rsi !== null) analysis.push("RSI(14): " + rsi.toFixed(2));
+  if (macd !== null && macdSignal !== null) analysis.push("MACD: " + (macd > macdSignal ? "bullish" : "bearish"));
 
   return {
-    signal, bias, score, entry, sl, tp1, tp2, waitFor,
-    atr14: atr,
-    support,
-    resistance,
+    signal: "WAIT",
+    bias,
+    score,
+    entryEligible: false,
+    singleTimeframeOnly: true,
+    entry: null,
+    sl: null,
+    tp1: null,
+    tp2: null,
+    waitFor: "Wait for 1d/4h/1h/15m trend and structure alignment plus a completed 5m trigger, fresh bid/ask and acceptable spread.",
+    atr14: finite(snapshot.atr14 ?? snapshot.atr),
+    support: finite(snapshot.support),
+    resistance: finite(snapshot.resistance),
     trend,
+    structure,
     bos,
     choch,
     liquiditySweep: liquidity,
-    fvg,
-    reason: analysis.length ? analysis.join(" · ") : "Insufficient technical fields.",
+    displacement,
+    fairValueGapDirection: fvg,
+    reason: (analysis.length ? analysis.join(" · ") + " · " : "") +
+      "Single-timeframe bias is descriptive only; it cannot qualify an entry.",
     technicalAnalysis: analysis,
-    invalidation: bias === "BULLISH"
-      ? "Invalidate if price closes below the identified bullish structure/support."
-      : bias === "BEARISH"
-        ? "Invalidate if price closes above the identified bearish structure/resistance."
-        : "Invalidate when a directional structure is established against the setup."
+    invalidation: "No entry or stop is issued by a single-timeframe snapshot."
+  };
+}
+
+
+const CORTEX_TIMEFRAME_SECONDS = {
+  "1m":60,"3m":180,"5m":300,"15m":900,"30m":1800,
+  "1h":3600,"2h":7200,"4h":14400,"1d":86400,"1w":604800
+};
+
+function buildCortexTimeframeFrame(rows, timeframe, nowMs = Date.now()) {
+  const interval = CORTEX_TIMEFRAME_SECONDS[cleanTimeframe(timeframe)] || 300;
+  const byTime = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const time = chartEpochSeconds(row?.time ?? row?.datetime ?? row?.timestamp);
+    const open = finite(row?.open), high = finite(row?.high);
+    const low = finite(row?.low), close = finite(row?.close);
+    if (!Number.isSafeInteger(time) || time <= 0 ||
+      ![open, high, low, close].every(Number.isFinite) ||
+      open <= 0 || low <= 0 || high < low ||
+      high < Math.max(open, close) || low > Math.min(open, close)) continue;
+    byTime.set(time, {
+      time, open, high, low, close,
+      volume: finite(row?.volume ?? row?.tick_count) ?? 0
+    });
+  }
+  const normalized = [...byTime.values()].sort((a,b)=>a.time-b.time);
+  const closedBars = normalized.filter(bar => (bar.time + interval) * 1000 <= nowMs).slice(-240);
+  const lastClosedBar = closedBars.at(-1) || null;
+  if (closedBars.length < 80 || !lastClosedBar) {
+    return {
+      ok:false,fresh:false,timeframe,barCount:closedBars.length,lastClosedBar:null,
+      lastClosedBarTime:null,ageSinceCloseMs:null,freshnessLimitMs:interval*2000,
+      reason:"INSUFFICIENT_COMPLETED_CANDLES"
+    };
+  }
+  const technical = deriveTechnicalFromBars(closedBars.map(bar=>({
+    ...bar,datetime:new Date(bar.time*1000).toISOString()
+  })));
+  const lastBarCloseMs=(lastClosedBar.time+interval)*1000;
+  const ageSinceCloseMs=Math.max(0,nowMs-lastBarCloseMs);
+  const freshnessLimitMs=Math.max(interval*2000,10*60*1000);
+  const fresh=Boolean(technical)&&ageSinceCloseMs<=freshnessLimitMs;
+  return {
+    ok:Boolean(technical),fresh,timeframe,barCount:closedBars.length,
+    lastClosedBar,lastClosedBarTime:new Date(lastClosedBar.time*1000).toISOString(),
+    lastBarCloseTime:new Date(lastBarCloseMs).toISOString(),
+    ageSinceCloseMs,freshnessLimitMs,technical,
+    reason:technical?null:"TECHNICAL_ANALYSIS_UNAVAILABLE"
+  };
+}
+
+async function fetchCachedCortexHistory(symbol,timeframe) {
+  const key=String(symbol).toUpperCase()+":"+String(timeframe).toLowerCase();
+  const cached=cortexMtfHistoryCache.get(key);
+  const age=cached?Date.now()-Number(cached.cachedAt||0):Infinity;
+  if(cached?.bars&&age<=CORTEX_MTF_HISTORY_CACHE_MS) return cached.bars;
+  const bars=await publicDerivFeed.getHistoricalCandles(symbol,{
+    timeframe,limit:180,timeoutMs:8000
+  });
+  if(!Array.isArray(bars)||bars.length<80) throw new Error("INSUFFICIENT_HISTORICAL_CANDLES");
+  cortexMtfHistoryCache.set(key,{bars,cachedAt:Date.now()});
+  if(cortexMtfHistoryCache.size>240){
+    const firstKey=cortexMtfHistoryCache.keys().next().value;
+    if(firstKey)cortexMtfHistoryCache.delete(firstKey);
+  }
+  return bars;
+}
+
+async function getCortexDerivQuote(symbol) {
+  try {
+    const quote=await publicDerivFeed.getQuote(symbol,{maxAgeMs:2500,timeoutMs:2500});
+    const epoch=finite(quote?.epoch);
+    const ageMs=finite(quote?.ageMs) ?? (epoch!==null?Math.max(0,Date.now()-epoch*1000):null);
+    return {
+      symbol,available:finite(quote?.price)!==null&&Number(quote.price)>0,
+      price:finite(quote?.price),bid:finite(quote?.bid),ask:finite(quote?.ask),
+      spread:finite(quote?.spread) ?? (finite(quote?.bid)!==null&&finite(quote?.ask)!==null?Number(quote.ask)-Number(quote.bid):null),
+      ageMs,epoch,source:quote?.source||"Deriv public live feed"
+    };
+  } catch(error) {
+    return {symbol,available:false,price:null,bid:null,ask:null,spread:null,ageMs:null,error:String(error?.message||"DERIV_QUOTE_UNAVAILABLE").slice(0,120)};
+  }
+}
+
+async function buildCortexMultiTimeframeForSymbol(symbol,{
+  quote=null,reuseTimeframe=null,reuseBars=null,nowMs=Date.now()
+}={}) {
+  const frames={};
+  const results=await Promise.all(CORTEX_MTF_TIMEFRAMES.map(async timeframe=>{
+    try {
+      const bars=String(reuseTimeframe||"").toLowerCase()===timeframe&&Array.isArray(reuseBars)
+        ?reuseBars
+        :await fetchCachedCortexHistory(symbol,timeframe);
+      return [timeframe,buildCortexTimeframeFrame(bars,timeframe,nowMs)];
+    } catch(error) {
+      return [timeframe,{
+        ok:false,fresh:false,timeframe,barCount:0,lastClosedBar:null,
+        lastClosedBarTime:null,ageSinceCloseMs:null,freshnessLimitMs:null,
+        reason:String(error?.message||"TIMEFRAME_DATA_UNAVAILABLE").slice(0,120)
+      }];
+    }
+  }));
+  for(const [timeframe,frame] of results)frames[timeframe]=frame;
+  const marketQuote=quote||await getCortexDerivQuote(symbol);
+  const entryDecision=evaluateCortexMultiTimeframeEntry({frames,quote:marketQuote});
+  return {
+    ok:true,symbol,timeframes:CORTEX_MTF_TIMEFRAMES,
+    executionTimeframe:"5m",
+    generatedAt:new Date(nowMs).toISOString(),
+    frames,
+    quote:marketQuote,
+    entryDecision,
+    analysisPolicy:"Closed candles only; top-down 1d/4h/1h/15m alignment; 5m execution trigger; fresh two-sided quote; spread and structural risk gates."
   };
 }
 
@@ -308,6 +424,7 @@ export function deriveTechnicalFromBars(bars) {
     structure,momentum:enhanced.momentum,volatility:enhanced.volatility,roc5,
     bos,choch,liquiditySweep:enhanced.liquiditySweepDirection,
     liquiditySweepDirection:enhanced.liquiditySweepDirection,
+    bosDirection:enhanced.bosDirection,
     fvg:enhanced.fairValueGap,fairValueGapDirection:enhanced.fairValueGapDirection,
     displacement:enhanced.displacementDirection,displacementDirection:enhanced.displacementDirection,
     orderBlock:enhanced.orderBlock,
@@ -605,6 +722,39 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
   technical = overlayLiveQuotes(technical, directQuotes);
   technical = technical.map(item => ({ ...item, pendingOrderZones: predictPendingOrderZones(item) }));
 
+  const focus = scannerCanonicalSymbol(focusSymbol || normalizedSymbols[0] || "");
+  let focusMultiTimeframe = null;
+  if (focus && normalizedSymbols.includes(focus)) {
+    const focusRow = technical.find(item => item.symbol === focus);
+    const focusQuote = quotes.find(item => item.symbol === focus && item.available);
+    try {
+      focusMultiTimeframe = await buildCortexMultiTimeframeForSymbol(focus,{
+        quote:focusQuote?{
+          ...focusQuote,
+          ageMs:finite(focusQuote.ageMs ?? focusQuote.quoteAgeMs)
+        }:null
+      });
+      technical = technical.map(item => item.symbol === focus ? {
+        ...item,
+        ...focusMultiTimeframe.entryDecision,
+        signal:focusMultiTimeframe.entryDecision.signal,
+        entryDecision:focusMultiTimeframe.entryDecision,
+        multiTimeframe:focusMultiTimeframe.frames,
+        multiTimeframeVerified:Object.values(focusMultiTimeframe.frames).every(frame=>frame?.ok&&frame?.fresh)
+      } : item);
+    } catch(error) {
+      focusMultiTimeframe = {
+        ok:false,
+        symbol:focus,
+        entryDecision:{
+          signal:"WAIT",bias:"NEUTRAL",entryEligible:false,entry:null,sl:null,tp1:null,tp2:null,
+          reason:"Multi-timeframe analysis unavailable; no entry can be qualified.",
+          blockedReasons:[String(error?.message||"MULTI_TIMEFRAME_ANALYSIS_UNAVAILABLE").slice(0,160)]
+        }
+      };
+    }
+  }
+
   const tvMap = Object.fromEntries(tv.map(x => [x.symbol, x]));
   const nativeTechnicalCount = technical.filter(item => item.technicalVerified).length;
   const hasTwelveDataTechnical = tdTechnical.length > 0;
@@ -619,7 +769,6 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
 
   let cortex = null;
   let cortexError = null;
-  const focus = scannerCanonicalSymbol(focusSymbol || normalizedSymbols[0] || "");
   if (cortexRunner && focus && normalizedSymbols.includes(focus)) {
     const focusTechnical = technical.find(item => item.symbol === focus && item.source !== "none");
     const focusQuote = quotes.find(item => item.symbol === focus && item.available);
@@ -639,7 +788,9 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
         quoteFreshnessMaxAgeMs: finite(focusQuote?.freshnessMaxAgeMs),
         freshnessMaxAgeMs: finite(focusQuote?.freshnessMaxAgeMs),
         verifiedQuote: Boolean(focusQuote?.verified),
-        scannerSource: technicalSource
+        scannerSource: technicalSource,
+        multiTimeframeAnalysis:focusMultiTimeframe,
+        entryDecision:focusMultiTimeframe?.entryDecision||null
       };
       try {
         cortex = await cortexRunner(cortexMarket);
@@ -707,6 +858,8 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
     technical,
     tradingViewSnapshots:tvMap,
     cortex,
+    multiTimeframeAnalysis:focusMultiTimeframe,
+    entryDecision:focusMultiTimeframe?.entryDecision||null,
     cortexFocusSymbol: focus || null,
     cortexError,
     analysis:ai.analysis || JSON.stringify(fallbackAnalysis),
@@ -1686,6 +1839,35 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
         timeframe,
         source:"Deriv public historical candles"
       });
+      const [quote,multiTimeframe]=await Promise.all([
+        getCortexDerivQuote(symbol),
+        buildCortexMultiTimeframeForSymbol(symbol,{reuseTimeframe:timeframe,reuseBars:bars})
+      ]);
+      payload.entryDecision=multiTimeframe.entryDecision;
+      payload.multiTimeframe={
+        timeframes:multiTimeframe.timeframes,
+        executionTimeframe:multiTimeframe.executionTimeframe,
+        generatedAt:multiTimeframe.generatedAt,
+        frames:multiTimeframe.frames,
+        analysisPolicy:multiTimeframe.analysisPolicy
+      };
+      payload.quoteDiagnostics={
+        available:Boolean(quote.available),
+        ageMs:quote.ageMs,
+        spread:quote.spread,
+        source:quote.source||null
+      };
+      payload.signal={
+        ...payload.signal,
+        ...multiTimeframe.entryDecision,
+        pendingOrderZones:payload.signal?.pendingOrderZones||null
+      };
+      payload.metadata={
+        ...payload.metadata,
+        multiTimeframeReady:Object.values(multiTimeframe.frames).every(frame=>frame?.ok&&frame?.fresh),
+        entryEligible:Boolean(multiTimeframe.entryDecision?.entryEligible),
+        executionTimeframe:multiTimeframe.executionTimeframe
+      };
       const feedStatus=publicDerivFeed.status(symbol);
       return res.json({
         ...payload,
