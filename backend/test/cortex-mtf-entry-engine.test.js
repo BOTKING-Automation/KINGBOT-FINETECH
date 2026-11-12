@@ -26,9 +26,10 @@ function qualifiedInput(overrides={}) {
   for(const [timeframe,patch] of Object.entries(overrides.frames||{})){
     frames[timeframe]=makeFrame(patch.direction||"BULLISH",patch);
   }
+  const {frames:frameOverrides,...rest}=overrides;
   return {
     frames,quote:{available:true,price:101.9,bid:101.85,ask:101.95,ageMs:200},
-    ...overrides
+    ...rest
   };
 }
 test("only a fully aligned, fresh and cost-aware multi-timeframe setup qualifies",()=>{
