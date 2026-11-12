@@ -132,9 +132,12 @@ test("specialist adapter preserves all five verified timeframe frames", () => {
   assert.equal(adapted.timeframes.find(frame=>frame.timeframe==="5m").atr,2);
   assert.equal(adapted.setupState,"BUY_CANDIDATE");
   assert.equal(adapted.timeframes.every(frame=>frame.available&&frame.atr===2),true);
-  assert.equal("regime" in adapted,false);
-  assert.equal("setup" in adapted,false);
-  assert.equal("execution" in adapted,false);
+  assert.equal(adapted.regime.timeframe,"4h");
+  assert.equal(adapted.regime.available,true);
+  assert.equal(adapted.setup.timeframe,"15m");
+  assert.equal(adapted.setup.available,true);
+  assert.equal(adapted.execution.timeframe,"5m");
+  assert.equal(adapted.execution.available,true);
 });
 
 test("neutral 5m context is not a directional conflict, but opposite 5m trend is",()=>{
