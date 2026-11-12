@@ -33,7 +33,7 @@ function qualifiedInput(overrides={}) {
   }
   const {frames:frameOverrides,...rest}=overrides;
   return {
-    frames,quote:{available:true,price:101.9,bid:101.85,ask:101.95,ageMs:200},
+    frames,quote:{available:true,timestampVerified:true,price:101.9,bid:101.85,ask:101.95,ageMs:200},
     ...rest
   };
 }
@@ -44,6 +44,15 @@ test("only a fully aligned, fresh and cost-aware multi-timeframe setup qualifies
   assert.ok(result.sl<result.entry);assert.ok(result.tp2>result.entry);
   assert.equal(Object.values(result.gates).every(Boolean),true);
 });
+test("a recent local receive time cannot replace a missing venue timestamp",()=>{
+  const result=evaluateCortexMultiTimeframeEntry(qualifiedInput({
+    quote:{available:true,timestampVerified:false,price:101.9,bid:101.85,ask:101.95,ageMs:25}
+  }));
+  assert.equal(result.entryEligible,false);
+  assert.equal(result.gates.freshTwoSidedQuote,false);
+  assert.ok(result.blockedReasons.some(reason=>reason.includes("fresh bid/ask")));
+});
+
 test("a single conflicting higher timeframe blocks the entry",()=>{
   const result=evaluateCortexMultiTimeframeEntry(qualifiedInput({frames:{"4h":{direction:"BEARISH"}}}));
   assert.equal(result.signal,"NO_TRADE");assert.equal(result.entryEligible,false);
@@ -69,11 +78,11 @@ test("a trend without a completed execution trigger remains WAIT",()=>{
 });
 test("stale quotes, wide spreads and weak reward-to-risk are rejected",()=>{
   const stale=evaluateCortexMultiTimeframeEntry(qualifiedInput({
-    quote:{available:true,price:101.9,bid:101.8,ask:102,ageMs:5000}
+    quote:{available:true,timestampVerified:true,price:101.9,bid:101.8,ask:102,ageMs:5000}
   }));
   assert.equal(stale.entryEligible,false);assert.equal(stale.gates.freshTwoSidedQuote,false);
   const wide=evaluateCortexMultiTimeframeEntry(qualifiedInput({
-    quote:{available:true,price:101.9,bid:101.4,ask:102.4,ageMs:200}
+    quote:{available:true,timestampVerified:true,price:101.9,bid:101.4,ask:102.4,ageMs:200}
   }));
   assert.equal(wide.entryEligible,false);assert.equal(wide.gates.spreadCost,false);
   const poorRR=evaluateCortexMultiTimeframeEntry(qualifiedInput({
@@ -102,7 +111,7 @@ test("a timeframe cannot borrow another timeframe's candles or timestamps",()=>{
 
 test("negative quote age and malformed closed-candle OHLC are rejected",()=>{
   const negativeAge=evaluateCortexMultiTimeframeEntry(qualifiedInput({
-    quote:{available:true,price:101.9,bid:101.85,ask:101.95,ageMs:-5}
+    quote:{available:true,timestampVerified:true,price:101.9,bid:101.85,ask:101.95,ageMs:-5}
   }));
   assert.equal(negativeAge.entryEligible,false);
   assert.equal(negativeAge.gates.freshTwoSidedQuote,false);
