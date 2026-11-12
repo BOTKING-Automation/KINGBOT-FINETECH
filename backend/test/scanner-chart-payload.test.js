@@ -145,3 +145,26 @@ test("scanner live chart batches candle painting and keeps quote cards increment
   assert.match(scannerPage, /Date\.now\(\)-receivedAt/);
   assert.match(scannerPage, /Date\.now\(\)-timestamp\*1000/);
 });
+
+
+test("live chart highlights only strictly qualified CORTEX entries",()=>{
+  assert.match(scannerPage,/id="chartSignalOverlay"/);
+  assert.match(scannerPage,/id="chartOverlaySignal"/);
+  assert.match(scannerPage,/id="chartOverlayDetail"/);
+  assert.match(scannerPage,/function drawChartSignalLevels\(ctx,width,height,chartState\)/);
+  const levelsStart=scannerPage.indexOf("  function drawChartSignalLevels(");
+  const levelsEnd=scannerPage.indexOf("\n  function drawChartZones()",levelsStart);
+  const levels=scannerPage.slice(levelsStart,levelsEnd);
+  assert.match(levels,/signal\.entryEligible!==true/);
+  assert.match(levels,/STOP LOSS/);
+  assert.match(levels,/TARGET 1/);
+  assert.match(levels,/TARGET 2/);
+  const markersStart=scannerPage.indexOf("  function buildChartMarkers(){");
+  const markersEnd=scannerPage.indexOf("\n  function buildChartZones(){",markersStart);
+  const markers=scannerPage.slice(markersStart,markersEnd);
+  assert.match(markers,/signal\.entryEligible===true/);
+  assert.doesNotMatch(markers,/WATCH|TECH OK/);
+  assert.match(scannerPage,/axisLabelVisible:false/);
+  assert.match(scannerPage,/chart-signal-overlay\.buy/);
+  assert.match(scannerPage,/chart-signal-overlay\.sell/);
+});
