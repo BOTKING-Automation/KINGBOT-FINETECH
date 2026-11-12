@@ -292,19 +292,25 @@ export function toCouncilMultiTimeframe(frames = {}, entryDecision = {}) {
   );
   const unique = [...new Set(directions)];
   const higherTimeframeBias = unique.length === 1 && ["BULLISH", "BEARISH"].includes(unique[0]) ? unique[0] : "MIXED";
+  const lowerDirections = ["15m", "5m"].map(timeframe =>
+    String(byTimeframe[timeframe]?.trend || "NEUTRAL").toUpperCase()
+  ).filter(direction => DIRECTIONAL.has(direction));
+  const lowerTimeframesConflict = higherTimeframeBias !== "MIXED" &&
+    lowerDirections.some(direction => direction !== higherTimeframeBias);
+  const lowerTimeframeBias = lowerDirections.length &&
+    lowerDirections.every(direction => direction === lowerDirections[0])
+      ? lowerDirections[0] : "MIXED";
+  const lowerTimeframesAgree = lowerTimeframeBias === higherTimeframeBias;
   const setupState = !complete ? "DATA_INSUFFICIENT"
-    : higherTimeframeBias === "MIXED" ? "CONFLICTED"
+    : higherTimeframeBias === "MIXED" || lowerTimeframesConflict ? "CONFLICTED"
     : entryDecision.entryEligible === true
       ? (side === "BUY" ? "BUY_CANDIDATE" : side === "SELL" ? "SELL_CANDIDATE" : "WAIT_CONFIRMATION")
       : entryDecision.signal === "NO_TRADE" ? "CONFLICTED" : "WAIT_CONFIRMATION";
-  const lowerTimeframesAgree = ["15m", "5m"].every(timeframe =>
-    String(byTimeframe[timeframe]?.trend || "NEUTRAL").toUpperCase() === higherTimeframeBias
-  );
   return {
     timeframes,
     requiredTimeframes: REQUIRED_TIMEFRAMES,
     higherTimeframeBias,
-    lowerTimeframeBias: lowerTimeframesAgree ? higherTimeframeBias : "MIXED",
+    lowerTimeframeBias,
     triggerPresent: Boolean(entryDecision.gates?.confirmedExecutionTrigger),
     setupState,
     policy: "CORTEX_STRICT_TOP_DOWN_MTF",
@@ -313,7 +319,8 @@ export function toCouncilMultiTimeframe(frames = {}, entryDecision = {}) {
       direction: higherTimeframeBias,
       htfBias: higherTimeframeBias,
       ltfBias: lowerTimeframesAgree ? higherTimeframeBias : "MIXED",
-      conflict: higherTimeframeBias === "MIXED" || !lowerTimeframesAgree,
+      conflict: higherTimeframeBias === "MIXED" || lowerTimeframesConflict,
+      lowerTimeframesConflict,
       total: timeframes.filter(frame => frame.ok).length,
       required: timeframes.length
     }
