@@ -73,15 +73,18 @@ export function classifyMarketSymbol(symbol) {
 
 function timestampMs(value) {
   const n = finite(value);
-  if (n === null) return null;
-  return n > 1e15 ? n / 1e6 : n;
+  if (n !== null) return n > 1e15 ? n / 1e6 : n;
+  const parsed = Date.parse(String(value ?? ""));
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function normalizeQuote({ symbol, category, price, bid = null, ask = null, change = null, volume = null, high = null, low = null, timestamp = null, source, provider, freshnessMaxAgeMs = DEFAULT_FRESHNESS_MS, raw = null }) {
   const normalized = normalizeMarketSymbol(symbol);
-  const ts = timestampMs(timestamp) || Date.now();
-  const age = Math.max(0, Date.now() - ts);
-  const fresh = age <= freshnessMaxAgeMs && Number.isFinite(Number(price)) && Number(price) > 0;
+  const sourceTimestamp = timestampMs(timestamp);
+  const receivedAt = Date.now();
+  const age = sourceTimestamp !== null ? Math.max(0, receivedAt - sourceTimestamp) : null;
+  const fresh = sourceTimestamp !== null && age <= freshnessMaxAgeMs &&
+    Number.isFinite(Number(price)) && Number(price) > 0;
 
   return {
     symbol: normalized,
@@ -94,7 +97,10 @@ function normalizeQuote({ symbol, category, price, bid = null, ask = null, chang
     volume: finite(volume),
     high: finite(high),
     low: finite(low),
-    timestamp: new Date(ts).toISOString(),
+    timestamp: sourceTimestamp !== null ? new Date(sourceTimestamp).toISOString() : null,
+    timestampVerified: sourceTimestamp !== null,
+    venueAgeMs: age,
+    receivedAt: new Date(receivedAt).toISOString(),
     ageMs: age,
     freshnessMaxAgeMs,
     available: fresh,
@@ -227,8 +233,8 @@ async function readMassive(symbol, category, apiKey) {
   return {
     symbol: s,
     price,
-    bid: finite(lastQuote?.b ?? lastQuote?.p),
-    ask: finite(lastQuote?.a ?? lastQuote?.P),
+    bid: finite(lastQuote?.b),
+    ask: finite(lastQuote?.a),
     change: finite(row?.todaysChangePerc),
     volume: finite(day?.v),
     high: finite(day?.h),
