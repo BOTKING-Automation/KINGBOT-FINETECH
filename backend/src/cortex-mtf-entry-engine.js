@@ -243,3 +243,139 @@ export function evaluateCortexMultiTimeframeEntry({ frames = {}, quote = null } 
 }
 
 export const CORTEX_MTF_TIMEFRAMES = REQUIRED_TIMEFRAMES;
+
+
+/**
+ * Convert the strict five-frame analysis into the existing specialist-engine
+ * timeframe contract. Missing/stale frames remain unavailable, never inferred.
+ */
+export function toCouncilMultiTimeframe(frames = {}, entryDecision = {}) {
+  const timeframes = REQUIRED_TIMEFRAMES.map(timeframe => {
+    const frame = frames[timeframe] || {};
+    const technical = frame.technical || {};
+    const available = frame.ok === true && frame.fresh === true &&
+      Number(frame.barCount || 0) >= 80 && number(technical.atr14 ?? technical.atr) > 0;
+    return {
+      timeframe,
+      ok: available,
+      available,
+      trend: technical.trend || "NEUTRAL",
+      structure: technical.structure || "unknown",
+      atr: number(technical.atr14 ?? technical.atr),
+      rsi: number(technical.rsi14 ?? technical.rsi),
+      adx: number(technical.adx14 ?? technical.adx),
+      momentum: number(technical.momentum),
+      emaFast: number(technical.ema20 ?? technical.emaFast),
+      emaSlow: number(technical.ema50 ?? technical.emaSlow),
+      bos: technical.bos || "NONE",
+      choch: technical.choch || "NONE",
+      liquiditySweep: technical.liquiditySweepDirection || "NONE",
+      displacement: technical.displacementDirection || "NONE",
+      breakout: Boolean(technical.breakout),
+      breakoutDirection: technical.breakoutDirection || "NONE",
+      retest: Boolean(technical.retest),
+      retestDirection: technical.retestDirection || "NONE",
+      orderBlock: technical.orderBlock || null,
+      fairValueGap: Boolean(technical.fairValueGap),
+      fairValueGapDirection: technical.fairValueGapDirection || "NONE",
+      lastClosedBarTime: frame.lastClosedBarTime || null,
+      ageSinceCloseMs: number(frame.ageSinceCloseMs),
+      barCount: Number(frame.barCount || 0),
+      source: technical.source || "KINGBOT verified OHLC"
+    };
+  });
+  const byTimeframe = Object.fromEntries(timeframes.map(frame => [frame.timeframe, frame]));
+  const side = String(entryDecision.side || "").toUpperCase();
+  const complete = timeframes.every(frame => frame.ok);
+  const directions = ["1d", "4h", "1h", "15m"].map(timeframe =>
+    String(byTimeframe[timeframe]?.trend || "NEUTRAL").toUpperCase()
+  );
+  const unique = [...new Set(directions)];
+  const higherTimeframeBias = unique.length === 1 && ["BULLISH", "BEARISH"].includes(unique[0]) ? unique[0] : "MIXED";
+  const setupState = !complete ? "DATA_INSUFFICIENT"
+    : higherTimeframeBias === "MIXED" ? "CONFLICTED"
+    : entryDecision.entryEligible === true
+      ? (side === "BUY" ? "BUY_CANDIDATE" : side === "SELL" ? "SELL_CANDIDATE" : "WAIT_CONFIRMATION")
+      : entryDecision.signal === "NO_TRADE" ? "CONFLICTED" : "WAIT_CONFIRMATION";
+  const regime = byTimeframe["4h"] || null;
+  const setup = byTimeframe["15m"] || null;
+  const execution = byTimeframe["5m"] || null;
+  const lowerTimeframesAgree = ["15m", "5m"].every(timeframe =>
+    String(byTimeframe[timeframe]?.trend || "NEUTRAL").toUpperCase() === higherTimeframeBias
+  );
+  return {
+    timeframes,
+    regime,
+    setup,
+    execution,
+    requiredTimeframes: REQUIRED_TIMEFRAMES,
+    higherTimeframeBias,
+    lowerTimeframeBias: lowerTimeframesAgree ? higherTimeframeBias : "MIXED",
+    triggerPresent: Boolean(entryDecision.gates?.confirmedExecutionTrigger),
+    setupState,
+    policy: "CORTEX_STRICT_TOP_DOWN_MTF",
+    alignment: {
+      complete,
+      direction: higherTimeframeBias,
+      htfBias: higherTimeframeBias,
+      ltfBias: lowerTimeframesAgree ? higherTimeframeBias : "MIXED",
+      conflict: higherTimeframeBias === "MIXED" || !lowerTimeframesAgree,
+      total: timeframes.filter(frame => frame.ok).length,
+      required: timeframes.length
+    }
+  };
+}
+
+/**
+ * A technical candidate is only eligible when the independent Strategy
+ * Council selects the same side, a specialist is routed, and hard-risk
+ * blockers are empty. It does not authorise or place orders.
+ */
+export function applyCortexCouncilApproval(entryDecision = {}, council = null) {
+  if (entryDecision.entryEligible !== true) return entryDecision;
+  const expected = entryDecision.side === "BUY" ? "BUY" : entryDecision.side === "SELL" ? "SELL" : null;
+  const councilState = String(council?.strategyCouncil?.state || "").toUpperCase();
+  const routedSide = String(council?.routing?.direction || "").toUpperCase();
+  const selectedEngine = String(council?.routing?.selectedEngine || "").trim();
+  const tradePlanReady = council?.tradePlan?.ok === true;
+  const riskBlocks = Array.isArray(council?.riskCouncil?.blocks) ? council.riskCouncil.blocks : [];
+  const approved = Boolean(expected && councilState === expected && routedSide === expected &&
+    selectedEngine && tradePlanReady && riskBlocks.length === 0);
+  if (approved) {
+    return {
+      ...entryDecision,
+      councilApproval: {
+        approved: true,
+        state: councilState,
+        selectedEngine,
+        riskBlocks: []
+      }
+    };
+  }
+  const blockers = [];
+  if (!council) blockers.push("CORTEX Strategy Council did not return a decision.");
+  if (councilState !== expected) blockers.push("Strategy Council state does not match the technical setup.");
+  if (routedSide !== expected) blockers.push("Strategy routing direction does not match the technical setup.");
+  if (!selectedEngine) blockers.push("No specialist engine was selected.");
+  if (!tradePlanReady) blockers.push("CORTEX trade-plan validation is unavailable.");
+  if (riskBlocks.length) blockers.push(...riskBlocks.map(value => "Risk Council: " + String(value)));
+  return {
+    ...entryDecision,
+    signal: "WAIT",
+    side: null,
+    entryEligible: false,
+    entry: null,
+    sl: null,
+    tp1: null,
+    tp2: null,
+    reason: "Technical confluence passed, but the independent CORTEX Strategy Council did not approve the same direction.",
+    waitFor: blockers.join(" "),
+    blockedReasons: [...(entryDecision.blockedReasons || []), ...blockers],
+    councilApproval: {
+      approved: false,
+      state: councilState || "UNAVAILABLE",
+      selectedEngine: selectedEngine || null,
+      riskBlocks
+    }
+  };
+}
