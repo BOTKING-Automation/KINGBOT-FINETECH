@@ -137,6 +137,26 @@ test("specialist adapter preserves all five verified timeframe frames", () => {
   assert.equal("execution" in adapted,false);
 });
 
+test("neutral 5m context is not a directional conflict, but opposite 5m trend is",()=>{
+  const bullishFrames=Object.fromEntries(["1d","4h","1h","15m","5m"].map(timeframe=>[
+    timeframe,{
+      ok:true,fresh:true,barCount:120,
+      technical:{trend:"BULLISH",structure:"bullish",atr14:2}
+    }
+  ]));
+  bullishFrames["5m"].technical.trend="NEUTRAL";
+  const neutralExecution=toCouncilMultiTimeframe(bullishFrames,{entryEligible:true,side:"BUY",signal:"ENTRY_CONFIRMING"});
+  assert.equal(neutralExecution.alignment.conflict,false);
+  assert.equal(neutralExecution.lowerTimeframeBias,"BULLISH");
+  assert.equal(neutralExecution.setupState,"BUY_CANDIDATE");
+
+  bullishFrames["5m"].technical.trend="BEARISH";
+  const opposingExecution=toCouncilMultiTimeframe(bullishFrames,{entryEligible:true,side:"BUY",signal:"ENTRY_CONFIRMING"});
+  assert.equal(opposingExecution.alignment.conflict,true);
+  assert.equal(opposingExecution.alignment.lowerTimeframesConflict,true);
+  assert.equal(opposingExecution.setupState,"CONFLICTED");
+});
+
 test("stale timeframe evidence is passed to the Council as unavailable", () => {
   const frames = Object.fromEntries(["1d","4h","1h","15m","5m"].map(timeframe => [
     timeframe,{ok:true,fresh:true,barCount:120,technical:{trend:"BULLISH",structure:"bullish",atr14:2}}
