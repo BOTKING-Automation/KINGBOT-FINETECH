@@ -94,7 +94,7 @@ test("a timeframe cannot borrow another timeframe's candles or timestamps",()=>{
   assert.equal(wrongIdentity.entryEligible,false);
   assert.ok(wrongIdentity.staleTimeframes.includes("4h"));
   const wrongInterval=evaluateCortexMultiTimeframeEntry(qualifiedInput({
-    frames:{"1h":{lastBarCloseTime:new Date(Date.now()-1000).toISOString()}}
+    frames:{"1h":{lastBarCloseTime:new Date(Date.now()-1000-30*60*1000).toISOString()}}
   }));
   assert.equal(wrongInterval.entryEligible,false);
   assert.ok(wrongInterval.staleTimeframes.includes("1h"));
