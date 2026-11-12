@@ -838,9 +838,11 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
   if (focusMultiTimeframe?.entryDecision?.entryEligible === true) {
     const beforeCouncil=focusMultiTimeframe.entryDecision;
     const approvedDecision=applyCortexCouncilApproval(beforeCouncil,cortex);
+    focusCouncilMultiTimeframe=toCouncilMultiTimeframe(focusMultiTimeframe.frames,approvedDecision);
     focusMultiTimeframe={
       ...focusMultiTimeframe,
       entryDecision:approvedDecision,
+      councilMultiTimeframe:focusCouncilMultiTimeframe,
       councilReview:{
         approved:Boolean(approvedDecision.councilApproval?.approved),
         state:approvedDecision.councilApproval?.state||"UNAVAILABLE",
@@ -1898,7 +1900,7 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
         getCortexDerivQuote(symbol),
         buildCortexMultiTimeframeForSymbol(symbol,{reuseTimeframe:timeframe,reuseBars:bars})
       ]);
-      const councilMultiTimeframe=toCouncilMultiTimeframe(
+      let councilMultiTimeframe=toCouncilMultiTimeframe(
         multiTimeframe.frames,
         multiTimeframe.entryDecision
       );
@@ -1958,6 +1960,7 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
         cortexError="CORTEX_COUNCIL_UNAVAILABLE";
       }
       const approvedDecision=applyCortexCouncilApproval(multiTimeframe.entryDecision,cortex);
+      councilMultiTimeframe=toCouncilMultiTimeframe(multiTimeframe.frames,approvedDecision);
       multiTimeframe.entryDecision=approvedDecision;
       multiTimeframe.councilMultiTimeframe=councilMultiTimeframe;
       multiTimeframe.councilReview={
