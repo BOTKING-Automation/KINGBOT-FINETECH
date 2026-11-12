@@ -285,6 +285,11 @@ export function toCouncilMultiTimeframe(frames = {}, entryDecision = {}) {
     };
   });
   const byTimeframe = Object.fromEntries(timeframes.map(frame => [frame.timeframe, frame]));
+  // Keep the full five-frame audit trail and expose the role contract used by
+  // the specialist council: 4H regime, 15M setup and 5M execution.
+  const regime = { ...byTimeframe["4h"], role: "regime" };
+  const setup = { ...byTimeframe["15m"], role: "setup" };
+  const execution = { ...byTimeframe["5m"], role: "execution" };
   const side = String(entryDecision.side || "").toUpperCase();
   const complete = timeframes.every(frame => frame.ok);
   const directions = ["1d", "4h", "1h", "15m"].map(timeframe =>
@@ -307,6 +312,9 @@ export function toCouncilMultiTimeframe(frames = {}, entryDecision = {}) {
       ? (side === "BUY" ? "BUY_CANDIDATE" : side === "SELL" ? "SELL_CANDIDATE" : "WAIT_CONFIRMATION")
       : entryDecision.signal === "NO_TRADE" ? "CONFLICTED" : "WAIT_CONFIRMATION";
   return {
+    regime,
+    setup,
+    execution,
     timeframes,
     requiredTimeframes: REQUIRED_TIMEFRAMES,
     higherTimeframeBias,
