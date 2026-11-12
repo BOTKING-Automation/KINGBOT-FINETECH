@@ -2,11 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { evaluateCortexMultiTimeframeEntry } from "../src/cortex-mtf-entry-engine.js";
 
-function makeFrame(direction = "BULLISH", overrides = {}) {
+const TIMEFRAME_MS = { "1d":86400000, "4h":14400000, "1h":3600000, "15m":900000, "5m":300000 };
+
+function makeFrame(timeframe, direction = "BULLISH", overrides = {}) {
+  const closeMs = Date.now() - 1000;
+  const openMs = closeMs - TIMEFRAME_MS[timeframe];
   const base = {
-    ok:true,fresh:true,ageSinceCloseMs:1000,freshnessLimitMs:300000,barCount:120,
-    lastClosedBarTime:"2026-11-12T08:00:00.000Z",
-    lastClosedBar:{open:100,high:102,low:99,close:101.8},
+    timeframe,ok:true,fresh:true,ageSinceCloseMs:1000,freshnessLimitMs:300000,barCount:120,
+    lastClosedBarTime:new Date(openMs).toISOString(),
+    lastBarCloseTime:new Date(closeMs).toISOString(),
+    lastClosedBar:{time:Math.floor(openMs/1000),open:100,high:102,low:99,close:101.8},
     technical:{
       trend:direction,structure:direction.toLowerCase(),adx:25,rsi14:60,
       momentum:direction==="BULLISH"?0.7:-0.7,atr14:2,close:101.8,
@@ -20,11 +25,11 @@ function makeFrame(direction = "BULLISH", overrides = {}) {
 }
 function qualifiedInput(overrides={}) {
   const frames={
-    "1d":makeFrame(),"4h":makeFrame(),"1h":makeFrame(),"15m":makeFrame(),
-    "5m":makeFrame("BULLISH",{technical:{marketStructure:{lastSwingHigh:106,lastSwingLow:100.5}}})
+    "1d":makeFrame("1d"),"4h":makeFrame("4h"),"1h":makeFrame("1h"),"15m":makeFrame("15m"),
+    "5m":makeFrame("5m","BULLISH",{technical:{marketStructure:{lastSwingHigh:106,lastSwingLow:100.5}}})
   };
   for(const [timeframe,patch] of Object.entries(overrides.frames||{})){
-    frames[timeframe]=makeFrame(patch.direction||"BULLISH",patch);
+    frames[timeframe]=makeFrame(timeframe,patch.direction||"BULLISH",patch);
   }
   const {frames:frameOverrides,...rest}=overrides;
   return {
@@ -80,4 +85,30 @@ test("stale quotes, wide spreads and weak reward-to-risk are rejected",()=>{
     }
   }));
   assert.equal(poorRR.entryEligible,false);assert.equal(poorRR.gates.rewardToRisk,false);
+});
+
+test("a timeframe cannot borrow another timeframe's candles or timestamps",()=>{
+  const wrongIdentity=evaluateCortexMultiTimeframeEntry(qualifiedInput({
+    frames:{"4h":{timeframe:"15m"}}
+  }));
+  assert.equal(wrongIdentity.entryEligible,false);
+  assert.ok(wrongIdentity.staleTimeframes.includes("4h"));
+  const wrongInterval=evaluateCortexMultiTimeframeEntry(qualifiedInput({
+    frames:{"1h":{lastBarCloseTime:new Date(Date.now()-1000).toISOString()}}
+  }));
+  assert.equal(wrongInterval.entryEligible,false);
+  assert.ok(wrongInterval.staleTimeframes.includes("1h"));
+});
+
+test("negative quote age and malformed closed-candle OHLC are rejected",()=>{
+  const negativeAge=evaluateCortexMultiTimeframeEntry(qualifiedInput({
+    quote:{available:true,price:101.9,bid:101.85,ask:101.95,ageMs:-5}
+  }));
+  assert.equal(negativeAge.entryEligible,false);
+  assert.equal(negativeAge.gates.freshTwoSidedQuote,false);
+  const malformed=evaluateCortexMultiTimeframeEntry(qualifiedInput({
+    frames:{"5m":{lastClosedBar:{open:101,high:100,low:99,close:101.8}}}
+  }));
+  assert.equal(malformed.entryEligible,false);
+  assert.equal(malformed.gates.confirmedExecutionTrigger,false);
 });
