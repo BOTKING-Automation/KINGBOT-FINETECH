@@ -10,7 +10,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { getBotDefinitions } from "./bot-engines.js";
 import { trainMlStrategyModel, mlSignalServiceStatus, probeMlSignalService } from "./ml-signal-client.js";
 import { calculateMarketIndicators } from "./worker-market-perception.js";
-import { CORTEX_MTF_TIMEFRAMES, evaluateCortexMultiTimeframeEntry } from "./cortex-mtf-entry-engine.js";
+import { CORTEX_MTF_TIMEFRAMES, evaluateCortexMultiTimeframeEntry, toCouncilMultiTimeframe, applyCortexCouncilApproval } from "./cortex-mtf-entry-engine.js";
 
 const DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"];
 const DEFAULT_TF = "5m";
@@ -136,15 +136,34 @@ function technicalEngine(snapshot) {
     tp2: null,
     waitFor: "Wait for 1d/4h/1h/15m trend and structure alignment plus a completed 5m trigger, fresh bid/ask and acceptable spread.",
     atr14: finite(snapshot.atr14 ?? snapshot.atr),
+    atr: finite(snapshot.atr14 ?? snapshot.atr),
     support: finite(snapshot.support),
     resistance: finite(snapshot.resistance),
+    emaFast: ema20,
+    emaSlow: ema50,
+    rsi,
+    adx: finite(snapshot.adx14 ?? snapshot.adx),
+    momentum: finite(snapshot.momentum) ?? 0,
+    volatility: finite(snapshot.volatility) ?? 0,
+    volume: finite(snapshot.volume) ?? 0,
     trend,
+    trendScore: trend === "BULLISH" ? 1 : trend === "BEARISH" ? -1 : 0,
     structure,
     bos,
     choch,
     liquiditySweep: liquidity,
+    liquiditySweepDirection: liquidity,
     displacement,
+    displacementDirection: displacement,
+    fairValueGap: fvg !== "NONE",
     fairValueGapDirection: fvg,
+    breakout: Boolean(snapshot.breakout),
+    breakoutDirection: String(snapshot.breakoutDirection || bos || "NONE").toUpperCase(),
+    retest: Boolean(snapshot.retest),
+    retestDirection: String(snapshot.retestDirection || "NONE").toUpperCase(),
+    orderBlock: snapshot.orderBlock || null,
+    marketStructure: snapshot.marketStructure || null,
+    candleCount: Number(snapshot.candleCount || 0),
     reason: (analysis.length ? analysis.join(" · ") + " · " : "") +
       "Single-timeframe bias is descriptive only; it cannot qualify an entry.",
     technicalAnalysis: analysis,
@@ -732,8 +751,8 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
 
   const focus = scannerCanonicalSymbol(focusSymbol || normalizedSymbols[0] || "");
   let focusMultiTimeframe = null;
+  let focusCouncilMultiTimeframe = null;
   if (focus && normalizedSymbols.includes(focus)) {
-    const focusRow = technical.find(item => item.symbol === focus);
     const focusQuote = quotes.find(item => item.symbol === focus && item.available);
     try {
       focusMultiTimeframe = await buildCortexMultiTimeframeForSymbol(focus,{
@@ -742,12 +761,17 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
           ageMs:optionalFinite(focusQuote.ageMs ?? focusQuote.quoteAgeMs)
         }:null
       });
+      focusCouncilMultiTimeframe = toCouncilMultiTimeframe(
+        focusMultiTimeframe.frames,
+        focusMultiTimeframe.entryDecision
+      );
+      focusMultiTimeframe.councilMultiTimeframe = focusCouncilMultiTimeframe;
       technical = technical.map(item => item.symbol === focus ? {
         ...item,
         ...focusMultiTimeframe.entryDecision,
         signal:focusMultiTimeframe.entryDecision.signal,
         entryDecision:focusMultiTimeframe.entryDecision,
-        multiTimeframe:focusMultiTimeframe.frames,
+        multiTimeframe:focusCouncilMultiTimeframe,
         multiTimeframeVerified:Object.values(focusMultiTimeframe.frames).every(frame=>frame?.ok&&frame?.fresh)
       } : item);
     } catch(error) {
@@ -797,6 +821,7 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
         freshnessMaxAgeMs: finite(focusQuote?.freshnessMaxAgeMs),
         verifiedQuote: Boolean(focusQuote?.verified),
         scannerSource: technicalSource,
+        multiTimeframe:focusCouncilMultiTimeframe,
         multiTimeframeAnalysis:focusMultiTimeframe,
         entryDecision:focusMultiTimeframe?.entryDecision||null
       };
@@ -808,6 +833,28 @@ async function standaloneMarketScan({ pool, twelveData, symbols, timeframe, cort
     } else {
       cortexError = "FOCUS_SYMBOL_TECHNICAL_DATA_UNAVAILABLE";
     }
+  }
+
+  if (focusMultiTimeframe?.entryDecision?.entryEligible === true) {
+    const beforeCouncil=focusMultiTimeframe.entryDecision;
+    const approvedDecision=applyCortexCouncilApproval(beforeCouncil,cortex);
+    focusMultiTimeframe={
+      ...focusMultiTimeframe,
+      entryDecision:approvedDecision,
+      councilReview:{
+        approved:Boolean(approvedDecision.councilApproval?.approved),
+        state:approvedDecision.councilApproval?.state||"UNAVAILABLE",
+        selectedEngine:approvedDecision.councilApproval?.selectedEngine||null,
+        riskBlocks:approvedDecision.councilApproval?.riskBlocks||[]
+      }
+    };
+    technical=technical.map(item=>item.symbol===focus?{
+      ...item,
+      ...approvedDecision,
+      signal:approvedDecision.signal,
+      entryDecision:approvedDecision,
+      multiTimeframe:focusCouncilMultiTimeframe
+    }:item);
   }
 
   if (!technical.some(x => x.source !== "none") && !directQuotes.some(q => q.available)) {
@@ -1851,12 +1898,84 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
         getCortexDerivQuote(symbol),
         buildCortexMultiTimeframeForSymbol(symbol,{reuseTimeframe:timeframe,reuseBars:bars})
       ]);
-      payload.entryDecision=multiTimeframe.entryDecision;
+      const councilMultiTimeframe=toCouncilMultiTimeframe(
+        multiTimeframe.frames,
+        multiTimeframe.entryDecision
+      );
+      const executionFrame=multiTimeframe.frames["5m"]||{};
+      const executionTechnical=executionFrame.technical||{};
+      const quoteTimestamp=Number.isFinite(Number(quote.epoch))?new Date(Number(quote.epoch)*1000).toISOString():null;
+      const quoteReceivedAt=quoteTimestamp||new Date().toISOString();
+      const cortexMarket={
+        symbol,
+        timeframe:"5m",
+        price:quote.price??executionTechnical.close??null,
+        bid:quote.bid,
+        ask:quote.ask,
+        spread:quote.spread,
+        atr:executionTechnical.atr14??executionTechnical.atr,
+        atr14:executionTechnical.atr14??executionTechnical.atr,
+        trend:executionTechnical.trend||"NEUTRAL",
+        momentum:executionTechnical.momentum,
+        volatility:executionTechnical.volatility,
+        volume:executionTechnical.volume,
+        structure:executionTechnical.structure||"unknown",
+        bos:executionTechnical.bos,
+        bosDirection:executionTechnical.bosDirection,
+        choch:executionTechnical.choch,
+        liquiditySweep:executionTechnical.liquiditySweepDirection,
+        liquiditySweepDirection:executionTechnical.liquiditySweepDirection,
+        displacement:executionTechnical.displacementDirection,
+        displacementDirection:executionTechnical.displacementDirection,
+        fairValueGap:Boolean(executionTechnical.fvg),
+        fairValueGapDirection:executionTechnical.fairValueGapDirection,
+        orderBlock:executionTechnical.orderBlock,
+        breakout:executionTechnical.breakout,
+        breakoutDirection:executionTechnical.breakoutDirection,
+        retest:executionTechnical.retest,
+        retestDirection:executionTechnical.retestDirection,
+        emaFast:executionTechnical.emaFast??executionTechnical.ema20,
+        emaSlow:executionTechnical.emaSlow??executionTechnical.ema50,
+        rsi:executionTechnical.rsi14??executionTechnical.rsi,
+        adx:executionTechnical.adx14??executionTechnical.adx,
+        candleCount:executionFrame.barCount||0,
+        quoteTimestamp,
+        timestamp:quoteTimestamp||quoteReceivedAt,
+        receivedAt:quoteReceivedAt,
+        quoteFreshnessMaxAgeMs:2500,
+        freshnessMaxAgeMs:2500,
+        verifiedQuote:Boolean(quote.available),
+        multiTimeframe:councilMultiTimeframe,
+        multiTimeframeAnalysis:multiTimeframe,
+        entryDecision:multiTimeframe.entryDecision
+      };
+      let cortex=null;
+      let cortexError=null;
+      if(typeof cortexRunner==="function"){
+        try{cortex=await cortexRunner(cortexMarket);}
+        catch(error){cortexError=String(error?.message||"CORTEX_COUNCIL_UNAVAILABLE").slice(0,180);}
+      }else{
+        cortexError="CORTEX_COUNCIL_UNAVAILABLE";
+      }
+      const approvedDecision=applyCortexCouncilApproval(multiTimeframe.entryDecision,cortex);
+      multiTimeframe.entryDecision=approvedDecision;
+      multiTimeframe.councilMultiTimeframe=councilMultiTimeframe;
+      multiTimeframe.councilReview={
+        approved:Boolean(approvedDecision.councilApproval?.approved),
+        state:approvedDecision.councilApproval?.state||"UNAVAILABLE",
+        selectedEngine:approvedDecision.councilApproval?.selectedEngine||null,
+        riskBlocks:approvedDecision.councilApproval?.riskBlocks||[],
+        error:cortexError
+      };
+      payload.entryDecision=approvedDecision;
+      payload.cortexCouncil=multiTimeframe.councilReview;
       payload.multiTimeframe={
         timeframes:multiTimeframe.timeframes,
         executionTimeframe:multiTimeframe.executionTimeframe,
         generatedAt:multiTimeframe.generatedAt,
         frames:multiTimeframe.frames,
+        councilMultiTimeframe,
+        councilReview:multiTimeframe.councilReview,
         analysisPolicy:multiTimeframe.analysisPolicy
       };
       payload.quoteDiagnostics={
@@ -1867,13 +1986,14 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
       };
       payload.signal={
         ...payload.signal,
-        ...multiTimeframe.entryDecision,
+        ...approvedDecision,
         pendingOrderZones:payload.signal?.pendingOrderZones||null
       };
       payload.metadata={
         ...payload.metadata,
         multiTimeframeReady:Object.values(multiTimeframe.frames).every(frame=>frame?.ok&&frame?.fresh),
-        entryEligible:Boolean(multiTimeframe.entryDecision?.entryEligible),
+        entryEligible:Boolean(approvedDecision.entryEligible),
+        councilApproved:Boolean(approvedDecision.councilApproval?.approved),
         executionTimeframe:multiTimeframe.executionTimeframe
       };
       const feedStatus=publicDerivFeed.status(symbol);
