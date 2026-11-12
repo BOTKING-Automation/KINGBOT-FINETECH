@@ -127,11 +127,14 @@ test("specialist adapter preserves all five verified timeframe frames", () => {
   ]));
   const adapted = toCouncilMultiTimeframe(frames,{entryEligible:true,side:"BUY",signal:"ENTRY_CONFIRMING",gates:{confirmedExecutionTrigger:true}});
   assert.equal(adapted.timeframes.length,5);
-  assert.equal(adapted.regime.timeframe,"4h");
-  assert.equal(adapted.setup.timeframe,"15m");
-  assert.equal(adapted.execution.timeframe,"5m");
+  assert.equal(adapted.timeframes.find(frame=>frame.timeframe==="4h").atr,2);
+  assert.equal(adapted.timeframes.find(frame=>frame.timeframe==="15m").atr,2);
+  assert.equal(adapted.timeframes.find(frame=>frame.timeframe==="5m").atr,2);
   assert.equal(adapted.setupState,"BUY_CANDIDATE");
   assert.equal(adapted.timeframes.every(frame=>frame.available&&frame.atr===2),true);
+  assert.equal("regime" in adapted,false);
+  assert.equal("setup" in adapted,false);
+  assert.equal("execution" in adapted,false);
 });
 
 test("stale timeframe evidence is passed to the Council as unavailable", () => {
