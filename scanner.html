@@ -1712,18 +1712,10 @@ body.kb-scanner-page .chart-pattern-item strong{font-size:7px}
       add(obBar.time,technical.orderBlock.direction==="BEARISH"?"aboveBar":"belowBar","#b69aff","square","OB");
     }
     if(chartLayerEnabled("structure")){
-      const bias=String(signal.bias||"").toUpperCase();
-      const active=String(signal.signal||"").toUpperCase();
-      const position=bias==="BEARISH"?"aboveBar":bias==="BULLISH"?"belowBar":"inBar";
-      const color=bias==="BEARISH"?"#ff7a94":bias==="BULLISH"?"#53e6b3":"#ffd166";
-      const shape=bias==="BEARISH"?"arrowDown":bias==="BULLISH"?"arrowUp":"circle";
-      add(last.time,position,color,shape,active==="ENTRY_CONFIRMING"?"TECH OK":"WATCH");
-      const cortex=state.latestScan?.cortex;
-      const focus=String(state.latestScan?.cortexFocusSymbol||cortex?.market?.symbol||"").toUpperCase();
-      const plan=cortex?.tradePlan;
-      const councilState=String(cortex?.strategyCouncil?.state||"").toUpperCase();
-      if(focus===chartState.symbol&&plan?.ok===true&&["BUY","SELL"].includes(councilState)){
-        add(last.time,plan.side==="SELL"?"aboveBar":"belowBar",plan.side==="SELL"?"#ff5578":"#38d9b0",plan.side==="SELL"?"arrowDown":"arrowUp","CORTEX "+String(plan.side||councilState));
+      const qualified=signal.entryEligible===true&&["BUY","SELL"].includes(String(signal.side||"").toUpperCase());
+      if(qualified){
+        const side=String(signal.side).toUpperCase();
+        add(last.time,side==="SELL"?"aboveBar":"belowBar",side==="SELL"?"#ff8298":"#68e3b4",side==="SELL"?"arrowDown":"arrowUp","CORTEX "+side);
       }
     }
     return markers.sort((a,b)=>a.time-b.time);
@@ -1948,11 +1940,13 @@ body.kb-scanner-page .chart-pattern-item strong{font-size:7px}
     ctx.clearRect(0,0,width,height);
     const showZones=chartLayerEnabled("zones")&&Boolean(chartState.zones?.length);
     const showPatterns=chartLayerEnabled("patterns")&&Boolean(chartState.patterns?.length);
-    if(!showZones&&!showPatterns)return;
     const timeScale=chartState.instance.timeScale();
     const visible=timeScale.getVisibleLogicalRange();
     if(!visible)return;
     const barIndexByTime=new Map(chartState.bars.map((bar,index)=>[bar.time,index]));
+    const showSignalLevels=chartLayerEnabled("risk")&&state.chartPayload?.metadata?.candleFresh===true&&
+      state.chartPayload?.metadata?.multiTimeframeReady===true&&currentChartSignal().signal?.entryEligible===true;
+    if(!showZones&&!showPatterns&&!showSignalLevels)return;
     if(showZones)chartState.zones.forEach(zone=>{
       const startIndex=barIndexByTime.get(zone.startTime);
       const endIndex=barIndexByTime.get(zone.endTime);
@@ -2016,16 +2010,6 @@ body.kb-scanner-page .chart-pattern-item strong{font-size:7px}
       }
       addChartPriceLine(signal.support??technical.support,"SUPPORT","#38d7ad",LW.LineStyle.Dotted,1);
       addChartPriceLine(signal.resistance??technical.resistance,"RESISTANCE","#f0b85b",LW.LineStyle.Dotted,1);
-      const planCortex=state.latestScan?.cortex;
-      const planFocus=String(state.latestScan?.cortexFocusSymbol||planCortex?.market?.symbol||"").toUpperCase();
-      const planCouncil=String(planCortex?.strategyCouncil?.state||"").toUpperCase();
-      const plan=planCortex?.tradePlan;
-      if(planFocus===chartState.symbol&&plan?.ok===true&&["BUY","SELL"].includes(planCouncil)){
-        const planSide=String(plan.side||planCouncil).toUpperCase();
-        addChartPriceLine(planCortex.market?.price,"CORTEX "+planSide+" PLAN ENTRY","#8edfff",LW.LineStyle.Solid,2);
-        addChartPriceLine(plan.stopLoss,"CORTEX PLAN STOP","#ff5578",LW.LineStyle.Solid,2);
-        addChartPriceLine(plan.takeProfit,"CORTEX PLAN TARGET","#7debc2",LW.LineStyle.Solid,2);
-      }
       const pending=signal.pendingOrderZones||technical.pendingOrderZones;
       const buyStop=pending?.buyStopTriggers?.[0]?.trigger;
       const sellStop=pending?.sellStopTriggers?.[0]?.trigger;
