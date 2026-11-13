@@ -100,27 +100,60 @@ class MarketSequenceTransformer(nn.Module):
         return self.classifier(self.output_norm(encoded[:, -1, :]))
 
 
-def _regime_from_features(
+REGIME_METHOD_VERSION = "causal-ohlc-indicators-v1"
+
+
+def _regime_from_bars(
+    bars: list[dict[str, float]],
+    index: int,
     raw_features: list[float],
-    bar: dict[str, float],
 ) -> str:
-    """Apply the incumbent regime taxonomy using only information at candle close."""
-    trend = float(raw_features[0])
-    price = float(bar["close"])
-    atr_estimate = max(price * float(raw_features[3]) / 10.0, 1e-9)
+    """Classify regime from actual indicators available at this candle close.
+
+    The prior prototype substituted synthetic EMA values from a trend flag,
+    which could force the regime detector toward trend/reversal. This version
+    computes the underlying values directly from the causal OHLC prefix.
+    """
+    window = bars[: index + 1]
+    if len(window) < 60:
+        raise ValueError("V13_REGIME_OHLC_HISTORY_INSUFFICIENT")
+
+    closes = [float(row["close"]) for row in window]
+    price = closes[-1]
+    ema_fast = engine.ema(closes, 20)
+    ema_slow = engine.ema(closes, 50)
+    atr_value = engine.atr(window, 14)
+    adx_value = engine.adx(window, 14)
+    if (
+        ema_fast is None
+        or ema_slow is None
+        or atr_value is None
+        or atr_value <= 0
+        or adx_value is None
+    ):
+        raise ValueError("V13_REGIME_OHLC_INDICATORS_UNAVAILABLE")
+
+    breakout = float(raw_features[14]) >= 0.5
     market = {
         "price": price,
-        "atr": atr_estimate,
-        "emaFast": 2.0 if trend > 0 else 0.0 if trend < 0 else 1.0,
-        "emaSlow": 1.0,
+        "atr": float(atr_value),
+        "emaFast": float(ema_fast),
+        "emaSlow": float(ema_slow),
         "momentum": float(raw_features[1]),
         "volatility": float(raw_features[2]),
-        "adx": float(raw_features[5]) * 50.0,
-        "breakout": float(raw_features[14]) >= 0.5,
+        "adx": float(adx_value),
+        "breakout": breakout,
+        "range": bool(float(adx_value) < 22.5 and not breakout),
         "structure": (
-            "bullish" if raw_features[8] > raw_features[9]
-            else "bearish" if raw_features[9] > raw_features[8]
+            "bullish" if price > ema_slow
+            else "bearish" if price < ema_slow
             else ""
+        ),
+        # detect_market_regime expects a fractional price return here and
+        # normalizes it by ATR/price to obtain ATR-scaled velocity.
+        "velocityPoints": (
+            (price - closes[-4]) / max(abs(price), 1e-12)
+            if len(closes) >= 4 else 0.0
         ),
     }
     return engine.detect_market_regime(market, "strategic")
@@ -187,7 +220,7 @@ def build_market_samples(
         labels.append(int(label))
         sample_times.append(float(bars[index]["_timestamp"]))
         label_end_times.append(float(bars[index + forward]["_timestamp"]))
-        regimes.append(_regime_from_features(raw_features, bars[index]))
+        regimes.append(_regime_from_bars(bars, index, raw_features))
 
     if not sequences:
         raise ValueError(f"V13_NO_VALID_SEQUENCES:{symbol}")
@@ -730,6 +763,8 @@ def run_experiment(
         "researchOnly": True,
         "promotionAllowed": False,
         "featureVersion": engine.FEATURE_VERSION,
+        "regimeMethodVersion": REGIME_METHOD_VERSION,
+        "regimeMethod": "incumbent detector supplied with causal EMA20, EMA50, ATR14, ADX14, OHLC momentum, volatility, breakout and ATR-scaled velocity",
         "sequenceLength": sequence_length,
         "model": {
             "type": "two-layer-multivariate-transformer-encoder",
