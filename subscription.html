@@ -1186,7 +1186,7 @@
 
         receiver.innerHTML=
           '<div class="mpesa-title">PAY VIA M-PESA</div>'+
-          '<div class="receiver">Send payment to <strong>'+esc(data.mpesaReceiver||"the configured M-Pesa receiver")+'</strong>. Use the exact amount shown for your selected plan and submit the transaction code below.</div>'+
+          '<div class="receiver">Send payment to <strong>'+esc(data.mpesaReceiver||"the configured M-Pesa receiver")+'</strong>. Confirm the exact KES amount with the KINGBOT payment desk before paying; USD plan prices are not an automatic exchange-rate quote.</div>'+
           '<span class="secure-tag">● SECURE SUBMISSION · MANUAL REVIEW</span>';
 
         select.innerHTML=plans.map(p=>{
@@ -1280,7 +1280,7 @@
               return `
                 <div class="history-item">
                   <div class="history-main">
-                    <strong>${esc(String(p.plan_id||"").toUpperCase())} · KES ${esc(p.amount_kes)}</strong>
+                    <strong>${esc(String(p.plan_id||"").toUpperCase())} · ${Number(p.billing_months)===3?"3 MONTHS":"1 MONTH"} · KES ${esc(p.amount_kes)}</strong>
                     <span>${esc(p.mpesa_code)} · ${esc(p.created_at?new Date(p.created_at).toLocaleString():"—")}</span>
                     ${p.reviewer_note?'<span>'+esc(p.reviewer_note)+'</span>':""}
                   </div>
