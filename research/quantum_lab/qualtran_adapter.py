@@ -149,6 +149,7 @@ def estimate_xauusd_tail_probability_bloq(
     try:
         import attrs
         import cirq
+        import qualtran
         from functools import cached_property
         from typing import Iterator
         from qualtran import QAny, QUInt, Register
