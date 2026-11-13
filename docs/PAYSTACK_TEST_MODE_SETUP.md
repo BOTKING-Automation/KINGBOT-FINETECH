@@ -18,6 +18,13 @@ Do not put either secret in GitHub, the browser, source files, or chat. Do not c
 
 The payment amount is computed by the backend from the selected plan's USD price and the configured KES-per-USD rate. Three-month prepaid billing uses the existing 30% discount (2.1 times the monthly price). The browser cannot submit or override the charged KES amount.
 
+## Important: confirm Paystack business eligibility before any live use
+
+Paystack's published [ineligible-business policy](https://support.paystack.com/en/articles/2127042) currently lists **Forex trading and currency exchange** among unsupported categories for Kenya. KINGBOT offers automated trading software; Paystack must confirm in writing whether this software/licensing model is eligible under its merchant rules before any live card, wallet or mobile-money charges are enabled.
+
+Describe the product accurately as a subscription for automated trading software, explain that customers retain custody of their broker accounts and funds, and ask Paystack to confirm the business category in writing. Do not misclassify the business or imply regulatory approval that KINGBOT does not hold. Test Mode is for technical sandbox testing only and is not evidence of live merchant eligibility. If Paystack declines the category, do not route KINGBOT payments through Paystack; select a provider whose written policy permits the product.
+
+
 ## 2. Configure the Paystack Test Mode webhook
 
 In the Paystack Dashboard's **Test Mode** settings under Developers / API configuration, add this HTTPS webhook URL:
