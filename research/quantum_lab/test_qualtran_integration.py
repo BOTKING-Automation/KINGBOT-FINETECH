@@ -21,6 +21,7 @@ class RealQualtranIntegrationTests(unittest.TestCase):
         self.assertEqual(report["empirical_trade_count"], 4)
         self.assertEqual(report["empirical_tail_event_count"], 1)
         self.assertAlmostEqual(report["empirical_tail_event_probability"], 0.25)
+        print("QUALTRAN_XAUUSD_RESOURCE_DIAGNOSTIC", report["qpe_resource_estimation_status"], report.get("component_resource_estimates"))
         self.assertEqual(report["state_preparation"], "StatePreparationAliasSampling")
         self.assertEqual(report["mean_operator"], "MeanEstimationOperator")
         self.assertEqual(report["phase_estimation"], "TextbookQPE")
