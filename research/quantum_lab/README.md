@@ -48,6 +48,21 @@ When Qualtran is installed in the separate environment, estimate_xauusd_tail_pro
 
 No quantum hardware is connected and no quantum measurement is performed. The reported tail probability is an empirical classical value used to define and validate the circuit's estimand.
 
+### Qualtran 0.7.0 resource-counting limitation observed in CI
+
+The dedicated interop job installs Qualtran 0.7.0 and constructs the empirical-tail
+StatePreparationAliasSampling → MeanEstimationOperator → TextbookQPE composition.
+On the four-outcome test fixture, Qualtran counts the state-preparation component as
+79 algorithm qubits and approximately 132 T gates. The uncontrolled mean-estimation
+component reports 79 qubits and a symbolic T expression (4096*_c0 + 727), not a
+numerical total.
+
+The complete controlled QPE resource walk is blocked by Qualtran's controlled atomic
+And decomposition (C[And], "And is atomic"). The adapter reports this limitation and
+does not claim a complete QPE T-count, total logical-qubit requirement, physical-qubit
+estimate, or runtime. These small-fixture component figures are not XAUUSD performance
+data and are not additive end-to-end QPE costs.
+
 ## Run the offline study
 
 From the repository root, prepare a private CSV following the schema above, then run:
