@@ -62,12 +62,26 @@ Example shape:
 
 The example is only a schema illustration; one candle is not a trainable dataset. Do not commit broker credentials, client data, or private trading histories to the repository. CI also runs a deterministic synthetic end-to-end test through sequence construction, Transformer fitting, development calibration, matched baseline fitting and untouched final evaluation; that fixture validates the pipeline only and is not performance evidence.
 
+## Collect real candles without a paid data key
+
+KINGBOT already uses Deriv's public historical-candle WebSocket for its native OHLC research/training fallback. This isolated collector reuses the same public endpoint and the existing XAUUSD/EURUSD/GBPUSD symbol mapping. It does not require a Twelve Data API key or a trading-account token, and it does not connect to an account or submit orders.
+
+Run from the repository root with Node.js 22 or newer:
+
+~~~bash
+node ml-signal-service/research/collect_deriv_candles.mjs   --symbols XAUUSD,EURUSD,GBPUSD   --timeframe 5m   --count 1000   --min-aligned 360   --output ml-signal-service/research/data/v13-deriv-5m-closed-candles.json
+~~~
+
+The collector requests public candles sequentially, removes any candle whose full interval has not elapsed, validates OHLC values, intersects timestamps across all three markets, and writes only synchronized closed bars. It fails when fewer than 360 common bars are available rather than silently training on unsynchronized histories. Public-feed availability, instrument coverage and provider limits can change; a failed collection is reported and does not fall back to fabricated data.
+
+The output is a local research dataset. Keep it out of commits unless its provenance and redistribution rights are confirmed. The CI tests cover timestamp alignment and closed-candle filtering using deterministic fixtures; CI does not contact Deriv.
+
 ## Run the experiment
 
 From the repository root, after installing the existing ML dependencies:
 
 ~~~bash
-python ml-signal-service/research/v13_sequence_transformer.py --input /path/to/closed-candle-markets.json --strategy all --timeframe 5m --sequence-length 16 --epochs 18 --report /path/to/v13-sequence-transformer-report.json
+python ml-signal-service/research/v13_sequence_transformer.py --input ml-signal-service/research/data/v13-deriv-5m-closed-candles.json --strategy all --timeframe 5m --sequence-length 16 --epochs 18 --report /path/to/v13-sequence-transformer-report.json
 ~~~
 
 Use --strategy strategic, flipper, breakout, smc-pro, or ladder-flip to run one specialist. Repeat with other available timeframe histories and record each data file's SHA-256 report value. Each invocation requires a sufficient common historical window across at least three markets.
