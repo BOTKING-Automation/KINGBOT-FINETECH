@@ -906,7 +906,7 @@
                     <span class="payment-rail-foot">CURRENT KINGBOT CHECKOUT</span>
                   </article>
 
-                  <article class="payment-rail payment-rail-pending" aria-disabled="true">
+                  <article class="payment-rail payment-rail-pending" id="paystackCardRail" aria-disabled="true">
                     <div class="payment-logo-row payment-card-logos" aria-label="Visa and Mastercard supported brands">
                       <img src="https://cdn.simpleicons.org/visa/1A1F71" alt="Visa" loading="lazy">
                       <img src="https://cdn.simpleicons.org/mastercard/EB001B" alt="Mastercard" loading="lazy">
@@ -916,7 +916,7 @@
                     <span class="payment-rail-foot">GATEWAY ACTIVATION REQUIRED</span>
                   </article>
 
-                  <article class="payment-rail payment-rail-pending" aria-disabled="true">
+                  <article class="payment-rail payment-rail-pending" id="paystackWalletRail" aria-disabled="true">
                     <div class="payment-logo-row payment-wallet-logos" aria-label="Apple Pay and Google Pay brands">
                       <img src="https://cdn.simpleicons.org/applepay/FFFFFF" alt="Apple Pay" loading="lazy">
                       <img src="https://cdn.simpleicons.org/googlepay/4285F4" alt="Google Pay" loading="lazy">
@@ -927,10 +927,12 @@
                   </article>
                 </div>
                 <div class="payment-provider-note">
-                  <span class="provider-note-label">KENYA-FIT GATEWAY CANDIDATE</span>
+                  <span class="provider-note-label">KENYA PAYMENT GATEWAY / SANDBOX</span>
                   <strong class="paystack-wordmark">PAYSTACK</strong>
-                  <span>Card and wallet processing requires a verified merchant account, API credentials and payment-webhook verification before activation.</span>
+                  <span>Test checkout only. KINGBOT verifies each transaction server-side; successful sandbox payments still require administrator approval before access is granted.</span>
                 </div>
+                <button id="paystackCheckoutButton" class="paystack-checkout-button" type="button" disabled>PAY BY CARD / WALLET · TEST MODE</button>
+                <div id="paystackCheckoutStatus" class="paystack-checkout-status" role="status" aria-live="polite">TEST CHECKOUT OFFLINE — the payment server still needs its Paystack test credentials, webhook secret and KES pricing rate.</div>
               </section>
 
               <div class="payment-mode-switch" role="tablist" aria-label="M-Pesa payment method">
@@ -1103,6 +1105,11 @@
     const checkoutLinkState=document.getElementById("checkoutLinkState");
     const mpesaGatewayStatus=document.getElementById("mpesaGatewayStatus");
     const mpesaGatewayCard=document.getElementById("mpesaGatewayCard");
+    const paystackCheckoutButton=document.getElementById("paystackCheckoutButton");
+    const paystackCheckoutStatus=document.getElementById("paystackCheckoutStatus");
+    const paystackCardRail=document.getElementById("paystackCardRail");
+    const paystackWalletRail=document.getElementById("paystackWalletRail");
+    let paystackConfigured=false;
     let paymentMode=(new URLSearchParams(location.search).get("method")||"stk").toLowerCase()==="manual" ? "manual" : "stk";
     let stkPollTimer=null;
     let stkPollDeadline=0;
@@ -1294,6 +1301,87 @@
       }
     }
 
+    function syncPaystackGatewayState(gatewayStatus){
+      paystackConfigured=gatewayStatus?.configured===true && String(gatewayStatus?.mode||"").toLowerCase()==="test";
+      if(paystackCheckoutButton){
+        paystackCheckoutButton.disabled=!paystackConfigured;
+        paystackCheckoutButton.textContent=paystackConfigured
+          ? "PAY BY CARD / WALLET · PAYSTACK TEST"
+          : "PAY BY CARD / WALLET · TEST MODE OFFLINE";
+      }
+      [paystackCardRail,paystackWalletRail].forEach(card=>{
+        if(!card)return;
+        card.classList.toggle("payment-rail-pending",!paystackConfigured);
+        card.classList.toggle("payment-rail-active",paystackConfigured);
+        card.setAttribute("aria-disabled",String(!paystackConfigured));
+        const foot=card.querySelector(".payment-rail-foot");
+        if(foot)foot.textContent=paystackConfigured
+          ? "PAYSTACK TEST · CHANNEL AVAILABILITY VARIES"
+          : "PAYSTACK TEST CONFIGURATION REQUIRED";
+      });
+      if(paystackCheckoutStatus){
+        paystackCheckoutStatus.textContent=paystackConfigured
+          ? "PAYSTACK TEST MODE READY · KES total is calculated on the server. Only payment channels enabled for this test account and customer device will appear."
+          : "TEST CHECKOUT OFFLINE — add PAYSTACK_SECRET_KEY (sk_test_), PAYSTACK_WEBHOOK_SECRET (whsec_) and PAYSTACK_USD_KES_RATE to the Render API service.";
+      }
+    }
+
+    async function startPaystackCheckout(){
+      if(!paystackConfigured)return;
+      const selected=plans.find(p=>String(p.id)===String(select.value));
+      const selectedPlan=selected?displayPlan(selected):null;
+      if(!selectedPlan){
+        status.textContent="Select a valid KINGBOT engine before opening checkout.";
+        return;
+      }
+      paystackCheckoutButton.disabled=true;
+      paystackCheckoutStatus.textContent="CREATING SECURE TEST CHECKOUT · calculating the KES amount from the server pricing rate…";
+      try{
+        const response=await window.KINGBOT_API.request("/api/subscription/payments/paystack/initialize",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({planId:selectedPlan.id,billingMonths,selectedBotId:null})
+        });
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok||!data.ok)throw new Error(data.message||data.error||"Paystack test checkout could not be initialized.");
+        const checkoutUrl=new URL(String(data.authorizationUrl||""));
+        if(checkoutUrl.protocol!=="https:"||checkoutUrl.hostname!=="checkout.paystack.com"){
+          throw new Error("The payment server returned an invalid Paystack checkout destination.");
+        }
+        paystackCheckoutStatus.textContent="TEST ORDER CREATED · KES "+Number(data.amountKes).toLocaleString("en-KE",{minimumFractionDigits:2,maximumFractionDigits:2})+" · redirecting to Paystack sandbox…";
+        window.location.assign(checkoutUrl.toString());
+      }catch(error){
+        paystackCheckoutStatus.textContent=error.message||"Paystack test checkout failed.";
+        paystackCheckoutButton.disabled=false;
+      }
+    }
+
+    async function verifyPaystackReturn(){
+      const params=new URLSearchParams(location.search);
+      const reference=String(params.get("reference")||"").trim();
+      if(params.get("gateway")!=="paystack"||!reference)return;
+      paystackCheckoutStatus.textContent="VERIFYING PAYSTACK TEST TRANSACTION WITH THE KINGBOT SERVER…";
+      try{
+        const response=await window.KINGBOT_API.request("/api/subscription/payments/paystack/verify?reference="+encodeURIComponent(reference));
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok||!data.ok)throw new Error(data.message||data.error||"Paystack verification is not available yet.");
+        const state=String(data.payment?.status||"").toLowerCase();
+        const verified=data.verified===true&&String(data.payment?.provider_status||"").toLowerCase()==="success";
+        if(verified){
+          paystackCheckoutStatus.textContent="TEST PAYMENT VERIFIED · KES "+Number(data.payment?.amount_kes||0).toLocaleString("en-KE",{minimumFractionDigits:2,maximumFractionDigits:2})+" · access remains locked until KINGBOT administrator approval.";
+          status.textContent="Paystack sandbox transaction verified. The payment is in the KINGBOT admin approval queue; no live money was collected.";
+        }else if(state==="failed"){
+          paystackCheckoutStatus.textContent="PAYSTACK TEST PAYMENT FAILED · no subscription access was granted.";
+          status.textContent="The Paystack test transaction was not completed or did not match the KINGBOT order.";
+        }else{
+          paystackCheckoutStatus.textContent="PAYSTACK TEST PAYMENT IS STILL PENDING · refresh this page after the checkout result is available.";
+        }
+        await loadMe();
+      }catch(error){
+        paystackCheckoutStatus.textContent=error.message||"Paystack transaction verification is pending.";
+      }
+    }
+
     function syncPaymentMode(){
       document.querySelectorAll("[data-payment-mode]").forEach(button=>{
         const active=button.dataset.paymentMode===paymentMode;
@@ -1326,6 +1414,7 @@
         }
 
         syncMpesaGatewayState(data.mpesaStatus||{});
+        syncPaystackGatewayState(data.paystackStatus||{});
 
         const serverPlans=Array.isArray(data.plans)?data.plans:[];
         plans=serverPlans.length
@@ -1354,9 +1443,11 @@
         syncPaymentMode();
         syncBasicBotChoice();
         await loadMe();
+        await verifyPaystackReturn();
 
       }catch(error){
         syncMpesaGatewayState({configured:false});
+        syncPaystackGatewayState({configured:false});
         syncPaymentMode();
         receiver.innerHTML=
           '<div class="mpesa-title">PAYMENT DESK UNAVAILABLE</div>'+
@@ -1435,7 +1526,7 @@
                 <div class="history-item">
                   <div class="history-main">
                     <strong>${esc(String(p.plan_id||"").toUpperCase())} · ${Number(p.billing_months)===3?"3 MONTHS":"1 MONTH"} · KES ${esc(p.amount_kes)}</strong>
-                    <span>${esc(p.mpesa_code)} · ${esc(p.created_at?new Date(p.created_at).toLocaleString():"—")}</span>
+                    <span>${esc(String(p.payment_method||"").toUpperCase()==="PAYSTACK" ? "PAYSTACK · "+(p.provider_reference||p.mpesa_code)+" · "+String(p.provider_status||"PENDING").toUpperCase() : p.mpesa_code)} · ${esc(p.submitted_at?new Date(p.submitted_at).toLocaleString():"—")}</span>
                     ${p.reviewer_note?'<span>'+esc(p.reviewer_note)+'</span>':""}
                   </div>
                   <span class="history-state ${esc(state)}">${esc(String(p.status||"PENDING").toUpperCase())}</span>
@@ -1451,6 +1542,7 @@
     }
 
     select.addEventListener("change",()=>{renderSummary();syncBasicBotChoice();});
+    paystackCheckoutButton?.addEventListener("click",startPaystackCheckout);
     document.getElementById("basicBotId")?.addEventListener("change",syncBasicBotChoice);
     document.querySelectorAll("[data-payment-mode]").forEach(button=>{
       button.addEventListener("click",()=>{
