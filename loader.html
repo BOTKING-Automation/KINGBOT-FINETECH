@@ -119,7 +119,7 @@ import "./system/session.js";
       go("landing.html");
     }catch(error){
       console.warn("[KINGBOT LOADER] Startup auth routing failed:",error?.message||error);
-      go("access-stable.html?return="+encodeURIComponent("index.html")+"#signin");
+      go("landing.html");
     }
   }
 
