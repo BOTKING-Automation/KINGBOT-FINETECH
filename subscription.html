@@ -1506,6 +1506,11 @@
         }else if(paymentStatus==="rejected"){
           accessState.className="access-state denied";
           accessState.textContent="● DENIED — payment was not approved. "+(latest?.reviewer_note||"Review the payment details and submit a valid transaction.");
+        }else if(paymentStatus==="awaiting_payment"){
+          accessState.className="access-state waiting";
+          accessState.textContent=String(latest?.payment_method||"").toUpperCase()==="PAYSTACK"
+            ? "● CHECKOUT IN PROGRESS — awaiting Paystack confirmation. No subscription access has been granted."
+            : "● CHECKOUT IN PROGRESS — awaiting payment confirmation. No subscription access has been granted.";
         }else if(paymentStatus==="pending"){
           accessState.className="access-state waiting";
           accessState.innerHTML="● WAITING — payment received and awaiting administrator verification.";
