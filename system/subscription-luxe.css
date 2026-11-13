@@ -241,3 +241,29 @@ body.kb-subscription-page .payment-summary .status-box{line-height:1.7}
   body.kb-subscription-page .plan-card,
   body.kb-subscription-page .submit{transition:none!important}
 }
+
+
+/* PAYSTACK / TEST CHECKOUT CTA */
+body.kb-subscription-page .paystack-checkout-button{
+  display:block;width:100%;min-height:48px;margin-top:12px;padding:12px 18px;
+  border:1px solid rgba(32,230,255,.42);border-radius:11px;
+  background:linear-gradient(105deg,rgba(32,230,255,.18),rgba(166,107,255,.20),rgba(255,79,216,.13));
+  color:#effaff;font:900 8px "IBM Plex Mono",monospace;letter-spacing:.10em;
+  box-shadow:0 0 25px rgba(32,230,255,.10),inset 0 1px 0 rgba(255,255,255,.08);
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
+}
+body.kb-subscription-page .paystack-checkout-button:not(:disabled):hover{
+  transform:translateY(-2px);border-color:rgba(255,255,255,.58);
+  box-shadow:0 12px 32px rgba(32,230,255,.15),0 0 32px rgba(166,107,255,.13);
+}
+body.kb-subscription-page .paystack-checkout-button:disabled{
+  cursor:not-allowed;opacity:.46;filter:saturate(.48);
+}
+body.kb-subscription-page .paystack-checkout-status{
+  margin-top:8px;padding:10px 12px;border:1px solid rgba(32,230,255,.15);
+  border-radius:9px;background:rgba(3,9,26,.58);color:#a8b8d4;
+  font:600 7px/1.7 "IBM Plex Mono",monospace;letter-spacing:.035em;
+}
+@media(prefers-reduced-motion:reduce){
+  body.kb-subscription-page .paystack-checkout-button{transition:none!important}
+}
