@@ -1359,7 +1359,7 @@
     async function verifyPaystackReturn(){
       const params=new URLSearchParams(location.search);
       const reference=String(params.get("reference")||"").trim();
-      if(params.get("gateway")!=="paystack"||!reference)return;
+      if(!/^KB[0-9]{10,}-[a-f0-9]{14}$/i.test(reference))return;
       paystackCheckoutStatus.textContent="VERIFYING PAYSTACK TEST TRANSACTION WITH THE KINGBOT SERVER…";
       try{
         const response=await window.KINGBOT_API.request("/api/subscription/payments/paystack/verify?reference="+encodeURIComponent(reference));
