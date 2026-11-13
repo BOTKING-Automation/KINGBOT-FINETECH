@@ -16,7 +16,7 @@ This is a research challenger, not a production model. It does not change live i
 
 The challenger consumes 16 consecutive closed-candle feature rows and uses a two-layer Transformer encoder to classify SELL / HOLD / BUY. It reuses the incumbent feature extractor, strategy feature masks, and triple-barrier labels so the comparison remains tied to the current feature and target definitions.
 
-The matched baseline is the current Random Forest + PyTorch MLP probability blend. Both approaches receive the same markets, timestamps, labels, training samples, development samples, and final samples.
+The matched baseline re-trains the incumbent Random Forest + PyTorch MLP architecture on the same training partition; it is not a direct replay of a persisted V10 champion artifact. Both approaches receive the same markets, timestamps, labels, training samples, development samples, and untouched final samples. The report explicitly records this comparison type.
 
 ## Validation design
 
