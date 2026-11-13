@@ -48,3 +48,11 @@ jobs:
 
       - name: Run incumbent and V13 unit tests
         run: python -m unittest discover -s ml-signal-service -p "test_*.py" -v
+
+      - name: Set up Node.js for offline data-collector tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Test public Deriv candle alignment and closed-bar filtering
+        run: node --test ml-signal-service/research/test_collect_deriv_candles.mjs
