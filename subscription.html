@@ -1357,6 +1357,7 @@
 
       }catch(error){
         syncMpesaGatewayState({configured:false});
+        syncPaymentMode();
         receiver.innerHTML=
           '<div class="mpesa-title">PAYMENT DESK UNAVAILABLE</div>'+
           '<div class="receiver">'+esc(error.message||"Subscription payment instructions could not be loaded.")+'</div>';
