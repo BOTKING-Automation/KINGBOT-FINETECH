@@ -12,7 +12,7 @@ Open the existing KINGBOT API service in Render (not the static GitHub Pages sit
 | `PAYSTACK_SECRET_KEY` | Your Paystack **Test Secret Key**, beginning with `sk_test_` |
 | `PAYSTACK_WEBHOOK_SECRET` | Your Test Mode webhook signing secret, beginning with `whsec_` |
 | `PAYSTACK_USD_KES_RATE` | The KES-per-USD rate approved by KINGBOT for the checkout quote |
-| `PAYSTACK_CALLBACK_URL` | `https://botking-automation.github.io/KINGBOT-FINETECH/subscription.html?gateway=paystack` |
+| `PAYSTACK_CALLBACK_URL` | `https://botking-automation.github.io/KINGBOT-FINETECH/subscription.html` |
 
 Do not put either secret in GitHub, the browser, source files, or chat. Do not configure a live key in this test integration. The card checkout remains disabled until the test secret, webhook secret, and rate are all present.
 
