@@ -68,7 +68,11 @@ const eventBus = new KingbotEventBus({pool,name:"kingbot-api"});
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
 app.use(requestSecurity);
-app.use(express.json({ limit: "512kb", strict: true }));
+app.use(express.json({
+  limit: "512kb",
+  strict: true,
+  verify: (req,_res,buf) => { req.rawBody = Buffer.from(buf); }
+}));
 app.use(cors(corsOptions()));
 app.use("/api", createApiLimiter());
 app.use("/api/broker", createWriteLimiter());
