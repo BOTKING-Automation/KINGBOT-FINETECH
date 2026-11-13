@@ -174,12 +174,16 @@ def estimate_xauusd_tail_probability_bloq(
 
     @attrs.frozen
     class _TailIndicatorEncoder(SelectOracle):
-        selection_registers: tuple
+        selection_regs: tuple
         values: tuple[int, ...]
 
         @cached_property
         def control_registers(self):
             return ()
+
+        @cached_property
+        def selection_registers(self):
+            return self.selection_regs
 
         @cached_property
         def target_registers(self):
@@ -200,7 +204,7 @@ def estimate_xauusd_tail_probability_bloq(
                     )
 
     encoder = _TailIndicatorEncoder(
-        selection_registers=tuple(synthesizer.selection_registers),
+        selection_regs=tuple(synthesizer.selection_registers),
         values=indicators,
     )
     code = CodeForRandomVariable(synthesizer=synthesizer, encoder=encoder)
