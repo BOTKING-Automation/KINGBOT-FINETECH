@@ -71,7 +71,11 @@ app.use(requestSecurity);
 app.use(express.json({
   limit: "512kb",
   strict: true,
-  verify: (req,_res,buf) => { req.rawBody = Buffer.from(buf); }
+  verify: (req,_res,buf) => {
+    if (String(req.originalUrl||"").startsWith("/api/subscription/paystack/webhook")) {
+      req.rawBody = Buffer.from(buf);
+    }
+  }
 }));
 app.use(cors(corsOptions()));
 app.use("/api", createApiLimiter());
