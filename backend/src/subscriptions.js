@@ -5,11 +5,19 @@ import { isAdminEmail } from "./admin-access.js";
 import { appendCommercialLedger } from "./commercial-ledger.js";
 import { initiateStkPush, queryStkPush, normalizeMpesaPhone, mpesaStatus, createStkReference } from "./mpesa.js";
 
-const PLANS = {
-  starter: { id:"starter", name:"Basic", priceUsd:130, billing:"monthly", botLimit:1, selectableBots:["strategic","breakout"], bots:["strategic","breakout"], requiresBotSelection:true, features:["Choose 1 of 2 entry bots","Strategic or Breakout","Core risk controls","Equity tracking"] },
-  pro: { id:"pro", name:"Professional", priceUsd:465, billing:"monthly", botLimit:3, selectableBots:[], bots:["strategic","breakout","smc-pro"], requiresBotSelection:false, features:["3 of 5 bot engines","Strategic + Breakout","SMC PRO","Advanced analytics","AI intelligence","Advanced risk controls"] },
-  institutional: { id:"institutional", name:"Institutional", priceUsd:800, billing:"monthly", botLimit:5, selectableBots:[], bots:["strategic","breakout","smc-pro","flipper","ladder-flip"], requiresBotSelection:false, features:["All 5 AI Strategy bots","Full trading OS","Advanced intelligence","Broker API integrations","Kill switch"] }
+const BOT_PLANS = {
+  strategic: { id:"strategic", name:"Strategic", priceUsd:249, billing:"monthly", billingOptions:[1,3], botLimit:1, selectableBots:[], bots:["strategic"], requiresBotSelection:false, public:true, features:["One dedicated engine licence","KINGBOT platform access","Account-level risk controls","Subscription and access oversight"] },
+  flipper: { id:"flipper", name:"Flipper", priceUsd:279, billing:"monthly", billingOptions:[1,3], botLimit:1, selectableBots:[], bots:["flipper"], requiresBotSelection:false, public:true, features:["One dedicated engine licence","KINGBOT platform access","Account-level risk controls","Subscription and access oversight"] },
+  breakout: { id:"breakout", name:"Breakout", priceUsd:299, billing:"monthly", billingOptions:[1,3], botLimit:1, selectableBots:[], bots:["breakout"], requiresBotSelection:false, public:true, features:["One dedicated engine licence","KINGBOT platform access","Account-level risk controls","Subscription and access oversight"] },
+  "smc-pro": { id:"smc-pro", name:"SMC PRO", priceUsd:399, billing:"monthly", billingOptions:[1,3], botLimit:1, selectableBots:[], bots:["smc-pro"], requiresBotSelection:false, public:true, features:["One dedicated engine licence","KINGBOT platform access","Account-level risk controls","Subscription and access oversight"] },
+  "ladder-flip": { id:"ladder-flip", name:"Ladder Flip V8", priceUsd:449, billing:"monthly", billingOptions:[1,3], botLimit:1, selectableBots:[], bots:["ladder-flip"], requiresBotSelection:false, public:true, features:["One dedicated engine licence","KINGBOT platform access","Account-level risk controls","Subscription and access oversight"] }
 };
+const LEGACY_PLANS = {
+  starter: { id:"starter", name:"Basic (legacy)", priceUsd:130, billing:"monthly", botLimit:1, selectableBots:["strategic","breakout"], bots:["strategic","breakout"], requiresBotSelection:true, public:false, features:["Legacy subscription record"] },
+  pro: { id:"pro", name:"Professional (legacy)", priceUsd:465, billing:"monthly", botLimit:3, selectableBots:[], bots:["strategic","breakout","smc-pro"], requiresBotSelection:false, public:false, features:["Legacy subscription record"] },
+  institutional: { id:"institutional", name:"Institutional (legacy)", priceUsd:800, billing:"monthly", botLimit:5, selectableBots:[], bots:["strategic","breakout","smc-pro","flipper","ladder-flip"], requiresBotSelection:false, public:false, features:["Legacy subscription record"] }
+};
+const PLANS = { ...BOT_PLANS, ...LEGACY_PLANS };
 const BOT_NAMES = { strategic:"KINGBOT STRATEGIC", flipper:"KINGBOT FLIPPER", breakout:"KINGBOT BREAKOUT", "smc-pro":"KINGBOT SMC PRO", "ladder-flip":"KINGBOT LADDER FLIP V8" };
 const hashToken = token => crypto.createHash("sha256").update(token).digest("hex");
 const planId = value => String(value || "").trim().toLowerCase();
@@ -65,7 +73,7 @@ async function requireAdmin(pool, req, res) {
 export function createSubscriptionRouter({pool,broker}) {
   const router = Router();
 
-  router.get("/plans",(_req,res)=>res.json({ok:true,plans:Object.values(PLANS).map(p=>({...p,selectableBotDetails:p.selectableBots.map(bot=>({botId:bot,botName:BOT_NAMES[bot]}))})),mpesaReceiver:process.env.MPESA_RECEIVER_PHONE||"0748275015",mpesaStatus:mpesaStatus()}));
+  router.get("/plans",(_req,res)=>res.json({ok:true,plans:Object.values(PLANS).filter(p=>p.public!==false).map(p=>({...p,billingOptions:[{months:1,discountPercent:0,totalUsd:p.priceUsd},{months:3,discountPercent:30,totalUsd:Number((p.priceUsd*2.1).toFixed(2))}],selectableBotDetails:[]})),mpesaReceiver:process.env.MPESA_RECEIVER_PHONE||"0748275015",mpesaStatus:mpesaStatus()}));
 
   router.get("/me",async(req,res)=>{
     const u=await requireUser(pool,req,res); if(!u)return;
@@ -73,7 +81,7 @@ export function createSubscriptionRouter({pool,broker}) {
       await expireStaleSubscriptions(pool);
       const s=await pool.query("SELECT id,plan_id,status,started_at,expires_at,approved_at FROM kingbot_subscriptions WHERE user_id=$1 AND status='active' AND expires_at>NOW() ORDER BY expires_at DESC LIMIT 1",[u.id]);
       const e=await pool.query("SELECT e.bot_id FROM kingbot_bot_entitlements e JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 AND e.active=TRUE AND s.status='active' AND s.expires_at>NOW() ORDER BY e.bot_id",[u.id]);
-      const p=await pool.query("SELECT id,plan_id,status,payment_method,mpesa_code,mpesa_receipt,amount_kes,payer_phone,payer_name,stk_status,stk_result_code,stk_result_desc,submitted_at,reviewed_at,reviewer_note,selected_bot_id FROM kingbot_payments WHERE user_id=$1 ORDER BY submitted_at DESC LIMIT 20",[u.id]);
+      const p=await pool.query("SELECT id,plan_id,status,payment_method,mpesa_code,mpesa_receipt,amount_kes,payer_phone,payer_name,stk_status,stk_result_code,stk_result_desc,submitted_at,reviewed_at,reviewer_note,selected_bot_id,billing_months FROM kingbot_payments WHERE user_id=$1 ORDER BY submitted_at DESC LIMIT 20",[u.id]);
       res.json({
         ok:true,
         isAdmin:isAdminEmail(u.email),
@@ -88,8 +96,9 @@ export function createSubscriptionRouter({pool,broker}) {
 
   router.post("/payments",async(req,res)=>{
     const u=await requireUser(pool,req,res); if(!u)return;
-    const p=planId(req.body?.planId), code=mpesaCode(req.body?.mpesaCode), amount=Number(req.body?.amountKes), phone=String(req.body?.payerPhone||"").trim(), payerName=String(req.body?.payerName||"").trim().replace(/\s+/g," "), selectedBot=normalizeBotId(req.body?.selectedBotId);
-    if(!PLANS[p])return res.status(400).json({ok:false,error:"Invalid subscription plan."});
+    const p=planId(req.body?.planId), code=mpesaCode(req.body?.mpesaCode), amount=Number(req.body?.amountKes), phone=String(req.body?.payerPhone||"").trim(), payerName=String(req.body?.payerName||"").trim().replace(/\s+/g," "), selectedBot=normalizeBotId(req.body?.selectedBotId), billingMonths=Number(req.body?.billingMonths||1);
+    if(!PLANS[p]||PLANS[p].public===false)return res.status(400).json({ok:false,error:"Invalid subscription plan."});
+    if(![1,3].includes(billingMonths))return res.status(400).json({ok:false,error:"Choose a one-month or three-month billing term."});
     if(PLANS[p].requiresBotSelection && !PLANS[p].selectableBots.includes(selectedBot))return res.status(400).json({ok:false,error:"Basic requires selecting either Strategic or Breakout."});
     if(!PLANS[p].requiresBotSelection && selectedBot && !PLANS[p].bots.includes(selectedBot))return res.status(400).json({ok:false,error:"The selected bot is not included in this plan."});
     if(!/^[A-Z0-9]{6,30}$/.test(code))return res.status(400).json({ok:false,error:"Enter a valid M-Pesa transaction code."});
@@ -106,8 +115,8 @@ export function createSubscriptionRouter({pool,broker}) {
           : "FAILED: This M-Pesa transaction code has already been submitted and cannot be reused.";
         return res.status(409).json({ok:false,code:"MPESA_CODE_REUSED",error:message});
       }
-      const q=await pool.query("INSERT INTO kingbot_payments(user_id,plan_id,amount_kes,mpesa_code,payer_phone,payer_name,selected_bot_id,status) VALUES($1,$2,$3,$4,$5,$6,$7,'pending') RETURNING id,plan_id,amount_kes,mpesa_code,payer_phone,payer_name,status,submitted_at",[u.id,p,amount,code,phone,payerName,selectedBot||null]);
-      await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'PAYMENT_SUBMITTED',$2::jsonb)",[u.id,JSON.stringify({paymentId:q.rows[0].id,planId:p,mpesaCode:code,selectedBotId:selectedBot||null})]);
+      const q=await pool.query("INSERT INTO kingbot_payments(user_id,plan_id,amount_kes,mpesa_code,payer_phone,payer_name,selected_bot_id,billing_months,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING id,plan_id,amount_kes,mpesa_code,payer_phone,payer_name,billing_months,status,submitted_at",[u.id,p,amount,code,phone,payerName,selectedBot||null,billingMonths]);
+      await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'PAYMENT_SUBMITTED',$2::jsonb)",[u.id,JSON.stringify({paymentId:q.rows[0].id,planId:p,mpesaCode:code,selectedBotId:selectedBot||null,billingMonths})]);
       res.status(201).json({ok:true,payment:q.rows[0],message:"Payment submitted for manual verification. Access remains locked until an administrator approves it."});
     } catch(err){
       if(err?.code==="23505" && String(err?.constraint||"").toLowerCase().includes("mpesa")){
@@ -129,7 +138,9 @@ export function createSubscriptionRouter({pool,broker}) {
     const phone=String(req.body?.payerPhone||"").trim();
     const payerName=String(req.body?.payerName||"").trim().replace(/\s+/g," ");
     const selectedBot=normalizeBotId(req.body?.selectedBotId);
-    if(!PLANS[p])return res.status(400).json({ok:false,error:"Invalid subscription plan."});
+    const billingMonths=Number(req.body?.billingMonths||1);
+    if(!PLANS[p]||PLANS[p].public===false)return res.status(400).json({ok:false,error:"Invalid subscription plan."});
+    if(![1,3].includes(billingMonths))return res.status(400).json({ok:false,error:"Choose a one-month or three-month billing term."});
     if(PLANS[p].requiresBotSelection && !PLANS[p].selectableBots.includes(selectedBot))return res.status(400).json({ok:false,error:"Basic requires selecting either Strategic or Breakout."});
     if(!PLANS[p].requiresBotSelection && selectedBot && !PLANS[p].bots.includes(selectedBot))return res.status(400).json({ok:false,error:"The selected bot is not included in this plan."});
     if(!Number.isFinite(amount)||amount<=0||amount>100000000)return res.status(400).json({ok:false,error:"Enter the exact amount to charge in KES."});
@@ -144,8 +155,8 @@ export function createSubscriptionRouter({pool,broker}) {
       await client.query("BEGIN");
       const placeholder=createStkReference(u.id);
       const q=await client.query(
-        "INSERT INTO kingbot_payments(user_id,plan_id,amount_kes,mpesa_code,payer_phone,payer_name,selected_bot_id,status,payment_method,stk_status) VALUES($1,$2,$3,$4,$5,$6,$7,'pending','STK_PUSH','INITIATING') RETURNING id,plan_id,amount_kes,payer_phone,payer_name,status,payment_method,stk_status,submitted_at",
-        [u.id,p,Math.floor(amount),placeholder,normalizeMpesaPhone(phone),payerName,selectedBot||null]
+        "INSERT INTO kingbot_payments(user_id,plan_id,amount_kes,mpesa_code,payer_phone,payer_name,selected_bot_id,billing_months,status,payment_method,stk_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'pending','STK_PUSH','INITIATING') RETURNING id,plan_id,amount_kes,payer_phone,payer_name,billing_months,status,payment_method,stk_status,submitted_at",
+        [u.id,p,Math.floor(amount),placeholder,normalizeMpesaPhone(phone),payerName,selectedBot||null,billingMonths]
       );
       paymentId=String(q.rows[0].id);
       await client.query("COMMIT");
@@ -156,7 +167,7 @@ export function createSubscriptionRouter({pool,broker}) {
           amount:Math.floor(amount),
           phone,
           accountReference:"KB"+paymentId.replace(/[^A-Za-z0-9]/g,"").slice(0,10),
-          transactionDesc:"KINGBOT "+p.toUpperCase()
+          transactionDesc:"KINGBOT "+p.toUpperCase()+" "+billingMonths+"M"
         });
       }catch(error){
         await pool.query(
@@ -321,7 +332,7 @@ export function createSubscriptionRouter({pool,broker}) {
   router.get("/admin/payments",async(req,res)=>{
     const a=await requireAdmin(pool,req,res);if(!a)return;
     try {
-      const q=await pool.query("SELECT p.id,p.user_id,u.first_name,u.last_name,u.email,u.phone,p.plan_id,p.amount_kes,p.mpesa_code,p.payer_phone,p.payer_name,p.selected_bot_id,p.status,p.payment_method,p.mpesa_receipt,p.stk_status,p.stk_result_code,p.stk_result_desc,p.checkout_request_id,p.submitted_at,p.reviewed_at,p.reviewed_by,p.reviewer_note FROM kingbot_payments p JOIN kingbot_users u ON u.id=p.user_id ORDER BY CASE WHEN p.status='pending' THEN 0 ELSE 1 END,p.submitted_at DESC LIMIT 200");
+      const q=await pool.query("SELECT p.id,p.user_id,u.first_name,u.last_name,u.email,u.phone,p.plan_id,p.amount_kes,p.mpesa_code,p.payer_phone,p.payer_name,p.selected_bot_id,p.billing_months,p.status,p.payment_method,p.mpesa_receipt,p.stk_status,p.stk_result_code,p.stk_result_desc,p.checkout_request_id,p.submitted_at,p.reviewed_at,p.reviewed_by,p.reviewer_note FROM kingbot_payments p JOIN kingbot_users u ON u.id=p.user_id ORDER BY CASE WHEN p.status='pending' THEN 0 ELSE 1 END,p.submitted_at DESC LIMIT 200");
       res.json({ok:true,payments:q.rows});
     }catch(err){console.error("[KINGBOT ADMIN]",err?.message||err);res.status(500).json({ok:false,error:"Payment queue unavailable."});}
   });
@@ -331,7 +342,7 @@ export function createSubscriptionRouter({pool,broker}) {
     const client=await pool.connect();
     try {
       await client.query("BEGIN");
-      const q=await client.query("SELECT id,user_id,plan_id,selected_bot_id,status FROM kingbot_payments WHERE id=$1 FOR UPDATE",[String(req.params.id||"")]);
+      const q=await client.query("SELECT id,user_id,plan_id,selected_bot_id,billing_months,status FROM kingbot_payments WHERE id=$1 FOR UPDATE",[String(req.params.id||"")]);
       if(!q.rowCount){await client.query("ROLLBACK");return res.status(404).json({ok:false,error:"Payment not found."});}
       const p=q.rows[0]; if(p.status!=="pending"){await client.query("ROLLBACK");return res.status(409).json({ok:false,error:"Payment has already been reviewed."});}
       const plan=PLANS[p.plan_id];
@@ -340,13 +351,14 @@ export function createSubscriptionRouter({pool,broker}) {
       if(!grantedBots.length){await client.query("ROLLBACK");return res.status(409).json({ok:false,error:"Basic plan requires a valid Strategic or Breakout bot selection."});}
       await client.query("UPDATE kingbot_payments SET status='approved',reviewed_at=NOW(),reviewed_by=$1,reviewer_note=$2 WHERE id=$3",[a.email,String(req.body?.note||"").trim().slice(0,500)||null,p.id]);
       await client.query("UPDATE kingbot_subscriptions SET status='superseded' WHERE user_id=$1 AND status='active'",[p.user_id]);
-      const s=await client.query("INSERT INTO kingbot_subscriptions(user_id,plan_id,status,started_at,expires_at,approved_at,approved_by,payment_id) VALUES($1,$2,'active',NOW(),NOW()+INTERVAL '1 month',NOW(),$3,$4) RETURNING id,plan_id,status,started_at,expires_at",[p.user_id,p.plan_id,a.email,p.id]);
+      const billingMonths=Number(p.billing_months)===3?3:1;
+      const s=await client.query("INSERT INTO kingbot_subscriptions(user_id,plan_id,status,started_at,expires_at,approved_at,approved_by,payment_id) VALUES($1,$2,'active',NOW(),NOW()+($3::int * INTERVAL '1 month'),NOW(),$4,$5) RETURNING id,plan_id,status,started_at,expires_at",[p.user_id,p.plan_id,billingMonths,a.email,p.id]);
       await client.query("UPDATE kingbot_bot_entitlements SET active=FALSE WHERE user_id=$1",[p.user_id]);
       for(const bot of grantedBots) await client.query("INSERT INTO kingbot_bot_entitlements(user_id,bot_id,subscription_id,active) VALUES($1,$2,$3,TRUE)",[p.user_id,bot,s.rows[0].id]);
-      await appendCommercialLedger(client,{userId:p.user_id,entryType:"SUBSCRIPTION_SALE",direction:"CREDIT",currency:"KES",amount:p.amount_kes,referenceType:"PAYMENT",referenceId:String(p.id),metadata:{subscriptionId:s.rows[0].id,planId:p.plan_id,grantedBots}});
-      await client.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'PAYMENT_APPROVED',$2::jsonb)",[p.user_id,JSON.stringify({paymentId:p.id,subscriptionId:s.rows[0].id,planId:p.plan_id,selectedBotId:p.selected_bot_id||null,grantedBots,approvedBy:a.email})]);
+      await appendCommercialLedger(client,{userId:p.user_id,entryType:"SUBSCRIPTION_SALE",direction:"CREDIT",currency:"KES",amount:p.amount_kes,referenceType:"PAYMENT",referenceId:String(p.id),metadata:{subscriptionId:s.rows[0].id,planId:p.plan_id,grantedBots,billingMonths}});
+      await client.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'PAYMENT_APPROVED',$2::jsonb)",[p.user_id,JSON.stringify({paymentId:p.id,subscriptionId:s.rows[0].id,planId:p.plan_id,selectedBotId:p.selected_bot_id||null,grantedBots,billingMonths,approvedBy:a.email})]);
       await client.query("COMMIT");
-      res.json({ok:true,subscription:s.rows[0],grantedBots:grantedBots.map(x=>BOT_NAMES[x])});
+      res.json({ok:true,subscription:s.rows[0],billingMonths,grantedBots:grantedBots.map(x=>BOT_NAMES[x])});
     }catch(err){await client.query("ROLLBACK").catch(()=>{});console.error("[KINGBOT ADMIN]",err?.message||err);res.status(500).json({ok:false,error:"Payment approval failed."});}finally{client.release();}
   });
 
@@ -624,7 +636,7 @@ export function createSubscriptionRouter({pool,broker}) {
 }
 export async function ensureSubscriptionSchema(pool){
   if(!pool)return;
-  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_payments (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, plan_id TEXT NOT NULL, amount_kes NUMERIC(14,2) NOT NULL, mpesa_code TEXT UNIQUE NOT NULL, payer_phone TEXT, payer_name TEXT, selected_bot_id TEXT, status TEXT NOT NULL DEFAULT 'pending', submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), reviewed_at TIMESTAMPTZ, reviewed_by TEXT, reviewer_note TEXT)");
+  await pool.query("CREATE TABLE IF NOT EXISTS kingbot_payments (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, plan_id TEXT NOT NULL, amount_kes NUMERIC(14,2) NOT NULL, mpesa_code TEXT UNIQUE NOT NULL, payer_phone TEXT, payer_name TEXT, selected_bot_id TEXT, billing_months INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'pending', submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), reviewed_at TIMESTAMPTZ, reviewed_by TEXT, reviewer_note TEXT)");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS payer_phone TEXT");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
@@ -632,6 +644,7 @@ export async function ensureSubscriptionSchema(pool){
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS reviewed_by TEXT");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS reviewer_note TEXT");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS selected_bot_id TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS billing_months INTEGER NOT NULL DEFAULT 1");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS payer_name TEXT");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'MANUAL_CODE'");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS mpesa_receipt TEXT");
