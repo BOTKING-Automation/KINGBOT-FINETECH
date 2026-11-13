@@ -1,0 +1,50 @@
+name: KINGBOT V13 Sequence Transformer Research
+
+on:
+  pull_request:
+    paths:
+      - "ml-signal-service/research/**"
+      - ".github/workflows/v13-sequence-transformer-research.yml"
+  push:
+    branches:
+      - "research/v13-sequence-transformer-20261113"
+    paths:
+      - "ml-signal-service/research/**"
+      - ".github/workflows/v13-sequence-transformer-research.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  research-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      KINGBOT_V13_TORCH_THREADS: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ml-signal-service/requirements.txt
+
+      - name: Install existing ML dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r ml-signal-service/requirements.txt
+
+      - name: Compile research and incumbent feature code
+        run: |
+          python -m py_compile \
+            ml-signal-service/service.py \
+            ml-signal-service/research/__init__.py \
+            ml-signal-service/research/v13_sequence_transformer.py \
+            ml-signal-service/research/test_v13_sequence_transformer.py
+
+      - name: Run incumbent and V13 unit tests
+        run: python -m unittest discover -s ml-signal-service -p "test_*.py" -v
