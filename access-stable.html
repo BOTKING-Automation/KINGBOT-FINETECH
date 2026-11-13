@@ -199,7 +199,7 @@ input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(25,2
         sessionStorage.setItem("signup_phone",payload.phone);
       }catch{}
       showMessage(result.existing&&!result.verified?"Account exists but is not verified. A fresh verification email was sent.":"Account created. A verification email has been sent.","success");
-      setTimeout(()=>location.replace("verify.html"),500);
+      setTimeout(()=>location.replace("verify.html?return="+encodeURIComponent(destination())),500);
     }catch(error){
       const code=String(error&&error.code||"");
       const map={
