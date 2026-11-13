@@ -1,0 +1,3 @@
+# Optional offline research environment only. Do not add this to Render or
+# ml-signal-service/requirements.txt. Qualtran is experimental/beta upstream.
+qualtran==0.7.0
