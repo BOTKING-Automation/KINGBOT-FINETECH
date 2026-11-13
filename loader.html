@@ -100,7 +100,7 @@ import "./system/session.js";
     try{
       const session=window.KINGBOT_SESSION;
       if(!session){
-        go("access-stable.html?return="+encodeURIComponent("index.html?kb-startup=complete")+"#signin");
+        go("landing.html");
         return;
       }
 
@@ -116,10 +116,10 @@ import "./system/session.js";
         return;
       }
 
-      go("access-stable.html?return="+encodeURIComponent("index.html")+"#signin");
+      go("landing.html");
     }catch(error){
       console.warn("[KINGBOT LOADER] Startup auth routing failed:",error?.message||error);
-      go("access-stable.html?return="+encodeURIComponent("index.html")+"#signin");
+      go("landing.html");
     }
   }
 
