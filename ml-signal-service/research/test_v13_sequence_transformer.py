@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 import torch
 
-import v13_sequence_transformer as v13
+from research import v13_sequence_transformer as v13
 
 
 def make_market(symbol="XAUUSD", count=280, start=1_790_000_000):
