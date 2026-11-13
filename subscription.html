@@ -812,6 +812,7 @@
     @media(max-width:820px){#plans .plan-card:hover,#plans .plan-card.selected{transform:none}}
     @media(prefers-reduced-motion:reduce){#plans .plan-card::before,#plans .plan-price{animation:none!important}}
   </style>
+  <link rel="stylesheet" href="system/subscription-luxe.css?v=1">
 </head>
 
 <body class="kb-subscription-page">
@@ -885,6 +886,52 @@
                 <div class="mpesa-title">CONNECTING TO PAYMENT DESK…</div>
                 <div class="receiver">Loading secure payment instructions.</div>
               </div>
+
+              <section class="payment-rail-section" aria-labelledby="paymentRailsTitle">
+                <div class="payment-rail-heading">
+                  <div>
+                    <span class="payment-rail-kicker">GLOBAL PAYMENT CHANNELS</span>
+                    <h3 id="paymentRailsTitle">Choose how to pay</h3>
+                  </div>
+                  <span class="payment-rail-security"><span aria-hidden="true">●</span> SECURE CHECKOUT</span>
+                </div>
+                <div class="payment-rail-grid">
+                  <article class="payment-rail payment-rail-active" id="mpesaGatewayCard">
+                    <div class="payment-rail-top">
+                      <span class="mpesa-brand-mark">M-PESA</span>
+                      <span class="payment-rail-state" id="mpesaGatewayStatus">CHECKING</span>
+                    </div>
+                    <strong>Mobile money</strong>
+                    <p>Safaricom payment prompt or manual transaction reference.</p>
+                    <span class="payment-rail-foot">CURRENT KINGBOT CHECKOUT</span>
+                  </article>
+
+                  <article class="payment-rail payment-rail-pending" aria-disabled="true">
+                    <div class="payment-logo-row payment-card-logos" aria-label="Visa and Mastercard supported brands">
+                      <img src="https://cdn.simpleicons.org/visa/1A1F71" alt="Visa" loading="lazy">
+                      <img src="https://cdn.simpleicons.org/mastercard/EB001B" alt="Mastercard" loading="lazy">
+                    </div>
+                    <strong>Debit &amp; credit cards</strong>
+                    <p>International card checkout for Visa and Mastercard.</p>
+                    <span class="payment-rail-foot">GATEWAY ACTIVATION REQUIRED</span>
+                  </article>
+
+                  <article class="payment-rail payment-rail-pending" aria-disabled="true">
+                    <div class="payment-logo-row payment-wallet-logos" aria-label="Apple Pay and Google Pay brands">
+                      <img src="https://cdn.simpleicons.org/applepay/FFFFFF" alt="Apple Pay" loading="lazy">
+                      <img src="https://cdn.simpleicons.org/googlepay/4285F4" alt="Google Pay" loading="lazy">
+                    </div>
+                    <strong>Digital wallets</strong>
+                    <p>Wallet checkout on supported devices and eligible cards.</p>
+                    <span class="payment-rail-foot">GATEWAY ACTIVATION REQUIRED</span>
+                  </article>
+                </div>
+                <div class="payment-provider-note">
+                  <span class="provider-note-label">KENYA-FIT GATEWAY CANDIDATE</span>
+                  <strong class="paystack-wordmark">PAYSTACK</strong>
+                  <span>Card and wallet processing requires a verified merchant account, API credentials and payment-webhook verification before activation.</span>
+                </div>
+              </section>
 
               <div class="payment-mode-switch" role="tablist" aria-label="M-Pesa payment method">
                 <button type="button" class="payment-mode active" data-payment-mode="stk" aria-selected="true">M-PESA PUSH</button>
@@ -1054,6 +1101,8 @@
     const checkoutLink=document.getElementById("checkoutLink");
     const copyCheckoutLink=document.getElementById("copyCheckoutLink");
     const checkoutLinkState=document.getElementById("checkoutLinkState");
+    const mpesaGatewayStatus=document.getElementById("mpesaGatewayStatus");
+    const mpesaGatewayCard=document.getElementById("mpesaGatewayCard");
     let paymentMode=(new URLSearchParams(location.search).get("method")||"stk").toLowerCase()==="manual" ? "manual" : "stk";
     let stkPollTimer=null;
     let stkPollDeadline=0;
@@ -1222,6 +1271,29 @@
       renderSummary();
     }
 
+    function syncMpesaGatewayState(mpesaStatus){
+      const stkConfigured=mpesaStatus?.configured===true;
+      const stkButton=document.querySelector('[data-payment-mode="stk"]');
+      if(stkButton){
+        stkButton.disabled=!stkConfigured;
+        stkButton.setAttribute("aria-disabled",String(!stkConfigured));
+        stkButton.title=stkConfigured
+          ? "M-Pesa STK Push credentials are configured."
+          : "M-Pesa STK Push is not configured. Use manual M-Pesa code submission.";
+      }
+      if(mpesaGatewayStatus){
+        mpesaGatewayStatus.textContent=stkConfigured
+          ? "STK CONFIGURED"
+          : "MANUAL CODE AVAILABLE";
+      }
+      if(mpesaGatewayCard){
+        mpesaGatewayCard.classList.toggle("payment-rail-stk-ready",stkConfigured);
+      }
+      if(!stkConfigured&&paymentMode==="stk"){
+        paymentMode="manual";
+      }
+    }
+
     function syncPaymentMode(){
       document.querySelectorAll("[data-payment-mode]").forEach(button=>{
         const active=button.dataset.paymentMode===paymentMode;
@@ -1253,6 +1325,8 @@
           throw new Error(data.error||"Could not load subscription plans.");
         }
 
+        syncMpesaGatewayState(data.mpesaStatus||{});
+
         const serverPlans=Array.isArray(data.plans)?data.plans:[];
         plans=serverPlans.length
           ? serverPlans.filter(p=>HOME_PLANS[planKey(p)])
@@ -1282,6 +1356,7 @@
         await loadMe();
 
       }catch(error){
+        syncMpesaGatewayState({configured:false});
         receiver.innerHTML=
           '<div class="mpesa-title">PAYMENT DESK UNAVAILABLE</div>'+
           '<div class="receiver">'+esc(error.message||"Subscription payment instructions could not be loaded.")+'</div>';
