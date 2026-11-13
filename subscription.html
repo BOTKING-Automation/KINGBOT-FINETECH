@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Michroma&family=Orbitron:wght@600;700;800;900&family=Oxanium:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="system/platform.css">
 
@@ -763,6 +763,54 @@
     @media(max-width:820px){.plans{grid-template-columns:repeat(2,minmax(0,1fr))}}
     @media(max-width:560px){.plans{grid-template-columns:1fr}.plan-card{min-height:0}.private-consultation{grid-template-columns:auto 1fr}.private-consultation a{grid-column:1/-1;text-align:center}.billing-choice{font-size:8px}.billing-promise{font-size:7px;line-height:1.5}}
     @media(prefers-reduced-motion:reduce){.plan-card{transition:none}}
+    /* PREMIUM GLASS PRICE CARDS — one colour signature per engine */
+    #plans .plan-card{
+      --plan-accent:#20e6ff;--plan-second:#c6faff;
+      position:relative;isolation:isolate;overflow:hidden;
+      border:1px solid color-mix(in srgb,var(--plan-accent) 42%,rgba(255,255,255,.12));
+      background:radial-gradient(ellipse at 90% 0%,var(--plan-glow),transparent 49%),linear-gradient(145deg,rgba(15,26,55,.64),rgba(4,9,24,.76));
+      -webkit-backdrop-filter:blur(20px) saturate(155%);backdrop-filter:blur(20px) saturate(155%);
+      box-shadow:0 20px 48px rgba(0,0,0,.34),0 0 23px var(--plan-glow),inset 0 1px 0 rgba(255,255,255,.12),inset 0 0 30px var(--plan-glow);
+      transition:transform .26s ease,border-color .26s ease,box-shadow .26s ease;
+    }
+    #plans .plan-card::before{
+      content:"";position:absolute;z-index:0;inset:0;pointer-events:none;
+      background:linear-gradient(120deg,transparent 8%,color-mix(in srgb,var(--plan-accent) 13%,transparent) 32%,transparent 54%,rgba(255,255,255,.055) 62%,transparent 76%);
+      background-size:230% 100%;opacity:.7;animation:kbSubGlassSweep 9s ease-in-out infinite;
+    }
+    #plans .plan-card>*{position:relative;z-index:1}
+    #plans .plan-card::after{z-index:0}
+    #plans .plan-card.plan-strategic{--plan-accent:#20e6ff;--plan-second:#c6faff}
+    #plans .plan-card.plan-flipper{--plan-accent:#ad7bff;--plan-second:#efd1ff}
+    #plans .plan-card.plan-breakout{--plan-accent:#ff55d9;--plan-second:#ffc2ec}
+    #plans .plan-card.plan-smc-pro{--plan-accent:#ffd166;--plan-second:#fff0bf}
+    #plans .plan-card.plan-ladder-flip{--plan-accent:#43f2b8;--plan-second:#c5ffeb}
+    #plans .plan-card:hover,#plans .plan-card.selected{transform:translateY(-5px);border-color:var(--plan-accent);box-shadow:0 25px 58px rgba(0,0,0,.42),0 0 32px var(--plan-glow),inset 0 1px 0 rgba(255,255,255,.16),inset 0 0 38px var(--plan-glow)}
+    #plans .plan-code{color:var(--plan-accent);font:700 7px "IBM Plex Mono",monospace;letter-spacing:.16em;text-shadow:0 0 12px var(--plan-glow)}
+    #plans .plan-name{font:800 12px "Michroma","Orbitron",sans-serif;letter-spacing:.02em;text-shadow:0 0 15px var(--plan-glow)}
+    #plans .plan-price{
+      color:transparent;background:linear-gradient(105deg,var(--plan-accent),#fff 38%,var(--plan-second) 68%,var(--plan-accent));background-size:260% 100%;
+      -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+      font:800 22px "Michroma","Orbitron",sans-serif;letter-spacing:-.045em;
+      filter:drop-shadow(0 0 10px var(--plan-glow));animation:kbSubPriceSpectrum 6s ease-in-out infinite;
+    }
+    #plans .plan-price small{color:#c5d0e6;-webkit-text-fill-color:#c5d0e6;font:700 7px "IBM Plex Mono",monospace;letter-spacing:.08em}
+    #plans .plan-description{color:#c0cce2;font:500 10px "Space Grotesk",sans-serif;line-height:1.5}
+    #plans .plan-effective{display:grid;gap:4px;min-height:47px;margin:5px 0 8px;color:#9baac8;font:700 7px "IBM Plex Mono",monospace;line-height:1.45}
+    #plans .plan-was{color:#8290ad;text-decoration:line-through}
+    #plans .plan-saving{color:var(--plan-accent);font-size:8px;text-shadow:0 0 12px var(--plan-glow)}
+    #plans .effective-month{color:#e8dcff;font-size:8px}
+    #plans .plan-quarter-prompt{color:var(--plan-accent);font-size:8px;text-shadow:0 0 12px var(--plan-glow)}
+    #plans .feature-list li{color:#bfcae0;font:600 12px "Rajdhani","Inter",sans-serif}
+    #plans .feature-list li::before{color:var(--plan-accent);text-shadow:0 0 10px var(--plan-accent)}
+    #plans .plan-select{border-color:color-mix(in srgb,var(--plan-accent) 55%,transparent);color:#f4f7ff;background:linear-gradient(110deg,color-mix(in srgb,var(--plan-accent) 11%,transparent),rgba(255,255,255,.035));box-shadow:0 0 17px var(--plan-glow);font:800 8px "IBM Plex Mono",monospace}
+    #plans .plan-select:hover{border-color:var(--plan-accent);box-shadow:0 0 26px var(--plan-glow)}
+    .pricing-currency-note{position:relative;max-width:850px;margin:0 auto 15px;padding:10px 15px;border:1px solid rgba(32,230,255,.16);border-radius:12px;background:linear-gradient(100deg,rgba(32,230,255,.055),rgba(166,107,255,.06),rgba(246,189,74,.045));color:#9eacc9;text-align:center;font:500 9px/1.65 "Inter",sans-serif;box-shadow:0 0 24px rgba(32,230,255,.045);backdrop-filter:blur(12px)}
+    .pricing-currency-note strong{color:#c7f8ff;font:800 8px "IBM Plex Mono",monospace;letter-spacing:.1em}
+    @keyframes kbSubGlassSweep{0%,100%{background-position:100% 0;opacity:.38}50%{background-position:0 0;opacity:.9}}
+    @keyframes kbSubPriceSpectrum{0%,100%{background-position:100% 50%;filter:drop-shadow(0 0 7px var(--plan-glow))}50%{background-position:0 50%;filter:drop-shadow(0 0 17px var(--plan-glow)) drop-shadow(0 0 26px var(--plan-glow))}}
+    @media(max-width:820px){#plans .plan-card:hover,#plans .plan-card.selected{transform:none}}
+    @media(prefers-reduced-motion:reduce){#plans .plan-card::before,#plans .plan-price{animation:none!important}}
   </style>
 </head>
 
@@ -804,6 +852,7 @@
             <button type="button" class="billing-choice" data-billing-months="3" aria-pressed="false">3 MONTHS <small>SAVE 30%</small></button>
           </div>
           <div class="billing-promise">PREPAY THREE MONTHS · RECEIVE 30% OFF THE THREE-MONTH TOTAL</div>
+          <div class="pricing-currency-note"><strong>PRICES ARE LISTED IN USD.</strong> M-Pesa checkout is entered in KES. Confirm the exact KES amount with the KINGBOT payment desk before paying; no automatic exchange-rate conversion is applied.</div>
           <div id="plans" class="plans"></div>
           <div class="private-consultation">
             <div class="consultation-icon" aria-hidden="true">♛</div>
@@ -1052,12 +1101,24 @@
       return String(plan?.id||"").trim().toLowerCase();
     }
 
+    function moneyUSD(value){
+      return Number(value||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+    }
+
     function displayPlan(plan){
       const key=planKey(plan);
       const home=HOME_PLANS[key]||{};
-      const monthly=HOME_PRICES[key] ?? Number(plan?.priceUsd||0);
+      const apiMonthly=Number(plan?.priceUsd);
+      const fallbackMonthly=Number(HOME_PRICES[key]||0);
+      const monthly=Number.isFinite(apiMonthly)&&apiMonthly>0?apiMonthly:fallbackMonthly;
       const undiscounted=monthly*billingMonths;
-      const total=billingMonths===3?Number((undiscounted*.7).toFixed(2)):monthly;
+      const billingOption=Array.isArray(plan?.billingOptions)
+        ? plan.billingOptions.find(option=>Number(option?.months)===billingMonths)
+        : null;
+      const apiTotal=Number(billingOption?.totalUsd);
+      const total=billingMonths===3&&Number.isFinite(apiTotal)&&apiTotal>0
+        ? Number(apiTotal.toFixed(2))
+        : billingMonths===3?Number((undiscounted*.7).toFixed(2)):monthly;
       return {
         id:String(plan?.id||key),
         key,
@@ -1115,7 +1176,20 @@
     }
 
     function renderPlans(){
+      const currentSelection=String(select.value||"");
       const display=plans.map(displayPlan);
+
+      // Keep the plan selector in lockstep with the chosen billing term.
+      select.innerHTML=display.map(p=>{
+        const termLabel=billingMonths===3?" · 3 MONTHS PREPAID":" / MONTH";
+        const amount=billingMonths===3?p.total:p.price;
+        return '<option value="'+esc(p.id)+'">'+esc(p.name)+' — $'+moneyUSD(amount)+' USD'+termLabel+'</option>';
+      }).join("");
+      if(plans.some(p=>String(p.id)===currentSelection)){
+        select.value=currentSelection;
+      }else if(plans.length){
+        select.value=plans[0].id;
+      }
 
       plansEl.innerHTML=display.map((p,index)=>`
         <article class="plan-card plan-${esc(p.key)} ${p.key==="smc-pro"?"featured":""}" data-plan="${esc(p.key)}">
@@ -1124,9 +1198,13 @@
             <div class="plan-glyph" aria-hidden="true">${esc(p.icon)}</div>
           </div>
           <div class="plan-name">${esc(p.name)}</div>
-          <div class="plan-price">$ ${p.total.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})} <small>USD</small></div>
-          <div class="plan-description">${billingMonths===3?"90-day prepaid access · 30% offer applied":"30-day private engine licence"}</div>
-          <div class="plan-effective">${billingMonths===3?"$"+(p.total/3).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})+" effective / month":"Billed monthly"}</div>
+          <div class="plan-price">$ ${moneyUSD(p.total)} <small>USD ${billingMonths===3?"TOTAL":"/ MONTH"}</small></div>
+          <div class="plan-description">${billingMonths===3?"90-day prepaid access · 30% saving applied":"30-day private engine licence"}</div>
+          <div class="plan-effective">
+            ${billingMonths===3
+              ? '<span class="plan-was">$'+moneyUSD(p.undiscounted)+' USD standard total</span><strong class="plan-saving">SAVE 30% · $'+moneyUSD(p.savings)+'</strong><b class="effective-month">$'+moneyUSD(p.total/3)+' effective / month</b>'
+              : '<strong class="plan-quarter-prompt">PREPAY 3 MONTHS · SAVE 30%</strong>'}
+          </div>
           <ul class="feature-list">
             ${p.features.map(feature=>"<li>"+esc(feature)+"</li>").join("")}
           </ul>
