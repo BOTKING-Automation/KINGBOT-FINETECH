@@ -2248,3 +2248,60 @@ body.kb-public-landing::after{
   .premium-engine-grid .engine-row,.price-plan,.price-art img{transition:none}
   body.kb-public-landing::after{display:none}
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   KINGBOT PRICING / GLASS LUXE FINISH
+   Distinct spectral glass treatment for each private engine licence.
+   ───────────────────────────────────────────────────────────────────────── */
+.premium-pricing .section-topline h2{text-wrap:balance;text-shadow:0 0 26px rgba(32,230,255,.12)}
+.premium-price-grid{gap:19px;align-items:stretch}
+.price-plan{
+  --plan-accent:#20e6ff;--plan-second:#c6faff;--plan-glow:rgba(32,230,255,.16);
+  position:relative;isolation:isolate;
+  border:1px solid color-mix(in srgb,var(--plan-accent) 43%,rgba(255,255,255,.12));
+  background:radial-gradient(ellipse at 92% 3%,var(--plan-glow),transparent 44%),radial-gradient(ellipse at 0% 100%,rgba(166,107,255,.075),transparent 48%),linear-gradient(145deg,rgba(17,29,59,.67),rgba(5,10,27,.76));
+  -webkit-backdrop-filter:blur(22px) saturate(155%);backdrop-filter:blur(22px) saturate(155%);
+  box-shadow:0 22px 56px rgba(0,0,0,.34),0 0 24px var(--plan-glow),inset 0 1px 0 rgba(255,255,255,.11),inset 0 0 34px var(--plan-glow);
+  transition:transform .28s ease,border-color .28s ease,box-shadow .28s ease,background .28s ease;
+}
+.price-plan::before{
+  inset:0;border-radius:inherit;
+  background:linear-gradient(118deg,transparent 8%,color-mix(in srgb,var(--plan-accent) 13%,transparent) 29%,transparent 49%,rgba(255,255,255,.055) 55%,transparent 67%,color-mix(in srgb,var(--plan-second) 11%,transparent) 88%);
+  background-size:240% 100%;opacity:.75;animation:kbGlassSweep 9s ease-in-out infinite;
+}
+.price-plan::after{left:9%;right:9%;height:2px;background:linear-gradient(90deg,transparent,var(--plan-accent),var(--plan-second),transparent);box-shadow:0 0 18px var(--plan-accent),0 0 34px var(--plan-glow)}
+@keyframes kbGlassSweep{0%,100%{background-position:100% 0;opacity:.38}50%{background-position:0 0;opacity:.9}}
+.price-strategic{--plan-accent:#20e6ff;--plan-second:#b9faff;--plan-glow:rgba(32,230,255,.18)}
+.price-flipper{--plan-accent:#ad7bff;--plan-second:#f0c5ff;--plan-glow:rgba(166,107,255,.19)}
+.price-breakout{--plan-accent:#ff55d9;--plan-second:#ffb1e9;--plan-glow:rgba(255,79,216,.18)}
+.price-smc{--plan-accent:#ffd166;--plan-second:#fff0b8;--plan-glow:rgba(246,189,74,.20)}
+.price-ladder{--plan-accent:#43f2b8;--plan-second:#c0ffe9;--plan-glow:rgba(53,240,176,.18)}
+.price-custom{--plan-accent:#ffe29a;--plan-second:#c6a7ff;--plan-glow:rgba(246,189,74,.18)}
+.price-plan .plan-label{font-family:"IBM Plex Mono",monospace;color:var(--plan-accent);letter-spacing:.2em;text-shadow:0 0 14px var(--plan-glow)}
+.price-plan .plan-number{font-family:"Oxanium",sans-serif;color:var(--plan-second)}
+.price-plan h3{font-family:"Michroma","Oxanium",sans-serif;font-size:clamp(17px,1.7vw,22px);letter-spacing:-.035em;text-shadow:0 0 18px var(--plan-glow)}
+.price-plan .plan-summary{color:#bdc9df;font-family:"Space Grotesk",sans-serif;font-size:11px}
+.price-plan .plan-price strong{
+  color:transparent;background:linear-gradient(105deg,var(--plan-accent) 0%,#fff 37%,var(--plan-second) 61%,var(--plan-accent) 100%);background-size:260% 100%;
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  font-family:"Michroma","Oxanium",sans-serif;font-size:clamp(25px,2.6vw,35px);letter-spacing:-.055em;
+  filter:drop-shadow(0 0 10px var(--plan-glow)) drop-shadow(0 0 22px var(--plan-glow));animation:kbPriceSpectrum 6.5s ease-in-out infinite;
+}
+@keyframes kbPriceSpectrum{0%,100%{background-position:100% 50%;filter:drop-shadow(0 0 7px var(--plan-glow))}50%{background-position:0 50%;filter:drop-shadow(0 0 17px var(--plan-glow)) drop-shadow(0 0 27px var(--plan-glow))}}
+.price-plan .plan-price span{color:#c2cce0;font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.08em}
+.price-plan .plan-offer{border-color:color-mix(in srgb,var(--plan-accent) 43%,transparent);color:var(--plan-accent);background:linear-gradient(100deg,color-mix(in srgb,var(--plan-accent) 11%,transparent),rgba(255,255,255,.025));box-shadow:inset 0 0 17px var(--plan-glow),0 0 15px color-mix(in srgb,var(--plan-accent) 15%,transparent);font-family:"IBM Plex Mono",monospace}
+.price-plan ul li{color:#c2cce0;font-family:"Rajdhani","Space Grotesk",sans-serif;font-size:13px;font-weight:600}
+.price-plan ul li::before{color:var(--plan-accent);text-shadow:0 0 12px var(--plan-accent)}
+.price-plan .button{font-family:"IBM Plex Mono",monospace;border-color:color-mix(in srgb,var(--plan-accent) 55%,transparent)}
+.price-plan .button-outline{color:#f4f7ff;background:linear-gradient(110deg,color-mix(in srgb,var(--plan-accent) 13%,transparent),rgba(255,255,255,.035));box-shadow:0 0 20px var(--plan-glow),inset 0 0 18px rgba(255,255,255,.025)}
+.price-plan .button-outline:hover{color:#fff;border-color:var(--plan-accent);box-shadow:0 0 28px var(--plan-glow),inset 0 0 20px var(--plan-glow)}
+.price-plan:hover{transform:translateY(-8px);border-color:var(--plan-accent);background:radial-gradient(ellipse at 92% 3%,color-mix(in srgb,var(--plan-accent) 22%,transparent),transparent 48%),linear-gradient(145deg,rgba(20,34,68,.78),rgba(5,10,27,.84));box-shadow:0 28px 70px rgba(0,0,0,.42),0 0 38px var(--plan-glow),inset 0 1px 0 rgba(255,255,255,.17),inset 0 0 40px var(--plan-glow)}
+.price-smc{transform:translateY(-6px)}.price-smc:hover{transform:translateY(-11px)}
+.price-custom{border-color:rgba(255,226,154,.48);background:radial-gradient(ellipse at 50% 0%,rgba(246,189,74,.17),transparent 52%),linear-gradient(145deg,rgba(31,25,53,.78),rgba(5,10,27,.84))}
+.billing-switch{-webkit-backdrop-filter:blur(20px) saturate(150%);backdrop-filter:blur(20px) saturate(150%)}
+.billing-choice{font-family:"IBM Plex Mono",monospace}
+.billing-banner{border-color:rgba(246,189,74,.35);background:linear-gradient(100deg,rgba(246,189,74,.11),rgba(166,107,255,.10),rgba(32,230,255,.09));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.premium-pricing .pricing-note{color:#9eacc8;font-family:"Space Grotesk",sans-serif}
+@media(max-width:1120px){.premium-price-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.price-plan,.price-plan:hover{transform:none}.price-plan .plan-price strong{font-size:clamp(29px,8vw,37px)}}
+@media(prefers-reduced-motion:reduce){.price-plan::before,.price-plan .plan-price strong{animation:none!important}}
