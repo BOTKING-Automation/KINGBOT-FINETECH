@@ -1,0 +1,243 @@
+/* KINGBOT FINETECH — premium subscription / payments control surface */
+:root{
+  --kb-luxe-cyan:#20e6ff;
+  --kb-luxe-violet:#a66bff;
+  --kb-luxe-pink:#ff4fd8;
+  --kb-luxe-gold:#f6bd4a;
+  --kb-luxe-mint:#35f0b0;
+  --kb-luxe-text:#f2f6ff;
+  --kb-luxe-muted:#9eacc9;
+}
+body.kb-subscription-page{
+  color:var(--kb-luxe-text)!important;
+  background:
+    radial-gradient(ellipse at 7% 2%,rgba(32,230,255,.14),transparent 30%),
+    radial-gradient(ellipse at 95% 0%,rgba(166,107,255,.16),transparent 31%),
+    radial-gradient(ellipse at 50% 60%,rgba(255,79,216,.055),transparent 38%),
+    radial-gradient(ellipse at 70% 100%,rgba(53,240,176,.06),transparent 32%),
+    linear-gradient(180deg,#030612 0%,#070d20 52%,#030612 100%)!important;
+  font-family:"Space Grotesk",Inter,sans-serif!important;
+}
+body.kb-subscription-page::before{
+  opacity:.48;
+  background-image:linear-gradient(rgba(32,230,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(32,230,255,.035) 1px,transparent 1px);
+  background-size:48px 48px;
+}
+body.kb-subscription-page .page{width:min(1500px,calc(100% - 46px));padding:28px 0 70px}
+body.kb-subscription-page .command-head{
+  position:relative;isolation:isolate;overflow:hidden;
+  border:1px solid rgba(32,230,255,.22);border-radius:24px;
+  background:radial-gradient(ellipse at 90% 0%,rgba(166,107,255,.22),transparent 37%),radial-gradient(ellipse at 0% 100%,rgba(32,230,255,.12),transparent 39%),linear-gradient(135deg,rgba(13,24,52,.91),rgba(5,10,27,.9));
+  box-shadow:0 24px 70px rgba(0,0,0,.36),0 0 38px rgba(32,230,255,.07),inset 0 1px 0 rgba(255,255,255,.10);
+  backdrop-filter:blur(22px) saturate(145%);
+}
+body.kb-subscription-page .command-head::after{
+  content:"";position:absolute;z-index:-1;right:-100px;top:-190px;width:430px;height:430px;border-radius:50%;
+  border:1px solid rgba(32,230,255,.15);box-shadow:0 0 70px rgba(166,107,255,.10),inset 0 0 60px rgba(32,230,255,.06);pointer-events:none;
+}
+body.kb-subscription-page .command-head::before{
+  height:2px;background:linear-gradient(90deg,transparent,var(--kb-luxe-cyan),var(--kb-luxe-violet),var(--kb-luxe-pink),var(--kb-luxe-gold),transparent);
+  box-shadow:0 0 24px rgba(32,230,255,.42);animation:kbSubscriptionTopScan 9s linear infinite;
+}
+@keyframes kbSubscriptionTopScan{0%{transform:translateX(-22%)}100%{transform:translateX(22%)}}
+body.kb-subscription-page .head-grid{grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:24px}
+body.kb-subscription-page .eyebrow{color:#9ceeff;font:700 9px "IBM Plex Mono",monospace;letter-spacing:.18em}
+body.kb-subscription-page .eyebrow::before{background:linear-gradient(90deg,var(--kb-luxe-cyan),var(--kb-luxe-violet));box-shadow:0 0 13px var(--kb-luxe-cyan)}
+body.kb-subscription-page h1{font:800 clamp(30px,4vw,52px)/1.05 "Oxanium","Space Grotesk",sans-serif;letter-spacing:-.045em;text-shadow:0 0 25px rgba(32,230,255,.10)}
+body.kb-subscription-page .gradient{
+  background:linear-gradient(100deg,#f7d389 0%,#20e6ff 35%,#a66bff 66%,#ff4fd8 100%);
+  background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:kbSubscriptionHeadline 10s ease-in-out infinite;
+}
+@keyframes kbSubscriptionHeadline{0%,100%{background-position:100% 50%}50%{background-position:0 50%}}
+body.kb-subscription-page .lead{max-width:800px;color:#b2c0d9;font:500 13px/1.8 "Space Grotesk",sans-serif}
+body.kb-subscription-page .head-status{gap:8px}
+body.kb-subscription-page .status-chip{
+  border-color:rgba(32,230,255,.17);border-radius:10px;background:rgba(4,11,31,.54);
+  color:#aebdd9;font:700 7px "IBM Plex Mono",monospace;letter-spacing:.08em;
+  box-shadow:inset 0 0 16px rgba(32,230,255,.035);
+}
+body.kb-subscription-page .status-chip.online{border-color:rgba(53,240,176,.30);background:rgba(53,240,176,.07);color:#8fffd0}
+body.kb-subscription-page .panel{
+  border:1px solid rgba(32,230,255,.16);border-radius:19px;
+  background:linear-gradient(145deg,rgba(12,22,49,.78),rgba(4,9,26,.86));
+  box-shadow:0 22px 62px rgba(0,0,0,.30),inset 0 1px 0 rgba(255,255,255,.075);
+  backdrop-filter:blur(22px) saturate(140%);
+}
+body.kb-subscription-page .panel-inner{padding:21px}
+body.kb-subscription-page .section-code{color:#8eeeff;font:700 8px "IBM Plex Mono",monospace;letter-spacing:.17em;text-shadow:0 0 12px rgba(32,230,255,.20)}
+body.kb-subscription-page .section-title{font:800 14px "Oxanium","Orbitron",sans-serif;letter-spacing:.05em;color:#f5f7ff}
+body.kb-subscription-page .section-note{color:#9cabc8;font:700 7px "IBM Plex Mono",monospace;letter-spacing:.09em}
+body.kb-subscription-page .billing-switch{
+  border-color:rgba(32,230,255,.24);border-radius:15px;
+  background:rgba(3,8,24,.76);box-shadow:0 0 30px rgba(32,230,255,.08),inset 0 0 22px rgba(166,107,255,.045);
+  backdrop-filter:blur(17px);
+}
+body.kb-subscription-page .billing-choice{font:800 10px "IBM Plex Mono",monospace}
+body.kb-subscription-page .billing-choice.active{color:#06101b;background:linear-gradient(105deg,#f6bd4a,#20e6ff 42%,#a66bff 78%,#ff4fd8);box-shadow:0 0 29px rgba(32,230,255,.20),0 0 35px rgba(166,107,255,.13)}
+body.kb-subscription-page .billing-promise{color:#ffe2a0;font:800 8px "IBM Plex Mono",monospace;letter-spacing:.13em;text-shadow:0 0 14px rgba(246,189,74,.20)}
+body.kb-subscription-page .pricing-currency-note{
+  border-color:rgba(32,230,255,.20);border-radius:12px;
+  background:linear-gradient(100deg,rgba(32,230,255,.065),rgba(166,107,255,.07),rgba(246,189,74,.045));
+  color:#a7b6d2;box-shadow:0 0 25px rgba(32,230,255,.045);backdrop-filter:blur(15px);
+}
+body.kb-subscription-page .pricing-currency-note strong{color:#c5f7ff}
+body.kb-subscription-page .plans{grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+body.kb-subscription-page .plan-card{
+  min-width:0;min-height:304px;padding:15px;border:1px solid rgba(32,230,255,.18);border-radius:17px;
+  background:radial-gradient(circle at 90% 0%,var(--plan-glow,rgba(32,230,255,.12)),transparent 48%),linear-gradient(150deg,rgba(16,29,62,.85),rgba(5,10,28,.93));
+  box-shadow:0 15px 40px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.08);
+}
+body.kb-subscription-page .plan-card.plan-strategic{--plan-glow:rgba(32,230,255,.17);border-color:rgba(32,230,255,.26)}
+body.kb-subscription-page .plan-card.plan-flipper{--plan-glow:rgba(166,107,255,.19);border-color:rgba(166,107,255,.29)}
+body.kb-subscription-page .plan-card.plan-breakout{--plan-glow:rgba(255,79,216,.17);border-color:rgba(255,79,216,.28)}
+body.kb-subscription-page .plan-card.plan-smc-pro{--plan-glow:rgba(246,189,74,.19);border-color:rgba(246,189,74,.32)}
+body.kb-subscription-page .plan-card.plan-ladder-flip{--plan-glow:rgba(53,240,176,.17);border-color:rgba(53,240,176,.27)}
+body.kb-subscription-page .plan-card:hover,body.kb-subscription-page .plan-card.selected{
+  border-color:rgba(255,255,255,.42);transform:translateY(-5px);
+  box-shadow:0 25px 52px rgba(0,0,0,.38),0 0 28px var(--plan-glow),inset 0 0 30px var(--plan-glow);
+}
+body.kb-subscription-page .plan-code{color:#a6c3e5;font:700 7px "IBM Plex Mono",monospace;letter-spacing:.11em}
+body.kb-subscription-page .plan-name{color:#f4f7ff;font:800 12px "Michroma","Oxanium",sans-serif}
+body.kb-subscription-page .plan-price{color:#fff;font:800 21px "Michroma","Oxanium",sans-serif;text-shadow:0 0 14px var(--plan-glow)}
+body.kb-subscription-page .plan-price small{color:#b1c1dd;font:700 7px "IBM Plex Mono",monospace}
+body.kb-subscription-page .plan-description{color:#b1bed8;font:500 9px/1.65 "Space Grotesk",sans-serif}
+body.kb-subscription-page .plan-effective{color:#a9bad8;font:700 7px "IBM Plex Mono",monospace;line-height:1.55}
+body.kb-subscription-page .plan-saving{color:#c7f8ff;text-shadow:0 0 12px var(--plan-glow)}
+body.kb-subscription-page .feature-list li{color:#c6d2e8;font:600 11px/1.5 "Rajdhani","Inter",sans-serif}
+body.kb-subscription-page .plan-select{
+  min-height:40px;border:1px solid rgba(32,230,255,.36);border-radius:10px;
+  background:linear-gradient(110deg,rgba(32,230,255,.13),rgba(166,107,255,.13));
+  color:#eff9ff;font:800 7px "IBM Plex Mono",monospace;letter-spacing:.10em;
+  box-shadow:0 0 17px rgba(32,230,255,.075);
+}
+body.kb-subscription-page .plan-select:hover{border-color:rgba(255,79,216,.50);box-shadow:0 0 23px rgba(166,107,255,.15)}
+body.kb-subscription-page .private-consultation{
+  border-color:rgba(246,189,74,.31);border-radius:17px;
+  background:radial-gradient(circle at 0 50%,rgba(246,189,74,.13),transparent 38%),linear-gradient(105deg,rgba(246,189,74,.06),rgba(166,107,255,.07),rgba(32,230,255,.05));
+  box-shadow:0 0 29px rgba(246,189,74,.06),inset 0 1px 0 rgba(255,255,255,.07);
+}
+body.kb-subscription-page .private-consultation strong{font:800 12px "Oxanium",sans-serif;color:#fff}
+body.kb-subscription-page .private-consultation p{color:#aebbd5;font:500 9px/1.6 "Space Grotesk",sans-serif}
+body.kb-subscription-page .private-consultation a{border-color:rgba(246,189,74,.4);color:#ffe5a7;background:rgba(246,189,74,.055);font:800 7px "IBM Plex Mono",monospace}
+body.kb-subscription-page .layout{grid-template-columns:minmax(0,1.35fr) minmax(330px,.82fr);gap:15px;margin-top:16px}
+body.kb-subscription-page .payment-grid{grid-template-columns:minmax(0,1fr) minmax(275px,.78fr);gap:13px}
+body.kb-subscription-page .payment-console,body.kb-subscription-page .payment-summary{
+  border:1px solid rgba(32,230,255,.15);border-radius:15px;
+  background:linear-gradient(150deg,rgba(6,15,37,.69),rgba(4,9,25,.82));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.055);
+}
+body.kb-subscription-page .payment-summary{position:sticky;top:18px;background:radial-gradient(circle at 95% 0%,rgba(166,107,255,.12),transparent 46%),linear-gradient(150deg,rgba(11,19,47,.85),rgba(4,9,25,.92))}
+body.kb-subscription-page .console-label{color:#93dff0;font:700 8px "IBM Plex Mono",monospace;letter-spacing:.13em}
+body.kb-subscription-page .mpesa-card{
+  border-color:rgba(53,240,176,.24);border-radius:12px;
+  background:radial-gradient(circle at 0 0,rgba(53,240,176,.11),transparent 48%),linear-gradient(115deg,rgba(8,35,39,.77),rgba(8,17,35,.83));
+}
+body.kb-subscription-page .mpesa-title{font:800 11px "Oxanium",sans-serif;color:#dcfff0;letter-spacing:.07em}
+body.kb-subscription-page .receiver{color:#b5d3d1;font:600 8px/1.75 "IBM Plex Mono",monospace}
+body.kb-subscription-page .secure-tag{color:#8fffd0;font:700 7px "IBM Plex Mono",monospace}
+body.kb-subscription-page .payment-rail-section{margin:15px 0 12px}
+body.kb-subscription-page .payment-rail-heading{display:flex;align-items:end;justify-content:space-between;gap:10px;margin-bottom:10px}
+body.kb-subscription-page .payment-rail-kicker{display:block;color:#8eefff;font:700 7px "IBM Plex Mono",monospace;letter-spacing:.15em}
+body.kb-subscription-page .payment-rail-heading h3{margin:4px 0 0;color:#f0f5ff;font:800 13px "Oxanium",sans-serif}
+body.kb-subscription-page .payment-rail-security{color:#8ca3c5;font:700 6px "IBM Plex Mono",monospace;letter-spacing:.09em;white-space:nowrap}
+body.kb-subscription-page .payment-rail-security span{color:#35f0b0;text-shadow:0 0 9px #35f0b0}
+body.kb-subscription-page .payment-rail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+body.kb-subscription-page .payment-rail{
+  min-width:0;min-height:132px;padding:11px;border:1px solid rgba(32,230,255,.16);border-radius:12px;
+  background:linear-gradient(145deg,rgba(13,26,55,.71),rgba(5,11,28,.84));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+}
+body.kb-subscription-page .payment-rail-active{border-color:rgba(53,240,176,.34);background:radial-gradient(circle at 0 0,rgba(53,240,176,.11),transparent 57%),linear-gradient(145deg,rgba(9,31,45,.84),rgba(5,11,28,.88));box-shadow:0 0 23px rgba(53,240,176,.06),inset 0 1px 0 rgba(255,255,255,.08)}
+body.kb-subscription-page .payment-rail-pending{border-color:rgba(166,107,255,.19);background:linear-gradient(145deg,rgba(20,19,52,.55),rgba(5,10,27,.75));opacity:.91}
+body.kb-subscription-page .payment-rail-top{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:28px}
+body.kb-subscription-page .mpesa-brand-mark{color:#48d56a;font:900 15px "Oxanium",sans-serif;letter-spacing:-.06em;text-shadow:0 0 12px rgba(72,213,106,.28)}
+body.kb-subscription-page .payment-rail-state{color:#87ffd0;font:700 6px "IBM Plex Mono",monospace;letter-spacing:.04em;text-align:right}
+body.kb-subscription-page .payment-rail strong{display:block;margin-top:8px;color:#edf5ff;font:800 9px "Oxanium",sans-serif}
+body.kb-subscription-page .payment-rail p{min-height:32px;margin:5px 0 9px;color:#9eafcc;font:500 8px/1.55 "Space Grotesk",sans-serif}
+body.kb-subscription-page .payment-rail-foot{display:block;color:#93a8c7;font:700 6px "IBM Plex Mono",monospace;letter-spacing:.04em}
+body.kb-subscription-page .payment-rail-active .payment-rail-foot{color:#8fffd0}
+body.kb-subscription-page .payment-logo-row{display:flex;align-items:center;gap:9px;min-height:29px}
+body.kb-subscription-page .payment-logo-row img{display:block;max-width:68px;height:24px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(255,255,255,.10))}
+body.kb-subscription-page .payment-card-logos img:first-child{width:52px}
+body.kb-subscription-page .payment-card-logos img:last-child{width:34px;height:27px}
+body.kb-subscription-page .payment-wallet-logos img:first-child{width:48px}
+body.kb-subscription-page .payment-wallet-logos img:last-child{width:58px}
+body.kb-subscription-page .payment-provider-note{
+  display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:9px;padding:9px 11px;
+  border:1px solid rgba(166,107,255,.18);border-radius:10px;background:linear-gradient(100deg,rgba(166,107,255,.07),rgba(32,230,255,.045));
+  color:#9baac7;font:500 7px/1.5 "Space Grotesk",sans-serif;
+}
+body.kb-subscription-page .provider-note-label{color:#b8a6ff;font:700 6px "IBM Plex Mono",monospace;letter-spacing:.08em}
+body.kb-subscription-page .paystack-wordmark{color:#69d6ff;font:900 10px "Oxanium",sans-serif;letter-spacing:.07em;text-shadow:0 0 12px rgba(0,195,247,.24)}
+body.kb-subscription-page .payment-mode-switch{gap:7px;padding:5px;border-color:rgba(32,230,255,.19);border-radius:11px;background:rgba(3,8,24,.7)}
+body.kb-subscription-page .payment-mode{min-height:39px;border-radius:8px;color:#a9b9d4;font:800 7px "IBM Plex Mono",monospace}
+body.kb-subscription-page .payment-mode.active{border-color:rgba(32,230,255,.34);background:linear-gradient(110deg,rgba(32,230,255,.13),rgba(166,107,255,.12));color:#d9faff;box-shadow:0 0 16px rgba(32,230,255,.08)}
+body.kb-subscription-page .payment-mode:disabled{opacity:.4;cursor:not-allowed;text-decoration:line-through}
+body.kb-subscription-page .checkout-link-card{border-color:rgba(32,230,255,.16);border-radius:11px;background:rgba(5,12,32,.66)}
+body.kb-subscription-page .checkout-link-head{color:#d6e5f7;font:800 7px "IBM Plex Mono",monospace}
+body.kb-subscription-page .checkout-link-row input,body.kb-subscription-page .form input,body.kb-subscription-page .form select{
+  border-color:rgba(32,230,255,.16);border-radius:9px;background:rgba(3,9,25,.83);color:#eef6ff;
+  font:600 9px "IBM Plex Mono",monospace;box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+}
+body.kb-subscription-page .form label{color:#a9bad7;font:700 7px "IBM Plex Mono",monospace;letter-spacing:.06em}
+body.kb-subscription-page .form input:focus,body.kb-subscription-page .form select:focus{border-color:rgba(32,230,255,.53);box-shadow:0 0 0 3px rgba(32,230,255,.08),0 0 17px rgba(32,230,255,.05)}
+body.kb-subscription-page .submit{
+  min-height:46px;border:1px solid rgba(255,255,255,.19);border-radius:11px;
+  background:linear-gradient(105deg,#f6bd4a,#20e6ff 48%,#a66bff);color:#06101b;
+  box-shadow:0 9px 27px rgba(32,230,255,.13),0 0 24px rgba(166,107,255,.08);
+  font:900 8px "IBM Plex Mono",monospace;letter-spacing:.08em;
+}
+body.kb-subscription-page .submit:hover{filter:brightness(1.07);transform:translateY(-2px)}
+body.kb-subscription-page .notice,body.kb-subscription-page .status-box,body.kb-subscription-page .stk-status{
+  border-color:rgba(32,230,255,.14);border-radius:10px;background:rgba(255,255,255,.025);color:#a7b6d2;
+  font:600 8px/1.7 "IBM Plex Mono",monospace;
+}
+body.kb-subscription-page .summary-name{color:#f2f7ff;font:800 11px "Oxanium",sans-serif}
+body.kb-subscription-page .summary-status{border-color:rgba(166,107,255,.24);background:rgba(166,107,255,.08);color:#c8b5ff;font:700 6px "IBM Plex Mono",monospace}
+body.kb-subscription-page .summary-price{
+  color:transparent;background:linear-gradient(105deg,#f6bd4a,#20e6ff 45%,#a66bff 75%,#ff4fd8);
+  -webkit-background-clip:text;background-clip:text;font:800 25px "Michroma","Oxanium",sans-serif;
+  filter:drop-shadow(0 0 13px rgba(32,230,255,.12));
+}
+body.kb-subscription-page .summary-price span{color:#9fb0cc;-webkit-text-fill-color:#9fb0cc;font:700 7px "IBM Plex Mono",monospace}
+body.kb-subscription-page .summary-line{border-color:rgba(32,230,255,.12);color:#9fafd0;font:600 8px "IBM Plex Mono",monospace}
+body.kb-subscription-page .summary-line strong{color:#e8efff;font:700 8px "IBM Plex Mono",monospace}
+body.kb-subscription-page .history-panel .section-title{color:#f1f5ff}
+body.kb-subscription-page .history-item{border-color:rgba(32,230,255,.11);background:rgba(255,255,255,.02)}
+body.kb-subscription-page .payment-summary .status-box{line-height:1.7}
+@media(max-width:1280px){
+  body.kb-subscription-page .plans{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.kb-subscription-page .payment-grid{grid-template-columns:minmax(0,1fr) minmax(260px,.75fr)}
+}
+@media(max-width:980px){
+  body.kb-subscription-page .head-grid{grid-template-columns:1fr;align-items:start}
+  body.kb-subscription-page .head-status{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.kb-subscription-page .layout{grid-template-columns:1fr}
+  body.kb-subscription-page .payment-summary{position:relative;top:auto}
+  body.kb-subscription-page .payment-grid{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+  body.kb-subscription-page .page{width:calc(100% - 26px);padding:18px 0 48px}
+  body.kb-subscription-page .plans{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.kb-subscription-page .payment-rail-grid{grid-template-columns:1fr}
+  body.kb-subscription-page .payment-rail{min-height:0}
+  body.kb-subscription-page .payment-provider-note{align-items:flex-start}
+}
+@media(max-width:560px){
+  body.kb-subscription-page .page{width:calc(100% - 18px)}
+  body.kb-subscription-page .panel-inner{padding:14px}
+  body.kb-subscription-page .command-head{padding:18px}
+  body.kb-subscription-page .head-status{grid-template-columns:1fr}
+  body.kb-subscription-page .plans{grid-template-columns:1fr}
+  body.kb-subscription-page .payment-rail-heading{align-items:flex-start;flex-direction:column}
+  body.kb-subscription-page .payment-logo-row{min-height:27px}
+  body.kb-subscription-page .private-consultation{grid-template-columns:auto 1fr}
+  body.kb-subscription-page .private-consultation a{grid-column:1/-1;text-align:center}
+}
+@media(prefers-reduced-motion:reduce){
+  body.kb-subscription-page .command-head::before,
+  body.kb-subscription-page .gradient{animation:none!important}
+  body.kb-subscription-page .plan-card,
+  body.kb-subscription-page .submit{transition:none!important}
+}
