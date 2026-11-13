@@ -1495,9 +1495,14 @@
         });
         const url=new URL(location.href);
         url.searchParams.set("months",String(billingMonths));
-        history.replaceState(null,"",url.toString());
+        window.history.replaceState(null,"",url.toString());
         renderPlans();
       });
+    });
+    document.querySelectorAll("[data-billing-months]").forEach(option=>{
+      const active=Number(option.dataset.billingMonths)===billingMonths;
+      option.classList.toggle("active",active);
+      option.setAttribute("aria-pressed",String(active));
     });
     syncPaymentMode();
     load();
