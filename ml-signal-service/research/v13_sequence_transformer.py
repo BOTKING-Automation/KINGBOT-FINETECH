@@ -749,6 +749,8 @@ def run_experiment(
             "fitPartition": "development_only",
         },
         "matchedBenchmark": {
+            "comparisonType": "retrained_incumbent_rf_mlp_architecture_on_identical_train_dev_final_partitions",
+            "baselineIsPersistedChampionArtifact": False,
             "baseline": baseline_final,
             "transformer": transformer_final,
             "selectionScoreDelta": delta,
