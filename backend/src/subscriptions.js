@@ -496,13 +496,16 @@ export function createSubscriptionRouter({pool,broker}) {
     if(!valid)return res.status(401).json({ok:false,error:"PAYSTACK_WEBHOOK_SIGNATURE_INVALID"});
     const event=req.body||{};
     if(String(event.event||"").toLowerCase()==="ping")return res.sendStatus(200);
-    res.sendStatus(200);
     const reference=String(event?.data?.reference||"").trim();
     if(reference && ["charge.success","charge.failed"].includes(String(event.event||"").toLowerCase())){
-      void syncPaystackPayment(pool,reference).catch(error=>{
+      try{
+        await syncPaystackPayment(pool,reference);
+      }catch(error){
         console.error("[KINGBOT PAYSTACK WEBHOOK]",error?.message||error);
-      });
+        return res.sendStatus(503);
+      }
     }
+    return res.sendStatus(200);
   });
 
   router.get("/access/:botId",async(req,res)=>{
