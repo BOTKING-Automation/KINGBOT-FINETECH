@@ -213,9 +213,63 @@ def estimate_xauusd_tail_probability_bloq(
         phase_precision_bits, delta
     )
     qpe_bloq = TextbookQPE(mean_operator, phase_state)
-    report = estimate_qualtran_bloq(
-        qpe_bloq, physical_model=physical_model, data_code_distance=data_code_distance
-    )
+    try:
+        report = estimate_qualtran_bloq(
+            qpe_bloq, physical_model=physical_model, data_code_distance=data_code_distance
+        )
+        report["qpe_resource_estimation_status"] = "COMPLETE"
+        report["component_resource_estimates"] = {}
+    except Exception as error:
+        # Qualtran 0.7.0 currently has an atomic controlled-And call-graph edge
+        # inside the controlled mean-estimation/QPE decomposition. Do not turn an
+        # incomplete count into a fabricated T-count or physical-qubit estimate.
+        from qualtran.surface_code import AlgorithmSummary
+
+        component_estimates = {}
+        for component_name, component_bloq in (
+            ("state_preparation", synthesizer),
+            ("mean_estimation_operator_uncontrolled", mean_operator),
+        ):
+            try:
+                component_summary = AlgorithmSummary.from_bloq(component_bloq)
+                component_estimates[component_name] = {
+                    "status": "COUNTED",
+                    "algorithm_qubits": _json_safe(component_summary.n_algo_qubits),
+                    "gate_counts": _json_safe(component_summary.n_logical_gates.asdict()),
+                    "approximate_t_count": _json_safe(
+                        component_summary.n_logical_gates.total_t_count()
+                    ),
+                }
+            except Exception as component_error:
+                component_estimates[component_name] = {
+                    "status": "UNAVAILABLE",
+                    "error_type": type(component_error).__name__,
+                    "error": str(component_error)[:500],
+                }
+        report = {
+            "schema_version": "kingbot-qualtran-resource-report-v1",
+            "mode": "OFFLINE_RESEARCH_ONLY",
+            "qualtran_version": getattr(qualtran, "__version__", "unknown"),
+            "bloq_type": type(qpe_bloq).__name__,
+            "logical_resources": None,
+            "physical_scenario": None,
+            "physical_resource_status": (
+                "NOT_COMPUTED_BECAUSE_FULL_QPE_GATE_COUNT_IS_INCOMPLETE"
+                if physical_model != "none" else "NOT_REQUESTED"
+            ),
+            "qpe_resource_estimation_status": "BLOCKED_BY_QUALTRAN_CONTROLLED_ATOMIC_BLOQ",
+            "qpe_resource_estimation_error_type": type(error).__name__,
+            "qpe_resource_estimation_error": str(error)[:1000],
+            "component_resource_estimates": component_estimates,
+            "resource_counting_note": (
+                "The QPE Bloq was constructed, but Qualtran's recursive logical gate "
+                "counter could not traverse a controlled atomic And Bloq. No total "
+                "QPE T-count or physical resource estimate is reported."
+            ),
+            "can_generate_trade_signal": False,
+            "can_place_order": False,
+            "approval_status": "NOT_A_MODEL_OR_TRADING_CANDIDATE",
+        }
     report.update({
         "estimand": "empirical_probability_single_trade_loss_ge_threshold",
         "loss_threshold_r": threshold,
