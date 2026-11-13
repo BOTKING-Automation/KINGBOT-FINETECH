@@ -28,7 +28,7 @@ A single shared UTC market window is used across the supplied symbols. Samples a
 
 Forward labels are purged at both split boundaries. The scaler is fitted only on training sequences. Final-period predictions are not used for model selection, early stopping, calibration, or threshold tuning.
 
-The report includes balanced accuracy, macro-F1, per-class recall and support, NLL, multiclass Brier score, ECE, and final-period metrics by market regime.
+The market-regime slices are computed from the incumbent regime taxonomy supplied with actual causal OHLC indicators at each decision candle: EMA20, EMA50, ATR14, ADX14, OHLC-derived momentum/volatility, breakout state and ATR-scaled velocity. The earlier prototype's synthetic EMA values derived from a trend flag have been removed. The report includes balanced accuracy, macro-F1, per-class recall and support, NLL, multiclass Brier score, ECE, and final-period metrics by market regime.
 
 The initial research gate retains KINGBOT's minimum balanced accuracy (0.36), macro-F1 (0.34), at least 30 final samples, and nonzero SELL/HOLD/BUY support and recall. The challenger must also beat the matched baseline selection score by at least 0.005 on the untouched final period.
 
@@ -60,7 +60,7 @@ Example shape:
 }
 ~~~
 
-The example is only a schema illustration; one candle is not a trainable dataset. Do not commit broker credentials, client data, or private trading histories to the repository.
+The example is only a schema illustration; one candle is not a trainable dataset. Do not commit broker credentials, client data, or private trading histories to the repository. CI also runs a deterministic synthetic end-to-end test through sequence construction, Transformer fitting, development calibration, matched baseline fitting and untouched final evaluation; that fixture validates the pipeline only and is not performance evidence.
 
 ## Run the experiment
 
