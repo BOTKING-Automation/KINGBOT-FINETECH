@@ -4,6 +4,14 @@ import { resolveFirebaseUser } from "./auth.js";
 import { isAdminEmail } from "./admin-access.js";
 import { appendCommercialLedger } from "./commercial-ledger.js";
 import { initiateStkPush, queryStkPush, normalizeMpesaPhone, mpesaStatus, createStkReference } from "./mpesa.js";
+import {
+  calculatePaystackAmountKes,
+  getPaystackConfig,
+  initializePaystackTransaction,
+  paystackStatus,
+  verifyPaystackTransaction,
+  verifyPaystackWebhookSignature
+} from "./paystack.js";
 
 const BOT_PLANS = {
   strategic: { id:"strategic", name:"Strategic", priceUsd:350, billing:"monthly", billingOptions:[1,3], botLimit:1, selectableBots:[], bots:["strategic"], requiresBotSelection:false, public:true, features:["One dedicated engine licence","KINGBOT platform access","Account-level risk controls","Subscription and access oversight"] },
@@ -30,6 +38,67 @@ function resolvePlanBots(plan, selectedBotId){
     return plan.selectableBots.includes(selected) ? [selected] : [];
   }
   return plan ? [...plan.bots] : [];
+}
+
+async function syncPaystackPayment(pool, reference){
+  const q=await pool.query(
+    "SELECT id,user_id,plan_id,amount_kes,billing_months,status,payment_method,provider_status FROM kingbot_payments WHERE provider_reference=$1 LIMIT 1",
+    [String(reference||"")]
+  );
+  if(!q.rowCount)return null;
+  const payment=q.rows[0];
+  if(String(payment.payment_method||"").toUpperCase()!=="PAYSTACK")return null;
+  if(String(payment.provider_status||"").toLowerCase()==="success" || String(payment.status||"").toLowerCase()==="approved"){
+    return payment;
+  }
+
+  const transaction=await verifyPaystackTransaction({reference});
+  const transactionStatus=String(transaction?.status||"").trim().toLowerCase();
+  const metadata=typeof transaction?.metadata==="string"
+    ? (()=>{try{return JSON.parse(transaction.metadata)}catch{return {}}})()
+    : (transaction?.metadata||{});
+  const amountMatches=Number(transaction?.amount)===Math.round(Number(payment.amount_kes)*100);
+  const currencyMatches=String(transaction?.currency||"").toUpperCase()==="KES";
+  const referenceMatches=String(transaction?.reference||"")===String(reference);
+  const metadataMatches=
+    String(metadata.kingbot_payment_id||"")===String(payment.id) &&
+    String(metadata.kingbot_user_id||"")===String(payment.user_id) &&
+    String(metadata.kingbot_plan_id||"")===String(payment.plan_id) &&
+    Number(metadata.kingbot_billing_months)===Number(payment.billing_months);
+
+  if(transactionStatus==="success" && !(amountMatches&&currencyMatches&&referenceMatches&&metadataMatches)){
+    await pool.query(
+      "UPDATE kingbot_payments SET status='failed',provider_status='mismatch',reviewer_note='Paystack transaction verification did not match the KINGBOT order.' WHERE id=$1 AND status<>'approved' AND provider_status IS DISTINCT FROM 'success'",
+      [payment.id]
+    );
+  }else if(transactionStatus==="success"){
+    const updated=await pool.query(
+      "UPDATE kingbot_payments SET status=CASE WHEN status='awaiting_payment' THEN 'pending' ELSE status END,provider_status='success',provider_channel=$2,provider_paid_at=COALESCE(provider_paid_at,NOW()),reviewer_note=CASE WHEN status='awaiting_payment' THEN 'Paystack test transaction verified; awaiting administrator approval.' ELSE reviewer_note END WHERE id=$1 AND status<>'approved' AND provider_status IS DISTINCT FROM 'success' RETURNING id",
+      [payment.id,String(transaction.channel||"").slice(0,40)||null]
+    );
+    if(updated.rowCount){
+      await pool.query(
+        "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'PAYSTACK_TEST_PAYMENT_VERIFIED',$2::jsonb)",
+        [payment.user_id,JSON.stringify({paymentId:payment.id,reference,amountKes:payment.amount_kes,channel:transaction.channel||null})]
+      );
+    }
+  }else if(["failed","abandoned"].includes(transactionStatus)){
+    await pool.query(
+      "UPDATE kingbot_payments SET status='failed',provider_status=$2,reviewer_note='Paystack test checkout was not completed.' WHERE id=$1 AND status='awaiting_payment' AND provider_status IS DISTINCT FROM 'success'",
+      [payment.id,transactionStatus]
+    );
+  }else{
+    await pool.query(
+      "UPDATE kingbot_payments SET provider_status=$2 WHERE id=$1 AND status='awaiting_payment' AND provider_status IS DISTINCT FROM 'success'",
+      [payment.id,transactionStatus||"pending"]
+    );
+  }
+
+  const latest=await pool.query(
+    "SELECT id,plan_id,amount_kes,mpesa_code,status,payment_method,provider_reference,provider_status,provider_channel,provider_paid_at,reviewer_note,submitted_at FROM kingbot_payments WHERE id=$1 LIMIT 1",
+    [payment.id]
+  );
+  return latest.rows[0]||payment;
 }
 
 export async function expireStaleSubscriptions(pool){
@@ -73,7 +142,7 @@ async function requireAdmin(pool, req, res) {
 export function createSubscriptionRouter({pool,broker}) {
   const router = Router();
 
-  router.get("/plans",(_req,res)=>res.json({ok:true,plans:Object.values(PLANS).filter(p=>p.public!==false).map(p=>({...p,billingOptions:[{months:1,discountPercent:0,totalUsd:p.priceUsd},{months:3,discountPercent:30,totalUsd:Number((p.priceUsd*2.1).toFixed(2))}],selectableBotDetails:[]})),mpesaReceiver:process.env.MPESA_RECEIVER_PHONE||"0748275015",mpesaStatus:mpesaStatus()}));
+  router.get("/plans",(_req,res)=>res.json({ok:true,plans:Object.values(PLANS).filter(p=>p.public!==false).map(p=>({...p,billingOptions:[{months:1,discountPercent:0,totalUsd:p.priceUsd},{months:3,discountPercent:30,totalUsd:Number((p.priceUsd*2.1).toFixed(2))}],selectableBotDetails:[]})),mpesaReceiver:process.env.MPESA_RECEIVER_PHONE||"0748275015",mpesaStatus:mpesaStatus(),paystackStatus:paystackStatus()}));
 
   router.get("/me",async(req,res)=>{
     const u=await requireUser(pool,req,res); if(!u)return;
@@ -81,7 +150,7 @@ export function createSubscriptionRouter({pool,broker}) {
       await expireStaleSubscriptions(pool);
       const s=await pool.query("SELECT id,plan_id,status,started_at,expires_at,approved_at FROM kingbot_subscriptions WHERE user_id=$1 AND status='active' AND expires_at>NOW() ORDER BY expires_at DESC LIMIT 1",[u.id]);
       const e=await pool.query("SELECT e.bot_id FROM kingbot_bot_entitlements e JOIN kingbot_subscriptions s ON s.id=e.subscription_id WHERE e.user_id=$1 AND e.active=TRUE AND s.status='active' AND s.expires_at>NOW() ORDER BY e.bot_id",[u.id]);
-      const p=await pool.query("SELECT id,plan_id,status,payment_method,mpesa_code,mpesa_receipt,amount_kes,payer_phone,payer_name,stk_status,stk_result_code,stk_result_desc,submitted_at,reviewed_at,reviewer_note,selected_bot_id,billing_months FROM kingbot_payments WHERE user_id=$1 ORDER BY submitted_at DESC LIMIT 20",[u.id]);
+      const p=await pool.query("SELECT id,plan_id,status,payment_method,mpesa_code,provider_reference,provider_status,provider_channel,provider_paid_at,mpesa_receipt,amount_kes,payer_phone,payer_name,stk_status,stk_result_code,stk_result_desc,submitted_at,reviewed_at,reviewer_note,selected_bot_id,billing_months FROM kingbot_payments WHERE user_id=$1 ORDER BY submitted_at DESC LIMIT 20",[u.id]);
       res.json({
         ok:true,
         isAdmin:isAdminEmail(u.email),
@@ -321,6 +390,124 @@ export function createSubscriptionRouter({pool,broker}) {
     }
   });
 
+  router.post("/payments/paystack/initialize",async(req,res)=>{
+    const u=await requireUser(pool,req,res);if(!u)return;
+    const config=getPaystackConfig();
+    if(!paystackStatus().configured)return res.status(503).json({ok:false,error:"PAYSTACK_TEST_NOT_CONFIGURED",message:"Paystack Test Mode requires a test secret key, webhook signing secret and server-side USD/KES rate."});
+    const p=planId(req.body?.planId);
+    const billingMonths=Number(req.body?.billingMonths||1);
+    const selectedBot=normalizeBotId(req.body?.selectedBotId);
+    const plan=PLANS[p];
+    if(!plan||plan.public===false)return res.status(400).json({ok:false,error:"Invalid subscription plan."});
+    if(![1,3].includes(billingMonths))return res.status(400).json({ok:false,error:"Choose a one-month or three-month billing term."});
+    if(plan.requiresBotSelection&&!plan.selectableBots.includes(selectedBot))return res.status(400).json({ok:false,error:"Choose a valid bot for this plan."});
+    if(!plan.requiresBotSelection&&selectedBot&&!plan.bots.includes(selectedBot))return res.status(400).json({ok:false,error:"The selected bot is not included in this plan."});
+    if(!u.email||!String(u.email).includes("@"))return res.status(400).json({ok:false,error:"A verified account email is required for Paystack checkout."});
+
+    let amountKes;
+    try{
+      amountKes=calculatePaystackAmountKes(plan.priceUsd,billingMonths,config.usdKesRate);
+    }catch(error){
+      return res.status(503).json({ok:false,error:"PAYSTACK_PRICE_CONFIGURATION_INVALID"});
+    }
+    const reference="KB"+Date.now()+"-"+crypto.randomBytes(7).toString("hex");
+    let payment;
+    try{
+      const inserted=await pool.query(
+        "INSERT INTO kingbot_payments(user_id,plan_id,amount_kes,mpesa_code,payer_name,selected_bot_id,billing_months,status,payment_method,provider_reference,provider_status) VALUES($1,$2,$3,$4,$5,$6,$7,'awaiting_payment','PAYSTACK',$4,'initializing') RETURNING id,plan_id,amount_kes,status,payment_method,provider_reference,provider_status,submitted_at",
+        [u.id,p,amountKes,reference,[u.first_name,u.last_name].filter(Boolean).join(" ")||null,selectedBot||null,billingMonths]
+      );
+      payment=inserted.rows[0];
+    }catch(error){
+      if(error?.code==="23505")return res.status(409).json({ok:false,error:"PAYSTACK_REFERENCE_CONFLICT",message:"Could not reserve a unique payment reference. Please retry."});
+      console.error("[KINGBOT PAYSTACK INITIALIZE]",error?.message||error);
+      return res.status(500).json({ok:false,error:"PAYSTACK_ORDER_CREATE_FAILED"});
+    }
+
+    try{
+      const checkout=await initializePaystackTransaction({
+        email:u.email,
+        amountKes,
+        reference,
+        metadata:{
+          kingbot_payment_id:String(payment.id),
+          kingbot_user_id:String(u.id),
+          kingbot_plan_id:p,
+          kingbot_billing_months:billingMonths,
+          kingbot_test_mode:true
+        }
+      });
+      const updated=await pool.query(
+        "UPDATE kingbot_payments SET provider_status='pending',provider_authorization_url=$2 WHERE id=$1 RETURNING id,plan_id,amount_kes,status,payment_method,provider_reference,provider_status,submitted_at",
+        [payment.id,checkout.authorization_url]
+      );
+      await pool.query(
+        "INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'PAYSTACK_TEST_CHECKOUT_INITIALIZED',$2::jsonb)",
+        [u.id,JSON.stringify({paymentId:payment.id,reference,planId:p,billingMonths,amountKes,currency:"KES"})]
+      );
+      return res.status(201).json({
+        ok:true,
+        testMode:true,
+        payment:updated.rows[0],
+        amountKes,
+        currency:"KES",
+        authorizationUrl:checkout.authorization_url,
+        message:"Paystack Test Mode checkout created. No real money will be collected."
+      });
+    }catch(error){
+      await pool.query(
+        "UPDATE kingbot_payments SET status='failed',provider_status='initialization_failed',reviewer_note='Paystack sandbox checkout initialization failed.' WHERE id=$1 AND status='awaiting_payment'",
+        [payment.id]
+      ).catch(()=>{});
+      console.error("[KINGBOT PAYSTACK INITIALIZE]",error?.message||error);
+      return res.status(502).json({ok:false,error:"PAYSTACK_TEST_INITIALIZATION_FAILED",message:"Paystack could not initialize the test checkout. Review the test credentials and retry."});
+    }
+  });
+
+  router.get("/payments/paystack/verify",async(req,res)=>{
+    const u=await requireUser(pool,req,res);if(!u)return;
+    const reference=String(req.query?.reference||"").trim();
+    if(!/^[A-Za-z0-9.=-]{8,100}$/.test(reference))return res.status(400).json({ok:false,error:"PAYSTACK_REFERENCE_INVALID"});
+    try{
+      const owned=await pool.query("SELECT id FROM kingbot_payments WHERE provider_reference=$1 AND user_id=$2 AND payment_method='PAYSTACK' LIMIT 1",[reference,u.id]);
+      if(!owned.rowCount)return res.status(404).json({ok:false,error:"PAYSTACK_PAYMENT_NOT_FOUND"});
+      const payment=await syncPaystackPayment(pool,reference);
+      return res.json({
+        ok:true,
+        testMode:true,
+        verified:String(payment?.provider_status||"").toLowerCase()==="success",
+        payment,
+        message:String(payment?.provider_status||"").toLowerCase()==="success"
+          ? "Test payment verified. Subscription access remains locked until KINGBOT administrator approval."
+          : "Paystack has not confirmed a successful payment yet."
+      });
+    }catch(error){
+      console.error("[KINGBOT PAYSTACK VERIFY]",error?.message||error);
+      return res.status(503).json({ok:false,error:"PAYSTACK_VERIFICATION_UNAVAILABLE",message:"The Paystack transaction could not be verified right now. Refresh payment status shortly."});
+    }
+  });
+
+  router.post("/paystack/webhook",async(req,res)=>{
+    const valid=verifyPaystackWebhookSignature({
+      rawBody:req.rawBody,
+      signatureHeader:req.get("paystack-signature"),
+      legacySignature:req.get("x-paystack-signature")
+    });
+    if(!valid)return res.status(401).json({ok:false,error:"PAYSTACK_WEBHOOK_SIGNATURE_INVALID"});
+    const event=req.body||{};
+    if(String(event.event||"").toLowerCase()==="ping")return res.sendStatus(200);
+    const reference=String(event?.data?.reference||"").trim();
+    if(reference && ["charge.success","charge.failed"].includes(String(event.event||"").toLowerCase())){
+      try{
+        await syncPaystackPayment(pool,reference);
+      }catch(error){
+        console.error("[KINGBOT PAYSTACK WEBHOOK]",error?.message||error);
+        return res.sendStatus(503);
+      }
+    }
+    return res.sendStatus(200);
+  });
+
   router.get("/access/:botId",async(req,res)=>{
     const u=await requireUser(pool,req,res); if(!u)return;
     const bot=String(req.params.botId||"").trim().toLowerCase();
@@ -332,7 +519,7 @@ export function createSubscriptionRouter({pool,broker}) {
   router.get("/admin/payments",async(req,res)=>{
     const a=await requireAdmin(pool,req,res);if(!a)return;
     try {
-      const q=await pool.query("SELECT p.id,p.user_id,u.first_name,u.last_name,u.email,u.phone,p.plan_id,p.amount_kes,p.mpesa_code,p.payer_phone,p.payer_name,p.selected_bot_id,p.billing_months,p.status,p.payment_method,p.mpesa_receipt,p.stk_status,p.stk_result_code,p.stk_result_desc,p.checkout_request_id,p.submitted_at,p.reviewed_at,p.reviewed_by,p.reviewer_note FROM kingbot_payments p JOIN kingbot_users u ON u.id=p.user_id ORDER BY CASE WHEN p.status='pending' THEN 0 ELSE 1 END,p.submitted_at DESC LIMIT 200");
+      const q=await pool.query("SELECT p.id,p.user_id,u.first_name,u.last_name,u.email,u.phone,p.plan_id,p.amount_kes,p.mpesa_code,p.payer_phone,p.payer_name,p.selected_bot_id,p.billing_months,p.status,p.payment_method,p.provider_reference,p.provider_status,p.provider_channel,p.provider_paid_at,p.mpesa_receipt,p.stk_status,p.stk_result_code,p.stk_result_desc,p.checkout_request_id,p.submitted_at,p.reviewed_at,p.reviewed_by,p.reviewer_note FROM kingbot_payments p JOIN kingbot_users u ON u.id=p.user_id ORDER BY CASE WHEN p.status='pending' THEN 0 ELSE 1 END,p.submitted_at DESC LIMIT 200");
       res.json({ok:true,payments:q.rows});
     }catch(err){console.error("[KINGBOT ADMIN]",err?.message||err);res.status(500).json({ok:false,error:"Payment queue unavailable."});}
   });
@@ -342,9 +529,13 @@ export function createSubscriptionRouter({pool,broker}) {
     const client=await pool.connect();
     try {
       await client.query("BEGIN");
-      const q=await client.query("SELECT id,user_id,plan_id,selected_bot_id,billing_months,status FROM kingbot_payments WHERE id=$1 FOR UPDATE",[String(req.params.id||"")]);
+      const q=await client.query("SELECT id,user_id,plan_id,selected_bot_id,billing_months,status,payment_method,provider_status FROM kingbot_payments WHERE id=$1 FOR UPDATE",[String(req.params.id||"")]);
       if(!q.rowCount){await client.query("ROLLBACK");return res.status(404).json({ok:false,error:"Payment not found."});}
       const p=q.rows[0]; if(p.status!=="pending"){await client.query("ROLLBACK");return res.status(409).json({ok:false,error:"Payment has already been reviewed."});}
+      if(String(p.payment_method||"").toUpperCase()==="PAYSTACK" && String(p.provider_status||"").toLowerCase()!=="success"){
+        await client.query("ROLLBACK");
+        return res.status(409).json({ok:false,error:"PAYSTACK_PAYMENT_NOT_VERIFIED",message:"This Paystack payment cannot grant access until the server confirms its successful transaction."});
+      }
       const plan=PLANS[p.plan_id];
       if(!plan){await client.query("ROLLBACK");return res.status(400).json({ok:false,error:"Payment references an invalid subscription plan."});}
       const grantedBots=resolvePlanBots(plan,p.selected_bot_id);
@@ -650,6 +841,12 @@ export async function ensureSubscriptionSchema(pool){
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS mpesa_receipt TEXT");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS merchant_request_id TEXT");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS checkout_request_id TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS provider_reference TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS provider_status TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS provider_channel TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS provider_authorization_url TEXT");
+  await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS provider_paid_at TIMESTAMPTZ");
+  await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS kingbot_payments_provider_reference_uq ON kingbot_payments(provider_reference) WHERE provider_reference IS NOT NULL");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS stk_status TEXT");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS stk_result_code TEXT");
   await pool.query("ALTER TABLE kingbot_payments ADD COLUMN IF NOT EXISTS stk_result_desc TEXT");
