@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-const DEFAULT_CALLBACK_URL = "https://botking-automation.github.io/KINGBOT-FINETECH/subscription.html?gateway=paystack";
+const DEFAULT_CALLBACK_URL = "https://botking-automation.github.io/KINGBOT-FINETECH/subscription.html";
 
 export function getPaystackConfig(env = process.env) {
   const mode = String(env.PAYSTACK_MODE || "test").trim().toLowerCase();
