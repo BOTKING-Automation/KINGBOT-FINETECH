@@ -803,6 +803,11 @@
     function syncAuthUI(detail){
       const authenticated = detail?.authenticated === true ||
         window.KINGBOT_SESSION?.isAuthenticated?.() === true;
+      // On the public landing surface, switch to the shared platform shell
+      // only after Firebase confirms an authenticated session.
+      if(document.body?.classList.contains("kb-public-landing")){
+        document.body.classList.toggle("kb-landing-authenticated",authenticated);
+      }
 
       const accountNode=root.querySelector(".kb-menu-account");
       if(accountNode){

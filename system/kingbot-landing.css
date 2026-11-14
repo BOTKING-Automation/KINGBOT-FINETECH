@@ -2341,3 +2341,16 @@ body.kb-public-landing::after{
   .artwork-frame .artwork-colour-glow{filter:blur(5px) saturate(1.6) brightness(1.35) drop-shadow(0 0 23px #20e6ff)}
   .artwork-frame .artwork-hero-image{filter:drop-shadow(0 0 15px #20e6ff) drop-shadow(0 0 36px rgba(32,230,255,.38))}
 }
+
+/* Authenticated landing: restore the shared KINGBOT platform navigation.
+   Guests keep the editorial landing header; members use the original
+   global platform menu and its account-aware links. */
+body.kb-public-landing:not(.kb-landing-authenticated) #kb-compact-nav,
+body.kb-public-landing:not(.kb-landing-authenticated) #kb-ai-float,
+body.kb-public-landing:not(.kb-landing-authenticated) .kb-skip-link,
+body.kb-public-landing:not(.kb-landing-authenticated) .kb-live-region {
+  display: none !important;
+}
+body.kb-public-landing.kb-landing-authenticated .site-header {
+  display: none !important;
+}
