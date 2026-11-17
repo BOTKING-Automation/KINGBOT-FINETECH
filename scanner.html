@@ -804,6 +804,8 @@ body.kb-scanner-page .catalog-more:hover{border-color:rgba(174,131,255,.48);box-
       <button class="catalog-tab" type="button" data-catalog-category="etf">ETFs</button>
       <button class="catalog-tab" type="button" data-catalog-category="crypto">CRYPTO</button>
       <button class="catalog-tab" type="button" data-catalog-category="commodities">COMMODITIES</button>
+      <button class="catalog-tab" type="button" data-catalog-category="bonds">BONDS</button>
+      <button class="catalog-tab" type="button" data-catalog-category="funds">FUNDS</button>
     </div>
     <label class="watchlist-search">
       <span aria-hidden="true">⌕</span>
@@ -2114,8 +2116,10 @@ body.kb-scanner-page .catalog-more:hover{border-color:rgba(174,131,255,.48);box-
       catalog.total=Number(data.total||0);
       catalog.hasMore=data.hasMore===true;
       catalog.offset=catalog.items.length;
-      setCatalogStatus(data.stale?"USING CACHED CATALOG · REFRESH PENDING":"TWELVE DATA CATALOG VERIFIED",data.stale?"warn":"good");
-      qs("catalogSourceNote").textContent=(data.source||"Twelve Data reference data")+(data.stale?" · cached reference snapshot":" · instrument metadata only; quote freshness is shown separately");
+      const partial=Array.isArray(data.unavailableCategories)&&data.unavailableCategories.length>0;
+      setCatalogStatus(data.stale?"USING CACHED CATALOG · REFRESH PENDING":partial?"PARTIAL CATALOG · SOME ASSET CLASSES RESTRICTED":"TWELVE DATA CATALOG VERIFIED",data.stale||partial?"warn":"good");
+      const missingNote=partial?" · unavailable: "+data.unavailableCategories.map(item=>item.category).join(", "):"";
+      qs("catalogSourceNote").textContent=(data.source||"Twelve Data reference data")+(data.stale?" · cached reference snapshot":" · instrument metadata only; quote freshness is shown separately")+missingNote;
       renderInstrumentCatalog();
     }catch(error){
       if(requestId!==catalog.requestId)return;
