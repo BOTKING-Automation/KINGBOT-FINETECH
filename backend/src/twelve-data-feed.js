@@ -377,7 +377,7 @@ export class TwelveDataFeed {
     }
     items.sort((a, b) => a.symbol.localeCompare(b.symbol) || a.exchange.localeCompare(b.exchange));
 
-    const safeLimit = Math.max(10, Math.min(100, Math.floor(Number(limit) || 40)));
+    const safeLimit = Math.max(1, Math.min(100, Math.floor(Number(limit) || 40)));
     const safeOffset = Math.max(0, Math.min(1000000, Math.floor(Number(offset) || 0)));
     return {
       ok: true,
