@@ -258,6 +258,26 @@ export class TwelveDataFeed {
     return websocketQuotes.map(q => q.available ? q : (restMap[q.symbol] || q));
   }
 
+  setSymbols(symbols = []) {
+    const next = [...new Set((Array.isArray(symbols) ? symbols : [])
+      .map(normalizeSymbol).filter(Boolean))].slice(0, 12);
+    const previous = this.symbols;
+    const nextSet = new Set(next);
+    const previousSet = new Set(previous);
+    const removed = previous.filter(symbol => !nextSet.has(symbol));
+    const added = next.filter(symbol => !previousSet.has(symbol));
+    this.symbols = next.length ? next : DEFAULT_SYMBOLS.slice();
+    if (this.enabled && this.ws?.readyState === WebSocket.OPEN) {
+      try {
+        if (removed.length) this.ws.send(JSON.stringify({ action: "unsubscribe", params: { symbols: removed.join(",") } }));
+        if (added.length) this.ws.send(JSON.stringify({ action: "subscribe", params: { symbols: added.join(",") } }));
+      } catch (error) {
+        console.warn("[TWELVE DATA WS] subscription update deferred:", error?.message || error);
+      }
+    }
+    return this.status();
+  }
+
   async loadInstrumentCatalog(category) {
     const config = INSTRUMENT_CATALOGS[category];
     if (!config) throw new Error("TWELVE_DATA_CATALOG_CATEGORY_UNSUPPORTED");
