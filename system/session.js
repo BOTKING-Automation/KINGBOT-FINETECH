@@ -6,7 +6,11 @@
 */
 (function(window){
 "use strict";
-const API_BASE="https://kingbot-fintech-api-etfv.onrender.com/api";
+const HOSTED_API_BASE="https://kingbot-fintech-api-etfv.onrender.com/api";
+const requestedApi=new URLSearchParams(window.location.search).get("kb-api")||"";
+const API_BASE=requestedApi==="local"
+ ? "http://127.0.0.1:10000/api"
+ : (/^https?:\/\//i.test(requestedApi) ? requestedApi.replace(/\/$/,"") : HOSTED_API_BASE);
 const API_ORIGIN=API_BASE.replace(/\/api\/?$/i,"");
 const state={checked:false,checking:false,authenticated:false,user:null,error:null,checkedAt:0};
 let activeCheck=null;
