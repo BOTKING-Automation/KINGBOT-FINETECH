@@ -379,7 +379,17 @@ export class TwelveDataFeed {
     }
 
     const normalizedQuery = String(query || "").trim().toLowerCase().slice(0, 80);
-    const catalogues = await Promise.all(categories.map(value => this.loadInstrumentCatalog(value)));
+    const catalogueResults = await Promise.allSettled(categories.map(value => this.loadInstrumentCatalog(value)));
+    const catalogues = catalogueResults.filter(result => result.status === "fulfilled").map(result => result.value);
+    const unavailableCategories = catalogueResults
+      .map((result, index) => result.status === "rejected" ? {
+        category: categories[index],
+        error: String(result.reason?.message || "CATALOG_UNAVAILABLE").slice(0, 180)
+      } : null)
+      .filter(Boolean);
+    if (!catalogues.length) {
+      throw new Error(unavailableCategories[0]?.error || "TWELVE_DATA_CATALOG_UNAVAILABLE");
+    }
     let items = catalogues.flatMap(catalogue => catalogue.items);
     const seen = new Set();
     items = items.filter(item => {
@@ -416,6 +426,7 @@ export class TwelveDataFeed {
         cached: catalogue.cached,
         stale: catalogue.stale === true
       })),
+      unavailableCategories,
       source: "Twelve Data reference catalogs",
       stale: catalogues.some(catalogue => catalogue.stale === true),
       generatedAt: new Date().toISOString()
