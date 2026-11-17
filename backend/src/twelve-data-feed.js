@@ -2,11 +2,13 @@ import WebSocket from "ws";
 
 const DEFAULT_SYMBOLS = ["XAU/USD","EUR/USD","GBP/USD","USD/JPY","BTC/USD"];
 const INSTRUMENT_CATALOGS = Object.freeze({
-  forex: { endpoint: "forex_pairs", label: "FOREX" },
-  stocks: { endpoint: "stocks", label: "STOCKS" },
-  etf: { endpoint: "etfs", label: "ETFS" },
-  crypto: { endpoint: "cryptocurrencies", label: "CRYPTO" },
-  commodities: { endpoint: "commodities", label: "COMMODITIES" }
+  forex: { endpoints: ["forex_pairs"], label: "FOREX" },
+  stocks: { endpoints: ["stocks"], label: "STOCKS" },
+  etf: { endpoints: ["etf", "etfs"], label: "ETFS" },
+  crypto: { endpoints: ["cryptocurrencies"], label: "CRYPTO" },
+  commodities: { endpoints: ["commodities"], label: "COMMODITIES" },
+  bonds: { endpoints: ["bonds"], label: "BONDS" },
+  funds: { endpoints: ["funds"], label: "FUNDS" }
 });
 const CATALOG_TTL_MS = Math.max(15 * 60 * 1000, Number(process.env.TWELVE_DATA_CATALOG_TTL_MS || 6 * 60 * 60 * 1000));
 
@@ -286,64 +288,84 @@ export class TwelveDataFeed {
       return { ...cached, cached: true, stale: false };
     }
 
-    const url = "https://api.twelvedata.com/" + config.endpoint +
-      "?format=JSON&page=1&outputsize=5000&apikey=" + encodeURIComponent(this.apiKey);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 45000);
-    try {
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: { Accept: "application/json" }
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || payload?.status === "error") {
-        throw new Error(payload?.message || ("TWELVE_DATA_" + config.endpoint.toUpperCase() + "_FAILED"));
+    let payload = null;
+    let selectedEndpoint = null;
+    let lastError = null;
+    for (const endpoint of config.endpoints) {
+      const url = "https://api.twelvedata.com/" + endpoint +
+        "?format=JSON&page=1&outputsize=5000&apikey=" + encodeURIComponent(this.apiKey);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 45000);
+      try {
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: { Accept: "application/json" }
+        });
+        const candidate = await response.json().catch(() => ({}));
+        if (!response.ok || candidate?.status === "error") {
+          throw new Error(candidate?.message || ("TWELVE_DATA_" + endpoint.toUpperCase().replace(/[^A-Z0-9]/g, "_") + "_FAILED"));
+        }
+        const rows = Array.isArray(candidate) ? candidate
+          : Array.isArray(candidate?.data) ? candidate.data
+          : Array.isArray(candidate?.values) ? candidate.values
+          : Array.isArray(candidate?.result?.list) ? candidate.result.list
+          : Array.isArray(candidate?.result) ? candidate.result
+          : null;
+        if (!rows) throw new Error("TWELVE_DATA_CATALOG_RESPONSE_INVALID");
+        payload = candidate;
+        selectedEndpoint = endpoint;
+        break;
+      } catch (error) {
+        lastError = error;
+      } finally {
+        clearTimeout(timer);
       }
-      const rows = Array.isArray(payload) ? payload
-        : Array.isArray(payload?.data) ? payload.data
-        : Array.isArray(payload?.values) ? payload.values
-        : Array.isArray(payload?.result) ? payload.result
-        : null;
-      if (!rows) throw new Error("TWELVE_DATA_CATALOG_RESPONSE_INVALID");
+    }
 
-      const items = rows.map(row => {
-        const providerSymbol = String(row?.symbol || row?.ticker || "").trim();
-        if (!providerSymbol) return null;
-        const exchangeList = Array.isArray(row?.available_exchanges) ? row.available_exchanges : [];
-        return {
-          symbol: kingbotSymbol(providerSymbol),
-          providerSymbol,
-          name: String(row?.name || row?.currency_base || row?.description || providerSymbol).trim(),
-          category: config.label,
-          exchange: String(row?.exchange || exchangeList[0] || "").trim(),
-          country: String(row?.country || "").trim(),
-          currency: String(row?.currency || row?.currency_quote || "").trim(),
-          instrumentType: String(row?.type || row?.instrument_type || config.label).trim(),
-          group: String(row?.currency_group || row?.category || "").trim()
-        };
-      }).filter(Boolean);
-
-      const result = {
-        category,
-        label: config.label,
-        items,
-        total: items.length,
-        cachedAt: Date.now(),
-        cached: false,
-        stale: false,
-        source: "Twelve Data reference catalog /" + config.endpoint
-      };
-      this.catalogCache.set(category, result);
-      return result;
-    } catch (error) {
+    if (!payload) {
       if (cached?.items?.length) {
-        return { ...cached, cached: true, stale: true, warning: String(error?.message || "CATALOG_REFRESH_FAILED").slice(0, 180) };
+        return { ...cached, cached: true, stale: true, warning: String(lastError?.message || "CATALOG_REFRESH_FAILED").slice(0, 180) };
       }
       throw new Error("TWELVE_DATA_CATALOG_" + category.toUpperCase() + "_UNAVAILABLE: " +
-        String(error?.message || "REFERENCE_DATA_REQUEST_FAILED").slice(0, 180));
-    } finally {
-      clearTimeout(timer);
+        String(lastError?.message || "REFERENCE_DATA_REQUEST_FAILED").slice(0, 180));
     }
+
+    const rows = Array.isArray(payload) ? payload
+      : Array.isArray(payload?.data) ? payload.data
+      : Array.isArray(payload?.values) ? payload.values
+      : Array.isArray(payload?.result?.list) ? payload.result.list
+      : Array.isArray(payload?.result) ? payload.result
+      : [];
+    const items = rows.map(row => {
+      const providerSymbol = String(row?.symbol || row?.ticker || "").trim();
+      if (!providerSymbol) return null;
+      const exchangeList = Array.isArray(row?.available_exchanges) ? row.available_exchanges : [];
+      return {
+        symbol: kingbotSymbol(providerSymbol),
+        providerSymbol,
+        name: String(row?.name || row?.currency_base || row?.description || providerSymbol).trim(),
+        category: config.label,
+        exchange: String(row?.exchange || row?.mic_code || exchangeList[0] || row?.fund_family || "").trim(),
+        country: String(row?.country || "").trim(),
+        currency: String(row?.currency || row?.currency_quote || "").trim(),
+        instrumentType: String(row?.type || row?.instrument_type || row?.fund_type || config.label).trim(),
+        group: String(row?.currency_group || row?.category || row?.fund_type || "").trim()
+      };
+    }).filter(Boolean);
+
+    const reportedCount = finite(payload?.count ?? payload?.result?.count);
+    const result = {
+      category,
+      label: config.label,
+      items,
+      total: reportedCount !== null ? reportedCount : items.length,
+      cachedAt: Date.now(),
+      cached: false,
+      stale: false,
+      source: "Twelve Data reference catalog /" + selectedEndpoint
+    };
+    this.catalogCache.set(category, result);
+    return result;
   }
 
   async instrumentCatalog({ category = "all", query = "", limit = 40, offset = 0 } = {}) {
