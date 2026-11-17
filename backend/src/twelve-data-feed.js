@@ -140,7 +140,7 @@ export class TwelveDataFeed {
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
-    }, 5000);
+    }, Math.max(1000, Number(process.env.TWELVE_DATA_RECONNECT_MS || 5000)));
   }
 
   async technicalSnapshot(symbol, timeframe="5m", { maxAgeMs=15000, force=false } = {}) {
