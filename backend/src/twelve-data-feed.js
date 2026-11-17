@@ -4,7 +4,7 @@ const DEFAULT_SYMBOLS = ["XAU/USD","EUR/USD","GBP/USD","USD/JPY","BTC/USD"];
 const INSTRUMENT_CATALOGS = Object.freeze({
   forex: { endpoint: "forex_pairs", label: "FOREX" },
   stocks: { endpoint: "stocks", label: "STOCKS" },
-  etf: { endpoint: "etf", label: "ETFS" },
+  etf: { endpoint: "etfs", label: "ETFS" },
   crypto: { endpoint: "cryptocurrencies", label: "CRYPTO" },
   commodities: { endpoint: "commodities", label: "COMMODITIES" }
 });
