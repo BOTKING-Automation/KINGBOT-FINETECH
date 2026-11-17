@@ -1,6 +1,14 @@
 import WebSocket from "ws";
 
 const DEFAULT_SYMBOLS = ["XAU/USD","EUR/USD","GBP/USD","USD/JPY","BTC/USD"];
+const INSTRUMENT_CATALOGS = Object.freeze({
+  forex: { endpoint: "forex_pairs", label: "FOREX" },
+  stocks: { endpoint: "stocks", label: "STOCKS" },
+  etf: { endpoint: "etf", label: "ETFS" },
+  crypto: { endpoint: "cryptocurrencies", label: "CRYPTO" },
+  commodities: { endpoint: "commodities", label: "COMMODITIES" }
+});
+const CATALOG_TTL_MS = Math.max(15 * 60 * 1000, Number(process.env.TWELVE_DATA_CATALOG_TTL_MS || 6 * 60 * 60 * 1000));
 
 function finite(value) {
   const n = Number(value);
@@ -30,9 +38,15 @@ function atrValue(bars,period=14){if(bars.length<=period)return null;const t=[];
 function deriveTechnicalFromBars(bars){if(bars.length<60)return null;const c=bars.map(x=>x.close),h=bars.map(x=>x.high),l=bars.map(x=>x.low),e20=emaSeries(c,20),e50=emaSeries(c,50),f=emaSeries(c,12),s=emaSeries(c,26),macdSeries=c.map((_,i)=>f[i]!=null&&s[i]!=null?f[i]-s[i]:null).filter(v=>v!=null),macd=macdSeries.at(-1),macdSignal=sma(macdSeries,9),rsi=rsiValue(c),atr=atrValue(bars),last=bars.at(-1),prev=bars.at(-2),rh=Math.max(...h.slice(-20,-1)),rl=Math.min(...l.slice(-20,-1)),ph=Math.max(...h.slice(-40,-20)),pl=Math.min(...l.slice(-40,-20)),ema20=e20.at(-1),ema50=e50.at(-1);const trend=ema20>ema50&&last.close>ema20?"BULLISH":ema20<ema50&&last.close<ema20?"BEARISH":"NEUTRAL";const bos=last.close>rh?"BULLISH":last.close<rl?"BEARISH":"NONE";const choch=prev.close<=ph&&last.close>ph?"BULLISH":prev.close>=pl&&last.close<pl?"BEARISH":"NONE";const liquiditySweep=last.low<rl&&last.close>rl?"BULLISH":last.high>rh&&last.close<rh?"BEARISH":"NONE";const fvg=bars.at(-1).low>bars.at(-3).high||bars.at(-1).high<bars.at(-3).low;return {close:last.close,price:last.close,ema20,ema50,rsi14:rsi,macd,macdSignal,atr14:atr,support:rl,resistance:rh,trend,bos,choch,liquiditySweep,fvg,barTime:last.datetime,receivedAt:new Date().toISOString()};}
 
 export class TwelveDataFeed {
-  constructor({ symbols = DEFAULT_SYMBOLS } = {}) {
+  constructor(options = {}) {
     this.apiKey = String(process.env.TWELVE_DATA_API_KEY || "").trim();
-    this.symbols = [...new Set(symbols.map(normalizeSymbol))];
+    const configuredSymbols = String(process.env.TWELVE_DATA_SYMBOLS || "")
+      .split(",").map(value => value.trim()).filter(Boolean);
+    const requestedSymbols = Array.isArray(options.symbols)
+      ? options.symbols
+      : (configuredSymbols.length ? configuredSymbols : DEFAULT_SYMBOLS);
+    this.symbols = [...new Set(requestedSymbols.map(normalizeSymbol).filter(Boolean))].slice(0, 12);
+    this.catalogCache = new Map();
     this.ws = null;
     this.connected = false;
     this.last = new Map();
@@ -242,6 +256,128 @@ export class TwelveDataFeed {
 
     const restMap = Object.fromEntries(restQuotes.map(q => [q.symbol, q]));
     return websocketQuotes.map(q => q.available ? q : (restMap[q.symbol] || q));
+  }
+
+  async loadInstrumentCatalog(category) {
+    const config = INSTRUMENT_CATALOGS[category];
+    if (!config) throw new Error("TWELVE_DATA_CATALOG_CATEGORY_UNSUPPORTED");
+    const cached = this.catalogCache.get(category);
+    if (cached && Date.now() - cached.cachedAt < CATALOG_TTL_MS) {
+      return { ...cached, cached: true, stale: false };
+    }
+
+    const url = "https://api.twelvedata.com/" + config.endpoint +
+      "?format=JSON&apikey=" + encodeURIComponent(this.apiKey);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 45000);
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { Accept: "application/json" }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.status === "error") {
+        throw new Error(payload?.message || ("TWELVE_DATA_" + config.endpoint.toUpperCase() + "_FAILED"));
+      }
+      const rows = Array.isArray(payload) ? payload
+        : Array.isArray(payload?.data) ? payload.data
+        : Array.isArray(payload?.values) ? payload.values
+        : Array.isArray(payload?.result) ? payload.result
+        : null;
+      if (!rows) throw new Error("TWELVE_DATA_CATALOG_RESPONSE_INVALID");
+
+      const items = rows.map(row => {
+        const providerSymbol = String(row?.symbol || row?.ticker || "").trim();
+        if (!providerSymbol) return null;
+        const exchangeList = Array.isArray(row?.available_exchanges) ? row.available_exchanges : [];
+        return {
+          symbol: kingbotSymbol(providerSymbol),
+          providerSymbol,
+          name: String(row?.name || row?.currency_base || row?.description || providerSymbol).trim(),
+          category: config.label,
+          exchange: String(row?.exchange || exchangeList[0] || "").trim(),
+          country: String(row?.country || "").trim(),
+          currency: String(row?.currency || row?.currency_quote || "").trim(),
+          instrumentType: String(row?.type || row?.instrument_type || config.label).trim(),
+          group: String(row?.currency_group || row?.category || "").trim()
+        };
+      }).filter(Boolean);
+
+      const result = {
+        category,
+        label: config.label,
+        items,
+        total: items.length,
+        cachedAt: Date.now(),
+        cached: false,
+        stale: false,
+        source: "Twelve Data reference catalog /" + config.endpoint
+      };
+      this.catalogCache.set(category, result);
+      return result;
+    } catch (error) {
+      if (cached?.items?.length) {
+        return { ...cached, cached: true, stale: true, warning: String(error?.message || "CATALOG_REFRESH_FAILED").slice(0, 180) };
+      }
+      throw new Error("TWELVE_DATA_CATALOG_" + category.toUpperCase() + "_UNAVAILABLE: " +
+        String(error?.message || "REFERENCE_DATA_REQUEST_FAILED").slice(0, 180));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async instrumentCatalog({ category = "all", query = "", limit = 40, offset = 0 } = {}) {
+    if (!this.enabled) throw new Error("TWELVE_DATA_NOT_CONFIGURED");
+    const requestedCategory = String(category || "all").trim().toLowerCase();
+    const categories = requestedCategory === "all"
+      ? Object.keys(INSTRUMENT_CATALOGS)
+      : [requestedCategory];
+    if (!categories.every(value => Object.hasOwn(INSTRUMENT_CATALOGS, value))) {
+      throw new Error("TWELVE_DATA_CATALOG_CATEGORY_UNSUPPORTED");
+    }
+
+    const normalizedQuery = String(query || "").trim().toLowerCase().slice(0, 80);
+    const catalogues = await Promise.all(categories.map(value => this.loadInstrumentCatalog(value)));
+    let items = catalogues.flatMap(catalogue => catalogue.items);
+    const seen = new Set();
+    items = items.filter(item => {
+      const key = [item.category, item.providerSymbol, item.exchange].join("|").toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    if (normalizedQuery) {
+      items = items.filter(item =>
+        item.symbol.toLowerCase().includes(normalizedQuery) ||
+        item.providerSymbol.toLowerCase().includes(normalizedQuery) ||
+        item.name.toLowerCase().includes(normalizedQuery) ||
+        item.exchange.toLowerCase().includes(normalizedQuery) ||
+        item.country.toLowerCase().includes(normalizedQuery)
+      );
+    }
+    items.sort((a, b) => a.symbol.localeCompare(b.symbol) || a.exchange.localeCompare(b.exchange));
+
+    const safeLimit = Math.max(10, Math.min(100, Math.floor(Number(limit) || 40)));
+    const safeOffset = Math.max(0, Math.min(1000000, Math.floor(Number(offset) || 0)));
+    return {
+      ok: true,
+      category: requestedCategory,
+      query: normalizedQuery,
+      offset: safeOffset,
+      limit: safeLimit,
+      total: items.length,
+      hasMore: safeOffset + safeLimit < items.length,
+      items: items.slice(safeOffset, safeOffset + safeLimit),
+      categories: catalogues.map(catalogue => ({
+        category: catalogue.category,
+        total: catalogue.total,
+        cached: catalogue.cached,
+        stale: catalogue.stale === true
+      })),
+      source: "Twelve Data reference catalogs",
+      stale: catalogues.some(catalogue => catalogue.stale === true),
+      generatedAt: new Date().toISOString()
+    };
   }
 
   onQuote(listener) {
