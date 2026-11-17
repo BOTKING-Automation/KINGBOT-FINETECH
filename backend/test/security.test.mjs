@@ -17,5 +17,7 @@ test("redactLogValue removes control characters and caps length", () => {
 test("allowedOrigins never falls back to wildcard origin", () => {
   const origins = allowedOrigins();
   assert.equal(origins.has("*"), false);
+  assert.equal(origins.has("http://127.0.0.1:5501"), true);
+  assert.equal(origins.has("http://localhost:5500"), true);
   assert.equal(origins instanceof Set, true);
 });
