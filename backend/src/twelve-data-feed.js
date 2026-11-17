@@ -287,7 +287,7 @@ export class TwelveDataFeed {
     }
 
     const url = "https://api.twelvedata.com/" + config.endpoint +
-      "?format=JSON&apikey=" + encodeURIComponent(this.apiKey);
+      "?format=JSON&page=1&outputsize=5000&apikey=" + encodeURIComponent(this.apiKey);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 45000);
     try {
