@@ -1092,7 +1092,10 @@ class AiMarketScannerStream {
 
   async ensureDerivBindings(symbols) {
     if (!this.publicDerivFeed) return;
-    const requested = [...new Set((symbols || []).map(scannerCanonicalSymbol).filter(Boolean))];
+    const requested = [...new Set((symbols || []).map(scannerCanonicalSymbol).filter(Boolean))].slice(0, 12);
+    if (this.twelveData?.enabled && typeof this.twelveData.setSymbols === "function") {
+      this.twelveData.setSymbols(requested);
+    }
     const twelveSubscribed = new Set(
       this.twelveData?.status?.()?.subscribedSymbols?.map(scannerCanonicalSymbol) || []
     );
