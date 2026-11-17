@@ -5,7 +5,15 @@ const DEFAULT_ORIGINS = [
   "https://botking-automation.github.io",
   "https://kingbot-finetech.vercel.app",
   "http://localhost:3000",
-  "http://localhost:5173"
+  "http://localhost:5173",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5173",
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
+  "http://localhost:5501",
+  "http://127.0.0.1:5501",
+  "http://localhost:5502",
+  "http://127.0.0.1:5502"
 ];
 
 export function allowedOrigins(){
@@ -13,7 +21,9 @@ export function allowedOrigins(){
     String(process.env.FRONTEND_ORIGINS || ""),
     String(process.env.FRONTEND_ORIGIN || "")
   ].join(",").split(",").map(x => x.trim()).filter(Boolean);
-  return new Set(configured.length ? configured : DEFAULT_ORIGINS);
+  // Keep the published frontends and localhost development ports available
+  // even when FRONTEND_ORIGIN is explicitly configured in production.
+  return new Set([...DEFAULT_ORIGINS, ...configured]);
 }
 
 export function corsOptions(){
