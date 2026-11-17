@@ -1621,7 +1621,7 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
         twelveData:twelveData.status(),
         instrumentCatalog:{
           configured:Boolean(twelveData?.enabled),
-          categories:["forex","stocks","etf","crypto","commodities"],
+          categories:["forex","stocks","etf","crypto","commodities","bonds","funds"],
           source:"Twelve Data reference catalogs"
         },
         derivPublic:{
