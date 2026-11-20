@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { databaseSslOptions } from "../src/database-ssl.js";
 
 const remoteUrl = "postgresql://kingbot:secret@ep-example.eu-central-1.aws.neon.tech/kingbot?sslmode=require";
+const localComposeUrl = "postgresql://kingbot:secret@postgres:5432/kingbot";
 
 test("remote PostgreSQL connections verify TLS certificates in production", () => {
   assert.deepEqual(databaseSslOptions(remoteUrl, { nodeEnv: "production" }), {
@@ -23,11 +24,40 @@ test("local development PostgreSQL may use loopback without TLS", () => {
   );
 });
 
-test("production never disables certificate verification for loopback hosts", () => {
+test("production never disables certificate verification for a loopback URL", () => {
   assert.deepEqual(
     databaseSslOptions("postgresql://127.0.0.1:5432/kingbot", { nodeEnv: "production" }),
     { rejectUnauthorized: true }
   );
+});
+
+test("isolated Compose database may disable TLS only with both explicit opt-ins", () => {
+  assert.equal(databaseSslOptions(localComposeUrl, {
+    nodeEnv: "production",
+    sslMode: "disable",
+    trustedLocalDb: "1"
+  }), false);
+});
+
+test("Compose database still verifies TLS if either opt-in is absent", () => {
+  assert.deepEqual(databaseSslOptions(localComposeUrl, {
+    nodeEnv: "production",
+    sslMode: "disable",
+    trustedLocalDb: "0"
+  }), { rejectUnauthorized: true });
+  assert.deepEqual(databaseSslOptions(localComposeUrl, {
+    nodeEnv: "production",
+    sslMode: "require",
+    trustedLocalDb: "1"
+  }), { rejectUnauthorized: true });
+});
+
+test("the local TLS exception never applies to remote database hosts", () => {
+  assert.deepEqual(databaseSslOptions(remoteUrl, {
+    nodeEnv: "production",
+    sslMode: "disable",
+    trustedLocalDb: "1"
+  }), { rejectUnauthorized: true });
 });
 
 test("invalid database URLs fail closed", () => {
