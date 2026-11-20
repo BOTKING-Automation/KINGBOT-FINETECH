@@ -10,7 +10,10 @@ export function databaseSslOptions(connectionString, { nodeEnv = process.env.NOD
 
   let hostname;
   try {
-    hostname = new URL(connectionString).hostname.toLowerCase().replace(/^\\[|\\]$/g, "");
+    hostname = new URL(connectionString).hostname.toLowerCase();
+    if (hostname.startsWith("[") && hostname.endsWith("]")) {
+      hostname = hostname.slice(1, -1);
+    }
   } catch {
     throw new Error("DATABASE_URL_MUST_BE_A_VALID_POSTGRES_URL");
   }
