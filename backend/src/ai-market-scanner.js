@@ -1092,7 +1092,10 @@ class AiMarketScannerStream {
 
   async ensureDerivBindings(symbols) {
     if (!this.publicDerivFeed) return;
-    const requested = [...new Set((symbols || []).map(scannerCanonicalSymbol).filter(Boolean))];
+    const requested = [...new Set((symbols || []).map(scannerCanonicalSymbol).filter(Boolean))].slice(0, 12);
+    if (this.twelveData?.enabled && typeof this.twelveData.setSymbols === "function") {
+      this.twelveData.setSymbols(requested);
+    }
     const twelveSubscribed = new Set(
       this.twelveData?.status?.()?.subscribedSymbols?.map(scannerCanonicalSymbol) || []
     );
@@ -1616,6 +1619,11 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
       ok:true, scanner:"KINGBOT AI MARKET SCANNER", aiReady:true, provider:"KINGBOT_NATIVE",
       marketData:{
         twelveData:twelveData.status(),
+        instrumentCatalog:{
+          configured:Boolean(twelveData?.enabled),
+          categories:["forex","stocks","etf","crypto","commodities","bonds","funds"],
+          source:"Twelve Data reference catalogs"
+        },
         derivPublic:{
           ...publicDerivFeed.status(),
           standalone:true,
@@ -1644,6 +1652,43 @@ export function registerAiMarketScanner(app, { pool, rateLimit, twelveData, serv
     });
   });
 
+
+  const catalogLimiter = rateLimit({
+    windowMs:60*1000,
+    limit:Number(process.env.AI_SCANNER_CATALOG_REQUESTS_PER_MINUTE || 20),
+    standardHeaders:"draft-8",
+    legacyHeaders:false,
+    message:{ok:false,error:"Instrument catalog request limit reached. Wait a moment and retry."}
+  });
+
+  app.get("/api/ai/market-scanner/instruments",catalogLimiter,async(req,res)=>{
+    if(!twelveData?.enabled){
+      return res.status(503).json({
+        ok:false,
+        error:"TWELVE_DATA_NOT_CONFIGURED",
+        message:"Set TWELVE_DATA_API_KEY on the KINGBOT backend to load the full Twelve Data instrument universe.",
+        source:"Twelve Data reference catalogs"
+      });
+    }
+    try{
+      const result=await twelveData.instrumentCatalog({
+        category:req.query?.category||"all",
+        query:req.query?.q||"",
+        limit:req.query?.limit||40,
+        offset:req.query?.offset||0
+      });
+      return res.json(result);
+    }catch(error){
+      const reason=String(error?.message||"TWELVE_DATA_CATALOG_UNAVAILABLE").slice(0,220);
+      const status=reason.includes("CATEGORY_UNSUPPORTED")?400:503;
+      return res.status(status).json({
+        ok:false,
+        error:reason.includes("CATEGORY_UNSUPPORTED")?"TWELVE_DATA_CATALOG_CATEGORY_UNSUPPORTED":"TWELVE_DATA_CATALOG_UNAVAILABLE",
+        reason,
+        source:"Twelve Data reference catalogs"
+      });
+    }
+  });
 
   const chartLimiter = rateLimit({
     windowMs:60*1000,

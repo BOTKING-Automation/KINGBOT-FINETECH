@@ -6,8 +6,17 @@
 */
 (function(window){
 "use strict";
-const API_BASE="https://kingbot-fintech-api-etfv.onrender.com/api";
-const API_ORIGIN=API_BASE.replace(/\/api\/?$/i,"");
+const HOSTED_API_BASE="https://kingbot-fintech-api-etfv.onrender.com/api";
+const LOCAL_API_BASE="http://127.0.0.1:10000/api";
+const requestedApi=new URLSearchParams(window.location.search).get("kb-api")||"";
+const LOCAL_DEVELOPMENT_HOSTS=new Set(["localhost","127.0.0.1","[::1]","::1"]);
+const isLocalDevelopmentHost=LOCAL_DEVELOPMENT_HOSTS.has(String(window.location.hostname||"").toLowerCase());
+// Never accept an API host from a URL parameter: authenticated Firebase tokens
+// must only be sent to the fixed production API or the local API on localhost.
+const API_BASE=requestedApi==="local"&&isLocalDevelopmentHost
+ ? LOCAL_API_BASE
+ : HOSTED_API_BASE;
+const API_ORIGIN=new URL(API_BASE).origin;
 const state={checked:false,checking:false,authenticated:false,user:null,error:null,checkedAt:0};
 let activeCheck=null;
 let firebaseAuthListenerBound=false;
@@ -43,8 +52,16 @@ async function firebaseClient(){
  return window.KINGBOT_FIREBASE||null;
 }
 function apiUrl(path){
- const value=String(path||"");
- if(/^https?:\/\//i.test(value))return value;
+ const value=String(path||"").trim();
+ if(!value)throw new Error("KINGBOT_API_PATH_REQUIRED");
+ if(/^(?:https?:)?\/\//i.test(value)){
+  const target=new URL(value,API_ORIGIN);
+  if(target.origin!==API_ORIGIN||target.username||target.password){
+   throw new Error("KINGBOT_API_ORIGIN_NOT_ALLOWED");
+  }
+  return target.href;
+ }
+ if(/^[a-z][a-z\\d+.-]*:/i.test(value))throw new Error("KINGBOT_API_ORIGIN_NOT_ALLOWED");
  return value.startsWith("/api/")?API_ORIGIN+value:API_BASE+(value.startsWith("/")?value:"/"+value);
 }
 function withTimeout(promise,ms){
