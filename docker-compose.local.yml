@@ -1,0 +1,119 @@
+name: kingbot-local
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kingbot}
+      POSTGRES_USER: ${POSTGRES_USER:-kingbot_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/windows-start.ps1 to create the local .env}
+    volumes:
+      - kingbot-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$\$POSTGRES_USER\" -d \"$\$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    networks:
+      - kingbot-internal
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kingbot-fintech-api:local
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "10000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kingbot_owner}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kingbot}
+      DATABASE_SSL_MODE: disable
+      KINGBOT_TRUSTED_LOCAL_DB: "1"
+      WORKER_STANDBY: "1"
+      KINGBOT_ML_SIGNAL_URL: http://ml-signal:10000
+      KINGBOT_ML_SIGNAL_SECRET: ${KINGBOT_ML_SIGNAL_SECRET:?Run scripts/windows-start.ps1 to create the local .env}
+    ports:
+      - "127.0.0.1:10000:10000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:10000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+    networks:
+      - kingbot-internal
+
+  ml-signal:
+    build:
+      context: ./ml-signal-service
+      dockerfile: Dockerfile
+    image: kingbot-ml-signal:local
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      PORT: "10000"
+      KINGBOT_ML_SIGNAL_SECRET: ${KINGBOT_ML_SIGNAL_SECRET:?Run scripts/windows-start.ps1 to create the local .env}
+      KINGBOT_ML_ARTIFACTS_URL: http://api:10000/api/ml-artifacts
+      KINGBOT_ML_ARTIFACT_TIMEOUT_SEC: "60"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:10000/health', timeout=5).read()"]
+      interval: 15s
+      timeout: 6s
+      retries: 20
+      start_period: 120s
+    networks:
+      - kingbot-internal
+
+  worker:
+    image: kingbot-fintech-api:local
+    restart: unless-stopped
+    init: true
+    command: ["node", "backend/src/worker-web.js"]
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "10001"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kingbot_owner}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kingbot}
+      DATABASE_SSL_MODE: disable
+      KINGBOT_TRUSTED_LOCAL_DB: "1"
+      WORKER_STANDBY: "0"
+      KINGBOT_ML_SIGNAL_URL: http://ml-signal:10000
+      KINGBOT_ML_SIGNAL_SECRET: ${KINGBOT_ML_SIGNAL_SECRET:?Run scripts/windows-start.ps1 to create the local .env}
+    ports:
+      - "127.0.0.1:10001:10001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      ml-signal:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:10001/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+    networks:
+      - kingbot-internal
+
+volumes:
+  kingbot-postgres-data:
+
+networks:
+  kingbot-internal:
+    driver: bridge
