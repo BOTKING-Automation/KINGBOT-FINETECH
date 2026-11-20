@@ -1,0 +1,18 @@
+# Local secrets and credentials
+.env
+.env.*
+!.env.selfhost.example
+
+# Local database exports and runtime data
+backups/
+local-data/
+*.log
+
+# Node and Python build/cache output
+node_modules/
+backend/node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
