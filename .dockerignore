@@ -1,0 +1,19 @@
+# Local secrets and environment files
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Git metadata and local development state
+.git
+.gitignore
+backups/
+local-data/
+*.log
+
+# Runtime caches and dependencies
+**/node_modules/
+**/__pycache__/
+**/.pytest_cache/
+**/.venv/
+**/venv/
