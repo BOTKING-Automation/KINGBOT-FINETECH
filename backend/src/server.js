@@ -6,6 +6,7 @@ import path from "node:path";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { databaseSslOptions } from "./database-ssl.js";
 import crypto from "node:crypto";
 import { createAuthRouter, ensureAuthSchema } from "./auth.js";
 import { createSubscriptionRouter, ensureSubscriptionSchema } from "./subscriptions.js";
@@ -53,7 +54,7 @@ const AI_PROVIDER = "kingbot-native";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const pool = DATABASE_URL ? new pg.Pool({
   connectionString: DATABASE_URL,
-  ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
+  ssl: databaseSslOptions(DATABASE_URL),
   max: Number(process.env.PG_POOL_MAX || 10),
   connectionTimeoutMillis: Number(process.env.PG_CONNECTION_TIMEOUT_MS || 8000),
   idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 30000)
