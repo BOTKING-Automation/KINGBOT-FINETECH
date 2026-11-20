@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { databaseSslOptions } from "./database-ssl.js";
 import { UserBrokerManager } from "./user-broker-manager.js";
 import { calculateMarketIndicators } from "./worker-market-perception.js";
 import { sortChronologicalCandles } from "./chronological-candles.js";
@@ -21,7 +22,7 @@ import { ensureGlobalRiskSchema, getGlobalRiskState, globalExecutionGate, record
 import { ensureAdaptiveIntelligenceSchema, recordAdaptiveDecision, settleAdaptiveDecision } from "./adaptive-intelligence.js";
 
 const { Pool } = pg;
-const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined }) : null;
+const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: databaseSslOptions(process.env.DATABASE_URL) }) : null;
 const broker = new UserBrokerManager({pool});
 let stopping = false;
 let timer = null;
