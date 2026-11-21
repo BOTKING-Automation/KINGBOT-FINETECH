@@ -1,29 +1,35 @@
-# KINGBOT V12 — Cross-Market, Multi-Timeframe Transformer Research
+# KINGBOT V12.1 — Overlap Repair and Context Ablation Research
 
-This branch is a research-only challenger to the V9 RF/PyTorch benchmark. It does not alter the production ML signal service, Render, broker integrations, or order execution.
+This branch is a research-only follow-on to V12. It preserves the V9 baseline and the original V12 branch. It does not alter production inference, Render, broker integrations, customer accounts, or order execution.
 
-## Research hypothesis
+## Research questions
 
-A joint Transformer that reads a target instrument's recent 32-bar history together with as-of context tokens from other instruments and timeframes may learn cross-market dependencies that a single-series model cannot represent.
+1. Does deeper, paginated BTC history materially improve timestamp overlap with FX/gold data?
+2. Does cross-market context help when restricted to source slots with sufficient coverage?
+3. Is a target-only Transformer more reliable than feeding a sparse, heterogeneous 25-slot context panel?
 
-## Panel construction and leakage controls
+## Data acquisition change
 
-- Reuse the same timestamped OHLC history and V9 causal strategy-masked feature/label generator.
-- Build target sequences separately per symbol; windows never cross instruments.
-- Context sources include all available symbols/timeframes: XAUUSD, EURUSD, GBPUSD, USDJPY, BTCUSD and 1m, 5m, 15m, 1h, 4h.
-- A source candle becomes available only at its close (source timestamp plus timeframe duration). For each target candle, select the latest context row whose close is no later than the target candle close.
-- Include log-compressed context staleness and mask unavailable or not-yet-closed context tokens.
-- Use the existing V9 sample timestamps, forward-label end timestamps, global chronological splits and purge logic.
-- Fit target and per-context-slot scalers on training-fold data only.
-- Compare against V9 RF + PyTorch MLP 55/45 on the same target samples, terminal-row features and fold masks.
-- Development window: 70%-85%; untouched final: 85%-100%, evaluated only if development quality and comparison guard pass.
+The research fetcher pages Binance BTCUSDT klines backwards in batches of up to 1,000 instead of accepting only one most-recent batch. It filters out any still-open candle and deduplicates timestamps before applying the shared history limit. Kraken remains a fallback and may still return a shorter history; the report records the source and actual date range for every series. BTCUSDT is a USDT-quoted proxy for the BTCUSD target label and is explicitly identified as such in source metadata.
 
-## Acceptance
+The fetcher does not fabricate missing data or forward-fill absent markets. The model report includes each series' first/last feature and availability timestamps, so overlapping history and stale context can be inspected.
 
-Preserve V9 gates: balanced accuracy >=0.36, macro-F1 >=0.34, at least 30 final samples, and nonzero recall for SELL, HOLD and BUY. The final candidate must also beat the matched V9 selection score by >=0.005.
+## Controlled ablations
 
-## Scope
+All ablations use the same target rows, chronological fold masks, label purging, Transformer architecture, training budget, and one shared matched V9 prediction set:
 
-One representative timeframe per specialist is evaluated in the pilot, not all three production timeframes. A candidate still requires all-timeframe validation, regime-separated analysis, execution-aware cost backtesting and shadow evaluation. No model weights are persisted, registered, promoted or deployed.
+- `target_only`: all cross-market context slots are masked.
+- `high_coverage`: retain only context slots with at least 60% availability in the current training fold.
+- `full_context`: retain every context slot that has any observations in the current training fold.
 
-Lightweight syntax/regression validation runs automatically. The compute-intensive five-pilot research workflow is separately gated by the run-v12-research pull-request label and is started only after the V11 report has been inspected.
+The high-coverage decision and full-context availability test use training rows only. Evaluation-window coverage cannot cause a slot to be selected. The high-coverage threshold is fixed at 0.60 before running the experiment.
+
+The best eligible development ablation is selected using only the 70%-85% development window. That mode is frozen before the 85%-100% final window is evaluated. No final window is evaluated unless the chosen development candidate first passes the unchanged quality gates and the development comparison guard.
+
+## Acceptance gates — unchanged
+
+Balanced accuracy >=0.36, macro-F1 >=0.34, at least 30 final samples, and nonzero SELL/HOLD/BUY recall. Final selection additionally requires a selection-score improvement of at least 0.005 over the matched V9 baseline. No gate is weakened to force a pass.
+
+## Scope and interpretation
+
+The pilot remains one representative timeframe per specialist. Any candidate still requires all-timeframe validation, regime-separated analysis, execution-aware spread/slippage/commission backtesting, robust walk-forward validation, and shadow evaluation before any deployment discussion. No model weights are persisted, registered, promoted, or deployed.

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json, sys, time
 from pathlib import Path
 from typing import Any
-from multivariate_transformer import PILOTS, run_pilot
+from multivariate_transformer import ABLATION_MODES, CONTEXT_COVERAGE_THRESHOLD, PILOTS, run_pilot
 
 
 def run(input_path: Path, output_path: Path) -> int:
@@ -22,29 +22,33 @@ def run(input_path: Path, output_path: Path) -> int:
         results.append(result)
         print("[KINGBOT V12 MULTIVARIATE PILOT]", json.dumps({
             "strategy": strategy, "timeframe": timeframe, "status": result.get("status"),
-            "developmentGate": (result.get("development") or {}).get("multivariate", {}).get("qualityGate"),
-            "finalGate": (result.get("final") or {}).get("multivariate", {}).get("qualityGate"),
+            "developmentGate": any(v.get("passesDevelopmentGuard", False) for v in (result.get("development") or {}).get("ablations", {}).values()),
+            "finalGate": (result.get("final") or {}).get("result", {}).get("multivariate", {}).get("qualityGate"),
+            "selectedAblation": result.get("selectedAblation"),
             "scoreDeltaVsV9": result.get("selectionScoreDeltaVsV9"), "error": result.get("error"),
         }, sort_keys=True))
     report = {
         "generatedAt": payload.get("generatedAt"),
         "completedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "researchVersion": "v12-cross-market-multitimeframe-transformer-pilot-1",
+        "researchVersion": "v12-1-overlap-ablation-and-history-repair-1",
         "researchOnly": True, "productionChanged": False, "modelArtifactsPersisted": False,
         "architecture": {
             "model": "2-layer Transformer encoder, 64-dimensional embeddings, 4 attention heads",
             "targetHistory": "32-bar target-market sequence",
-            "context": "as-of snapshots for all available symbol/timeframe series",
+            "context": "three controlled ablations: target-only, >=60% training-fold coverage, and all available training-covered slots",
             "alignment": "context candle feature is available only after its candle close",
             "staleness": "log1p age measured in target-timeframe units",
-            "missingData": "unavailable/not-yet-closed context tokens are masked",
+            "missingData": "unavailable/not-yet-closed context tokens are masked; high-coverage slot selection uses training-fold coverage only",
             "training": "supervised SELL/HOLD/BUY; training-fold-only scaling",
             "epochs": 12, "optimizer": "AdamW", "device": "CPU",
         },
         "validation": {
             "developmentWindow": "70%-85%", "finalWindow": "85%-100% untouched",
             "globalTimestampAlignment": True, "forwardLabelPurging": True,
-            "matchedBaseline": "V9 RF + PyTorch MLP 55/45 on identical target rows and fold masks",
+            "matchedBaseline": "one V9 RF + PyTorch MLP 55/45 prediction set reused across ablations on identical rows and fold masks",
+            "contextAblations": list(ABLATION_MODES),
+            "highCoverageThreshold": CONTEXT_COVERAGE_THRESHOLD,
+            "modeSelection": "best eligible development ablation only; mode is frozen before untouched final evaluation",
             "gatesUnchanged": {"balancedAccuracy": 0.36, "macroF1": 0.34,
                 "minimumTestSamples": 30, "nonzeroRecall": ["SELL", "HOLD", "BUY"]},
             "additionalGate": "Final multivariate model passes unchanged gates and exceeds matched V9 selection score by >=0.005",
@@ -54,10 +58,11 @@ def run(input_path: Path, output_path: Path) -> int:
         "summary": {
             "targetModels": len(results),
             "evaluatedModels": sum(r.get("status") != "RESEARCH_ERROR" for r in results),
-            "developmentPassed": sum(bool((r.get("development") or {}).get("multivariate", {}).get("qualityGate")) for r in results),
+            "developmentPassed": sum(bool(r.get("selectedAblation")) for r in results),
             "finalEvaluated": sum(r.get("final") is not None for r in results),
-            "finalQualityGatePassed": sum(bool((r.get("final") or {}).get("multivariate", {}).get("qualityGate")) for r in results),
+            "finalQualityGatePassed": sum(bool((r.get("final") or {}).get("result", {}).get("multivariate", {}).get("qualityGate")) for r in results),
             "researchCandidatesPassed": sum(r.get("status") == "RESEARCH_CANDIDATE_PASS" for r in results),
+            "selectedAblations": {mode: sum(r.get("selectedAblation") == mode for r in results) for mode in ABLATION_MODES},
             "completeBotsReady": 0, "elapsedSeconds": round(time.time() - start, 3),
         },
         "results": results,

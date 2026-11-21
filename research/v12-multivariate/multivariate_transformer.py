@@ -26,6 +26,8 @@ BATCH = 128
 SEED = 20261109
 MIN_BA, MIN_F1, MIN_N, MIN_DELTA = 0.36, 0.34, 30, 0.005
 N_FEATURES = len(service.FEATURE_NAMES)
+CONTEXT_COVERAGE_THRESHOLD = 0.60
+ABLATION_MODES = ("target_only", "high_coverage", "full_context")
 
 
 class CrossMarketTransformer(nn.Module):
@@ -135,10 +137,19 @@ def build_dataset(markets_by_timeframe: dict[str, Any], strategy: str,
         raise ValueError("V12_PANEL_ALIGNMENT_INVALID")
     if not np.isfinite(X).all() or not np.isfinite(C).all() or not np.isfinite(A).all():
         raise ValueError("V12_NONFINITE_FEATURES")
+    series_diagnostics = []
+    for key in slots:
+        src = series[key]
+        series_diagnostics.append({
+            "key": key, "source": src["source"], "rows": int(len(src["f"])),
+            "firstFeatureTime": float(src["t"][0]), "lastFeatureTime": float(src["t"][-1]),
+            "firstAvailableTime": float(src["available"][0]), "lastAvailableTime": float(src["available"][-1]),
+        })
     return {"X": X, "C": C, "M": M, "A": A, "y": y, "times": T, "ends": E,
             "symbols": symbols, "slots": slots, "coverage": coverage,
             "contextCoverage": {slots[i]: float((~M[:, i]).mean()) for i in range(len(slots))},
-            "targetTimeframe": target_tf, "sequenceLength": seq_len}
+            "targetTimeframe": target_tf, "sequenceLength": seq_len,
+            "seriesDiagnostics": series_diagnostics}
 
 
 def _scale(train_x, eval_x, train_c, eval_c, train_m, eval_m, train_a, eval_a):
@@ -159,6 +170,30 @@ def _scale(train_x, eval_x, train_c, eval_c, train_m, eval_m, train_a, eval_a):
     tc = np.concatenate([tc, train_a[:, :, None]], axis=2).astype(np.float32)
     ec = np.concatenate([ec, eval_a[:, :, None]], axis=2).astype(np.float32)
     return tx, ex, tc, ec, tm, em
+
+
+def context_ablation(context, missing, ages, train_indices, mode: str,
+                      threshold: float = CONTEXT_COVERAGE_THRESHOLD):
+    """Mask context slots using training-fold coverage only (no validation leakage)."""
+    if mode not in ABLATION_MODES or not 0.0 <= threshold <= 1.0:
+        raise ValueError("V12_ABLATION_CONFIGURATION_INVALID")
+    train_missing = np.asarray(missing)[train_indices]
+    coverage = (~train_missing).mean(axis=0) if len(train_missing) else np.zeros(missing.shape[1])
+    if mode == "target_only":
+        selected = np.asarray([], dtype=np.int64)
+    elif mode == "high_coverage":
+        selected = np.flatnonzero(coverage >= threshold)
+    else:
+        selected = np.flatnonzero(coverage > 0.0)
+    keep = np.zeros(missing.shape[1], dtype=bool)
+    keep[selected] = True
+    out_context = np.asarray(context).copy()
+    out_missing = np.asarray(missing).copy()
+    out_ages = np.asarray(ages).copy()
+    out_context[:, ~keep] = 0.0
+    out_ages[:, ~keep] = 0.0
+    out_missing[:, ~keep] = True
+    return out_context, out_missing, out_ages, selected.tolist(), coverage.astype(float).tolist()
 
 
 def fit_predict(train_x, train_c, train_m, train_a, train_y,
@@ -223,34 +258,69 @@ def metrics(y_true, p):
         "selectionScore": 0.60 * ba + 0.40 * f1}
 
 
-def run_fold(data, train_fraction, test_fraction):
+def run_fold(data, train_fraction, test_fraction, modes=ABLATION_MODES):
     tr, te, cutoff = service.global_temporal_split_masks(data["times"], data["ends"],
         train_fraction=train_fraction, test_fraction=test_fraction)
     if tr.sum() < 90 or te.sum() < MIN_N:
         raise ValueError("V12_FOLD_SAMPLE_COVERAGE_INSUFFICIENT")
     X, C, M, A, y = (data[k] for k in ("X", "C", "M", "A", "y"))
     yp, yt = y[tr], y[te]
-    model_p = fit_predict(X[tr], C[tr], M[tr], A[tr], yp, X[te], C[te], M[te], A[te])
+    # One identical V9 prediction set is reused across every ablation.
     base_p = matched_v9(X[tr], yp, X[te], yt)
+    baseline = metrics(yt, base_p)
+    results = {}
+    train_rows = np.flatnonzero(tr)
+    for mode in modes:
+        variant_c, variant_m, variant_a, selected, coverage = context_ablation(
+            C, M, A, train_rows, mode)
+        model_p = fit_predict(X[tr], variant_c[tr], variant_m[tr], variant_a[tr], yp,
+                               X[te], variant_c[te], variant_m[te], variant_a[te])
+        model_metrics = metrics(yt, model_p)
+        delta = model_metrics["selectionScore"] - baseline["selectionScore"]
+        results[mode] = {
+            "multivariate": model_metrics,
+            "selectionScoreDeltaVsV9": float(delta),
+            "selectedContextSlots": [data["slots"][i] for i in selected],
+            "selectedContextCount": len(selected),
+            "trainingContextCoverage": {data["slots"][i]: coverage[i] for i in range(len(data["slots"]))},
+            "passesDevelopmentGuard": bool(model_metrics["qualityGate"] and delta >= -0.01),
+        }
     return {"cutoffTimestamp": float(cutoff), "trainSamples": int(tr.sum()),
-        "contextCoverage": data["contextCoverage"], "multivariate": metrics(yt, model_p),
-        "v9MatchedBaseline": metrics(yt, base_p)}
+        "contextCoverageOverall": data["contextCoverage"],
+        "v9MatchedBaseline": baseline, "ablations": results}
+
+
+def _best_development_ablation(development):
+    eligible = [(name, result) for name, result in development["ablations"].items()
+                if result["passesDevelopmentGuard"]]
+    if not eligible:
+        return None
+    # Choose only on the development window; the untouched final window cannot select a mode.
+    return max(eligible, key=lambda item: item[1]["multivariate"]["selectionScore"])[0]
 
 
 def run_pilot(strategy, timeframe, markets_by_timeframe):
     data = build_dataset(markets_by_timeframe, strategy, timeframe)
     dev = run_fold(data, 0.70, 0.85)
-    dev_delta = dev["multivariate"]["selectionScore"] - dev["v9MatchedBaseline"]["selectionScore"]
-    advance = dev["multivariate"]["qualityGate"] and dev_delta >= -0.01
-    final = run_fold(data, 0.85, 1.0) if advance else None
-    delta = final["multivariate"]["selectionScore"] - final["v9MatchedBaseline"]["selectionScore"] if final else None
-    passed = bool(final and final["multivariate"]["qualityGate"] and delta >= MIN_DELTA)
+    chosen_mode = _best_development_ablation(dev)
+    final_fold = run_fold(data, 0.85, 1.0, modes=(chosen_mode,)) if chosen_mode else None
+    final_result = final_fold["ablations"][chosen_mode] if final_fold else None
+    final_baseline = final_fold["v9MatchedBaseline"] if final_fold else None
+    delta = final_result["selectionScoreDeltaVsV9"] if final_result else None
+    passed = bool(final_result and final_result["multivariate"]["qualityGate"] and delta >= MIN_DELTA)
     return {"strategy": strategy, "timeframe": timeframe,
-        "status": "RESEARCH_CANDIDATE_PASS" if passed else ("FINAL_REJECTED" if final else "DEVELOPMENT_REJECTED"),
+        "status": "RESEARCH_CANDIDATE_PASS" if passed else ("FINAL_REJECTED" if final_fold else "DEVELOPMENT_REJECTED"),
         "sequenceLength": data["sequenceLength"], "contextSlots": len(data["slots"]),
         "contextSlotKeys": data["slots"], "marketCoverage": data["coverage"],
-        "contextCoverageOverall": data["contextCoverage"], "development": dev,
-        "developmentScoreDeltaVsV9": float(dev_delta), "final": final,
+        "seriesDiagnostics": data.get("seriesDiagnostics", []),
+        "contextCoverageOverall": data["contextCoverage"],
+        "contextAblationThreshold": CONTEXT_COVERAGE_THRESHOLD,
+        "development": dev, "selectedAblation": chosen_mode,
+        "final": ({"cutoffTimestamp": final_fold["cutoffTimestamp"],
+                   "trainSamples": final_fold["trainSamples"],
+                   "v9MatchedBaseline": final_baseline,
+                   "selectedAblation": chosen_mode,
+                   "result": final_result} if final_fold else None),
         "selectionScoreDeltaVsV9": float(delta) if delta is not None else None,
         "requiredImprovementMargin": MIN_DELTA, "passesFinalResearchGate": passed,
         "promotion": "NONE_RESEARCH_ONLY"}

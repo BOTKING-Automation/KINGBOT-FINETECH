@@ -27,11 +27,44 @@ function toBars(rows, timeIndex, openIndex, highIndex, lowIndex, closeIndex, vol
 }
 
 async function fetchBinanceBars(timeframe) {
-  const url = API_BASE + "?symbol=BTCUSDT&interval=" + encodeURIComponent(timeframe) + "&limit=1000";
-  const response = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(20000) });
-  const rows = await response.json().catch(() => []);
-  if (!response.ok || !Array.isArray(rows)) throw new Error("BINANCE_HISTORY_HTTP_" + response.status);
-  return toBars(rows.slice(0, -1).slice(-HISTORY_LIMIT), 0, 1, 2, 3, 4, 5);
+  // Binance allows at most 1,000 klines per request. Page backwards so BTC
+  // history has the same requested depth as the FX/gold panel where possible.
+  const merged = new Map();
+  const nowMs = Date.now();
+  let endTime = nowMs;
+  let previousOldest = Infinity;
+  const maxPages = Math.max(2, Math.ceil(HISTORY_LIMIT / 900) + 2);
+
+  for (let page = 0; page < maxPages && merged.size < HISTORY_LIMIT; page++) {
+    const url = API_BASE + "?symbol=BTCUSDT&interval=" + encodeURIComponent(timeframe) +
+      "&limit=1000&endTime=" + endTime;
+    const response = await fetch(url, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(20000)
+    });
+    const rows = await response.json().catch(() => []);
+    if (!response.ok || !Array.isArray(rows)) {
+      throw new Error("BINANCE_HISTORY_HTTP_" + response.status);
+    }
+    if (!rows.length) break;
+
+    const closedRows = rows.filter(row => Array.isArray(row) && Number(row[6]) < nowMs);
+    for (const bar of toBars(closedRows, 0, 1, 2, 3, 4, 5)) {
+      const timestamp = Date.parse(bar.time);
+      if (Number.isFinite(timestamp)) merged.set(timestamp, bar);
+    }
+
+    const oldestOpen = Number(rows[0][0]);
+    if (!Number.isFinite(oldestOpen) || oldestOpen <= 0 || oldestOpen >= previousOldest) break;
+    previousOldest = oldestOpen;
+    if (rows.length < 1000) break;
+    endTime = oldestOpen - 1;
+  }
+
+  return [...merged.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, bar]) => bar)
+    .slice(-HISTORY_LIMIT);
 }
 
 async function fetchKrakenBars(timeframe) {
