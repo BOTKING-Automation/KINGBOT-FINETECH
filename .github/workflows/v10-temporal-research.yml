@@ -1,0 +1,64 @@
+name: KINGBOT V10 Temporal AI Research
+
+on:
+  pull_request:
+    branches: [v9-training-audit]
+    paths:
+      - "research/v10-temporal/**"
+      - ".github/workflows/v10-temporal-research.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  temporal-ai-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install existing ML dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ml-signal-service/requirements.txt
+
+      - name: Python syntax and temporal regression tests
+        run: |
+          python -m py_compile ml-signal-service/service.py research/v10-temporal/temporal_challenger.py research/v10-temporal/run_temporal_research.py
+          python -m unittest discover -s research/v10-temporal -p "test_*.py"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+
+      - name: Fetch closed, timestamped market history
+        run: |
+          node backend/scripts/v9-fetch-live-markets.mjs /tmp/kingbot-v10-temporal-input.json
+
+      - name: Run V10 temporal challenger research
+        run: |
+          python research/v10-temporal/run_temporal_research.py /tmp/kingbot-v10-temporal-input.json /tmp/kingbot-v10-temporal-report.json
+
+      - name: Upload V10 temporal research report and input data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kingbot-v10-temporal-research
+          path: |
+            /tmp/kingbot-v10-temporal-input.json
+            /tmp/kingbot-v10-temporal-report.json
+          if-no-files-found: warn
+          retention-days: 14
