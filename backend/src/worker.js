@@ -20,6 +20,7 @@ import { ensureBotEngineSchema } from "./bot-engines.js";
 import { ensureBotRuntimeSchema } from "./bot-runtime.js";
 import { ensureGlobalRiskSchema, getGlobalRiskState, globalExecutionGate, recordWorkerHeartbeat } from "./global-risk.js";
 import { ensureAdaptiveIntelligenceSchema, recordAdaptiveDecision, settleAdaptiveDecision } from "./adaptive-intelligence.js";
+import { ensureMlArtifactsSchema } from "./ml-artifacts.js";
 
 const { Pool } = pg;
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: databaseSslOptions(process.env.DATABASE_URL) }) : null;
@@ -31,6 +32,8 @@ const WORKER_POLL_MS = 750;
 const MAX_PARALLEL_BOTS = 8;
 const activeExecutionKeys = new Set();
 let lastWorkerHeartbeat = 0;
+let lastMlFeedbackSweep = 0;
+let mlFeedbackDrainRunning = false;
 
 const num=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
 const timeframeMinutes={"1m":1,"2m":2,"3m":3,"4m":4,"5m":5,"6m":6,"10m":10,"12m":12,"15m":15,"20m":20,"30m":30,"1h":60,"2h":120,"3h":180,"4h":240,"6h":360,"8h":480,"12h":720,"1d":1440,"1w":10080,"1mn":43200};
@@ -45,6 +48,7 @@ async function ensureWorkerSchema(){
   await broker.ensureSchema();
   await ensureGlobalRiskSchema(pool);
   await ensureAdaptiveIntelligenceSchema(pool);
+  await ensureMlArtifactsSchema(pool);
   // Normalize historical access failures that were incorrectly persisted as engine errors.
   await pool.query("UPDATE kingbot_bot_runtime SET state='STOPPED',updated_at=NOW() WHERE state='ERROR' AND last_error='SUBSCRIPTION_NOT_ACTIVE'");
   await pool.query("CREATE TABLE IF NOT EXISTS kingbot_account_risk_state (user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE,provider TEXT NOT NULL,account_id TEXT NOT NULL,baseline_date DATE NOT NULL,day_start_equity NUMERIC NOT NULL,peak_equity NUMERIC NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,provider,account_id))");
@@ -258,6 +262,141 @@ async function getWorkerPositions(userId){
   return data;
 }
 
+async function enqueueSettledMlFeedback() {
+  await pool.query(`
+    INSERT INTO kingbot_private.ml_feedback_outbox(decision_id,payload,status,next_attempt_at)
+    SELECT
+      d.decision_id,
+      jsonb_build_object(
+        'decisionId', d.decision_id::text,
+        'settledAt', to_char(d.settled_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+        'botId', lower(COALESCE(j.bot_id,d.selected_engine,'')),
+        'symbol', upper(COALESCE(d.symbol,j.symbol,'')),
+        'timeframe', lower(COALESCE(d.decision_json->'market'->>'timeframe','5m')),
+        'direction', CASE upper(d.direction)
+          WHEN 'BULLISH' THEN 'BUY'
+          WHEN 'BEARISH' THEN 'SELL'
+          WHEN 'BUY' THEN 'BUY'
+          WHEN 'SELL' THEN 'SELL'
+          ELSE upper(COALESCE(j.side,''))
+        END,
+        'outcome', d.outcome_status,
+        'market', COALESCE(d.decision_json->'market','{}'::jsonb),
+        'pnl', d.pnl,
+        'rMultiple', d.r_multiple
+      ),
+      'PENDING',
+      NOW()
+    FROM kingbot_ai_adaptive_decisions d
+    JOIN kingbot_execution_journal j
+      ON j.user_id=d.user_id AND j.decision_id=d.decision_id AND j.status='SETTLED'
+    WHERE d.outcome_status IN ('WIN','LOSS','BREAKEVEN','INVALIDATED')
+      AND d.settled_at IS NOT NULL
+      AND d.pnl IS NOT NULL
+      AND d.r_multiple IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM kingbot_private.ml_feedback_outbox o
+        WHERE o.decision_id=d.decision_id
+      )
+    ON CONFLICT(decision_id) DO NOTHING
+  `);
+}
+
+async function deliverPendingMlFeedback(limit = 5) {
+  const batch = await pool.query(`
+    WITH due AS (
+      SELECT decision_id
+        FROM kingbot_private.ml_feedback_outbox
+       WHERE (status='PENDING' AND next_attempt_at<=NOW())
+          OR (status='PROCESSING' AND updated_at<NOW()-INTERVAL '2 minutes')
+       ORDER BY created_at ASC
+       LIMIT $1
+       FOR UPDATE SKIP LOCKED
+    )
+    UPDATE kingbot_private.ml_feedback_outbox AS item
+       SET status='PROCESSING', updated_at=NOW()
+      FROM due
+     WHERE item.decision_id=due.decision_id
+    RETURNING item.decision_id,item.payload,item.attempts
+  `, [Math.max(1, Math.min(20, Number(limit) || 5))]);
+
+  const permanentErrors = new Set([
+    "ML_FEEDBACK_DECISION_ID_INVALID",
+    "ML_FEEDBACK_STRATEGY_INVALID",
+    "ML_FEEDBACK_SYMBOL_INVALID",
+    "ML_FEEDBACK_TIMEFRAME_INVALID",
+    "ML_FEEDBACK_DIRECTION_INVALID",
+    "ML_FEEDBACK_OUTCOME_INVALID",
+    "ML_FEEDBACK_MARKET_BARS_REQUIRED",
+    "ML_FEEDBACK_MARKET_HISTORY_INSUFFICIENT",
+    "ML_FEEDBACK_MARKET_TIMESTAMPS_REQUIRED",
+    "ML_FEEDBACK_MARKET_TIMESTAMP_REQUIRED",
+    "ML_FEEDBACK_SETTLEMENT_TIMESTAMP_REQUIRED",
+    "ML_FEEDBACK_TIMESTAMP_ORDER_INVALID",
+    "ML_FEEDBACK_SETTLEMENT_METRICS_REQUIRED",
+    "ML_FEEDBACK_SETTLEMENT_METRICS_INVALID",
+    "ML_FEEDBACK_OUTCOME_PNL_MISMATCH",
+    "ML_FEEDBACK_FEATURES_INVALID",
+    "ML_FEEDBACK_DECISION_CONFLICT"
+  ]);
+
+  for (const row of batch.rows) {
+    let result = null;
+    try {
+      result = await recordMlFeedback(row.payload || {});
+    } catch (error) {
+      result = { ok: false, error: String(error?.message || "ML_FEEDBACK_DELIVERY_FAILED") };
+    }
+
+    if (result === null) {
+      // No ML service is configured yet. Keep the row available for a later setup.
+      await pool.query(
+        `UPDATE kingbot_private.ml_feedback_outbox
+            SET status='PENDING',next_attempt_at=NOW()+INTERVAL '5 minutes',updated_at=NOW()
+          WHERE decision_id=$1 AND status='PROCESSING'`,
+        [row.decision_id]
+      );
+      continue;
+    }
+
+    if (result?.ok === true) {
+      await pool.query(
+        `UPDATE kingbot_private.ml_feedback_outbox
+            SET status='DELIVERED',attempts=attempts+1,last_error=NULL,updated_at=NOW()
+          WHERE decision_id=$1 AND status='PROCESSING'`,
+        [row.decision_id]
+      );
+      continue;
+    }
+
+    const errorCode = String(result?.error || result?.status || "ML_FEEDBACK_DELIVERY_FAILED").slice(0, 180);
+    const nextAttempts = Number(row.attempts || 0) + 1;
+    // Transient infrastructure/configuration failures remain queued indefinitely;
+    // only malformed or contradictory settled samples are terminal.
+    const failed = permanentErrors.has(errorCode);
+    const delaySeconds = Math.min(3600, 15 * (2 ** Math.min(nextAttempts, 8)));
+    await pool.query(
+      `UPDATE kingbot_private.ml_feedback_outbox
+          SET status=$2,
+              attempts=$3,
+              last_error=$4,
+              next_attempt_at=CASE WHEN $5 THEN NOW() ELSE NOW()+($6::double precision*INTERVAL '1 second') END,
+              updated_at=NOW()
+        WHERE decision_id=$1 AND status='PROCESSING'`,
+      [row.decision_id, failed ? "FAILED" : "PENDING", nextAttempts, errorCode, failed, delaySeconds]
+    );
+  }
+}
+
+function scheduleMlFeedbackSweep() {
+  if (mlFeedbackDrainRunning || stopping || !pool) return;
+  mlFeedbackDrainRunning = true;
+  void enqueueSettledMlFeedback()
+    .then(() => deliverPendingMlFeedback(5))
+    .catch(error => console.warn("[KINGBOT ML FEEDBACK] outbox sweep failed:", error?.message || error))
+    .finally(() => { mlFeedbackDrainRunning = false; });
+}
+
 async function reconcileBrokerState(userId,status,positions){
   const provider=String(status?.broker||"").toLowerCase();
   const accountId=String(status?.accountId||"");
@@ -296,36 +435,7 @@ async function reconcileBrokerState(userId,status,positions){
             const settled=await settleAdaptiveDecision(pool,userId,{decisionId:String(row.decision_id),outcome,pnl:profit});
             if(settled){
               await pool.query("UPDATE kingbot_execution_journal SET status='SETTLED',updated_at=NOW() WHERE user_id=$1 AND client_id=$2",[userId,row.client_id]);
-              try{
-                const decisionQ=await pool.query(
-                  "SELECT decision_json FROM kingbot_ai_adaptive_decisions WHERE decision_id=$1 AND user_id=$2 LIMIT 1",
-                  [String(row.decision_id),userId]
-                );
-                const decision=decisionQ.rows?.[0]?.decision_json||{};
-                const market=decision?.market||{};
-                const direction=String(
-                  decision?.routing?.direction ||
-                  decision?.summary?.bias ||
-                  row?.side ||
-                  ""
-                ).toUpperCase();
-                if(recordMlFeedback){
-                  void recordMlFeedback({
-                    botId:String(row.bot_id||settled.selected_engine||"").toLowerCase(),
-                    symbol:String(settled.symbol||row.symbol||market.symbol||"").toUpperCase(),
-                    timeframe:String(market.timeframe||row.timeframe||"5m").toLowerCase(),
-                    direction:direction==="BULLISH"?"BUY":direction==="BEARISH"?"SELL":direction,
-                    outcome,
-                    market,
-                    pnl:profit,
-                    rMultiple:settled.r_multiple
-                  }).then(result=>{
-                    if(result?.ok)console.log("[KINGBOT ML FEEDBACK]",JSON.stringify({botId:row.bot_id,symbol:settled.symbol,outcome,feedbackRows:result.feedbackRows,retrainRecommended:result.retrainRecommended}));
-                  }).catch(error=>console.warn("[KINGBOT ML FEEDBACK] failed:",error?.message||error));
-                }
-              }catch(error){
-                console.warn("[KINGBOT ML FEEDBACK] decision context unavailable:",error?.message||error);
-              }
+              // Durable delivery is reconstructed from settled decisions by the outbox sweep.
             }
           }catch(error){
             console.warn("[KINGBOT ADAPTIVE] settlement skipped",JSON.stringify({decisionId:row.decision_id,error:String(error?.message||"SETTLEMENT_FAILED").slice(0,160)}));
@@ -1230,6 +1340,10 @@ async function execute(row){
 async function cycle(){
   if(stopping||!pool)return;
   await heartbeat();
+  if(Date.now()-lastMlFeedbackSweep>=5000){
+    lastMlFeedbackSweep=Date.now();
+    scheduleMlFeedbackSweep();
+  }
   await getGlobalRisk();
   if(Date.now()-lastSubscriptionSweep>30000){
     lastSubscriptionSweep=Date.now();

@@ -231,7 +231,7 @@ export async function settleAdaptiveDecision(pool, userId, payload = {}) {
   if (!decisionId) throw new Error("DECISION_ID_REQUIRED");
 
   const existing = await pool.query(
-    "SELECT decision_id,risk_amount FROM kingbot_ai_adaptive_decisions WHERE decision_id=$1 AND user_id=$2",
+    "SELECT decision_id,risk_amount,outcome_status,pnl,r_multiple,settled_at,symbol,selected_engine,regime,setup_type,mfe_r,mae_r,slippage,latency_ms FROM kingbot_ai_adaptive_decisions WHERE decision_id=$1 AND user_id=$2",
     [decisionId, userId]
   );
   if (!existing.rowCount) throw new Error("ADAPTIVE_DECISION_NOT_FOUND");
@@ -247,6 +247,19 @@ export async function settleAdaptiveDecision(pool, userId, payload = {}) {
     rMultiple = pnl / Number(existing.rows[0].risk_amount);
   }
   if (outcome !== "UNREALIZED" && rMultiple == null) throw new Error("R_MULTIPLE_REQUIRED");
+
+  const prior = existing.rows[0];
+  if (prior.outcome_status !== "UNSETTLED") {
+    const samePnl = prior.pnl == null && pnl == null
+      ? true
+      : Math.abs(Number(prior.pnl) - Number(pnl)) <= 1e-9;
+    if (prior.outcome_status !== outcome || !samePnl) {
+      throw new Error("ADAPTIVE_DECISION_ALREADY_SETTLED");
+    }
+    // A retried broker-reconciliation pass must be able to finish its journal
+    // update and enqueue learning feedback after a previous partial failure.
+    return { ...prior, alreadySettled: true };
+  }
 
   const result = await pool.query(
     `

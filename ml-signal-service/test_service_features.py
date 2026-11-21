@@ -1,5 +1,8 @@
 import math
+import time
 import unittest
+import uuid
+from unittest.mock import patch
 
 import numpy as np
 import torch
@@ -387,6 +390,125 @@ class EngineFeatureParityTests(unittest.TestCase):
             0.50 * service.RF_ENSEMBLE_WEIGHT + (1.0 / 3.0) * service.TORCH_ENSEMBLE_WEIGHT,
         ])
         self.assertTrue(np.allclose(probabilities[0], expected, atol=1e-6))
+
+
+class PersistentFeedbackTests(unittest.TestCase):
+    def setUp(self):
+        self.original_feedback = list(service.FEEDBACK_ROWS)
+        service.FEEDBACK_ROWS.clear()
+        self.addCleanup(self._restore_feedback)
+
+    def _restore_feedback(self):
+        service.FEEDBACK_ROWS[:] = self.original_feedback
+
+    def timestamped_market(self, count=80):
+        now = time.time()
+        bars = make_bars(count)
+        start = int(now) - count * 60
+        for index, bar in enumerate(bars):
+            bar["time"] = start + index * 60
+        return {"mlBars": bars}, now
+
+    def valid_feedback_args(self):
+        market, now = self.timestamped_market()
+        return {
+            "strategy": "strategic",
+            "symbol": "XAUUSD",
+            "timeframe": "5m",
+            "direction": "BUY",
+            "outcome": "WIN",
+            "market": market,
+            "pnl": 12.5,
+            "r_multiple": 1.25,
+            "decision_id": str(uuid.uuid4()),
+            "settled_at": now - 1,
+        }
+
+    def test_feedback_requires_timestamped_market_history(self):
+        args = self.valid_feedback_args()
+        args["market"] = {"mlBars": make_bars(80)}
+        with patch("service.save_feedback_row") as persist:
+            with self.assertRaisesRegex(ValueError, "ML_FEEDBACK_MARKET_TIMESTAMPS_REQUIRED"):
+                service.record_feedback(**args)
+        persist.assert_not_called()
+        self.assertEqual(service.FEEDBACK_ROWS, [])
+
+    def test_feedback_rejects_settlement_before_last_market_bar(self):
+        args = self.valid_feedback_args()
+        args["settled_at"] = args["market"]["mlBars"][-1]["time"] - 10
+        with patch("service.save_feedback_row") as persist:
+            with self.assertRaisesRegex(ValueError, "ML_FEEDBACK_TIMESTAMP_ORDER_INVALID"):
+                service.record_feedback(**args)
+        persist.assert_not_called()
+
+    def test_feedback_persists_before_becoming_training_memory(self):
+        args = self.valid_feedback_args()
+        with patch("service.save_feedback_row", return_value={"ok": True, "duplicate": False}) as persist:
+            result = service.record_feedback(**args)
+
+        persist.assert_called_once()
+        self.assertEqual(persist.call_args.args[0]["decisionId"], args["decision_id"])
+        self.assertEqual(result["status"], "ML_FEEDBACK_RECORDED")
+        self.assertEqual(result["feedbackRows"], 1)
+        self.assertEqual(service.FEEDBACK_ROWS[0]["label"], 1)
+
+    def test_duplicate_feedback_does_not_duplicate_in_memory_rows(self):
+        args = self.valid_feedback_args()
+        with patch("service.save_feedback_row", side_effect=[
+            {"ok": True, "duplicate": False},
+            {"ok": True, "duplicate": True},
+        ]):
+            first = service.record_feedback(**args)
+            second = service.record_feedback(**args)
+
+        self.assertFalse(first["duplicate"])
+        self.assertTrue(second["duplicate"])
+        self.assertEqual(first["decisionId"], second["decisionId"])
+        self.assertEqual(len(service.FEEDBACK_ROWS), 1)
+
+    def test_feedback_restore_rejects_duplicate_and_malformed_rows(self):
+        now = time.time()
+        decision_id = str(uuid.uuid4())
+        valid = {
+            "decisionId": decision_id,
+            "strategy": "strategic",
+            "symbol": "XAUUSD",
+            "timeframe": "5m",
+            "direction": "BUY",
+            "outcome": "WIN",
+            "label": 1,
+            "features": [0.0] * len(service.FEATURE_NAMES),
+            "marketAsOf": now - 120,
+            "settledAt": now - 60,
+            "pnl": 2.0,
+            "rMultiple": 1.0,
+            "receivedAt": now,
+        }
+        invalid = {**valid, "decisionId": "not-a-uuid"}
+        restored = service.restore_feedback_records([valid, valid, invalid])
+
+        self.assertEqual(len(restored), 1)
+        self.assertEqual(restored[0]["decisionId"], decision_id)
+        self.assertEqual(len(restored[0]["features"]), len(service.FEATURE_NAMES))
+
+    def test_feedback_restore_rejects_unsettled_market_timestamps(self):
+        now = time.time()
+        row = {
+            "decisionId": str(uuid.uuid4()),
+            "strategy": "strategic",
+            "symbol": "XAUUSD",
+            "timeframe": "5m",
+            "direction": "BUY",
+            "outcome": "WIN",
+            "label": 1,
+            "features": [0.0] * len(service.FEATURE_NAMES),
+            "marketAsOf": now,
+            "settledAt": now - 1,
+            "pnl": 2.0,
+            "rMultiple": 1.0,
+            "receivedAt": now,
+        }
+        self.assertEqual(service.restore_feedback_records([row]), [])
 
 
 if __name__ == "__main__":
