@@ -356,7 +356,7 @@ function renderLearningMonitor(data){
  $("learningService").innerHTML=[
   ["ML SERVICE",learningPill(serviceState,svc.ready?"ok":svc.configured?"wait":"bad"),svc.status||"—"],
   ["MODEL RESTORE",learningPill(svc.modelRestoreStatus||"UNKNOWN",svc.modelRestoreStatus==="RESTORED"||svc.modelRestoreStatus==="EMPTY"?"ok":"wait"),"service startup state"],
-  ["FEEDBACK RESTORE",learningPill(svc.feedbackRestoreStatus||"UNKNOWN",svc.feedbackRestoreStatus==="RESTORED"||svc.feedbackRestoreStatus==="EMPTY"?"ok":"wait"),(svc.persistedFeedbackRowsReported||0)+" persisted rows reported"],
+  ["FEEDBACK RESTORE",learningPill(svc.feedbackRestoreStatus||"UNKNOWN",svc.feedbackRestoreStatus==="RESTORED"||svc.feedbackRestoreStatus==="EMPTY"?"ok":"wait"),(svc.persistedFeedbackRowsReported||0)+" rows restored at startup"],
   ["LOADED MODELS",registry.available?registry.count:"—",registry.available?"model registry records":"registry unavailable"],
   ["TRAINING JOBS",svc.training||0,"active ML training tasks"],
   ["FEEDBACK PERSISTENCE",learningPill(svc.feedbackPersistenceConfigured?"CONFIGURED":"NOT CONFIGURED",svc.feedbackPersistenceConfigured?"ok":"wait"),(svc.feedbackRowsInMemory||0)+" in-memory rows"]
