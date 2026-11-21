@@ -6,6 +6,7 @@ import { webSearchStatus } from "./kingbot-web-search.js";
 import { identitySnapshot, buildCognitivePlan, capabilitySet, qualityAudit, thinkingProfile, normalizeThinkingLevel } from "./kingbot-intelligence-core.js";
 import { buildKingbotAgentPlan } from "./kingbot-agent-core.js";
 import { conversationalReply } from "./kingbot-dialogue-cortex.js";
+import { generateLocalLlmReply, localLlmStatus } from "./kingbot-local-llm.js";
 
 const DEFAULT_SYMBOLS=["XAUUSD","EURUSD","GBPUSD","USDJPY","BTCUSD"];
 const MODEL="KINGBOT-CORTEX-1";
@@ -78,7 +79,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     let brokerStatus={connected:false};
     try{brokerStatus=await broker.getStatus(user.id)}catch{}
     res.json({
-      ok:true,agentReady:true,nativeReady:true,externalProvider:EXTERNAL_PROVIDER,model:MODEL,mode:"KINGBOT_NATIVE_INTELLIGENCE_AGENT",
+      ok:true,agentReady:true,nativeReady:true,externalProvider:EXTERNAL_PROVIDER,model:MODEL,mode:"KINGBOT_NATIVE_WITH_OPTIONAL_LOCAL_LLM",localLlm:localLlmStatus(),
       agentCore:buildKingbotAgentPlan({intent:"PLATFORM_SUPPORT",symbol:"XAUUSD",conversation:[],thinkingLevel:"EXPERT"}),
       authority:"ANALYSIS_ONLY",marketData:feed.status(),brokerConnected:Boolean(brokerStatus?.connected),
       engines:Object.keys(getBotDefinitions()),webResearch:webSearchStatus(),identity:identitySnapshot(),cognitiveLoop:identitySnapshot().cognitiveLoop,thinkingLevels:["FAST","STANDARD","DEEP","EXPERT"],defaultThinkingLevel:"EXPERT",defaultProfile:thinkingProfile("EXPERT")
@@ -110,6 +111,21 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
         sources:[]
       };
     }
+    // Ollama is an optional local language layer for ordinary conversation only.
+    // Market, account, broker, risk and execution decisions remain on verified native services.
+    if (native?.intent === "CONVERSATION" && localLlmStatus().enabled) {
+      const localReply = await generateLocalLlmReply({ question });
+      if (localReply.ok) {
+        native = {
+          ...native,
+          provider: "OLLAMA_LOCAL",
+          model: localReply.model,
+          reply: { ...(native.reply || {}), answer: localReply.answer },
+          verified: { ...(native.verified || {}), localLlm: true }
+        };
+      }
+    }
+
     await eventBus?.publish({eventType:"AI_RESPONSE_READY",aggregateType:"AI_AGENT",aggregateId:user.id,userId:user.id,correlationId,source:"ai-agent",payload:{intent:native?.intent||null,verified:native?.verified||{},memoryAware:Boolean(native?.cognition?.memory?.available),degraded:Boolean(native?.verified?.degraded)}}).catch(()=>{});
     const cognitivePlan=native?.cognition?.plan || buildCognitivePlan({intent:native?.intent || "PLATFORM_SUPPORT",symbol,conversation,thinkingLevel});
 
@@ -124,8 +140,8 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
       ok:true,
       degraded:Boolean(native?.verified?.degraded),
       agent:"KINGBOT",
-      model:MODEL,
-      provider:"KINGBOT_NATIVE",
+      model:native?.model || MODEL,
+      provider:native?.provider || "KINGBOT_NATIVE",
       symbol,
       identity:identitySnapshot(),
       cognitivePlan,
