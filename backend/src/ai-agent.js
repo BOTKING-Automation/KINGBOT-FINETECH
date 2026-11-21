@@ -114,7 +114,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
     // Ollama is an optional local language layer for ordinary conversation only.
     // Market, account, broker, risk and execution decisions remain on verified native services.
     if (native?.intent === "CONVERSATION" && localLlmStatus().enabled) {
-      const localReply = await generateLocalLlmReply({ question, conversation });
+      const localReply = await generateLocalLlmReply({ question });
       if (localReply.ok) {
         native = {
           ...native,
