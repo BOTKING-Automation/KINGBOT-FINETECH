@@ -47,7 +47,7 @@ export function normalizeMlFeedbackPayload(body, now = Date.now()) {
   }
 
   const features = body.features;
-  if (!Array.isArray(features) || features.length < 1 || features.length > 128 ||
+  if (!Array.isArray(features) || features.length !== 28 ||
       !features.every(value => typeof value === "number" && Number.isFinite(value))) {
     throw new Error("ML_FEEDBACK_FEATURES_INVALID");
   }
@@ -65,6 +65,9 @@ export function normalizeMlFeedbackPayload(body, now = Date.now()) {
     throw new Error("ML_FEEDBACK_TIMESTAMP_ORDER_INVALID");
   }
 
+  if (body.pnl == null || body.rMultiple == null) {
+    throw new Error("ML_FEEDBACK_SETTLEMENT_METRICS_INVALID");
+  }
   const pnl = Number(body.pnl);
   const rMultiple = Number(body.rMultiple);
   if (!Number.isFinite(pnl) || !Number.isFinite(rMultiple)) {
