@@ -95,7 +95,6 @@ body{margin:0;min-height:100vh;background:
     <button class="tab" data-tab="learning">09 · AI LEARNING</button>
     <button class="tab" data-tab="audit">10 · AUDIT</button>
     <button class="tab" data-tab="developer">11 · DEVELOPER API</button>
-    <button class="tab" data-tab="developer">10 · DEVELOPER API</button>
   </nav>
 
   <section class="tab-panel active" data-tab-panel="overview">
@@ -411,9 +410,6 @@ async function showAdminSignIn(fb){
    form.addEventListener("submit",async e=>{
      e.preventDefault();
      const button=document.getElementById("adminLoginButton");
- document.querySelector('[data-tab="learning"]').addEventListener("click",()=>void loadLearningMonitor());
- $("learningRefresh").addEventListener("click",()=>void loadLearningMonitor());
- setInterval(()=>{if(document.querySelector('[data-tab="learning"].active'))void loadLearningMonitor()},60000);
      const error=document.getElementById("adminLoginError");
      button.disabled=true;button.textContent="AUTHENTICATING…";error.textContent="";
      try{
@@ -467,6 +463,9 @@ async function ensureAdminSession(){
  return true
 }
 document.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===btn));document.querySelectorAll(".tab-panel").forEach(x=>x.classList.toggle("active",x.dataset.tabPanel===btn.dataset.tab))}));
+ document.querySelector('[data-tab="learning"]').addEventListener("click",()=>void loadLearningMonitor());
+ $("learningRefresh").addEventListener("click",()=>void loadLearningMonitor());
+ setInterval(()=>{if(document.querySelector('[data-tab="learning"].active'))void loadLearningMonitor()},60000);
 $("refreshBtn").addEventListener("click",()=>loadAll(true));$("overviewRefreshBtn").addEventListener("click",()=>loadAll(true));
 async function emergencyStop(){if(!confirm("Activate the global KINGBOT emergency stop? This will lock all stored bot risk profiles and stop currently recorded RUNNING runtimes."))return;await adminPost("/api/subscription/admin/risk/kill-switch",{active:true},"Global kill switch activated.");}
 $("globalKillBtn").addEventListener("click",emergencyStop);$("overviewKillBtn").addEventListener("click",emergencyStop);$("riskKillOn").addEventListener("click",emergencyStop);$("riskKillOff").addEventListener("click",async()=>{if(!confirm("Clear the global risk lock? Clearing the lock does not restart any stopped bot."))return;await adminPost("/api/subscription/admin/risk/kill-switch",{active:false},"Global risk lock cleared.");});
