@@ -92,9 +92,9 @@ body{margin:0;min-height:100vh;background:
     <button class="tab" data-tab="brokers">06 · BROKERS</button>
     <button class="tab" data-tab="risk">07 · RISK</button>
     <button class="tab" data-tab="ai">08 · AI & SECURITY</button>
-    <button class="tab" data-tab="audit">09 · AUDIT</button>
-    <button class="tab" data-tab="developer">10 · DEVELOPER API</button>
-    <button class="tab" data-tab="developer">10 · DEVELOPER API</button>
+    <button class="tab" data-tab="learning">09 · AI LEARNING</button>
+    <button class="tab" data-tab="audit">10 · AUDIT</button>
+    <button class="tab" data-tab="developer">11 · DEVELOPER API</button>
   </nav>
 
   <section class="tab-panel active" data-tab-panel="overview">
@@ -176,6 +176,42 @@ body{margin:0;min-height:100vh;background:
       <section class="panel"><div class="panel-head"><div><h3>AUTHENTICATION</h3><span>IDENTITY LAYER</span></div></div><div class="hero-note">Firebase Authentication verifies identity and email status. Admin authorization is then checked by the KINGBOT backend against configured administrator email access.</div></section>
       <section class="panel warn"><div class="panel-head"><div><h3>SECRETS</h3><span>PROTECTED</span></div></div><div class="hero-note">Gemini, Firebase Admin, broker tokens and encryption keys are backend environment secrets and are intentionally never rendered in this console.</div></section>
     </div>
+  </section>
+
+  <section class="tab-panel" data-tab-panel="learning">
+    <div class="section-head">
+      <div><h2>AI LEARNING MONITOR</h2><p>Verified trade outcomes, durable feedback delivery and current model-validation records.</p></div>
+      <div class="action-row"><span id="learningStatus" class="section-tag">NOT SYNCED</span><button id="learningRefresh" class="btn cyan">↻ REFRESH LEARNING</button></div>
+    </div>
+    <div class="status-grid" id="learningMetrics"></div>
+    <section class="panel warn" style="margin-top:12px">
+      <div class="panel-head"><div><h3>DATA INTEGRITY & METRIC DEFINITIONS</h3><span>NO SIMULATED PERFORMANCE</span></div></div>
+      <div class="hero-note" id="learningDataStatus">Realized outcome metrics are sourced from PostgreSQL settled-trade feedback. Model accuracy, balanced accuracy and Macro F1 are held-out validation metrics from the current ML model registry; they are not the live trade win rate and do not guarantee future results. Breakeven trades are excluded from the decisive-trade win-rate denominator.</div>
+    </section>
+    <div class="grid-2">
+      <section class="panel accent">
+        <div class="panel-head"><div><h3>FEEDBACK DELIVERY PIPELINE</h3><span>POSTGRESQL OUTBOX</span></div></div>
+        <div class="status-grid" id="learningPipeline"></div>
+        <div class="micro" id="learningOutboxAge" style="margin-top:10px">Oldest pending item: —</div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><div><h3>ML SERVICE & RESTORE STATE</h3><span>LIVE SERVICE PROBE</span></div></div>
+        <div class="status-grid" id="learningService"></div>
+      </section>
+    </div>
+    <section class="panel">
+      <div class="panel-head"><div><h3>REALIZED OUTCOMES BY STRATEGY</h3><span>SETTLED FEEDBACK ONLY</span></div></div>
+      <div class="table-wrap"><table class="table"><thead><tr><th>STRATEGY</th><th>TRADES</th><th>WINS</th><th>LOSSES</th><th>INVALIDATED</th><th>BREAKEVEN</th><th>WIN RATE</th><th>AVERAGE R</th><th>LAST SETTLED</th></tr></thead><tbody id="learningStrategies"></tbody></table></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><div><h3>MODEL VALIDATION REGISTRY</h3><span>CURRENT CHAMPION MODELS</span></div></div>
+      <div class="table-wrap"><table class="table"><thead><tr><th>MODEL</th><th>SYMBOLS</th><th>TRAIN / TEST</th><th>HELD-OUT ACC.</th><th>BALANCED ACC.</th><th>MACRO F1</th><th>QUALITY GATE</th><th>PROMOTION</th><th>FEEDBACK USED</th></tr></thead><tbody id="learningModels"></tbody></table></div>
+      <div class="micro" style="margin-top:9px">Validation figures are reported by the loaded model registry. No model score is shown until the ML service returns one.</div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><div><h3>RECENT VERIFIED OUTCOMES</h3><span>LAST 12 PERSISTED SAMPLES · NO CUSTOMER IDENTIFIERS</span></div></div>
+      <div class="table-wrap"><table class="table"><thead><tr><th>RECEIVED</th><th>STRATEGY</th><th>SYMBOL</th><th>DIRECTION</th><th>OUTCOME</th><th>REALIZED PNL</th><th>R MULTIPLE</th></tr></thead><tbody id="learningRecent"></tbody></table></div>
+    </section>
   </section>
 
   <section class="tab-panel" data-tab-panel="developer">
@@ -293,6 +329,61 @@ function renderBrokers(){$("brokerCount").textContent=brokers.length+" mapped br
 function renderRisk(){$("riskCount").textContent=risks.length+" risk profiles";$("riskBody").innerHTML=risks.length?risks.map(r=>'<tr><td><div class="user-name">'+esc((r.first_name||"")+" "+(r.last_name||""))+'</div><div class="email">'+esc(r.email||"")+'</div></td><td>'+esc(String(r.bot_id||"").toUpperCase())+'</td><td>'+esc(r.execution_mode||"—")+'</td><td>'+esc(r.max_risk_per_trade_pct)+'%</td><td>'+esc(r.daily_drawdown_pct)+'%</td><td>'+esc(r.total_drawdown_pct)+'%</td><td>'+esc(r.max_positions)+'</td><td>'+(r.kill_switch?'<span class="pill bad">LOCKED</span>':'<span class="pill ok">CLEAR</span>')+'</td><td>'+esc(fmtDate(r.updated_at))+'</td><td><label class="switch"><input type="checkbox" data-risk-user="'+esc(r.user_id)+'" data-risk-bot="'+esc(r.bot_id)+'" '+(r.kill_switch?"checked":"")+'> KILL</label></td></tr>').join(""):'<tr><td colspan="10"><div class="empty">No risk profiles stored yet.</div></td></tr>'}
 function renderExecutions(target){const el=$(target);el.innerHTML=executions.length?executions.slice(0,100).map(e=>'<article class="payment-card '+(String(e.status||"").toLowerCase()==="rejected"?"rejected":"")+'"><div class="payment-top"><div><div class="customer">'+esc(e.email||"")+'</div><div class="micro">'+esc(String(e.bot_id||"").toUpperCase())+' · '+esc(e.execution_mode||"")+'</div></div><span class="pill '+(e.status==="SUBMITTED"?"ok":e.status==="REJECTED"?"bad":"wait")+'">'+esc(e.status||"—")+'</span></div><div class="code">'+esc(String(e.side||"").toUpperCase())+' '+esc(e.symbol||"")+' · '+esc(e.volume||"—")+'</div><div class="micro" style="margin-top:7px">'+esc(fmtDate(e.created_at))+(e.error_message?" · "+esc(e.error_message):"")+'</div></article>').join(""):'<div class="empty">No execution journal entries.</div>'}
 function renderOverview(){const running=runtimes.filter(r=>r.state==="RUNNING").length;const errs=runtimes.filter(r=>r.state==="ERROR").length;const connected=brokers.filter(b=>b.connected).length;const aiReady=health.aiReady===true;$("overviewStatus").innerHTML=[["RUNTIME RUNNING",running,"real runtime records"],["RUNTIME ERRORS",errs,"reported errors"],["BROKER CONNECTED",connected,"server connections"],["AI PROVIDER",aiReady?"READY":"NOT READY","backend health"],["PENDING PAYMENTS",payments.filter(p=>p.status==="pending").length,"manual review"],["KILL LOCKS",risks.filter(r=>r.kill_switch).length,"active bot locks"],["EXECUTIONS",executions.length,"journal records"],["LAST SYNC",$("lastSync").dataset.value||"—","browser time"]].map(x=>'<div class="status-card"><div class="k">'+x[0]+'</div><div class="v">'+esc(x[1])+'</div><div class="s">'+esc(x[2])+'</div></div>').join("");}
+let learningMonitorBusy=false;
+function learningPct(value){return value==null?"—":Number(value).toFixed(2)+"%"}
+function learningNum(value,digits=2){return value==null?"—":Number(value).toFixed(digits)}
+function learningPill(value,kind="info"){return '<span class="pill '+kind+'">'+esc(value)+'</span>'}
+function renderLearningMonitor(data){
+ const o=data.outcomes||{},q=data.outbox||{},svc=data.mlService||{},registry=data.modelRegistry||{};
+ const metricRows=[
+  ["PERSISTED OUTCOMES",o.total??0,"verified settled samples"],
+  ["WIN RATE",learningPct(o.winRate),"decisive outcomes · breakeven excluded"],
+  ["AVERAGE R",learningNum(o.averageR),"realized R multiple"],
+  ["LAST 24 HOURS",o.last24h??0,"newly received samples"],
+  ["FEEDBACK BACKLOG",(Number(q.pending)||0)+(Number(q.processing)||0),"pending + processing"]
+ ];
+ $("learningMetrics").innerHTML=metricRows.map(x=>'<div class="status-card"><div class="k">'+esc(x[0])+'</div><div class="v">'+esc(x[1])+'</div><div class="s">'+esc(x[2])+'</div></div>').join("");
+ $("learningStatus").textContent="SYNC "+new Date(data.generatedAt||Date.now()).toLocaleTimeString()+" · DATABASE";
+ $("learningDataStatus").textContent="Source: "+String(data.dataSource||"UNKNOWN")+". Realized win rate uses WIN divided by WIN + LOSS + INVALIDATED; "+(o.breakeven||0)+" breakeven outcomes are excluded. Model metrics are held-out validation statistics, not realized trade performance.";
+ $("learningPipeline").innerHTML=[
+  ["PENDING",q.pending||0,"wait"],
+  ["PROCESSING",q.processing||0,"info"],
+  ["DELIVERED",q.delivered||0,"ok"],
+  ["FAILED",q.failed||0,(q.failed||0)>0?"bad":"ok"]
+ ].map(x=>'<div class="status-card"><div class="k">'+esc(x[0])+'</div><div class="v">'+esc(x[1])+'</div><div class="s">'+learningPill(x[0]==="FAILED"&&x[1]>0?"REVIEW REQUIRED":x[0]==="PENDING"&&x[1]>0?"AWAITING DELIVERY":x[0]==="DELIVERED"?"PERSISTED":x[0]==="PROCESSING"?"IN FLIGHT":"CLEAR",x[2])+'</div></div>').join("");
+ $("learningOutboxAge").textContent="Oldest pending item: "+(q.oldestPendingAt?fmtDate(q.oldestPendingAt):"none");
+ const serviceState=svc.ready?"READY":svc.reachable?"DEGRADED":svc.configured?"UNREACHABLE":"NOT CONFIGURED";
+ $("learningService").innerHTML=[
+  ["ML SERVICE",learningPill(serviceState,svc.ready?"ok":svc.configured?"wait":"bad"),svc.status||"—"],
+  ["MODEL RESTORE",learningPill(svc.modelRestoreStatus||"UNKNOWN",svc.modelRestoreStatus==="RESTORED"||svc.modelRestoreStatus==="EMPTY"?"ok":"wait"),"service startup state"],
+  ["FEEDBACK RESTORE",learningPill(svc.feedbackRestoreStatus||"UNKNOWN",svc.feedbackRestoreStatus==="RESTORED"||svc.feedbackRestoreStatus==="EMPTY"?"ok":"wait"),(svc.persistedFeedbackRowsReported||0)+" rows restored at startup"],
+  ["LOADED MODELS",registry.available?registry.count:"—",registry.available?"model registry records":"registry unavailable"],
+  ["TRAINING JOBS",svc.training||0,"active ML training tasks"],
+  ["FEEDBACK PERSISTENCE",learningPill(svc.feedbackPersistenceConfigured?"CONFIGURED":"NOT CONFIGURED",svc.feedbackPersistenceConfigured?"ok":"wait"),(svc.feedbackRowsInMemory||0)+" in-memory rows"]
+ ].map(x=>'<div class="status-card"><div class="k">'+esc(x[0])+'</div><div class="v">'+(typeof x[1]==="string"&&x[1].startsWith('<span')?x[1]:esc(x[1]))+'</div><div class="s">'+esc(x[2])+'</div></div>').join("");
+ const strategies=Array.isArray(data.strategies)?data.strategies:[];
+ $("learningStrategies").innerHTML=strategies.length?strategies.map(x=>'<tr><td><b>'+esc(String(x.strategy||"").toUpperCase())+'</b></td><td>'+esc(x.total)+'</td><td>'+esc(x.wins)+'</td><td>'+esc(x.losses)+'</td><td>'+esc(x.invalidated)+'</td><td>'+esc(x.breakeven)+'</td><td>'+esc(learningPct(x.winRate))+'</td><td>'+esc(learningNum(x.averageR))+'</td><td>'+esc(fmtDate(x.lastSettledAt))+'</td></tr>').join(""):'<tr><td colspan="9"><div class="empty">No persisted feedback has been recorded yet.</div></td></tr>';
+ const models=Array.isArray(registry.models)?registry.models:[];
+ $("learningModels").innerHTML=models.length?models.map(x=>'<tr><td><b>'+esc((x.strategy||"").toUpperCase())+'</b><div class="micro">'+esc(x.timeframe||"")+' · '+esc(x.validationType||"")+'</div><div class="micro">'+esc(x.featureVersion||"")+'</div></td><td>'+esc((x.symbols||[]).join(", ")||"—")+'</td><td>'+esc(x.trainSamples)+' / '+esc(x.testSamples)+'</td><td>'+esc(learningPct(x.ensembleAccuracy))+'</td><td>'+esc(learningPct(x.ensembleBalancedAccuracy))+'</td><td>'+esc(learningPct(x.ensembleMacroF1))+'</td><td>'+learningPill(x.qualityGate?"PASS":"NOT PASSED",x.qualityGate?"ok":"wait")+'</td><td>'+learningPill(x.promotion||"UNKNOWN",x.promotion==="CHAMPION"?"ok":"wait")+'</td><td>'+esc(x.feedbackRowsUsed)+'</td></tr>').join(""):'<tr><td colspan="9"><div class="empty">'+(registry.available?"No champion models are currently loaded.":"ML model registry is unavailable; validation metrics are not being reported.")+'</div></td></tr>';
+ const recent=Array.isArray(data.recent)?data.recent:[];
+ $("learningRecent").innerHTML=recent.length?recent.map(x=>'<tr><td>'+esc(fmtDate(x.receivedAt))+'</td><td>'+esc(String(x.strategy||"").toUpperCase())+'</td><td>'+esc(x.symbol)+'</td><td>'+esc(x.direction)+'</td><td>'+learningPill(x.outcome,x.outcome==="WIN"?"ok":x.outcome==="BREAKEVEN"?"info":"bad")+'</td><td>'+esc(learningNum(x.pnl))+'</td><td>'+esc(learningNum(x.rMultiple))+'</td></tr>').join(""):'<tr><td colspan="7"><div class="empty">No persisted outcomes yet.</div></td></tr>';
+}
+async function loadLearningMonitor(){
+ if(learningMonitorBusy)return;
+ learningMonitorBusy=true;
+ $("learningStatus").textContent="SYNCING…";
+ try{
+  const data=await json("/api/admin/ai-learning-monitor");
+  renderLearningMonitor(data);
+ }catch(error){
+  $("learningStatus").textContent="UNAVAILABLE";
+  $("learningMetrics").innerHTML='<div class="status-card"><div class="k">MONITOR STATUS</div><div class="v">UNAVAILABLE</div><div class="s">'+esc(error?.message||"Learning data could not be loaded.")+'</div></div>';
+  $("learningStrategies").innerHTML='<tr><td colspan="9"><div class="empty">Learning data unavailable. Check admin authorization, backend deployment and ML database schema.</div></td></tr>';
+  $("learningModels").innerHTML='<tr><td colspan="9"><div class="empty">No model metrics were returned.</div></td></tr>';
+  console.error("[KINGBOT LEARNING MONITOR]",error);
+ }finally{learningMonitorBusy=false}
+}
+
 async function loadAll(showToast=false){try{const results=await Promise.all([
  json("/api/subscription/admin/overview"),json("/api/subscription/admin/users"),json("/api/subscription/admin/payments"),json("/api/subscription/admin/activity"),
  json("/api/subscription/admin/entitlements"),json("/api/subscription/admin/runtime"),json("/api/subscription/admin/risk"),json("/api/subscription/admin/brokers"),json("/api/subscription/admin/executions"),json("/api/subscription/plans"),
@@ -372,6 +463,9 @@ async function ensureAdminSession(){
  return true
 }
 document.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===btn));document.querySelectorAll(".tab-panel").forEach(x=>x.classList.toggle("active",x.dataset.tabPanel===btn.dataset.tab))}));
+ document.querySelector('[data-tab="learning"]').addEventListener("click",()=>void loadLearningMonitor());
+ $("learningRefresh").addEventListener("click",()=>void loadLearningMonitor());
+ setInterval(()=>{if(document.querySelector('[data-tab="learning"].active'))void loadLearningMonitor()},60000);
 $("refreshBtn").addEventListener("click",()=>loadAll(true));$("overviewRefreshBtn").addEventListener("click",()=>loadAll(true));
 async function emergencyStop(){if(!confirm("Activate the global KINGBOT emergency stop? This will lock all stored bot risk profiles and stop currently recorded RUNNING runtimes."))return;await adminPost("/api/subscription/admin/risk/kill-switch",{active:true},"Global kill switch activated.");}
 $("globalKillBtn").addEventListener("click",emergencyStop);$("overviewKillBtn").addEventListener("click",emergencyStop);$("riskKillOn").addEventListener("click",emergencyStop);$("riskKillOff").addEventListener("click",async()=>{if(!confirm("Clear the global risk lock? Clearing the lock does not restart any stopped bot."))return;await adminPost("/api/subscription/admin/risk/kill-switch",{active:false},"Global risk lock cleared.");});

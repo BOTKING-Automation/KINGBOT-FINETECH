@@ -146,6 +146,8 @@ export async function ensureMlArtifactsSchema(pool) {
     );
     CREATE INDEX IF NOT EXISTS idx_kb_ml_feedback_training
       ON ${SCHEMA}.ml_trade_feedback(strategy,timeframe,market_as_of,settled_at);
+    CREATE INDEX IF NOT EXISTS idx_kb_ml_feedback_received_at
+      ON ${SCHEMA}.ml_trade_feedback(received_at DESC);
     ALTER TABLE ${SCHEMA}.ml_trade_feedback ENABLE ROW LEVEL SECURITY;
     REVOKE ALL ON TABLE ${SCHEMA}.ml_trade_feedback FROM PUBLIC;
 
