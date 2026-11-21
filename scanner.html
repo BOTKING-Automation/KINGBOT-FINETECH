@@ -555,8 +555,8 @@ tbody tr:hover{background:rgba(34,230,255,.035)}
         }
 
         if(type==="subscribed"){
-          setStreamState("LIVE","good");
-          qs("coreSub").textContent="Continuous market stream · "+(message.scanIntervalMs||5000)+"ms intelligence cycle";
+          setStreamState("SCANNING","warn");
+          qs("coreSub").textContent="Subscribed · "+(message.scanIntervalMs||2500)+"ms target cadence · verifying live quotes + OHLC…";
           return;
         }
 
@@ -567,13 +567,15 @@ tbody tr:hover{background:rgba(34,230,255,.035)}
 
         if(type==="scan" && message.data){
           const data=message.data;
+          const stream=message.stream||{};
+          const scanState=stream.state||"DEGRADED";
           if(Array.isArray(data.quotes))state.quotes=data.quotes;
           renderQuotes();
           renderScan(data);
           qs("lastScan").textContent=new Date(data.generatedAt||Date.now()).toLocaleTimeString();
-          qs("scanState").textContent="LIVE SCAN";
-          setStreamState("LIVE","good");
-          qs("coreSub").textContent=(data.source||"Live market feed")+" · continuous AI scan";
+          qs("scanState").textContent=scanState==="LIVE"?"LIVE SCAN":scanState==="UNAVAILABLE"?"DATA UNAVAILABLE":"DEGRADED SCAN";
+          setStreamState(scanState,scanState==="LIVE"?"good":"warn");
+          qs("coreSub").textContent=(data.source||"Live market feed")+" · target "+(stream.scanIntervalMs||2500)+"ms · scan "+(stream.scanDurationMs??"—")+"ms · OHLC "+(stream.technicalCoverage||((data.technicalCount||0)+"/"+((data.symbols||[]).length)))+" · quotes "+(stream.quoteCoverage||((data.quoteCount||0)+"/"+((data.symbols||[]).length)))+" · stale "+(stream.staleQuoteCount||0)+"q/"+(stream.staleTechnicalCount||0)+"t";
           return;
         }
 
