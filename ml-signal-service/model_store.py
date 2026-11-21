@@ -145,3 +145,56 @@ def load_model_artifacts() -> list[dict[str, Any]]:
         except Exception:
             continue
     return restored
+
+
+def save_feedback_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Persist one settled, timestamped trade-feedback sample idempotently."""
+    base_url, secret, timeout = _config()
+    if not base_url or not secret:
+        raise RuntimeError("ML_FEEDBACK_PERSISTENCE_NOT_CONFIGURED")
+    if not isinstance(row, dict) or not row.get("decisionId"):
+        raise ValueError("ML_FEEDBACK_DECISION_ID_REQUIRED")
+
+    try:
+        encoded = json.dumps(row, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    except (TypeError, ValueError) as error:
+        raise ValueError("ML_FEEDBACK_PAYLOAD_INVALID") from error
+    if not encoded or len(encoded) > 64 * 1024:
+        raise ValueError("ML_FEEDBACK_SIZE_LIMIT_EXCEEDED")
+
+    request = urllib.request.Request(
+        f"{base_url}/feedback",
+        data=encoded,
+        method="POST",
+        headers={
+            "accept": "application/json",
+            "content-type": "application/json",
+            "content-length": str(len(encoded)),
+            "x-kingbot-ml-secret": secret,
+        },
+    )
+    with _open_with_retry(request, timeout) as response:
+        return _json_response(response)
+
+
+def load_feedback_rows() -> list[dict[str, Any]]:
+    """Restore a bounded set of durable feedback rows from the private API."""
+    base_url, secret, timeout = _config()
+    if not base_url or not secret:
+        raise RuntimeError("ML_FEEDBACK_PERSISTENCE_NOT_CONFIGURED")
+
+    request = urllib.request.Request(
+        f"{base_url}/feedback",
+        method="GET",
+        headers={
+            "accept": "application/json",
+            "x-kingbot-ml-secret": secret,
+        },
+    )
+    with _open_with_retry(request, timeout) as response:
+        payload = _json_response(response)
+
+    items = payload.get("items")
+    if not isinstance(items, list):
+        raise RuntimeError("ML_FEEDBACK_STORE_ITEMS_INVALID")
+    return [item for item in items[:10000] if isinstance(item, dict)]
