@@ -43,6 +43,8 @@ import { ensureCommercialLedgerSchema, registerCommercialLedgerRoutes } from "./
 import { ensureUserMemorySchema } from "./kingbot-user-memory.js";
 import { registerCommandPlane } from "./command-plane.js";
 import { registerMlArtifacts, ensureMlArtifactsSchema } from "./ml-artifacts.js";
+import { registerAiLearningMonitor } from "./ai-learning-monitor.js";
+import { probeMlSignalService, listMlSignalModels } from "./ml-signal-client.js";
 import { requestSecurity, corsOptions, createApiLimiter, createWriteLimiter } from "./security.js";
 import { ensureAuditIntegritySchema, verifyAuditChain } from "./audit-integrity.js";
 
@@ -720,6 +722,7 @@ registerKingbotEventRoutes(app, { requireUser, pool, eventBus });
 registerCommercialLedgerRoutes(app,{pool});
 registerCommandPlane(app,{pool,broker,twelveData,eventBus});
 registerMlArtifacts(app,{pool});
+registerAiLearningMonitor(app, { pool, requireUser, isAdminEmail, probeMlSignalService, listMlSignalModels });
 
 app.get("/api/admin/security/audit-integrity", async (req,res)=>{
   const a=await requireUser(pool,req,res); if(!a)return;
