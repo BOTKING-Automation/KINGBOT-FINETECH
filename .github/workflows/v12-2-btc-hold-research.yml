@@ -1,0 +1,56 @@
+name: KINGBOT V12.2 BTC and HOLD-aware Objective Research
+
+on:
+  push:
+    branches: [v12-2-btc-hold-loss-research]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  research:
+    if: github.ref == 'refs/heads/v12-2-btc-hold-loss-research' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ML dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ml-signal-service/requirements.txt
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package.json
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --omit=dev
+      - name: Validate V12.2 fetcher and research suite
+        run: |
+          node --check backend/scripts/v122-fetch-live-markets.mjs
+          python -m py_compile ml-signal-service/service.py research/v12-multivariate/multivariate_transformer.py research/v12-multivariate/run_v122_hold_research.py research/v12-multivariate/test_v122_hold_research.py
+          python -m unittest discover -s research/v12-multivariate -p "test_*.py"
+      - name: Fetch deep closed BTC and FX/gold market history
+        env:
+          KINGBOT_V122_HISTORY_LIMIT: "2500"
+        run: node backend/scripts/v122-fetch-live-markets.mjs /tmp/kingbot-v122-input.json
+      - name: Run V12.2 controlled HOLD-aware objective experiment
+        run: python research/v12-multivariate/run_v122_hold_research.py /tmp/kingbot-v122-input.json /tmp/kingbot-v122-report.json
+      - name: Upload V12.2 report and input data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kingbot-v122-btc-hold-research
+          path: |
+            /tmp/kingbot-v122-input.json
+            /tmp/kingbot-v122-report.json
+          if-no-files-found: warn
+          retention-days: 14
