@@ -217,10 +217,12 @@ export async function predictMlStrategySignal({ botId, market } = {}) {
   }
 }
 
-export async function recordMlFeedback({ botId, symbol, timeframe, direction, outcome, market, pnl, rMultiple } = {}) {
-  if(!enabled() || !botId || !symbol || !market) return null;
+export async function recordMlFeedback({ decisionId, settledAt, botId, symbol, timeframe, direction, outcome, market, pnl, rMultiple } = {}) {
+  if(!enabled() || !decisionId || !settledAt || !botId || !symbol || !market) return null;
   try{
     return await request("/feedback", {
+      decisionId: String(decisionId).trim(),
+      settledAt: String(settledAt),
       botId: String(botId).trim().toLowerCase(),
       symbol: String(symbol).trim().toUpperCase(),
       timeframe: String(timeframe || "5m").trim().toLowerCase(),
