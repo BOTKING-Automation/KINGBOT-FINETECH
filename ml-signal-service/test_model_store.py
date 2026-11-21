@@ -100,5 +100,53 @@ class ModelStoreTests(unittest.TestCase):
         self.assertEqual(restored, [])
 
 
+    def test_save_feedback_posts_stable_decision_identity(self):
+        observed = {}
+        row = {
+            "decisionId": "550e8400-e29b-41d4-a716-446655440000",
+            "strategy": "strategic",
+            "symbol": "XAUUSD",
+        }
+
+        def fake_urlopen(request, timeout):
+            observed["url"] = request.full_url
+            observed["method"] = request.get_method()
+            observed["body"] = json.loads(request.data.decode("utf-8"))
+            observed["secret"] = request.get_header("X-kingbot-ml-secret")
+            return FakeResponse({"ok": True, "created": True, "duplicate": False})
+
+        with patch("model_store.urllib.request.urlopen", side_effect=fake_urlopen):
+            result = model_store.save_feedback_row(row)
+
+        self.assertTrue(result["created"])
+        self.assertEqual(observed["method"], "POST")
+        self.assertTrue(observed["url"].endswith("/feedback"))
+        self.assertEqual(observed["body"]["decisionId"], row["decisionId"])
+        self.assertEqual(observed["secret"], "test-only-secret")
+
+    def test_save_feedback_rejects_non_json_values(self):
+        with self.assertRaisesRegex(ValueError, "ML_FEEDBACK_PAYLOAD_INVALID"):
+            model_store.save_feedback_row({
+                "decisionId": "550e8400-e29b-41d4-a716-446655440000",
+                "notFinite": float("nan"),
+            })
+
+    def test_load_feedback_rows_returns_persisted_items(self):
+        items = [
+            {"decisionId": "550e8400-e29b-41d4-a716-446655440000"},
+            {"decisionId": "550e8400-e29b-41d4-a716-446655440001"},
+        ]
+        with patch("model_store.urllib.request.urlopen", return_value=FakeResponse({
+            "ok": True,
+            "count": len(items),
+            "items": items,
+        })) as mocked:
+            restored = model_store.load_feedback_rows()
+
+        self.assertEqual(restored, items)
+        self.assertEqual(mocked.call_args.args[0].get_method(), "GET")
+        self.assertTrue(mocked.call_args.args[0].full_url.endswith("/feedback"))
+
+
 if __name__ == "__main__":
     unittest.main()
