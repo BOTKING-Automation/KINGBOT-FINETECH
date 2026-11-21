@@ -191,8 +191,8 @@ export function registerAiLearningMonitor(app, {
 
     try {
       const [mlService, modelRegistry] = await Promise.all([
-        Promise.resolve(probeMlSignalService?.()).catch(() => null),
-        Promise.resolve(listMlSignalModels?.()).catch(() => null)
+        Promise.resolve().then(() => probeMlSignalService?.()).catch(() => null),
+        Promise.resolve().then(() => listMlSignalModels?.()).catch(() => null)
       ]);
       const snapshot = await loadAiLearningSnapshot(pool, { mlService, modelRegistry });
       res.setHeader("Cache-Control", "no-store");
