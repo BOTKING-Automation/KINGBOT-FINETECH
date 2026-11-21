@@ -165,6 +165,15 @@ class EngineFeatureParityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ML_MARKET_BAR_TIMESTAMP_INVALID"):
             service.normalize_market_bars(bars)
 
+    def test_normalize_market_bars_retains_the_latest_configured_history_window(self):
+        bars = make_bars(service.MAX_BARS_PER_MARKET + 120)
+        for index, bar in enumerate(bars):
+            bar["time"] = 1_700_000_000 + index * 60
+        normalized = service.normalize_market_bars(bars)
+        self.assertEqual(len(normalized), service.MAX_BARS_PER_MARKET)
+        self.assertAlmostEqual(normalized[0]["close"], bars[-service.MAX_BARS_PER_MARKET]["close"])
+        self.assertAlmostEqual(normalized[-1]["close"], bars[-1]["close"])
+
     def test_normalize_market_bars_preserves_order_when_provider_has_no_timestamps(self):
         bars = make_bars(60)
         normalized = service.normalize_market_bars(bars)
@@ -278,6 +287,31 @@ class EngineFeatureParityTests(unittest.TestCase):
             service.FEATURE_VERSION,
         )
 
+    def test_global_temporal_split_supports_a_disjoint_development_window(self):
+        times = np.arange(200, dtype=np.float64)
+        ends = times + 1.0
+        train, test, cutoff = service.global_temporal_split_masks(
+            times, ends, train_fraction=0.70, test_fraction=0.85
+        )
+        self.assertTrue(np.all(times[train] < cutoff))
+        self.assertTrue(np.all(ends[train] < cutoff))
+        self.assertTrue(np.all(times[test] >= cutoff))
+        self.assertTrue(np.all(times[test] < np.quantile(times, 0.85) + 2))
+        self.assertFalse(np.any(train & test))
+        self.assertGreater(int(train.sum()), 40)
+        self.assertGreaterEqual(int(test.sum()), 20)
+
+    def test_default_global_temporal_split_is_unchanged(self):
+        times = np.arange(100, dtype=np.float64)
+        ends = times + 1.0
+        old_train, old_test, old_cutoff = service.global_temporal_split_masks(times, ends)
+        new_train, new_test, new_cutoff = service.global_temporal_split_masks(
+            times, ends, train_fraction=0.78, test_fraction=1.0
+        )
+        np.testing.assert_array_equal(old_train, new_train)
+        np.testing.assert_array_equal(old_test, new_test)
+        self.assertEqual(old_cutoff, new_cutoff)
+
     def test_validation_measures_the_live_probability_blend(self):
         features = np.zeros((2, len(service.FEATURE_NAMES)), dtype=np.float32)
         probabilities = service.ensemble_probabilities(
@@ -293,6 +327,106 @@ class EngineFeatureParityTests(unittest.TestCase):
             0.50 * service.RF_ENSEMBLE_WEIGHT + (1.0 / 3.0) * service.TORCH_ENSEMBLE_WEIGHT,
         ])
         self.assertTrue(np.allclose(probabilities[0], expected, atol=1e-6))
+
+    def test_per_model_ensemble_weight_can_select_either_component(self):
+        features = np.zeros((2, len(service.FEATURE_NAMES)), dtype=np.float32)
+        rf = DummyRandomForest()
+        torch_model = UniformTorchModel()
+        rf_only = service.ensemble_probabilities(rf, torch_model, features, rf_weight=1.0)
+        torch_only = service.ensemble_probabilities(rf, torch_model, features, rf_weight=0.0)
+        np.testing.assert_allclose(
+            rf_only,
+            np.tile(np.asarray([[0.20, 0.30, 0.50]], dtype=np.float32), (2, 1)),
+            atol=1e-6,
+        )
+        np.testing.assert_allclose(
+            torch_only,
+            np.full((2, 3), 1.0 / 3.0, dtype=np.float32),
+            atol=1e-6,
+        )
+
+    def test_per_model_ensemble_weight_rejects_invalid_values(self):
+        features = np.zeros((1, len(service.FEATURE_NAMES)), dtype=np.float32)
+        with self.assertRaisesRegex(ValueError, "ML_ENSEMBLE_RF_WEIGHT_INVALID"):
+            service.ensemble_probabilities(
+                DummyRandomForest(), UniformTorchModel(), features, rf_weight=1.5
+            )
+
+    def test_model_artifact_preserves_model_specific_ensemble_weight(self):
+        X = np.zeros((9, len(service.FEATURE_NAMES)), dtype=np.float32)
+        X[:, 0] = np.linspace(-1.0, 1.0, len(X))
+        y = np.asarray([-1, 0, 1, -1, 0, 1, -1, 0, 1], dtype=np.int64)
+        forest = service.RandomForestClassifier(
+            n_estimators=3, max_depth=2, random_state=7
+        ).fit(X, y)
+        scaler = service.StandardScaler().fit(X)
+        record = {
+            "rf": forest,
+            "torch": service.MLP(len(service.FEATURE_NAMES), 3),
+            "scaler": scaler,
+            "feature_version": service.FEATURE_VERSION,
+            "ensemble_rf_weight": 0.8,
+        }
+        restored = service.deserialize_model_record(service.serialize_model_record(record))
+        self.assertAlmostEqual(restored["ensemble_rf_weight"], 0.8)
+
+
+class V9LabelDistributionTests(unittest.TestCase):
+    def test_atr_window_optimization_matches_full_prefix_exactly(self):
+        bars = make_bars(220)
+        for index in range(60, len(bars)):
+            full = service.atr(bars[:index + 1], 14)
+            window = service.atr(bars[index - 14:index + 1], 14)
+            self.assertAlmostEqual(full, window, places=12)
+
+    def test_class_distribution_reports_sell_hold_buy_counts_and_ratios(self):
+        distribution = service.class_distribution(
+            np.asarray([-1, -1, 0, 1, 1, 1], dtype=np.int64)
+        )
+        self.assertEqual(distribution["samples"], 6)
+        self.assertEqual(distribution["counts"], {"SELL": 2, "HOLD": 1, "BUY": 3})
+        self.assertEqual(
+            distribution["ratios"],
+            {"SELL": 0.3333, "HOLD": 0.1667, "BUY": 0.5},
+        )
+
+    def test_label_sensitivity_reports_alternative_fallbacks_without_mutating_v9_default(self):
+        bars = make_bars(180)
+        baseline = [
+            service.triple_barrier_label(
+                bars, index, service.atr(bars[:index + 1], 14)
+            )
+            for index in range(60, len(bars) - service.FORWARD_HORIZON)
+            if service.atr(bars[:index + 1], 14) is not None
+        ]
+        report = service.label_sensitivity_distribution(bars)
+        self.assertEqual(set(report), {"0.35", "0.45", "0.55", "0.60"})
+        self.assertEqual(report["0.35"]["samples"], len(baseline))
+        self.assertEqual(
+            report["0.35"]["counts"],
+            service.class_distribution(np.asarray(baseline, dtype=np.int64))["counts"],
+        )
+        for distribution in report.values():
+            self.assertEqual(set(distribution["counts"]), {"SELL", "HOLD", "BUY"})
+            self.assertAlmostEqual(sum(distribution["ratios"].values()), 1.0, places=3)
+
+    def test_fallback_override_is_diagnostic_and_default_label_is_unchanged(self):
+        bars = [
+            {"open": 100.0, "high": 100.2, "low": 99.8, "close": 100.0, "volume": 100.0}
+            for _ in range(80)
+        ]
+        for offset in range(1, 7):
+            bars[60 + offset] = {
+                "open": 100.0,
+                "high": 100.55,
+                "low": 99.80,
+                "close": 100.0 + (0.45 if offset == 6 else 0.15 * offset / 6),
+                "volume": 100.0,
+            }
+        default_label = service.triple_barrier_label(bars, 60, 1.0)
+        relaxed_hold_label = service.triple_barrier_label(bars, 60, 1.0, fallback_atr=0.60)
+        self.assertEqual(default_label, 1)
+        self.assertEqual(relaxed_hold_label, 0)
 
 
 if __name__ == "__main__":
