@@ -163,6 +163,41 @@ export function mlSignalServiceStatus() {
   };
 }
 
+export async function listMlSignalModels() {
+  if (!enabled()) {
+    return { ok: false, status: "ML_SERVICE_NOT_CONFIGURED", models: [] };
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(500, TIMEOUT_MS));
+  try {
+    const response = await fetch(URL + "/models", {
+      headers: { "accept": "application/json", "x-kingbot-ml-secret": SECRET },
+      signal: controller.signal
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.ok !== true) {
+      return {
+        ok: false,
+        status: String(data?.error || "ML_MODELS_HTTP_" + response.status),
+        models: []
+      };
+    }
+    return {
+      ok: true,
+      status: "AVAILABLE",
+      models: Array.isArray(data.models) ? data.models : []
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: error?.name === "AbortError" ? "ML_MODELS_TIMEOUT" : normalizeError(error, "ML_MODELS_UNAVAILABLE"),
+      models: []
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function probeMlSignalService() {
   if (!enabled()) {
     return {
