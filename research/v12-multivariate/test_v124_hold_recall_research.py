@@ -1,0 +1,174 @@
+import unittest
+
+import numpy as np
+import torch
+from unittest.mock import patch
+
+import run_v124_hold_recall_research as research
+
+from run_v124_hold_recall_research import (
+    LOSS_PROFILES,
+    _batch_loss,
+    class_weight_vector,
+    select_development_profile,
+    unchanged_acceptance_gates,
+)
+
+
+class V124HoldRecallResearchTests(unittest.TestCase):
+    def test_unchanged_acceptance_gates_match_v12_baseline(self):
+        gates = unchanged_acceptance_gates()
+        self.assertEqual(gates["balancedAccuracy"], 0.36)
+        self.assertEqual(gates["macroF1"], 0.34)
+        self.assertEqual(gates["minimumFinalSamples"], 30)
+        self.assertEqual(gates["nonzeroRecall"], ["SELL", "HOLD", "BUY"])
+        self.assertEqual(gates["finalSelectionScoreDeltaVsV9"], 0.005)
+
+    def test_all_class_weight_profiles_are_finite_positive_and_training_only(self):
+        train_y = np.asarray([-1] * 80 + [0] * 20 + [1] * 60, dtype=np.int64)
+        for profile in LOSS_PROFILES:
+            weights = class_weight_vector(train_y, profile)
+            self.assertEqual(weights.shape, (3,))
+            self.assertTrue(np.isfinite(weights).all())
+            self.assertTrue((weights > 0).all())
+            self.assertAlmostEqual(float(weights.mean()), 1.0, places=5)
+
+    def test_sqrt_inverse_weights_are_less_extreme_than_inverse_frequency(self):
+        train_y = np.asarray([-1] * 100 + [0] * 10 + [1] * 50, dtype=np.int64)
+        inverse = class_weight_vector(train_y, "inverse_frequency_ce")
+        square_root = class_weight_vector(train_y, "sqrt_inverse_frequency_ce")
+        inverse_ratio = float(inverse.max() / inverse.min())
+        square_root_ratio = float(square_root.max() / square_root.min())
+        self.assertLess(square_root_ratio, inverse_ratio)
+
+    def test_effective_number_weights_upweight_rare_classes(self):
+        train_y = np.asarray([-1] * 100 + [0] * 10 + [1] * 50, dtype=np.int64)
+        mapped = np.asarray(
+            [research.service.LABEL_TO_INDEX[int(value)] for value in train_y],
+            dtype=np.int64,
+        )
+        counts = np.bincount(mapped, minlength=3)
+        rare_class = int(np.argmin(counts))
+        common_class = int(np.argmax(counts))
+        for profile in ("effective_number_ce", "effective_number_focal"):
+            weights = class_weight_vector(train_y, profile)
+            self.assertGreater(
+                float(weights[rare_class]), float(weights[common_class])
+            )
+
+    def test_effective_number_focal_loss_has_finite_gradients(self):
+        logits = torch.tensor(
+            [[2.0, 0.2, -0.5], [0.1, 1.4, 0.2], [-0.4, 0.1, 1.8]],
+            dtype=torch.float32,
+            requires_grad=True,
+        )
+        labels = torch.tensor([0, 1, 2], dtype=torch.long)
+        weights = torch.tensor([0.8, 1.4, 0.8], dtype=torch.float32)
+        loss = _batch_loss(
+            logits, labels, weights, "effective_number_focal"
+        )
+        self.assertTrue(torch.isfinite(loss))
+        loss.backward()
+        self.assertIsNotNone(logits.grad)
+        self.assertTrue(torch.isfinite(logits.grad).all())
+
+    def test_invalid_class_weight_profile_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "V124_LOSS_PROFILE_INVALID"):
+            class_weight_vector(np.asarray([-1, 0, 1]), "future_test_weighting")
+
+    def test_no_final_profile_is_selected_when_development_gate_fails(self):
+        development = {
+            "profiles": {
+                name: {
+                    "passesDevelopmentGuard": False,
+                    "model": {"selectionScore": 0.99},
+                    "holdRecall": 0.99,
+                }
+                for name in LOSS_PROFILES
+            }
+        }
+        self.assertIsNone(select_development_profile(development))
+
+    def test_profile_selection_uses_development_score_and_hold_recall_tie_break(self):
+        development = {
+            "profiles": {
+                "inverse_frequency_ce": {
+                    "passesDevelopmentGuard": True,
+                    "model": {"selectionScore": 0.35},
+                    "holdRecall": 0.20,
+                },
+                "effective_number_ce": {
+                    "passesDevelopmentGuard": True,
+                    "model": {"selectionScore": 0.35},
+                    "holdRecall": 0.27,
+                },
+                "sqrt_inverse_frequency_ce": {
+                    "passesDevelopmentGuard": False,
+                    "model": {"selectionScore": 0.99},
+                    "holdRecall": 0.99,
+                },
+            }
+        }
+        self.assertEqual(
+            select_development_profile(development), "effective_number_ce"
+        )
+
+
+    def test_loss_fold_honors_selected_profile_subset(self):
+        labels = np.asarray([-1, 0, 1, -1, 0], dtype=np.int64)
+        train_mask = np.asarray([True, True, True, False, False])
+        eval_mask = np.asarray([False, False, False, True, True])
+        matrix = np.ones((5, 2), dtype=np.float32)
+        context_matrix = np.full((5, 2), 7.0, dtype=np.float32)
+        data = {
+            "C": matrix,
+            "M": matrix,
+            "A": matrix,
+            "y": labels,
+            "variants": {
+                "baseline": matrix,
+                "full_cortex": matrix,
+            },
+            "contextVariants": {
+                "full_cortex": context_matrix,
+            },
+        }
+        metrics = {
+            "classRecall": {"SELL": 0.5, "HOLD": 0.2, "BUY": 0.5},
+            "selectionScore": 0.4,
+            "qualityGate": True,
+        }
+        probabilities = np.full((2, 3), 1.0 / 3.0, dtype=np.float32)
+
+        with (
+            patch.object(
+                research.v123, "_fold_masks",
+                return_value=(train_mask, eval_mask, 1234.0),
+            ),
+            patch.object(research, "_matched_v9", return_value=probabilities),
+            patch.object(research, "_detailed_metrics", return_value=metrics),
+            patch.object(research, "fit_predict", return_value=probabilities) as fit,
+        ):
+            result = research._run_loss_fold(
+                data, 0.70, 0.85, ("effective_number_ce",)
+            )
+
+        self.assertEqual(
+            list(result["profiles"]), ["effective_number_ce"]
+        )
+        fit.assert_called_once()
+        self.assertEqual(
+            fit.call_args.kwargs["loss_profile"], "effective_number_ce"
+        )
+        np.testing.assert_array_equal(
+            fit.call_args.args[1], context_matrix[train_mask]
+        )
+        np.testing.assert_array_equal(
+            fit.call_args.args[6], context_matrix[eval_mask]
+        )
+        self.assertEqual(result["testSamples"], 2)
+
+
+
+if __name__ == "__main__":
+    unittest.main()
