@@ -368,7 +368,9 @@ async function deliverPendingMlFeedback(limit = 5) {
 
     const errorCode = String(result?.error || result?.status || "ML_FEEDBACK_DELIVERY_FAILED").slice(0, 180);
     const nextAttempts = Number(row.attempts || 0) + 1;
-    const failed = permanentErrors.has(errorCode) || nextAttempts >= 12;
+    // Transient infrastructure/configuration failures remain queued indefinitely;
+    // only malformed or contradictory settled samples are terminal.
+    const failed = permanentErrors.has(errorCode);
     const delaySeconds = Math.min(3600, 15 * (2 ** Math.min(nextAttempts, 8)));
     await pool.query(
       `UPDATE kingbot_private.ml_feedback_outbox
