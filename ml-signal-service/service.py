@@ -16,6 +16,7 @@ import math
 import os
 import threading
 import time
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime, timezone
 from typing import Any
@@ -27,7 +28,7 @@ from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 from sklearn.preprocessing import StandardScaler
 from torch import nn
 
-from model_store import load_model_artifacts, save_model_artifact
+from model_store import load_feedback_rows, load_model_artifacts, save_feedback_row, save_model_artifact
 
 
 HOST = "0.0.0.0"
@@ -59,7 +60,9 @@ PREDICTION_SEMAPHORE = threading.BoundedSemaphore(MAX_PREDICTIONS)
 MAX_FEEDBACK_ROWS = max(200, min(10000, int(os.getenv("KINGBOT_ML_MAX_FEEDBACK_ROWS", "4000"))))
 MIN_FEEDBACK_RETRAIN = max(20, min(500, int(os.getenv("KINGBOT_ML_MIN_FEEDBACK_RETRAIN", "60"))))
 FEEDBACK_ROWS: list[dict[str, Any]] = []
-FEEDBACK_VERSION = "online-feedback-v1"
+FEEDBACK_VERSION = "online-feedback-v2-persistent-settled"
+PERSISTED_FEEDBACK_LOADED = 0
+FEEDBACK_RESTORE_STATUS = "PENDING" if os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip() else "DISABLED"
 
 LABELS = [-1, 0, 1]
 LABEL_TO_INDEX = {-1: 0, 0: 1, 1: 2}
@@ -130,6 +133,7 @@ torch.set_num_interop_threads(max(1, min(4, TORCH_THREADS)))
 def restore_persisted_models() -> None:
     """Restore trusted model artifacts asynchronously after the HTTP server starts."""
     global MODEL_RESTORE_STATUS, PERSISTED_MODELS_LOADED
+    global PERSISTED_FEEDBACK_LOADED, FEEDBACK_RESTORE_STATUS
 
     if not os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip():
         MODEL_RESTORE_STATUS = "DISABLED"
@@ -171,6 +175,15 @@ def restore_persisted_models() -> None:
 
             PERSISTED_MODELS_LOADED = loaded
             MODEL_RESTORE_STATUS = "RESTORED" if loaded else "EMPTY"
+            try:
+                restored_feedback = restore_feedback_records(load_feedback_rows())
+                with LOCK:
+                    FEEDBACK_ROWS[:] = restored_feedback[-MAX_FEEDBACK_ROWS:]
+                PERSISTED_FEEDBACK_LOADED = len(FEEDBACK_ROWS)
+                FEEDBACK_RESTORE_STATUS = "RESTORED" if PERSISTED_FEEDBACK_LOADED else "EMPTY"
+            except Exception as feedback_error:
+                FEEDBACK_RESTORE_STATUS = "FAILED"
+                print("[KINGBOT ML FEEDBACK] restore failed", str(feedback_error)[:180])
             print("[KINGBOT ML STORE] restore complete", json.dumps({
                 "loaded": loaded,
                 "champions": len(MODELS),
@@ -1230,7 +1243,8 @@ def train_model(strategy: str, timeframe: str, markets: list[dict[str, Any]]) ->
                 row for row in FEEDBACK_ROWS
                 if timestamped
                 and split_timestamp is not None
-                and finite(row.get("receivedAt"), math.inf) < split_timestamp
+                and finite(row.get("marketAsOf"), math.inf) < split_timestamp
+                and finite(row.get("settledAt"), math.inf) < split_timestamp
                 and str(row.get("strategy")) == strategy
                 and str(row.get("timeframe")) == timeframe.lower()
                 and isinstance(row.get("features"), list)
@@ -1453,6 +1467,86 @@ def model_status(key: str) -> dict[str, Any]:
     }
 
 
+def feedback_market_bars(market: dict[str, Any]) -> list[dict[str, float]]:
+    """Require a fully timestamped OHLC history for a realized trade sample."""
+    raw_bars = market.get("mlBars")
+    if not isinstance(raw_bars, list):
+        multi_timeframe = market.get("multiTimeframe")
+        execution = multi_timeframe.get("execution") if isinstance(multi_timeframe, dict) else None
+        raw_bars = execution.get("mlBars") if isinstance(execution, dict) else None
+    if not isinstance(raw_bars, list):
+        raise ValueError("ML_FEEDBACK_MARKET_BARS_REQUIRED")
+    bars = normalize_market_bars(raw_bars)
+    if len(bars) < 60:
+        raise ValueError("ML_FEEDBACK_MARKET_HISTORY_INSUFFICIENT")
+    if any("_timestamp" not in bar for bar in bars):
+        raise ValueError("ML_FEEDBACK_MARKET_TIMESTAMPS_REQUIRED")
+    return bars
+
+
+def restore_feedback_records(items: Any) -> list[dict[str, Any]]:
+    """Validate rows loaded from PostgreSQL before making them available to training."""
+    if not isinstance(items, list):
+        raise ValueError("ML_FEEDBACK_STORE_ITEMS_INVALID")
+    restored: dict[str, dict[str, Any]] = {}
+    valid_outcomes = {"WIN", "LOSS", "BREAKEVEN", "INVALIDATED"}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        try:
+            decision_id = str(uuid.UUID(str(item.get("decisionId") or ""))).lower()
+            strategy = str(item.get("strategy") or "").strip().lower()
+            symbol = str(item.get("symbol") or "").strip().upper()
+            timeframe = str(item.get("timeframe") or "5m").strip().lower()
+            direction = str(item.get("direction") or "").strip().upper()
+            outcome = str(item.get("outcome") or "").strip().upper()
+            label = int(item.get("label"))
+            features = item.get("features")
+            market_as_of = parse_bar_timestamp(item.get("marketAsOf"))
+            settled_at = parse_bar_timestamp(item.get("settledAt"))
+            received_at = parse_bar_timestamp(item.get("receivedAt")) or time.time()
+            pnl = float(item.get("pnl"))
+            r_multiple = float(item.get("rMultiple"))
+            if strategy not in STRATEGY_FOCUS or not symbol or not timeframe:
+                continue
+            if direction not in {"BUY", "SELL"} or outcome not in valid_outcomes:
+                continue
+            expected_label = 0 if outcome == "BREAKEVEN" else (
+                1 if ((direction == "BUY") == (outcome == "WIN")) else -1
+            )
+            if label != expected_label or not isinstance(features, list) or len(features) != len(FEATURE_NAMES):
+                continue
+            feature_values = [float(value) for value in features]
+            if not all(math.isfinite(value) for value in feature_values):
+                continue
+            if market_as_of is None or settled_at is None or settled_at <= market_as_of:
+                continue
+            if not math.isfinite(pnl) or not math.isfinite(r_multiple):
+                continue
+            if ((outcome == "WIN" and pnl <= 0) or
+                    (outcome in {"LOSS", "INVALIDATED"} and pnl >= 0) or
+                    (outcome == "BREAKEVEN" and pnl != 0)):
+                continue
+            restored[decision_id] = {
+                "decisionId": decision_id,
+                "strategy": strategy,
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "direction": direction,
+                "outcome": outcome,
+                "label": label,
+                "features": feature_values,
+                "marketAsOf": market_as_of,
+                "settledAt": settled_at,
+                "pnl": pnl,
+                "rMultiple": r_multiple,
+                "receivedAt": received_at,
+            }
+        except (TypeError, ValueError, OverflowError):
+            continue
+    return sorted(restored.values(), key=lambda row: row["receivedAt"])
+
+
 def current_market_features(market: dict[str, Any], strategy: str) -> np.ndarray:
     """Build live features with the exact same OHLC extractor used during training."""
     if not isinstance(market, dict):
@@ -1490,6 +1584,8 @@ def record_feedback(
     market: dict[str, Any],
     pnl: float | None = None,
     r_multiple: float | None = None,
+    decision_id: str | None = None,
+    settled_at: Any = None,
 ) -> dict[str, Any]:
     normalized_direction = str(direction or "").strip().upper()
     normalized_outcome = str(outcome or "").strip().upper()
@@ -1500,14 +1596,35 @@ def record_feedback(
     if not isinstance(market, dict):
         raise ValueError("ML_FEEDBACK_MARKET_REQUIRED")
 
-    features = current_market_features(market, strategy)[0].astype(float).tolist()
-    label = 1 if normalized_direction == "BUY" else -1
-    if normalized_outcome in {"LOSS", "INVALIDATED"}:
-        label *= -1
-    if normalized_outcome == "BREAKEVEN":
-        label = 0
+    try:
+        normalized_decision_id = str(uuid.UUID(str(decision_id or ""))).lower()
+    except (TypeError, ValueError, AttributeError) as error:
+        raise ValueError("ML_FEEDBACK_DECISION_ID_INVALID") from error
 
+    normalized_bars = feedback_market_bars(market)
+    market_as_of = float(normalized_bars[-1]["_timestamp"])
+    settled_timestamp = parse_bar_timestamp(settled_at)
+    if settled_timestamp is None:
+        raise ValueError("ML_FEEDBACK_SETTLEMENT_TIMESTAMP_REQUIRED")
+    if settled_timestamp <= market_as_of or settled_timestamp > time.time() + 60:
+        raise ValueError("ML_FEEDBACK_TIMESTAMP_ORDER_INVALID")
+
+    normalized_pnl = float(pnl) if pnl is not None else math.nan
+    normalized_r_multiple = float(r_multiple) if r_multiple is not None else math.nan
+    if not math.isfinite(normalized_pnl) or not math.isfinite(normalized_r_multiple):
+        raise ValueError("ML_FEEDBACK_SETTLEMENT_METRICS_REQUIRED")
+    if ((normalized_outcome == "WIN" and normalized_pnl <= 0) or
+            (normalized_outcome in {"LOSS", "INVALIDATED"} and normalized_pnl >= 0) or
+            (normalized_outcome == "BREAKEVEN" and normalized_pnl != 0)):
+        raise ValueError("ML_FEEDBACK_OUTCOME_PNL_MISMATCH")
+
+    features = current_market_features(market, strategy)[0].astype(float).tolist()
+    label = 0 if normalized_outcome == "BREAKEVEN" else (
+        1 if ((normalized_direction == "BUY") == (normalized_outcome == "WIN")) else -1
+    )
+    received_at = time.time()
     row = {
+        "decisionId": normalized_decision_id,
         "strategy": strategy,
         "symbol": str(symbol or "").upper(),
         "timeframe": str(timeframe or "5m").lower(),
@@ -1515,28 +1632,43 @@ def record_feedback(
         "outcome": normalized_outcome,
         "label": int(label),
         "features": features,
-        "pnl": None if pnl is None else finite(pnl, 0.0),
-        "rMultiple": None if r_multiple is None else finite(r_multiple, 0.0),
-        "receivedAt": time.time(),
+        "marketAsOf": market_as_of,
+        "settledAt": settled_timestamp,
+        "pnl": normalized_pnl,
+        "rMultiple": normalized_r_multiple,
+        "receivedAt": received_at,
     }
+    persisted_payload = {
+        **row,
+        "settledAt": datetime.fromtimestamp(settled_timestamp, timezone.utc).isoformat(),
+    }
+    try:
+        persistence_result = save_feedback_row(persisted_payload)
+    except Exception as error:
+        raise RuntimeError(f"ML_FEEDBACK_PERSISTENCE_FAILED:{str(error)[:140]}") from error
+
     with LOCK:
-        FEEDBACK_ROWS.append(row)
+        if not any(existing.get("decisionId") == normalized_decision_id for existing in FEEDBACK_ROWS):
+            FEEDBACK_ROWS.append(row)
         if len(FEEDBACK_ROWS) > MAX_FEEDBACK_ROWS:
             del FEEDBACK_ROWS[:len(FEEDBACK_ROWS) - MAX_FEEDBACK_ROWS]
+        feedback_count = len(FEEDBACK_ROWS)
 
+    duplicate = bool(persistence_result.get("duplicate", False))
     return {
         "ok": True,
-        "status": "ML_FEEDBACK_RECORDED",
+        "status": "ML_FEEDBACK_ALREADY_RECORDED" if duplicate else "ML_FEEDBACK_RECORDED",
+        "decisionId": normalized_decision_id,
         "strategy": strategy,
         "symbol": row["symbol"],
         "timeframe": row["timeframe"],
         "outcome": normalized_outcome,
         "label": label,
-        "feedbackRows": len(FEEDBACK_ROWS),
-        "retrainRecommended": len(FEEDBACK_ROWS) >= MIN_FEEDBACK_RETRAIN,
+        "duplicate": duplicate,
+        "feedbackRows": feedback_count,
+        "retrainRecommended": feedback_count >= MIN_FEEDBACK_RETRAIN,
         "feedbackVersion": FEEDBACK_VERSION,
     }
-
 
 def predict_model(strategy: str, symbol: str, timeframe: str, market: dict[str, Any]) -> dict[str, Any]:
     key = f"{strategy}:{timeframe.lower()}"
@@ -1670,6 +1802,9 @@ class Handler(BaseHTTPRequestHandler):
                 "persistedModelsLoaded": PERSISTED_MODELS_LOADED,
                 "training": len(TRAINING_KEYS),
                 "feedbackRows": len(FEEDBACK_ROWS),
+                "persistedFeedbackRows": PERSISTED_FEEDBACK_LOADED,
+                "feedbackRestoreStatus": FEEDBACK_RESTORE_STATUS,
+                "feedbackPersistenceConfigured": bool(os.getenv("KINGBOT_ML_ARTIFACTS_URL", "").strip()),
                 "feedbackVersion": FEEDBACK_VERSION,
                 "championModels": len(MODELS),
                 "challengerModels": len(CHALLENGERS),
@@ -1746,7 +1881,8 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 result = record_feedback(
                     strategy, symbol, timeframe, direction, outcome, market,
-                    body.get("pnl"), body.get("rMultiple")
+                    body.get("pnl"), body.get("rMultiple"),
+                    body.get("decisionId"), body.get("settledAt")
                 )
                 self._json(200, {"stage": "AI_STRATEGIES", **result})
                 return
@@ -1766,7 +1902,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(404, {"ok": False, "error": "NOT_FOUND"})
         except RuntimeError as error:
             message = str(error)[:180]
-            status = 503 if message.startswith("ML_MODEL_PERSISTENCE_FAILED") else 409
+            status = 503 if message.startswith(("ML_MODEL_PERSISTENCE_FAILED", "ML_FEEDBACK_PERSISTENCE_FAILED")) else 409
             self._json(status, {"ok": False, "error": message})
         except ValueError as error:
             self._json(422, {"ok": False, "error": str(error)[:180]})
