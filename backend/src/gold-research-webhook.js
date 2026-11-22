@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { Router } from "express";
 
 const ALLOWED_TIMEFRAMES = new Set([
   "1", "1m", "5", "5m", "15", "15m", "60", "1h", "240", "4h", "D", "1D"
