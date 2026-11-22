@@ -36,7 +36,7 @@ test("XAU collector retains chronological closed candles and records source sema
 });
 
 test("XAU collector rejects still-open candles", () => {
-  const data = buildXauusdDataset(rawCandles([1795336800,1795337100,1795337700]), {
+  const data = buildXauusdDataset(rawCandles([1795336800,1795337100,1795338000]), {
     timeframe: "5m",
     nowEpochSeconds: NOW,
     minBars: 2,
