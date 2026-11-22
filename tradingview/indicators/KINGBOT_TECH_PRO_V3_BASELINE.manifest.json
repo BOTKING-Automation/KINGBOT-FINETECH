@@ -1,0 +1,56 @@
+{
+  "product": "KINGBOT TECH PRO",
+  "baseline_id": "KINGBOT-TECH-PRO-V3-BASELINE",
+  "snapshot_date": "2026-11-22",
+  "source_path": "tradingview/indicators/KINGBOT_TECH_PRO_V3_BASELINE.pine",
+  "sha256": "4db02aa604739aa563f12a79068386c5d1534898eb5e5078bdecda9a53ada867",
+  "bytes": 68515,
+  "lines": 1424,
+  "release_status": "FROZEN_BASELINE",
+  "pine_version": 5,
+  "script_type": "indicator (not strategy)",
+  "features_preserved": [
+    "chart patterns",
+    "candlestick patterns",
+    "BOS/CHoCH",
+    "order blocks",
+    "fair value gaps",
+    "equal highs/lows",
+    "liquidity sweeps",
+    "premium/discount",
+    "previous day/week/month levels",
+    "EMA 50/200",
+    "RSI",
+    "ATR",
+    "MTF bias",
+    "BUY/SELL with Entry/SL/TP1-TP3",
+    "ASIAN/LONDON/NEW YORK sessions",
+    "Dashboard Mini/Full/Off"
+  ],
+  "static_checks": {
+    "drawing_constructors": 39,
+    "constructors_using_xloc_bar_index": 39,
+    "constructors_using_xloc_bar_time": 0,
+    "line_new": 20,
+    "box_new": 10,
+    "label_new": 9,
+    "plotshape": 7,
+    "request_security": 9,
+    "alertcondition": 6,
+    "delimiter_check": "passed"
+  },
+  "not_yet_verified": [
+    "TradingView Pine Editor compilation",
+    "XAUUSD chart behaviour across 1D/4H/1H/15M/5M/1M",
+    "Bar Replay reproducibility",
+    "broker-feed normalization",
+    "spread/commission/slippage-aware backtest",
+    "shadow deployment"
+  ],
+  "control": {
+    "new_signals_production_enabled": false,
+    "baseline_must_not_be_modified": true,
+    "candidate_default": "OFF",
+    "promotion_requires_backtest_and_shadow": true
+  }
+}
