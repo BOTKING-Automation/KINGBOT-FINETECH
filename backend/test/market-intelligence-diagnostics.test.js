@@ -48,3 +48,23 @@ test("diagnostics report incomplete data instead of manufacturing directional co
   assert.ok(!result.warnings.includes("PATTERN_EVIDENCE_CONFLICT"));
   assert.ok(result.warnings.includes("MTF_COVERAGE_INCOMPLETE"));
 });
+
+
+test("verified neutral timeframes count toward data coverage but not directional votes", () => {
+  const result = buildMarketIntelligenceDiagnostics({
+    multiTimeframe: {
+      requiredTimeframes: ["5m", "15m", "1h", "4h"],
+      timeframes: [
+        { timeframe: "5m", ok: true, trend: "BULLISH" },
+        { timeframe: "15m", ok: true, trend: "BULLISH" },
+        { timeframe: "1h", ok: true, trend: "NEUTRAL" },
+        { timeframe: "4h", ok: true, trend: "NEUTRAL" }
+      ]
+    }
+  });
+  assert.equal(result.weightedMultiTimeframe.coveragePct, 100);
+  assert.deepEqual(result.weightedMultiTimeframe.verifiedTimeframes, ["5m", "15m", "1h", "4h"]);
+  assert.deepEqual(result.weightedMultiTimeframe.usableTimeframes, ["5m", "15m"]);
+  assert.equal(result.weightedMultiTimeframe.alignmentPct, 100);
+  assert.ok(!result.warnings.includes("MTF_COVERAGE_INCOMPLETE"));
+});

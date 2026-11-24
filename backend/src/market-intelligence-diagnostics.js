@@ -51,7 +51,8 @@ export function buildMarketIntelligenceDiagnostics({
   const requiredFrames = Array.isArray(multiTimeframe.requiredTimeframes)
     ? multiTimeframe.requiredTimeframes
     : ["5m", "15m", "1h", "4h"];
-  const usable = frames.filter(frame => frame?.ok !== false && directionOf(frame?.trend));
+  const verifiedFrames = frames.filter(frame => frame?.ok === true);
+  const usable = verifiedFrames.filter(frame => directionOf(frame?.trend));
   let bullishWeight = 0;
   let bearishWeight = 0;
   let totalWeight = 0;
@@ -104,7 +105,7 @@ export function buildMarketIntelligenceDiagnostics({
   });
 
   const warnings = [];
-  if (usable.length < requiredFrames.length) warnings.push("MTF_COVERAGE_INCOMPLETE");
+  if (verifiedFrames.length < requiredFrames.length) warnings.push("MTF_COVERAGE_INCOMPLETE");
   if (weightedDirection === "MIXED" && usable.length) warnings.push("MTF_WEIGHTED_DIRECTION_MIXED");
   if (opposedTriggers > 0) warnings.push("LOWER_TIMEFRAME_TRIGGER_DIVERGENCE");
   if (hasDirectionalWeightedBias && opposedPatterns > 0 && marketPatterns.length) warnings.push("PATTERN_EVIDENCE_CONFLICT");
@@ -120,9 +121,10 @@ export function buildMarketIntelligenceDiagnostics({
       bearishWeight: Number(bearishWeight.toFixed(2)),
       totalWeight: Number(totalWeight.toFixed(2)),
       alignmentPct: weightedAlignmentPct,
-      coveragePct: requiredFrames.length ? Math.round(usable.length / requiredFrames.length * 100) : null,
+      coveragePct: requiredFrames.length ? Math.round(verifiedFrames.length / requiredFrames.length * 100) : null,
+      verifiedTimeframes: verifiedFrames.map(frame => frame.timeframe),
       usableTimeframes: usable.map(frame => frame.timeframe),
-      missingTimeframes: requiredFrames.filter(timeframe => !usable.some(frame => frame.timeframe === timeframe))
+      missingTimeframes: requiredFrames.filter(timeframe => !verifiedFrames.some(frame => frame.timeframe === timeframe))
     },
     lowerTimeframeTriggers: {
       frames: lowerFrames.map(frame => frame.timeframe),
