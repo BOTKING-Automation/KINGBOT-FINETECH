@@ -90,3 +90,82 @@ test("directional flags are not treated as truthy when scanner reports NONE",asy
   assert.equal(result.riskCouncil.blocks.length,0);
   assert.ok(["WAIT","CONFLICTED"].includes(result.strategyCouncil.state));
 });
+
+
+test("concurrent CORTEX requests share one completed MTF scan and reuse its short-lived cache", async()=>{
+  const calls=[];
+  const scanRunner=async({timeframe})=>{
+    calls.push(timeframe);
+    await new Promise(resolve=>setTimeout(resolve,15));
+    return {
+      ok:true,
+      technical:[{
+        symbol:"CACHE-XAUUSD",
+        source:"test native OHLC",
+        technicalVerified:true,
+        price:2000,
+        trend:"BULLISH",
+        bos:"BULLISH",
+        displacement:"BULLISH",
+        atr14:10,
+        rsi14:58,
+        ema20:2005,
+        ema50:1995,
+        barTime:now,
+        receivedAt:now
+      }],
+      quotes:[{symbol:"CACHE-XAUUSD",price:2000,verified:true,timestamp:now}]
+    };
+  };
+  const options={symbol:"CACHE-XAUUSD",baseTimeframe:"15m",scanRunner};
+  const [first,second]=await Promise.all([
+    buildMultiTimeframeContext(options),
+    buildMultiTimeframeContext(options)
+  ]);
+  assert.equal(calls.length,4);
+  assert.equal(first.timeframes.length,4);
+  assert.equal(first.cacheHit,false);
+  assert.equal(second.coalesced,true);
+  const third=await buildMultiTimeframeContext(options);
+  assert.equal(third.cacheHit,true);
+  assert.equal(calls.length,4);
+});
+
+test("CORTEX never reuses a cached analysis across a changed deterministic risk state",async()=>{
+  const sameMarket={...market,symbol:"XAUUSD-RISK-CACHE"};
+  const first=await orchestrateKingbotIntelligence({
+    market:sameMarket,
+    riskContext:{executionMode:"DEMO"},
+    options:{botId:null},
+    adaptivePerformance:{}
+  });
+  assert.equal(first.riskCouncil.blocks.length,0);
+  const blocked=await orchestrateKingbotIntelligence({
+    market:sameMarket,
+    riskContext:{executionMode:"DEMO",globalKillSwitch:true},
+    options:{botId:null},
+    adaptivePerformance:{}
+  });
+  assert.ok(blocked.riskCouncil.blocks.includes("GLOBAL_KILL_SWITCH"));
+  assert.equal(blocked.cached,undefined);
+  assert.equal(blocked.execution.authorized,false);
+});
+
+test("personalized memory is never served from the shared CORTEX result cache",async()=>{
+  const sameMarket={...market,symbol:"XAUUSD-MEMORY-CACHE"};
+  const first=await orchestrateKingbotIntelligence({
+    market:sameMarket,
+    memory:[{selected_engine:"strategic",direction:"BUY",confidence:70}],
+    options:{botId:null},
+    adaptivePerformance:{}
+  });
+  const second=await orchestrateKingbotIntelligence({
+    market:sameMarket,
+    memory:[{selected_engine:"smc-pro",direction:"SELL",confidence:55}],
+    options:{botId:null},
+    adaptivePerformance:{}
+  });
+  assert.equal(first.memoryContext[0].selectedEngine,"strategic");
+  assert.equal(second.memoryContext[0].selectedEngine,"smc-pro");
+  assert.equal(second.cached,undefined);
+});
