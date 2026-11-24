@@ -10,6 +10,8 @@ const FIREBASE_TOKEN = "test-firebase-id-token";
 function createHarness(pageUrl) {
   const calls = [];
   const location = new URL(pageUrl);
+  let replacedUrl = null;
+  location.replace = value => { replacedUrl = String(value); };
   const browserWindow = {
     location,
     KINGBOT_FIREBASE: {
@@ -40,7 +42,7 @@ function createHarness(pageUrl) {
     }
   });
   vm.runInContext(sessionSource, context, { filename: "system/session.js" });
-  return { api: browserWindow.KINGBOT_API, calls };
+  return { api: browserWindow.KINGBOT_API, session: browserWindow.KINGBOT_SESSION, calls, get replacedUrl() { return replacedUrl; } };
 }
 
 test("production pages ignore attacker-controlled remote API query parameters", () => {
@@ -83,4 +85,14 @@ test("KINGBOT_API refuses absolute or protocol-relative requests to an external 
     error => error?.message === "KINGBOT_API_ORIGIN_NOT_ALLOWED"
   );
   assert.equal(harness.calls.length, 0, "no authenticated fetch may be sent to an external origin");
+});
+
+
+test("local API selection survives the protected sign-in redirect", () => {
+  const harness = createHarness("http://localhost:5500/ai.html?kb-api=local");
+  harness.session.redirectToSignIn();
+  const redirect = new URL(harness.replacedUrl, "http://localhost:5500");
+  assert.equal(redirect.pathname, "/access-stable.html");
+  assert.equal(redirect.searchParams.get("kb-api"), "local");
+  assert.equal(redirect.searchParams.get("return"), "/ai.html?kb-api=local");
 });

@@ -7,12 +7,35 @@ import { buildMarketEvidence, marketDecisionGate } from "./market-evidence-engin
 import { buildStrategyCouncil } from "./strategy-council.js";
 import { evaluateStrategySpecialists } from "./strategy-specialists.js";
 import { getGoldPriceFeed } from "./gold-price-feed.js";
+import { buildMarketIntelligenceDiagnostics } from "./market-intelligence-diagnostics.js";
 
 const BOT_IDS = ["strategic", "flipper", "breakout", "smc-pro", "ladder-flip"];
 const MODEL = "KINGBOT-CORTEX-1";
 const ai = null;
 const CACHE_MS = Math.max(2500, Number(process.env.KINGBOT_INTELLIGENCE_CACHE_MS || 7000));
 const cache = new Map();
+const MTF_CONTEXT_CACHE_MS = Math.max(500, Math.min(15000, Number(process.env.KINGBOT_MTF_CONTEXT_CACHE_MS || 2500)));
+const mtfContextCache = new Map();
+const mtfContextInFlight = new Map();
+const scopeIdentities = new WeakMap();
+let nextScopeIdentity = 1;
+
+function scopeIdentity(value) {
+  if (!value || (typeof value !== "object" && typeof value !== "function")) return "none";
+  let id = scopeIdentities.get(value);
+  if (!id) {
+    id = nextScopeIdentity++;
+    scopeIdentities.set(value, id);
+  }
+  return String(id);
+}
+
+function storeBoundedCache(target, key, value, maxEntries = 400) {
+  target.delete(key);
+  target.set(key, value);
+  while (target.size > maxEntries) target.delete(target.keys().next().value);
+}
+
 const publicGoldPriceFeed = getGoldPriceFeed();
 
 const SYNTHESIS_SCHEMA = {
@@ -111,7 +134,7 @@ function normalizeMarket(input = {}) {
   };
 }
 
-export async function buildMultiTimeframeContext({pool,twelveData,symbol,baseTimeframe="15m",scanRunner=runStandaloneMarketScan}={}){
+async function buildMultiTimeframeContextUncached({pool,twelveData,symbol,baseTimeframe="15m",scanRunner=runStandaloneMarketScan}={}){
   const requestedLevels=[...new Set(["5m","15m","1h","4h",String(baseTimeframe).toLowerCase()])];
   // MTF analysis is a KINGBOT capability, not a Twelve Data entitlement.
   // Each timeframe uses the same native scanner pipeline and its own verified
@@ -191,6 +214,51 @@ export async function buildMultiTimeframeContext({pool,twelveData,symbol,baseTim
     higherTimeframeBias:htfBias,lowerTimeframeBias:ltfBias,triggerPresent:trigger,setupState,
     staleTimeframes:scans.filter(x=>!x.ok).map(x=>x.timeframe)
   };
+}
+
+
+export async function buildMultiTimeframeContext(options = {}) {
+  const scanRunner = options.scanRunner || runStandaloneMarketScan;
+  const symbol = upper(options.symbol);
+  if (!symbol) return buildMultiTimeframeContextUncached({ ...options, scanRunner });
+
+  const baseTimeframe = lower(options.baseTimeframe || "15m");
+  const key = JSON.stringify({
+    symbol,
+    baseTimeframe,
+    pool: scopeIdentity(options.pool),
+    twelveData: scopeIdentity(options.twelveData),
+    scanRunner: scopeIdentity(scanRunner)
+  });
+  const now = Date.now();
+  const cached = mtfContextCache.get(key);
+  if (cached && now - cached.cachedAt <= MTF_CONTEXT_CACHE_MS) {
+    mtfContextCache.delete(key);
+    mtfContextCache.set(key, cached);
+    return { ...cached.result, cacheHit: true, cacheAgeMs: Math.max(0, now - cached.cachedAt) };
+  }
+  if (cached) mtfContextCache.delete(key);
+
+  const existing = mtfContextInFlight.get(key);
+  if (existing) return { ...(await existing), coalesced: true, cacheHit: false };
+
+  const operation = buildMultiTimeframeContextUncached({ ...options, scanRunner }).then(result => {
+    const required = Array.isArray(result?.requiredTimeframes) ? result.requiredTimeframes : [];
+    const frames = Array.isArray(result?.timeframes) ? result.timeframes : [];
+    const complete = required.length > 0 && frames.length === required.length &&
+      frames.every(frame => frame?.ok === true && frame?.technicalReady === true);
+    if (complete) {
+      storeBoundedCache(mtfContextCache, key, { result, cachedAt: Date.now() }, 128);
+    }
+    return { ...result, cacheHit: false, cacheAgeMs: 0 };
+  });
+
+  mtfContextInFlight.set(key, operation);
+  try {
+    return await operation;
+  } finally {
+    if (mtfContextInFlight.get(key) === operation) mtfContextInFlight.delete(key);
+  }
 }
 
 function analyzeTechnical(m) {
@@ -486,7 +554,37 @@ async function synthesize(payload) {
     }
   };
 }
-function cacheKey(market, options = {}) {
+function adaptiveMetricsSignature(metrics) {
+  if (!metrics || typeof metrics !== "object") return null;
+  return ["trades","sufficientSample","reliability","adjustment","winRate","avgR"]
+    .map(key => metrics[key] ?? null);
+}
+
+function adaptiveCacheSignature(performance = {}) {
+  return BOT_IDS.map(botId => {
+    const bot = performance?.[botId] || {};
+    const group = source => Object.entries(source || {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => [key, adaptiveMetricsSignature(value)]);
+    return [botId, adaptiveMetricsSignature(bot.overall), group(bot.byRegime), group(bot.bySetup)];
+  });
+}
+
+function cacheKey(market, options = {}, riskContext = {}, adaptivePerformance = {}, thinkingLevel = "EXPERT") {
+  const frames = Array.isArray(market.multiTimeframe?.timeframes)
+    ? market.multiTimeframe.timeframes.map(frame => ({
+        timeframe: frame.timeframe,
+        ok: frame.ok,
+        trend: frame.trend,
+        bos: frame.bos,
+        choch: frame.choch,
+        liquiditySweep: frame.liquiditySweep,
+        displacement: frame.displacement,
+        breakout: frame.breakout,
+        retest: frame.retest,
+        barTime: frame.barTime
+      }))
+    : null;
   return JSON.stringify({
     symbol: market.symbol,
     timeframe: market.timeframe,
@@ -495,32 +593,84 @@ function cacheKey(market, options = {}) {
     spread: market.spread,
     trend: market.trend,
     momentum: market.momentum,
+    volatility: market.volatility,
     structure: market.structure,
+    rsi: market.rsi,
+    adx: market.adx,
+    emaFast: market.emaFast,
+    emaSlow: market.emaSlow,
     quoteTimestamp: market.quoteTimestamp || null,
+    receivedAt: market.receivedAt || market.timestamp || null,
+    quoteFreshnessMaxAgeMs: market.quoteFreshnessMaxAgeMs ?? null,
+    freshnessMaxAgeMs: market.freshnessMaxAgeMs ?? null,
     barTime: market.barTime || null,
+    bos: market.rawBos ?? market.bos ?? null,
+    choch: market.rawChoch ?? market.choch ?? null,
+    liquiditySweep: market.rawLiquiditySweep ?? market.liquiditySweep ?? null,
+    displacement: market.rawDisplacement ?? market.displacement ?? null,
+    orderBlock: market.orderBlock ? {
+      direction: market.orderBlock.direction,
+      high: market.orderBlock.high,
+      low: market.orderBlock.low
+    } : null,
+    fairValueGap: market.fairValueGap ?? market.fvg ?? null,
+    fairValueGapDirection: market.fairValueGapDirection ?? null,
+    breakout: market.breakout ?? null,
+    breakoutDirection: market.breakoutDirection ?? null,
+    retest: market.retest ?? null,
+    retestDirection: market.retestDirection ?? null,
+    volume: market.volume ?? null,
     crossMarket: market.crossMarket?.breadth ? {
       live: market.crossMarket.breadth.live,
       up: market.crossMarket.breadth.up,
       down: market.crossMarket.breadth.down,
       avgChange: market.crossMarket.breadth.avgChange
     } : null,
-    liquiditySweep: market.liquiditySweep,
-    displacement: market.displacement,
-    breakout: market.breakout,
-    retest: market.retest,
+    multiTimeframe: market.multiTimeframe ? {
+      policy: market.multiTimeframe.policy,
+      setupState: market.multiTimeframe.setupState,
+      higherTimeframeBias: market.multiTimeframe.higherTimeframeBias,
+      lowerTimeframeBias: market.multiTimeframe.lowerTimeframeBias,
+      frames
+    } : null,
+    risk: {
+      maxSpreadAtrRatio: riskContext.maxSpreadAtrRatio ?? null,
+      staleDataMs: riskContext.staleDataMs ?? null,
+      killSwitch: Boolean(riskContext.killSwitch),
+      globalKillSwitch: Boolean(riskContext.globalKillSwitch),
+      globalTradingPaused: Boolean(riskContext.globalTradingPaused),
+      executionMode: upper(riskContext.executionMode || "DEMO"),
+      liveAuthorized: Boolean(riskContext.liveAuthorized)
+    },
+    adaptive: adaptiveCacheSignature(adaptivePerformance),
+    thinkingLevel,
     botId: options.botId || null
   });
 }
 
 export async function orchestrateKingbotIntelligence({ market: inputMarket = {}, riskContext = {}, options = {}, memory = [], adaptivePerformance = {}, thinkingLevel = "EXPERT" } = {}) {
   const market = normalizeMarket(inputMarket);
-  if (!market.multiTimeframe && market.symbol) market.multiTimeframe = await buildMultiTimeframeContext({ pool: options.pool, twelveData: options.twelveData, symbol: market.symbol, baseTimeframe: market.timeframe });
-  const marketEvidence = buildMarketEvidence(market, { maxAgeMs: Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000) });
   const level = normalizeThinkingLevel(thinkingLevel || options.thinkingLevel || "EXPERT");
+  const key = cacheKey(market, options, riskContext, adaptivePerformance, level);
+  const maxAgeMs = Number(market.quoteFreshnessMaxAgeMs || market.freshnessMaxAgeMs || riskContext.staleDataMs || process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000);
+  const inputFreshness = freshness(market.quoteTimestamp || market.receivedAt || market.timestamp, maxAgeMs);
+  const cached = memory.length === 0 && inputFreshness.ok ? cache.get(key) : null;
+  if (cached && Date.now() - cached.at <= CACHE_MS) {
+    cache.delete(key);
+    cache.set(key, cached);
+    return { ...cached.result, cached: true };
+  }
+  if (cached || !inputFreshness.ok) cache.delete(key);
+  if (!market.multiTimeframe && market.symbol) {
+    market.multiTimeframe = await buildMultiTimeframeContext({
+      pool: options.pool,
+      twelveData: options.twelveData,
+      symbol: market.symbol,
+      baseTimeframe: market.timeframe
+    });
+  }
+  const marketEvidence = buildMarketEvidence(market, { maxAgeMs: Number(process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000) });
   const cognitivePlan = buildCognitivePlan({ intent: "MARKET_INTELLIGENCE", symbol: market.symbol, conversation: [], thinkingLevel: level });
-  const key = cacheKey(market, options);
-  const cached = cache.get(key);
-  if (cached && Date.now() - cached.at <= CACHE_MS) return { ...cached.result, cached: true };
 
   const technical = analyzeTechnical(market);
   technical.evidenceQuality = marketEvidence.evidenceQuality;
@@ -532,6 +682,7 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
   const analysts = [technical, regime, context, execution, crossMarket];
   const engines = BOT_IDS.map(id => engineFit(id, market, regime, adaptivePerformance));
   const specialistCards = evaluateStrategySpecialists({ market, multiTimeframe: market.multiTimeframe || {}, regime });
+  const intelligenceDiagnostics = buildMarketIntelligenceDiagnostics({ market, multiTimeframe: market.multiTimeframe || {}, specialists: specialistCards, evidence: marketEvidence });
   const specialistByBot = new Map(specialistCards.map(card => [card.botId, card]));
   const enrichedEngines = engines.map(engine => ({ ...engine, specialist: specialistByBot.get(engine.botId) || null }));
   const debate = buildDebate(analysts, enrichedEngines, market);
@@ -598,7 +749,8 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
         Number(market.quoteFreshnessMaxAgeMs || market.freshnessMaxAgeMs || process.env.KINGBOT_BRAIN_MAX_DATA_AGE_MS || 5000)
       ),
       freshnessMode: market.quoteTimestamp ? "LIVE_QUOTE" : (market.receivedAt ? "LIVE_DATA_INGESTION" : "BAR_CONTEXT"),
-      evidence: marketEvidence
+      evidence: marketEvidence,
+      intelligenceDiagnostics
     },
     analysts,
     debate,
@@ -652,7 +804,7 @@ export async function orchestrateKingbotIntelligence({ market: inputMarket = {},
     watch: enrichedEngines.filter(e => !e.strategyMatch).slice(0, 3).map(e => e.botId + ": below legacy engine threshold")
   };
 
-  cache.set(key, { at: Date.now(), result });
+  if (memory.length === 0 && inputFreshness.ok) storeBoundedCache(cache, key, { at: Date.now(), result }, 400);
   return result;
 }
 

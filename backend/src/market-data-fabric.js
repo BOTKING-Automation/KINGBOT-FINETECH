@@ -3,6 +3,65 @@ import { getDerivMarketFeed } from "./deriv-market-feed.js";
 
 const DEFAULT_FRESHNESS_MS = Math.max(15000, Number(process.env.KINGBOT_MARKET_DATA_MAX_AGE_MS || 120000));
 const REQUEST_TIMEOUT_MS = Math.max(1000, Number(process.env.KINGBOT_MARKET_DATA_TIMEOUT_MS || 4500));
+const QUOTE_CACHE_TTL_MS = (() => {
+  const raw = process.env.KINGBOT_MARKET_QUOTE_CACHE_MS;
+  const value = raw === undefined ? 500 : Number(raw);
+  return Number.isFinite(value) ? Math.max(0, Math.min(3000, value)) : 500;
+})();
+const QUOTE_CACHE_MAX_ENTRIES = 600;
+const quoteCache = new Map();
+const quoteInFlight = new Map();
+const objectScopes = new WeakMap();
+let nextObjectScope = 1;
+
+function objectScope(value) {
+  if (!value || (typeof value !== "object" && typeof value !== "function")) return "none";
+  let id = objectScopes.get(value);
+  if (!id) {
+    id = nextObjectScope++;
+    objectScopes.set(value, id);
+  }
+  return String(id);
+}
+
+function quoteCacheIdentity(fabric, symbol) {
+  return [
+    symbol,
+    objectScope(fabric.twelveData),
+    objectScope(fabric.goldFeed),
+    objectScope(fabric.derivFeed),
+    Boolean(fabric.massiveApiKey)
+  ].join("|");
+}
+
+function freshCachedQuote(entry) {
+  if (!entry?.quote || Date.now() - entry.cachedAt > QUOTE_CACHE_TTL_MS) return null;
+  const timestampMs = Date.parse(String(entry.quote.timestamp || ""));
+  const maxAgeMs = Number(entry.quote.freshnessMaxAgeMs) || DEFAULT_FRESHNESS_MS;
+  if (!Number.isFinite(timestampMs)) return null;
+  const ageMs = Math.max(0, Date.now() - timestampMs);
+  if (ageMs > maxAgeMs || !(Number(entry.quote.price) > 0)) return null;
+  return {
+    ...entry.quote,
+    ok: true,
+    ageMs,
+    available: true,
+    verified: true,
+    quality: "VERIFIED",
+    cacheHit: true,
+    executionAuthorized: false,
+    executionAuthority: "NONE"
+  };
+}
+
+function storeQuoteCache(key, quote) {
+  quoteCache.delete(key);
+  quoteCache.set(key, { quote, cachedAt: Date.now() });
+  while (quoteCache.size > QUOTE_CACHE_MAX_ENTRIES) {
+    quoteCache.delete(quoteCache.keys().next().value);
+  }
+}
+
 
 const CRYPTO_QUOTES = {
   BTCUSD: "BTCUSDT",
@@ -289,7 +348,31 @@ export class MarketDataFabric {
     if (!symbol || symbol.length < 3) {
       return { symbol, available: false, verified: false, error: "MARKET_SYMBOL_REQUIRED", provider: "KINGBOT_MARKET_DATA_FABRIC" };
     }
+    const key = quoteCacheIdentity(this, symbol);
+    const cached = freshCachedQuote(quoteCache.get(key));
+    if (cached) return cached;
+    quoteCache.delete(key);
 
+    const existing = quoteInFlight.get(key);
+    if (existing) {
+      const result = await existing;
+      return { ...result, coalesced: true };
+    }
+
+    const operation = this.fetchQuoteUncached(symbol);
+    quoteInFlight.set(key, operation);
+    try {
+      const result = await operation;
+      if (QUOTE_CACHE_TTL_MS > 0 && result?.available && result?.verified) {
+        storeQuoteCache(key, result);
+      }
+      return { ...result, cacheHit: false };
+    } finally {
+      if (quoteInFlight.get(key) === operation) quoteInFlight.delete(key);
+    }
+  }
+
+  async fetchQuoteUncached(symbol) {
     const category = classifyMarketSymbol(symbol);
     const failures = [];
     const providerList = SOURCE_ORDER[category] || SOURCE_ORDER.unknown;

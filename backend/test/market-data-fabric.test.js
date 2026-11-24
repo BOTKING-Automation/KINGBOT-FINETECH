@@ -115,3 +115,39 @@ test("snapshot exposes provider and verification counts", async () => {
   assert.equal(snapshot.verifiedCount, 2);
   assert.equal(snapshot.executionAuthority, undefined);
 });
+
+
+test("coalesces concurrent same-symbol quote requests and reuses a very short fresh cache", async () => {
+  let calls = 0;
+  const goldFeed = {
+    async getQuote() {
+      calls += 1;
+      await new Promise(resolve => setTimeout(resolve, 30));
+      return {
+        symbol: "XAUUSD",
+        price: 4175.25,
+        timestamp: Date.now(),
+        source: "test gold feed",
+        provider: "gold-api.com"
+      };
+    }
+  };
+  const fabric = new MarketDataFabric({
+    goldFeed,
+    twelveData: { enabled: false },
+    derivFeed: null
+  });
+  const [first, second] = await Promise.all([
+    fabric.getQuote("XAUUSD"),
+    fabric.getQuote("GOLD")
+  ]);
+  assert.equal(calls, 1);
+  assert.equal(first.available, true);
+  assert.equal(second.available, true);
+  assert.equal(second.coalesced, true);
+  const third = await fabric.getQuote("XAUUSD");
+  assert.equal(calls, 1);
+  assert.equal(third.cacheHit, true);
+  assert.equal(third.executionAuthorized, false);
+  assert.equal(third.executionAuthority, "NONE");
+});

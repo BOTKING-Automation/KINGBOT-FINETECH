@@ -16,6 +16,8 @@ const DEFAULT_TF = "5m";
 const publicGoldPriceFeed = getGoldPriceFeed();
 const publicDerivFeed = getDerivMarketFeed();
 const publicDerivTechnicalCache = new Map();
+const publicDerivTechnicalInFlight = new Map();
+const PUBLIC_TECHNICAL_CACHE_MAX_ENTRIES = 240;
 const PUBLIC_TECHNICAL_CACHE_MS = Math.max(5000, Number(process.env.KINGBOT_SCANNER_TECHNICAL_CACHE_MS || 15000));
 
 function cleanSymbols(value) {
@@ -504,31 +506,46 @@ async function fetchCachedPublicDerivTechnical(symbol, timeframe) {
   if(cached?.technical && age<=PUBLIC_TECHNICAL_CACHE_MS) {
     return {...cached.technical, technicalCacheAgeMs:Math.max(0,age)};
   }
-  const bars=await publicDerivFeed.getHistoricalCandles(symbol,{timeframe,limit:120,timeoutMs:5000});
-  const technical=deriveTechnicalFromBars((Array.isArray(bars)?bars:[]).map(b=>({...b,datetime:b.time})));
-  if(!technical) throw new Error("INSUFFICIENT_HISTORICAL_CANDLES");
-  const snapshot={...technical,symbol,timeframe,source:"Deriv public live OHLC",barTime:technical.barTime||bars.at(-1)?.time||null,receivedAt:new Date().toISOString()};
-  publicDerivTechnicalCache.set(key,{technical:snapshot,cachedAt:Date.now()});
-  return {...snapshot,technicalCacheAgeMs:0};
+
+  const existing=publicDerivTechnicalInFlight.get(key);
+  if(existing) {
+    const technical=await existing;
+    const entry=publicDerivTechnicalCache.get(key);
+    return {...technical,technicalCacheAgeMs:Math.max(0,Date.now()-Number(entry?.cachedAt||Date.now())),technicalCoalesced:true};
+  }
+
+  const operation=(async()=>{
+    const bars=await publicDerivFeed.getHistoricalCandles(symbol,{timeframe,limit:120,timeoutMs:5000});
+    const technical=deriveTechnicalFromBars((Array.isArray(bars)?bars:[]).map(b=>({...b,datetime:b.time})));
+    if(!technical) throw new Error("INSUFFICIENT_HISTORICAL_CANDLES");
+    const snapshot={...technical,symbol,timeframe,source:"Deriv public live OHLC",barTime:technical.barTime||bars.at(-1)?.time||null,receivedAt:new Date().toISOString()};
+    publicDerivTechnicalCache.delete(key);
+    publicDerivTechnicalCache.set(key,{technical:snapshot,cachedAt:Date.now()});
+    while(publicDerivTechnicalCache.size>PUBLIC_TECHNICAL_CACHE_MAX_ENTRIES) {
+      publicDerivTechnicalCache.delete(publicDerivTechnicalCache.keys().next().value);
+    }
+    return snapshot;
+  })();
+
+  publicDerivTechnicalInFlight.set(key,operation);
+  try {
+    return {...await operation,technicalCacheAgeMs:0};
+  } finally {
+    if(publicDerivTechnicalInFlight.get(key)===operation) publicDerivTechnicalInFlight.delete(key);
+  }
 }
 
 async function fetchPublicDerivData(symbols, timeframe) {
   const rows = await Promise.all(symbols.map(async symbol => {
-    let quote = null;
-    let technical = null;
-    let quoteError = null;
-    let technicalError = null;
-    try {
-      quote = await publicDerivFeed.getQuote(symbol,{maxAgeMs:3000,timeoutMs:2000});
-    } catch(error) {
-      quoteError = String(error?.message||"DERIV_PUBLIC_QUOTE_UNAVAILABLE").slice(0,140);
-    }
-    try {
-      technical = await fetchCachedPublicDerivTechnical(symbol,timeframe);
-    } catch(error) {
-      technicalError = String(error?.message||"DERIV_PUBLIC_OHLC_UNAVAILABLE").slice(0,140);
-    }
-    return {symbol,quote,technical,quoteError,technicalError};
+    const [quoteResult, technicalResult] = await Promise.all([
+      publicDerivFeed.getQuote(symbol,{maxAgeMs:3000,timeoutMs:2000})
+        .then(quote => ({ quote }))
+        .catch(error => ({ quoteError:String(error?.message||"DERIV_PUBLIC_QUOTE_UNAVAILABLE").slice(0,140) })),
+      fetchCachedPublicDerivTechnical(symbol,timeframe)
+        .then(technical => ({ technical }))
+        .catch(error => ({ technicalError:String(error?.message||"DERIV_PUBLIC_OHLC_UNAVAILABLE").slice(0,140) }))
+    ]);
+    return {symbol,...quoteResult,...technicalResult};
   }));
   return rows;
 }
