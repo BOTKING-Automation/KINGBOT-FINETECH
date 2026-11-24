@@ -813,6 +813,15 @@
               <button id="runQuery" class="btn btn-primary" type="submit">SEND ↗</button>
             </form>
             <div class="composer-hint">ENTER TO SEND · SHIFT+ENTER FOR NEW LINE · CONVERSATION CONTEXT IS KEPT FOR THIS SESSION</div>
+            <div class="puter-optin" style="margin-top:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025)">
+              <label for="puterLlmOptIn" style="display:flex;align-items:center;gap:9px;color:var(--text);font-size:10px;font-weight:800;letter-spacing:.06em;cursor:pointer">
+                <input id="puterLlmOptIn" type="checkbox" style="accent-color:var(--cyan);width:15px;height:15px">
+                ENABLE GENERATIVE LLM · PUTER.JS
+              </label>
+              <p style="margin:8px 0 0 24px;color:var(--muted);font-size:10px;line-height:1.6">
+                Optional. Eligible questions and safe recent chat context are sent to the selected Puter AI model. AI usage is billed to your Puter account. Live market, broker, account, risk and trading requests stay on KINGBOT CORTEX.
+              </p>
+            </div>
           </div>
         </article>
 
@@ -1117,6 +1126,8 @@
   <script src="system/auth-gate.js"></script>
   <script src="system/access-control.js"></script>
   <script src="system/navigation.js"></script>
+  <script src="https://js.puter.com/v2/"></script>
+  <script src="system/puter-ai-client.js"></script>
   <script src="system/ai-support.js"></script>
   <script src="system/intelligence-orchestrator.js"></script>
 </body>
