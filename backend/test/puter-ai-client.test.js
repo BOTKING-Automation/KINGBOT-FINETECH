@@ -24,17 +24,19 @@ function loadClient(puter) {
 
 test("Puter adapter exposes the selected model and availability without making calls", () => {
   const client = loadClient({ ai: { chat: async () => ({ message: { content: "ok" } }) } });
-  assert.equal(client.model, "gpt-5.4-nano");
+  assert.equal(client.model, "openai/gpt-5.4-nano");
   assert.equal(client.isAvailable(), true);
 });
 
 test("ordinary conversation uses Puter with bounded, non-sensitive context", async () => {
   let capturedMessages;
+  let capturedTestMode;
   let capturedOptions;
   const client = loadClient({
     ai: {
-      chat: async (messages, options) => {
+      chat: async (messages, testMode, options) => {
         capturedMessages = messages;
+        capturedTestMode = testMode;
         capturedOptions = options;
         return { message: { content: "Hello from the generative layer." } };
       }
@@ -56,9 +58,11 @@ test("ordinary conversation uses Puter with bounded, non-sensitive context", asy
   assert.equal(capturedMessages.at(-1).role, "user");
   assert.match(capturedMessages.at(-1).content, /language models/);
   assert.equal(capturedMessages.some(message => /broker account balance/i.test(message.content)), false);
-  assert.equal(capturedOptions.model, "gpt-5.4-nano");
-  assert.equal(capturedOptions.normalize, true);
+  assert.equal(capturedTestMode, false);
+  assert.equal(capturedOptions.model, "openai/gpt-5.4-nano");
   assert.equal(capturedOptions.stream, false);
+  assert.equal(capturedOptions.temperature, 0.2);
+  assert.equal(capturedOptions.max_tokens, 900);
 });
 
 test("trading, account and runtime intents are never sent to Puter", async () => {
@@ -86,7 +90,9 @@ test("web research is synthesized only when native sources are supplied", async 
   let messages;
   const client = loadClient({
     ai: {
-      chat: async input => {
+      chat: async (input, testMode, options) => {
+        assert.equal(testMode, false);
+        assert.equal(options.model, "openai/gpt-5.4-nano");
         messages = input;
         return { message: { content: "Source-backed summary [1]." } };
       }
