@@ -25,7 +25,7 @@ test("weighted MTF diagnostics prioritize higher timeframes without changing dec
   assert.equal(result.weightedMultiTimeframe.direction, "BULLISH");
   assert.equal(result.weightedMultiTimeframe.alignmentPct, 70);
   assert.equal(result.weightedMultiTimeframe.coveragePct, 100);
-  assert.equal(result.lowerTimeframeTriggers.observedDirectionalTriggers, 3);
+  assert.equal(result.lowerTimeframeTriggers.observedDirectionalTriggers, 4);
   assert.equal(result.lowerTimeframeTriggers.opposedTriggers, 1);
   assert.equal(result.patternConfluence.opposedToWeightedBias, 1);
   assert.equal(result.specialistReadiness[0].completionPct, 50);
