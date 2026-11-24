@@ -6,7 +6,7 @@
 (function (window) {
   "use strict";
 
-  const MODEL = "gpt-5.4-nano";
+  const MODEL = "openai/gpt-5.4-nano";
   const MAX_TEXT = 5000;
   const SAFE_INTENTS = new Set([
     "CONVERSATION",
@@ -126,15 +126,15 @@
           cortexReply: input.cortexReply,
           sources: input.sources
         }),
+        false,
         {
           model: MODEL,
           stream: false,
           temperature: 0.2,
           max_tokens: 900,
-          normalize: true,
           ...(controller ? { signal: controller.signal } : {})
         }
-      );
+      )
       const content = response?.message?.content ?? response?.text ?? response?.content ?? "";
       const answer = Array.isArray(content)
         ? content.map(part => typeof part === "string" ? part : String(part?.text || "")).join("")
