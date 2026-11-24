@@ -142,6 +142,7 @@ export function registerAiAgent(app,{requireUser,pool,broker,rateLimit,twelveDat
       agent:"KINGBOT",
       model:native?.model || MODEL,
       provider:native?.provider || "KINGBOT_NATIVE",
+      intent:native?.intent || "PLATFORM_SUPPORT",
       symbol,
       identity:identitySnapshot(),
       cognitivePlan,
