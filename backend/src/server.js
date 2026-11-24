@@ -36,6 +36,7 @@ import { createMt5HostingRouter, ensureMt5HostingSchema } from "./mt5-hosting.js
 import { createFintechOpsRouter, ensureFintechOpsSchema } from "./fintech-operations.js";
 import { ensureGlobalRiskSchema, getGlobalRiskState } from "./global-risk.js";
 import { registerGoldSignals, ensureGoldSignalsSchema } from "./gold-signals.js";
+import { registerGoldResearchWebhook } from "./gold-research-webhook.js";
 import { syntheticCatalog, CORE_SYNTHETIC_FAMILIES } from "./synthetic-markets.js";
 import { registerIntelligenceOrchestrator, ensureIntelligenceOrchestratorSchema } from "./intelligence-orchestrator.js";
 import { KingbotEventBus, registerKingbotEventRoutes } from "./kingbot-event-bus.js";
@@ -104,6 +105,7 @@ app.use("/api/mt5/bridge", createMt5BridgeRouter({ pool, broker }));
 app.use("/api/mt5/hosting", createMt5HostingRouter({ pool, requireUser }));
 app.use("/api/finops", createFintechOpsRouter({ pool }));
 registerGoldSignals(app,{pool,rateLimit,twelveData});
+registerGoldResearchWebhook(app,{pool,rateLimit});
 
 // Generic broker connection API used by Broker Connect, Terminal and account-aware pages.
 app.post("/api/broker/account", async (req,res)=>{

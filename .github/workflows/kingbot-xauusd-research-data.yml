@@ -1,0 +1,54 @@
+name: KINGBOT XAUUSD Research Data Collection
+
+on:
+  workflow_dispatch:
+    inputs:
+      timeframes:
+        description: "Comma-separated UTC candle timeframes"
+        required: true
+        default: "1m,5m,15m,1h,4h,1d"
+        type: string
+      count:
+        description: "Candles requested per timeframe (capped at 1000)"
+        required: true
+        default: "1000"
+        type: string
+      min_bars:
+        description: "Minimum closed candles required per timeframe"
+        required: true
+        default: "200"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  collect-xauusd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate inputs
+        shell: bash
+        run: |
+          [[ "${{ inputs.count }}" =~ ^[0-9]+$ ]] || exit 1
+          [[ "${{ inputs.min_bars }}" =~ ^[0-9]+$ ]] || exit 1
+      - name: Collect closed XAUUSD candles
+        run: |
+          node research/kingbot-tech-pro/collect_xauusd_candles.mjs \
+            --timeframes "${{ inputs.timeframes }}" \
+            --count "${{ inputs.count }}" \
+            --min-bars "${{ inputs.min_bars }}" \
+            --output research/kingbot-tech-pro/data/xauusd-closed-candles.json
+      - name: Upload research dataset artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kingbot-xauusd-closed-candles
+          path: research/kingbot-tech-pro/data/xauusd-closed-candles.json
+          if-no-files-found: error
+          retention-days: 14
