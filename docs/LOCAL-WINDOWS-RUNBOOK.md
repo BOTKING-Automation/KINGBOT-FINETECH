@@ -1,13 +1,13 @@
 # KINGBOT FINETECH — Local Windows Runbook
 
-This setup runs the KINGBOT API, PostgreSQL database, Python ML signal service and separate execution worker on your own Windows computer. The database is stored in a local Docker volume. The API and worker listen only on loopback ports.
+This setup runs the KINGBOT API, PostgreSQL database and Python ML signal service on your own Windows computer. The database is stored in a local Docker volume. The API is bound to loopback; the execution worker is deliberately disabled by default and can be enabled separately.
 
 ## What runs locally
 
 - API: http://127.0.0.1:10000
 - PostgreSQL: private Docker network only; not exposed to your LAN
 - ML signal service: private Docker network only
-- Execution worker health: http://127.0.0.1:10001/health
+- Optional execution worker health (only after explicit enable): http://127.0.0.1:10001/health
 - Browser UI: http://localhost:5500
 - Local AI page: http://localhost:5500/ai.html?kb-api=local
 
@@ -51,7 +51,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 On first launch, the script creates a private `.env` file with random local PostgreSQL, session, broker-encryption and ML-service secrets. It does not overwrite an existing `.env`.
 
-Docker Compose builds and starts the local database, API, ML signal service and worker. The first build can be large because the Python service installs CPU PyTorch and scikit-learn.
+Docker Compose builds and starts the local database, API and ML signal service. The execution worker is disabled by default so starting the intelligence stack cannot accidentally run previously enabled bots. The first build can be large because the Python service installs CPU PyTorch and scikit-learn.
 
 ## 3. Configure Firebase Admin for authenticated backend requests
 
@@ -97,7 +97,6 @@ From another PowerShell terminal:
 ```powershell
 .\scripts\windows-status.ps1
 Invoke-RestMethod http://127.0.0.1:10000/api/health
-Invoke-RestMethod http://127.0.0.1:10001/health
 ```
 
 Useful diagnostics:
@@ -109,6 +108,19 @@ docker compose -f docker-compose.local.yml logs --tail 150 ml-signal
 docker compose -f docker-compose.local.yml logs --tail 150 worker
 ```
 
+## Optional: enable the execution worker deliberately
+
+Market-data collection, CORTEX orchestration and ML inference do not require the execution worker. Keep it disabled while validating the local intelligence stack.
+
+Only enable it after reviewing the local database, confirming the intended DEMO account and risk settings, and deliberately deciding to run the execution loop:
+
+```powershell
+.\scripts\windows-start.ps1 -EnableExecutionWorker
+Invoke-RestMethod http://127.0.0.1:10001/health
+```
+
+This starts a real execution worker, not a paper-trading simulator. Do not enable it with LIVE credentials during initial local validation.
+
 ## Market-data configuration
 
 The local stack can use available public feeds, including the public Gold API, Deriv public market feed and Binance public crypto quotes. Add a Twelve Data key privately to `.env` if you have one and want its supported streaming/technical coverage. Do not place provider keys in browser JavaScript.
@@ -118,7 +130,7 @@ Without a valid Twelve Data key, the instrument universe and candle availability
 ## Safety and data separation
 
 - The new local database volume starts independently. It does not copy the Render PostgreSQL database or customer records.
-- Keep local execution in DEMO mode while validating feeds, model readiness and the five specialists.
+- Keep the execution worker disabled while validating feeds, model readiness and the five specialists. If you later enable it, use DEMO mode only.
 - Do not connect a LIVE broker or enable trading until the complete market feed, risk state, worker health and account mapping have been verified.
 - The worker is a real execution service, not a simulator. It can act on any enabled and correctly authorized bot/account records in the local database.
 - The API, worker and ML ports are bound to loopback/private Docker networking. Do not change those bindings to 0.0.0.0 or expose PostgreSQL publicly.

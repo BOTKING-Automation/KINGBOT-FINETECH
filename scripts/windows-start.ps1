@@ -1,3 +1,7 @@
+param(
+    [switch]$EnableExecutionWorker
+)
+
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
@@ -49,8 +53,13 @@ try {
         throw "The .env file contains ungenerated placeholders. Remove those placeholders or delete .env and rerun setup."
     }
 
-    Write-Host "Building and starting KINGBOT API, PostgreSQL, ML service, and worker..." -ForegroundColor Cyan
-    docker compose -f docker-compose.local.yml up -d --build
+    if ($EnableExecutionWorker) {
+        Write-Host "Building and starting KINGBOT API, PostgreSQL, ML service, and execution worker..." -ForegroundColor Cyan
+        docker compose -f docker-compose.local.yml --profile execution up -d --build
+    } else {
+        Write-Host "Building and starting KINGBOT API, PostgreSQL and ML service. Execution worker remains disabled..." -ForegroundColor Cyan
+        docker compose -f docker-compose.local.yml up -d --build postgres api ml-signal
+    }
     if ($LASTEXITCODE -ne 0) {
         throw "Docker Compose did not start successfully. Inspect logs with: docker compose -f docker-compose.local.yml logs --tail 100"
     }
@@ -73,7 +82,11 @@ try {
     docker compose -f docker-compose.local.yml ps
     if ($Ready) {
         Write-Host "KINGBOT API health check passed: http://127.0.0.1:10000/api/health" -ForegroundColor Green
-        Write-Host "Worker health check: http://127.0.0.1:10001/health"
+        if ($EnableExecutionWorker) {
+            Write-Host "Execution worker health check: http://127.0.0.1:10001/health"
+        } else {
+            Write-Host "Execution worker is OFF by default. Enable it only deliberately with: .\scripts\windows-start.ps1 -EnableExecutionWorker" -ForegroundColor Yellow
+        }
     } else {
         Write-Warning "Containers were started, but the API did not report healthy before the check ended. Review the container logs before enabling any broker connection."
     }
