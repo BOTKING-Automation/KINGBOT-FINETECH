@@ -514,7 +514,38 @@
     if(sources.length){
       answer += "\n\nSOURCES\n" + sources.map((s,i) => (i+1)+". "+String(s.title||"Source")+" — "+String(s.url||"")).join("\n");
     }
-    return { answer, data };
+    return { answer, data, provider: "KINGBOT_CORTEX", model: String(data?.model || "KINGBOT-CORTEX-1") };
+  }
+
+  async function runGenerativeLayer(question, conversation, nativeResult) {
+    if (byId("puterLlmOptIn")?.checked !== true) return nativeResult;
+    const client = window.KINGBOT_PUTER_AI;
+    if (!client?.complete) {
+      showToast("Puter AI is unavailable; native CORTEX response used.", "warn");
+      return nativeResult;
+    }
+    const data = nativeResult?.data || {};
+    const generated = await client.complete({
+      question,
+      intent: data.intent || "",
+      conversation,
+      cortexReply: data.reply || {},
+      sources: Array.isArray(data.sources) ? data.sources : []
+    });
+    if (!generated?.ok) {
+      if (generated?.reason !== "INTENT_NOT_ELIGIBLE" &&
+          generated?.reason !== "SENSITIVE_CONTEXT" &&
+          generated?.reason !== "RESEARCH_SOURCES_REQUIRED") {
+        showToast("Puter AI unavailable; native CORTEX response used.", "warn");
+      }
+      return nativeResult;
+    }
+    return {
+      ...nativeResult,
+      answer: generated.answer,
+      provider: "PUTER",
+      model: generated.model || client.model
+    };
   }
 
   async function loadContext() {
@@ -563,10 +594,11 @@
     addHistory("user", clean);
     showTyping();
 
+    let conversation = [];
     try {
       if (!state.context) void loadContext();
 
-      const conversation = state.messages
+      conversation = state.messages
         .slice(0, -1)
         .slice(-4)
         .map(item => ({
@@ -574,10 +606,11 @@
           content: String(item.content || "").slice(0, 1800)
         }));
 
-      // Conversation circuit-breaker: greetings/small talk must never be
-      // misinterpreted as a market request when the backend is stale.
-      const localConversation = localConversationReply(clean, conversation);
-      const result = localConversation || await runBackendAgent(clean, conversation);
+      // The secured native backend classifies every prompt first. Puter is
+      // an optional language layer only; its client enforces a strict intent
+      // allowlist and blocks market/account/broker/risk/execution context.
+      const nativeResult = await runBackendAgent(clean, conversation);
+      const result = await runGenerativeLayer(clean, conversation, nativeResult);
 
       hideTyping();
       addHistory("assistant", result.answer);
@@ -585,8 +618,9 @@
 
       state.lastQueryAt = new Date();
       setText("lastQuery", state.lastQueryAt.toLocaleTimeString());
-      setChatState("KINGBOT CORTEX ONLINE");
-      showToast("KINGBOT response ready.", "good");
+      const generativeUsed = result.provider === "PUTER";
+      setChatState(generativeUsed ? "CORTEX + PUTER LLM" : "KINGBOT CORTEX ONLINE");
+      showToast(generativeUsed ? "KINGBOT generative response ready." : "KINGBOT CORTEX response ready.", "good");
     } catch (error) {
       hideTyping();
       // Never expose raw HTTP/infra failures as the assistant's answer.
@@ -647,6 +681,7 @@
     const focus = byId("openConsole");
     const mobileToggle = byId("mobileToggle");
     const nav = byId("nav");
+    const puterToggle = byId("puterLlmOptIn");
 
     form?.addEventListener("submit", event => {
       event.preventDefault();
@@ -667,6 +702,20 @@
     clear?.addEventListener("click", clearHistory);
     symbol?.addEventListener("change", loadContext);
     focus?.addEventListener("click", focusCommand);
+    puterToggle?.addEventListener("change", () => {
+      if (puterToggle.checked) {
+        if (window.KINGBOT_PUTER_AI?.isAvailable?.()) {
+          showToast("Generative LLM enabled. Eligible prompts may incur Puter AI usage charges.", "warn");
+          setChatState("PUTER LLM ENABLED · OPT-IN");
+        } else {
+          showToast("Puter.js is not available. Native CORTEX remains active.", "warn");
+          setChatState("CORTEX ONLY · PUTER UNAVAILABLE");
+        }
+      } else {
+        setChatState("KINGBOT CORTEX ONLINE");
+        showToast("Native CORTEX only. No Puter AI calls will be made.", "good");
+      }
+    });
 
     mobileToggle?.addEventListener("click", () => {
       nav?.classList.toggle("mobile-open");
