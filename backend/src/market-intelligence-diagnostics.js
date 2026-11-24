@@ -84,8 +84,9 @@ export function buildMarketIntelligenceDiagnostics({
   const alignedTriggers = triggerRows.filter(row => row.aligned).length;
   const opposedTriggers = triggerRows.length - alignedTriggers;
   const marketPatterns = featureRows(market);
-  const alignedPatterns = marketPatterns.filter(row => row.direction === weightedDirection).length;
-  const opposedPatterns = marketPatterns.filter(row => row.direction !== weightedDirection).length;
+  const hasDirectionalWeightedBias = weightedDirection === "BULLISH" || weightedDirection === "BEARISH";
+  const alignedPatterns = hasDirectionalWeightedBias ? marketPatterns.filter(row => row.direction === weightedDirection).length : null;
+  const opposedPatterns = hasDirectionalWeightedBias ? marketPatterns.filter(row => row.direction !== weightedDirection).length : null;
 
   const specialistReadiness = specialists.map(card => {
     const conditions = Array.isArray(card.conditions) ? card.conditions.length : 0;
@@ -106,7 +107,7 @@ export function buildMarketIntelligenceDiagnostics({
   if (usable.length < requiredFrames.length) warnings.push("MTF_COVERAGE_INCOMPLETE");
   if (weightedDirection === "MIXED" && usable.length) warnings.push("MTF_WEIGHTED_DIRECTION_MIXED");
   if (opposedTriggers > 0) warnings.push("LOWER_TIMEFRAME_TRIGGER_DIVERGENCE");
-  if (opposedPatterns > 0 && marketPatterns.length) warnings.push("PATTERN_EVIDENCE_CONFLICT");
+  if (hasDirectionalWeightedBias && opposedPatterns > 0 && marketPatterns.length) warnings.push("PATTERN_EVIDENCE_CONFLICT");
   if (specialistReadiness.some(row => row.contradictions > 0)) warnings.push("SPECIALIST_CONTRADICTIONS_PRESENT");
 
   return {
@@ -132,6 +133,7 @@ export function buildMarketIntelligenceDiagnostics({
       details: triggerRows
     },
     patternConfluence: {
+      assessmentAvailable: hasDirectionalWeightedBias,
       observedDirectionalPatterns: marketPatterns.length,
       alignedWithWeightedBias: alignedPatterns,
       opposedToWeightedBias: opposedPatterns,

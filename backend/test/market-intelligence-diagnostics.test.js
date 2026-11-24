@@ -36,12 +36,15 @@ test("weighted MTF diagnostics prioritize higher timeframes without changing dec
 
 test("diagnostics report incomplete data instead of manufacturing directional confidence", () => {
   const result = buildMarketIntelligenceDiagnostics({
-    market: {},
+    market: { bos: "BULLISH" },
     multiTimeframe: { requiredTimeframes: ["5m", "15m", "1h", "4h"], timeframes: [] }
   });
   assert.equal(result.weightedMultiTimeframe.direction, "MIXED");
   assert.equal(result.weightedMultiTimeframe.alignmentPct, null);
   assert.equal(result.weightedMultiTimeframe.coveragePct, 0);
-  assert.equal(result.patternConfluence.observedDirectionalPatterns, 0);
+  assert.equal(result.patternConfluence.observedDirectionalPatterns, 1);
+  assert.equal(result.patternConfluence.assessmentAvailable, false);
+  assert.equal(result.patternConfluence.opposedToWeightedBias, null);
+  assert.ok(!result.warnings.includes("PATTERN_EVIDENCE_CONFLICT"));
   assert.ok(result.warnings.includes("MTF_COVERAGE_INCOMPLETE"));
 });
