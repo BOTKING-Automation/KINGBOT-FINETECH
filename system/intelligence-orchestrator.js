@@ -80,6 +80,36 @@
       ).join("")||'<div class="orch-empty">NO ANALYST STATE</div>';
     }
 
+    const diagnostics=market.intelligenceDiagnostics||{};
+    const weighted=diagnostics.weightedMultiTimeframe||{};
+    const triggers=diagnostics.lowerTimeframeTriggers||{};
+    const patterns=diagnostics.patternConfluence||{};
+    const readiness=Array.isArray(diagnostics.specialistReadiness)?diagnostics.specialistReadiness:[];
+    const diagnosticsRoot=$("orchIntelligenceDiagnostics");
+    if(diagnosticsRoot){
+      const alignment=weighted.alignmentPct==null?"—":String(weighted.alignmentPct)+"%";
+      const coverage=weighted.coveragePct==null?"—":String(weighted.coveragePct)+"%";
+      const triggerAlignment=triggers.alignmentPct==null?"—":String(triggers.alignmentPct)+"%";
+      const triggerDetail=Number(triggers.observedDirectionalTriggers||0)
+        ? String(triggers.alignedTriggers||0)+" aligned / "+String(triggers.observedDirectionalTriggers||0)+" directional triggers · "+String(triggers.opposedTriggers||0)+" opposed"
+        : "No directional lower-timeframe trigger observed.";
+      const patternDetail=patterns.assessmentAvailable
+        ? String(patterns.alignedWithWeightedBias||0)+" aligned / "+String(patterns.observedDirectionalPatterns||0)+" observed · "+String(patterns.opposedToWeightedBias||0)+" opposed"
+        : "Not assessable until a directional weighted MTF bias is available.";
+      const specialistRows=readiness.map(row=>{
+        const label=String(row.botId||"SPECIALIST").replace(/-/g," ").toUpperCase();
+        const state=row.qualified?"QUALIFIED":"CONDITIONS PENDING";
+        const detail=String(row.confirmedConditions||0)+" confirmed · "+String(row.missingConditions||0)+" missing · "+String(row.contradictions||0)+" contradictions";
+        return '<div class="orch-agent"><div><span>'+esc(label)+" · "+esc(state)+'</span><small>'+esc(detail)+'</small></div><strong>'+esc(fmt(row.completionPct))+'%</strong></div>';
+      }).join("");
+      diagnosticsRoot.innerHTML=
+        '<div class="orch-agent"><div><span>WEIGHTED MULTI-TIMEFRAME</span><small>'+esc((weighted.usableTimeframes||[]).join(" / ")||"No directional frames")+' · '+esc(coverage)+' verified coverage</small></div><strong>'+esc(weighted.direction||"MIXED")+' · '+esc(alignment)+'</strong></div>'+
+        '<div class="orch-agent"><div><span>LOWER-TIMEFRAME TRIGGERS</span><small>'+esc(triggerDetail)+'</small></div><strong>'+esc(triggerAlignment)+'</strong></div>'+
+        '<div class="orch-agent"><div><span>PATTERN CONFLUENCE</span><small>'+esc(patternDetail)+'</small></div><strong>'+esc(patterns.assessmentAvailable?"ASSESSED":"N/A")+'</strong></div>'+
+        (specialistRows||'<div class="orch-muted">Specialist readiness is not available.</div>')+
+        '<small class="orch-muted">DIAGNOSTIC ONLY · NO EXECUTION AUTHORITY'+(Array.isArray(diagnostics.warnings)&&diagnostics.warnings.length?" · "+esc(diagnostics.warnings.join(" · ")):"")+'</small>';
+    }
+
     const engineList=$("orchEngines");
     if(engineList){
       const council=data.strategyCouncil||{};
