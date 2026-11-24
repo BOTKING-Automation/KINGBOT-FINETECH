@@ -7,7 +7,7 @@ KINGBOT remains a native, evidence-first intelligence system. The generative lan
 ## Provider
 
 - Browser integration: Puter.js at https://js.puter.com/v2/.
-- Initial model: gpt-5.4-nano.
+- Initial model: openai/gpt-5.4-nano.
 - Billing: Puter user-pays; each user is responsible for their own Puter AI usage.
 - Consent: disabled by default. The user must enable the checkbox on ai.html before eligible prompts can reach Puter.
 - Failure mode: the UI keeps the native CORTEX answer if the SDK is unavailable, the request fails, or the intent is not eligible.
