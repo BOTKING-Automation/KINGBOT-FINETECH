@@ -68,10 +68,10 @@ The browser signs in with Firebase Authentication. The local backend also needs 
 
 The helper writes the compact service-account JSON into the ignored local `.env` file and does not print the private key. Never upload this file or paste its contents into chat or GitHub.
 
-Recreate the API and worker containers so they read the new environment:
+Recreate only the API container so it reads the new environment. The worker remains disabled:
 
 ```powershell
-docker compose -f docker-compose.local.yml up -d --force-recreate api worker
+docker compose -f docker-compose.local.yml up -d --force-recreate api
 ```
 
 ## 4. Start the local browser frontend

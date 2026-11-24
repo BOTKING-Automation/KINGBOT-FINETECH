@@ -40,5 +40,5 @@ $Updated = [string]::Join([Environment]::NewLine, $EnvLines) + [Environment]::Ne
 )
 
 Write-Host "Firebase Admin credentials imported into the ignored local .env file." -ForegroundColor Green
-Write-Host "The private key was not displayed. Recreate the API and worker containers to apply it:" -ForegroundColor Yellow
-Write-Host "docker compose -f docker-compose.local.yml up -d --force-recreate api worker"
+Write-Host "The private key was not displayed. Recreate only the API container to apply it; execution remains disabled:" -ForegroundColor Yellow
+Write-Host "docker compose -f docker-compose.local.yml up -d --force-recreate api"
