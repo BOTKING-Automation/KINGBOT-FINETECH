@@ -25,16 +25,35 @@ if (-not $PythonPath -or -not (Test-Path $PythonPath)) {
     throw "Python 3 was not found. Install Python 3 or add the Python launcher (py.exe) to PATH."
 }
 
-Write-Host "KINGBOT local UI: $Url" -ForegroundColor Cyan
-Write-Host "Static server binds to 127.0.0.1:$Port only. Press Ctrl+C to stop." -ForegroundColor Yellow
-Start-Process $Url
+$Arguments = '-m http.server ' + $Port + ' --bind 127.0.0.1 --directory "' + $RepoRoot + '"'
+$Server = Start-Process -FilePath $PythonPath -ArgumentList $Arguments -WindowStyle Hidden -PassThru
+$Ready = $false
 
-Push-Location $RepoRoot
 try {
-    & $PythonPath -m http.server $Port --bind 127.0.0.1 --directory $RepoRoot
-    if ($LASTEXITCODE -ne 0) {
-        throw "The local frontend server exited with code $LASTEXITCODE."
+    for ($Attempt = 0; $Attempt -lt 24; $Attempt++) {
+        if ($Server.HasExited) {
+            throw "The local UI server exited unexpectedly. Confirm Python 3 is installed."
+        }
+        try {
+            $Response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 2
+            if ($Response.StatusCode -eq 200) {
+                $Ready = $true
+                break
+            }
+        } catch {}
+        Start-Sleep -Milliseconds 250
     }
+
+    if (-not $Ready) {
+        throw "The local UI server did not become ready on port $Port."
+    }
+
+    Write-Host "KINGBOT local UI: $Url" -ForegroundColor Cyan
+    Write-Host "Static server is bound to 127.0.0.1:$Port only." -ForegroundColor Green
+    Start-Process $Url
+    [void](Read-Host "Press Enter to stop the local UI server (Ctrl+C also works)")
 } finally {
-    Pop-Location
+    if ($Server -and -not $Server.HasExited) {
+        Stop-Process -Id $Server.Id -Force -ErrorAction SilentlyContinue
+    }
 }
