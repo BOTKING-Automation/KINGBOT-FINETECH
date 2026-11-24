@@ -331,6 +331,7 @@ h1{margin:12px 0 7px;font:900 clamp(30px,4.6vw,54px) Orbitron;line-height:1;lett
   </section>
 </div>
 
+<script src="system/session.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1114,7 +1115,7 @@ void restoreDerivOAuthReturn();
 </script>
 <script>
 (function(){
-  ["system/session.js","system/auth-gate.js","system/access-control.js","system/navigation.js"].forEach(function(src){
+  ["system/auth-gate.js","system/access-control.js","system/navigation.js"].forEach(function(src){
     var s=document.createElement("script");
     s.src=src;
     s.defer=true;
