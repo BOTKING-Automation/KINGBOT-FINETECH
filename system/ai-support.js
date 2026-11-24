@@ -8,7 +8,7 @@
 (function (window) {
   "use strict";
 
-  const API_BASE = "https://kingbot-fintech-api-etfv.onrender.com/api";
+  const API_BASE = window.KINGBOT_API?.baseUrl || window.KINGBOT_FIREBASE?.API_BASE || "https://kingbot-fintech-api-etfv.onrender.com/api";
   const state = {
     context: null,
     health: null,
