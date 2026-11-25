@@ -192,7 +192,8 @@ async function consecutiveLosses(userId){
   if(cached && Date.now()-cached.at<LOSS_CACHE_MS)return cached.value;
   try{
     const trades=await broker.getTrades({userId,startTime:new Date(Date.now()-7*86400000),endTime:new Date()});
-    const deals=Array.isArray(trades?.data?.deals)?trades.data.deals:[];
+    if(!Array.isArray(trades?.data?.deals))throw new Error("TRADE_HISTORY_UNAVAILABLE");
+    const deals=trades.data.deals;
     let count=0;
     for(const d of deals.sort((a,b)=>new Date(b.time||b.brokerTime||0)-new Date(a.time||a.brokerTime||0))){
       const profit=Number(d.profit);
