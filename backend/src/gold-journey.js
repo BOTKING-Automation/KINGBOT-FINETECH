@@ -90,6 +90,16 @@ export function applyGoldJourneyRiskProfile(settings = {}, symbol = "") {
   };
 }
 
+export function canRunGoldJourneyBot(botId, configuredJourneyBotIds = []) {
+  const configured = Array.isArray(configuredJourneyBotIds)
+    ? configuredJourneyBotIds.map(value => String(value || "").trim().toLowerCase()).filter(Boolean)
+    : [];
+  if (!configured.length) return true;
+  return configured.length === 1
+    && configured[0] === GOLD_JOURNEY_PROFILE.preferredBotId
+    && String(botId || "").trim().toLowerCase() === GOLD_JOURNEY_PROFILE.preferredBotId;
+}
+
 export function goldJourneyRiskBudget(equityUsd) {
   const equity = finite(equityUsd);
   if (equity === null || equity <= 0) return null;
