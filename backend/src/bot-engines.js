@@ -454,14 +454,14 @@ async function hasEntitlement(pool, userId, botId, userEmail) {
 
 async function getRiskSettings(pool,userId,botId){
  if(!pool)return null;
- const q=await pool.query("SELECT daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,lot_size,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch,journey_profile,journey_starting_capital_usd,journey_reward_to_risk,updated_at FROM kingbot_bot_risk_settings WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
+ const q=await pool.query("SELECT daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,lot_size,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch,journey_profile,journey_starting_capital_usd,journey_reward_to_risk,journey_loss_pause_acknowledged,updated_at FROM kingbot_bot_risk_settings WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
  if(!q.rowCount)return null;
  const x=q.rows[0];
- const settings={...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,lotSize:x.lot_size,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:(String(x.execution_mode||"DEMO")==="PAPER"?"DEMO":String(x.execution_mode||"DEMO")),killSwitch:Boolean(x.kill_switch),journeyProfile:String(x.journey_profile||"STANDARD"),journeyStartingCapitalUsd:Number(x.journey_starting_capital_usd||200),journeyRewardToRisk:Number(x.journey_reward_to_risk||4)};
+ const settings={...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,lotSize:x.lot_size,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:(String(x.execution_mode||"DEMO")==="PAPER"?"DEMO":String(x.execution_mode||"DEMO")),killSwitch:Boolean(x.kill_switch),journeyProfile:String(x.journey_profile||"STANDARD"),journeyStartingCapitalUsd:Number(x.journey_starting_capital_usd||200),journeyRewardToRisk:Number(x.journey_reward_to_risk||4),journeyLossPauseAcknowledged:Boolean(x.journey_loss_pause_acknowledged)};
  if(botId==="ladder-flip")settings.maxPositions=Math.min(LADDER_V8_DEFAULTS.maxTotalRungs,Math.max(LADDER_V8_DEFAULTS.fixedRungCount,settings.maxPositions));
  return settings;
 }
-function defaultRisk(bot){return {...normalizeRiskSettings(bot.risk),journeyProfile:"STANDARD",journeyStartingCapitalUsd:200,journeyRewardToRisk:4};}
+function defaultRisk(bot){return {...normalizeRiskSettings(bot.risk),journeyProfile:"STANDARD",journeyStartingCapitalUsd:200,journeyRewardToRisk:4,journeyLossPauseAcknowledged:false};}
 function validateUserRisk(body,bot){
  const s=normalizeRiskSettings(body||{},bot.risk);
  if(!Number.isFinite(Number(s.lotSize))||Number(s.lotSize)<=0)return {error:"INVALID_LOT_SIZE"};
@@ -478,10 +478,11 @@ function validateUserRisk(body,bot){
      maxConsecutiveLosses:3,autoPauseOnLossStreak:true,
      journeyProfile:journey.journeyProfile,
      journeyStartingCapitalUsd:journey.journeyStartingCapitalUsd,
-     journeyRewardToRisk:journey.journeyRewardToRisk
+     journeyRewardToRisk:journey.journeyRewardToRisk,
+     journeyLossPauseAcknowledged:body?.journeyLossPauseAcknowledged===true
    });
  }else{
-   Object.assign(s,journey);
+   Object.assign(s,journey,{journeyLossPauseAcknowledged:false});
  }
  return {settings:s};
 }
@@ -553,7 +554,7 @@ export function createBotEngineRouter({ pool }) {
     const requestedMode=s.journeyProfile===GOLD_JOURNEY_PROFILE_ID?"DEMO":String(req.body?.executionMode||"DEMO").toUpperCase();
     if(!["DEMO","LIVE"].includes(requestedMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
     try{
-      await pool.query("INSERT INTO kingbot_bot_risk_settings(user_id,bot_id,daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,lot_size,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch,journey_profile,journey_starting_capital_usd,journey_reward_to_risk) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) ON CONFLICT(user_id,bot_id) DO UPDATE SET daily_drawdown_pct=EXCLUDED.daily_drawdown_pct,total_drawdown_pct=EXCLUDED.total_drawdown_pct,max_risk_per_trade_pct=EXCLUDED.max_risk_per_trade_pct,max_positions=EXCLUDED.max_positions,lot_size=EXCLUDED.lot_size,max_spread_atr_ratio=EXCLUDED.max_spread_atr_ratio,stale_data_ms=EXCLUDED.stale_data_ms,max_consecutive_losses=EXCLUDED.max_consecutive_losses,auto_pause_on_loss_streak=EXCLUDED.auto_pause_on_loss_streak,execution_mode=EXCLUDED.execution_mode,kill_switch=EXCLUDED.kill_switch,journey_profile=EXCLUDED.journey_profile,journey_starting_capital_usd=EXCLUDED.journey_starting_capital_usd,journey_reward_to_risk=EXCLUDED.journey_reward_to_risk,updated_at=NOW()",[user.id,bot.id,s.dailyDrawdownPct,s.totalDrawdownPct,s.maxRiskPerTradePct,s.maxPositions,s.lotSize,s.maxSpreadAtrRatio,s.staleDataMs,s.maxConsecutiveLosses,s.autoPauseOnLossStreak,requestedMode,Boolean(req.body?.killSwitch),s.journeyProfile,s.journeyStartingCapitalUsd,s.journeyRewardToRisk]);
+      await pool.query("INSERT INTO kingbot_bot_risk_settings(user_id,bot_id,daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,lot_size,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch,journey_profile,journey_starting_capital_usd,journey_reward_to_risk,journey_loss_pause_acknowledged) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) ON CONFLICT(user_id,bot_id) DO UPDATE SET daily_drawdown_pct=EXCLUDED.daily_drawdown_pct,total_drawdown_pct=EXCLUDED.total_drawdown_pct,max_risk_per_trade_pct=EXCLUDED.max_risk_per_trade_pct,max_positions=EXCLUDED.max_positions,lot_size=EXCLUDED.lot_size,max_spread_atr_ratio=EXCLUDED.max_spread_atr_ratio,stale_data_ms=EXCLUDED.stale_data_ms,max_consecutive_losses=EXCLUDED.max_consecutive_losses,auto_pause_on_loss_streak=EXCLUDED.auto_pause_on_loss_streak,execution_mode=EXCLUDED.execution_mode,kill_switch=EXCLUDED.kill_switch,journey_profile=EXCLUDED.journey_profile,journey_starting_capital_usd=EXCLUDED.journey_starting_capital_usd,journey_reward_to_risk=EXCLUDED.journey_reward_to_risk,journey_loss_pause_acknowledged=EXCLUDED.journey_loss_pause_acknowledged,updated_at=NOW()",[user.id,bot.id,s.dailyDrawdownPct,s.totalDrawdownPct,s.maxRiskPerTradePct,s.maxPositions,s.lotSize,s.maxSpreadAtrRatio,s.staleDataMs,s.maxConsecutiveLosses,s.autoPauseOnLossStreak,requestedMode,Boolean(req.body?.killSwitch),s.journeyProfile,s.journeyStartingCapitalUsd,s.journeyRewardToRisk,Boolean(s.journeyLossPauseAcknowledged)]);
       await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'BOT_RISK_SETTINGS_UPDATED',$2::jsonb)",[user.id,JSON.stringify({botId:bot.id,executionMode:requestedMode==="PAPER"?"DEMO":requestedMode,settings:s,killSwitch:Boolean(req.body?.killSwitch)})]);
       res.json({ok:true,botId:bot.id,settings:s,executionMode:requestedMode==="PAPER"?"DEMO":requestedMode,killSwitch:Boolean(req.body?.killSwitch),message:"Risk profile saved to the KINGBOT risk engine."});
     }catch(err){console.error("[KINGBOT RISK]",err?.message||err);res.status(500).json({ok:false,error:"Risk settings could not be saved."});}
@@ -564,7 +565,7 @@ export function createBotEngineRouter({ pool }) {
 
 export async function ensureBotEngineSchema(pool){
  if(!pool)return;
- await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_risk_settings (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, bot_id TEXT NOT NULL, daily_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 5, total_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 10, max_risk_per_trade_pct NUMERIC(6,2) NOT NULL DEFAULT 1, max_positions INTEGER NOT NULL DEFAULT 3, lot_size NUMERIC(12,4) NOT NULL DEFAULT 0.01, max_spread_atr_ratio NUMERIC(6,3) NOT NULL DEFAULT 0.25, stale_data_ms INTEGER NOT NULL DEFAULT 5000, max_consecutive_losses INTEGER NOT NULL DEFAULT 3, auto_pause_on_loss_streak BOOLEAN NOT NULL DEFAULT TRUE, execution_mode TEXT NOT NULL DEFAULT 'DEMO', kill_switch BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id,bot_id))");
+ await pool.query("CREATE TABLE IF NOT EXISTS kingbot_bot_risk_settings (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES kingbot_users(id) ON DELETE CASCADE, bot_id TEXT NOT NULL, daily_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 5, total_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 10, max_risk_per_trade_pct NUMERIC(6,2) NOT NULL DEFAULT 1, max_positions INTEGER NOT NULL DEFAULT 3, lot_size NUMERIC(12,4) NOT NULL DEFAULT 0.01, max_spread_atr_ratio NUMERIC(6,3) NOT NULL DEFAULT 0.25, stale_data_ms INTEGER NOT NULL DEFAULT 5000, max_consecutive_losses INTEGER NOT NULL DEFAULT 3, auto_pause_on_loss_streak BOOLEAN NOT NULL DEFAULT TRUE, execution_mode TEXT NOT NULL DEFAULT 'DEMO', kill_switch BOOLEAN NOT NULL DEFAULT FALSE, journey_loss_pause_acknowledged BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id,bot_id))");
  await pool.query("UPDATE kingbot_bot_risk_settings SET execution_mode='DEMO' WHERE execution_mode='PAPER'");
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS daily_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 5");
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS total_drawdown_pct NUMERIC(6,2) NOT NULL DEFAULT 10");
@@ -580,5 +581,6 @@ export async function ensureBotEngineSchema(pool){
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS journey_profile TEXT NOT NULL DEFAULT 'STANDARD'");
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS journey_starting_capital_usd NUMERIC(12,2) NOT NULL DEFAULT 200");
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS journey_reward_to_risk NUMERIC(6,2) NOT NULL DEFAULT 4");
+ await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS journey_loss_pause_acknowledged BOOLEAN NOT NULL DEFAULT FALSE");
  await pool.query("ALTER TABLE kingbot_bot_risk_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
 }
