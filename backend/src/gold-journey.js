@@ -21,7 +21,7 @@ const finite = (value) => Number.isFinite(Number(value)) ? Number(value) : null;
 
 export function isGoldJourneySymbol(symbol) {
   const normalized = String(symbol || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-  return normalized.startsWith("XAUUSD");
+  return normalized.startsWith("XAUUSD") || normalized === "FRXXAUUSD";
 }
 
 export function normalizeGoldJourneyProfile(input = {}) {
