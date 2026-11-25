@@ -3,6 +3,7 @@ import { requireUser } from "./subscriptions.js";
 import { isAdminEmail } from "./admin-access.js";
 import { evaluateRisk, authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
 import { LADDER_V8_DEFAULTS } from "./ladder-v8.js";
+import { GOLD_JOURNEY_PROFILE_ID, normalizeGoldJourneyProfile } from "./gold-journey.js";
 
 const BOT_DEFINITIONS = {
   strategic: {
@@ -372,14 +373,18 @@ export function getBotDefinitions() {
   return BOT_DEFINITIONS;
 }
 
-export function getTradePlan(botId, snapshot, side) {
+export function getTradePlan(botId, snapshot, side, options = {}) {
   const bot = BOT_DEFINITIONS[botId];
   if (!bot) throw new Error("Unknown bot.");
   const c = baseContext(snapshot);
   if (!Number.isFinite(c.atr) || c.atr <= 0) return { ok: false, reason: "ATR_REQUIRED" };
   const plan = bot.tradePlan;
   const stopDistance = c.atr * plan.slAtr;
-  const takeProfitDistance = plan.tpAtr > 0 ? c.atr * plan.tpAtr : 0;
+  const requestedRewardToRisk = Number(options?.rewardToRisk);
+  const useRequestedRewardToRisk = Number.isFinite(requestedRewardToRisk) && requestedRewardToRisk >= 1;
+  const takeProfitDistance = useRequestedRewardToRisk
+    ? stopDistance * requestedRewardToRisk
+    : (plan.tpAtr > 0 ? c.atr * plan.tpAtr : 0);
   const entry = Number(c.entryPrice || c.price || 0);
   const normalizedSide = String(side || "").toUpperCase();
   if (!entry || !["BUY","SELL"].includes(normalizedSide)) return { ok: false, reason: "TRADE_PLAN_INPUT_INVALID" };
@@ -390,7 +395,7 @@ export function getTradePlan(botId, snapshot, side) {
     atr: c.atr,
     stopDistance,
     takeProfitDistance,
-    riskReward: Number((plan.tpAtr / plan.slAtr).toFixed(2)),
+    riskReward: Number((stopDistance > 0 ? takeProfitDistance / stopDistance : 0).toFixed(2)),
     stopLoss: normalizedSide === "BUY" ? entry - stopDistance : entry + stopDistance,
     takeProfit: takeProfitDistance > 0 ? (normalizedSide === "BUY" ? entry + takeProfitDistance : entry - takeProfitDistance) : null,
     trailingTriggerR: plan.trailingTriggerR,
@@ -449,19 +454,34 @@ async function hasEntitlement(pool, userId, botId, userEmail) {
 
 async function getRiskSettings(pool,userId,botId){
  if(!pool)return null;
- const q=await pool.query("SELECT daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,lot_size,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch,updated_at FROM kingbot_bot_risk_settings WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
+ const q=await pool.query("SELECT daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,lot_size,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch,journey_profile,journey_starting_capital_usd,journey_reward_to_risk,updated_at FROM kingbot_bot_risk_settings WHERE user_id=$1 AND bot_id=$2",[userId,botId]);
  if(!q.rowCount)return null;
  const x=q.rows[0];
- const settings={...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,lotSize:x.lot_size,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:(String(x.execution_mode||"DEMO")==="PAPER"?"DEMO":String(x.execution_mode||"DEMO")),killSwitch:Boolean(x.kill_switch)};
+ const settings={...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,lotSize:x.lot_size,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:(String(x.execution_mode||"DEMO")==="PAPER"?"DEMO":String(x.execution_mode||"DEMO")),killSwitch:Boolean(x.kill_switch),journeyProfile:String(x.journey_profile||"STANDARD"),journeyStartingCapitalUsd:Number(x.journey_starting_capital_usd||200),journeyRewardToRisk:Number(x.journey_reward_to_risk||4)};
  if(botId==="ladder-flip")settings.maxPositions=Math.min(LADDER_V8_DEFAULTS.maxTotalRungs,Math.max(LADDER_V8_DEFAULTS.fixedRungCount,settings.maxPositions));
  return settings;
 }
-function defaultRisk(bot){return normalizeRiskSettings(bot.risk);}
+function defaultRisk(bot){return {...normalizeRiskSettings(bot.risk),journeyProfile:"STANDARD",journeyStartingCapitalUsd:200,journeyRewardToRisk:4};}
 function validateUserRisk(body,bot){
  const s=normalizeRiskSettings(body||{},bot.risk);
  if(!Number.isFinite(Number(s.lotSize))||Number(s.lotSize)<=0)return {error:"INVALID_LOT_SIZE"};
  if(s.totalDrawdownPct<s.dailyDrawdownPct)return {error:"TOTAL_DRAWDOWN_MUST_BE_AT_LEAST_DAILY_DRAWDOWN"};
- if(s.maxRiskPerTradePct>bot.risk.maxRiskPerTradePct*3)return {error:"MAX_RISK_PER_TRADE_EXCEEDS_BOT_SAFETY_CEILING"};
+ if(Number(body?.maxRiskPerTradePct)>12.5)return {error:"MAX_RISK_PER_TRADE_EXCEEDS_HARD_CEILING"};
+ const journey=normalizeGoldJourneyProfile(body||{});
+ if(journey.error)return {error:journey.error};
+ if(journey.journeyProfile===GOLD_JOURNEY_PROFILE_ID){
+   if(bot.id==="ladder-flip")return {error:"GOLD_JOURNEY_LADDER_ENGINE_UNSUPPORTED"};
+   Object.assign(s,{
+     dailyDrawdownPct:12.5,totalDrawdownPct:25,maxRiskPerTradePct:12.5,
+     maxPositions:1,maxSpreadAtrRatio:0.2,staleDataMs:5000,
+     maxConsecutiveLosses:1,autoPauseOnLossStreak:true,
+     journeyProfile:journey.journeyProfile,
+     journeyStartingCapitalUsd:journey.journeyStartingCapitalUsd,
+     journeyRewardToRisk:journey.journeyRewardToRisk
+   });
+ }else{
+   Object.assign(s,journey);
+ }
  return {settings:s};
 }
 
