@@ -214,7 +214,7 @@ async function settings(userId,botId,symbol){
   if(!bot)throw new Error("BOT_NOT_FOUND");
   const base=!q.rowCount
     ? {...normalizeRiskSettings(bot.risk),executionMode:"DEMO",killSwitch:false,journeyProfile:"STANDARD",journeyStartingCapitalUsd:200,journeyRewardToRisk:4}
-    : (()=>{const x=q.rows[0];return {...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,lotSize:x.lot_size,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:(String(x.execution_mode||"DEMO")==="PAPER"?"DEMO":String(x.execution_mode||"DEMO")),killSwitch:Boolean(x.kill_switch),journeyProfile:String(x.journey_profile||"STANDARD"),journeyStartingCapitalUsd:Number(x.journey_starting_capital_usd||200),journeyRewardToRisk:Number(x.journey_reward_to_risk||4)};})();
+    : (()=>{const x=q.rows[0];return {...normalizeRiskSettings({dailyDrawdownPct:x.daily_drawdown_pct,totalDrawdownPct:x.total_drawdown_pct,maxRiskPerTradePct:x.max_risk_per_trade_pct,maxPositions:x.max_positions,lotSize:x.lot_size,maxSpreadAtrRatio:x.max_spread_atr_ratio,staleDataMs:x.stale_data_ms,maxConsecutiveLosses:x.max_consecutive_losses,autoPauseOnLossStreak:x.auto_pause_on_loss_streak}),executionMode:(String(x.execution_mode||"DEMO")==="PAPER"?"DEMO":String(x.execution_mode||"DEMO")),killSwitch:Boolean(x.kill_switch),journeyProfile:String(x.journey_profile||"STANDARD"),journeyStartingCapitalUsd:Number(x.journey_starting_capital_usd||200),journeyRewardToRisk:Number(x.journey_reward_to_risk||4),journeyLossPauseAcknowledged:Boolean(x.journey_loss_pause_acknowledged)};})();
   if(botId==="ladder-flip")base.maxPositions=Math.min(LADDER_V8_DEFAULTS.maxTotalRungs,Math.max(LADDER_V8_DEFAULTS.fixedRungCount,base.maxPositions));
   return applyGoldJourneyRiskProfile({...base,botId},symbol);
 }
@@ -1115,7 +1115,7 @@ async function execute(row){
   const reconciliation=await reconcileBrokerState(userId,status,positions).catch(error=>({
     checked:false,status:"ERROR",reason:String(error?.message||"BROKER_RECONCILIATION_FAILED").slice(0,180)
   }));
-  const authorization=authorizeOrder({limits:s,executionMode:s.executionMode,killSwitch:s.killSwitch,globalKillSwitch:globalRisk.globalKillSwitch,globalTradingPaused:globalRisk.tradingPaused,equity:Number(account.equity),dayStartEquity:dayStart,peakEquity:peak,openPositions:positions.length,requestedRiskPct:s.maxRiskPerTradePct,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,dataAgeMs:Date.now()-quoteTime,consecutiveLosses:losses,requireLossStreakData:s.goldJourneyEnabled,lossStreakVerified:losses!==null&&losses!==undefined&&Number.isFinite(Number(losses)),requireGoldJourneySymbol:s.goldJourneyConfigured,goldJourneySymbolVerified:isGoldJourneySymbol(config.symbol)&&botId!=="ladder-flip",requireProjectedDrawdownCheck:s.goldJourneyConfigured,skipSpreadAtr:botId==="ladder-flip"&&String(status.broker||"").toLowerCase()==="deriv"});
+  const authorization=authorizeOrder({limits:s.goldJourneyEnabled&&s.journeyLossPauseAcknowledged?{...s,maxConsecutiveLosses:Number.MAX_SAFE_INTEGER}:s,executionMode:s.executionMode,killSwitch:s.killSwitch,globalKillSwitch:globalRisk.globalKillSwitch,globalTradingPaused:globalRisk.tradingPaused,equity:Number(account.equity),dayStartEquity:dayStart,peakEquity:peak,openPositions:positions.length,requestedRiskPct:s.maxRiskPerTradePct,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,dataAgeMs:Date.now()-quoteTime,consecutiveLosses:losses,requireLossStreakData:s.goldJourneyEnabled,lossStreakVerified:losses!==null&&losses!==undefined&&Number.isFinite(Number(losses)),requireGoldJourneySymbol:s.goldJourneyConfigured,goldJourneySymbolVerified:isGoldJourneySymbol(config.symbol)&&botId!=="ladder-flip",requireProjectedDrawdownCheck:s.goldJourneyConfigured,skipSpreadAtr:botId==="ladder-flip"&&String(status.broker||"").toLowerCase()==="deriv"});
   const risk=authorization?.risk
     ? {...authorization.risk,allowed:Boolean(authorization.allowed),reason:authorization.reason||null}
     : authorization;
@@ -1329,6 +1329,7 @@ async function execute(row){
     try{
       order=await broker.placeOrder({side,symbol:config.symbol,volume,stopLoss,takeProfit,comment:"KINGBOT",clientId,userId,multiplier:String(status.broker||"").toLowerCase()==="deriv"?100:undefined});
       await pool.query("UPDATE kingbot_execution_journal SET status='SUBMITTED',broker_result=$2::jsonb,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,JSON.stringify(order)]);
+      if(s.goldJourneyEnabled&&s.journeyLossPauseAcknowledged){await pool.query("UPDATE kingbot_bot_risk_settings SET journey_loss_pause_acknowledged=FALSE,updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);}
       action="ORDER_SUBMITTED";
     }catch(error){
       await pool.query("UPDATE kingbot_execution_journal SET status='REJECTED',error_message=$2,updated_at=NOW() WHERE id=$1",[journal.rows[0].id,String(error?.message||"ORDER_REJECTED").slice(0,500)]);
