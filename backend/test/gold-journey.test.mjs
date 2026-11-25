@@ -12,6 +12,7 @@ import {
   validateGoldJourneyOrder
 } from "../src/gold-journey.js";
 import { evaluateRisk, normalizeRiskSettings } from "../src/risk-engine.js";
+import { getTradePlan } from "../src/bot-engines.js";
 
 test("Gold Journey profile fixes the requested capital, risk and reward-to-risk", () => {
   assert.equal(GOLD_JOURNEY_PROFILE.startingCapitalUsd, 200);
@@ -66,6 +67,17 @@ test("Gold Journey target calculation produces a gross 1:4 target for both direc
   assert.equal(goldJourneyTargetPrice({ entryPrice: 2300, stopLoss: 2290, side: "BUY" }), 2340);
   assert.equal(goldJourneyTargetPrice({ entryPrice: 2300, stopLoss: 2310, side: "SELL" }), 2260);
   assert.equal(goldJourneyTargetPrice({ entryPrice: 2300, stopLoss: 2300, side: "BUY" }), null);
+});
+
+test("strategy trade plans override native targets to the Gold Journey 1:4 multiple", () => {
+  const plan = getTradePlan("strategic", {
+    symbol: "XAUUSD", timeframe: "5m", price: 2300, entryPrice: 2300, atr: 10
+  }, "BUY", { rewardToRisk: 4 });
+  assert.equal(plan.ok, true);
+  assert.equal(plan.stopDistance, 16);
+  assert.equal(plan.takeProfitDistance, 64);
+  assert.equal(plan.riskReward, 4);
+  assert.equal(plan.takeProfit, 2364);
 });
 
 test("final broker prices must still satisfy at least 1:4", () => {
