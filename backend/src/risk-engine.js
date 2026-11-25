@@ -20,6 +20,9 @@ export function evaluateRisk(input={}){
  const equity=finite(input.equity),dayStart=finite(input.dayStartEquity),peak=finite(input.peakEquity,equity),openPositions=finite(input.openPositions),riskPct=finite(input.requestedRiskPct),spread=finite(input.spread),atr=finite(input.atr),dataAgeMs=finite(input.dataAgeMs,0),consecutiveLosses=Math.max(0,finite(input.consecutiveLosses));
  const dailyDd=dayStart>0?Math.max(0,(dayStart-equity)/dayStart*100):0;
  const totalDd=peak>0?Math.max(0,(peak-equity)/peak*100):0;
+ const projectedEquity=equity>0?equity*(1-riskPct/100):equity;
+ const projectedDailyDd=dayStart>0?Math.max(0,(dayStart-projectedEquity)/dayStart*100):0;
+ const projectedTotalDd=peak>0?Math.max(0,(peak-projectedEquity)/peak*100):0;
  const checks=[
   ["DAILY_DRAWDOWN",dailyDd<r.dailyDrawdownPct],
   ["TOTAL_DRAWDOWN",totalDd<r.totalDrawdownPct],
@@ -28,11 +31,13 @@ export function evaluateRisk(input={}){
   ["STALE_MARKET_DATA",dataAgeMs<=r.staleDataMs],
   ["SPREAD_FILTER",input.skipSpreadAtr===true||!(atr>0)||spread/atr<=r.maxSpreadAtrRatio],
   ["GOLD_JOURNEY_SYMBOL_REQUIRED",!input.requireGoldJourneySymbol||input.goldJourneySymbolVerified===true],
+  ["PROJECTED_DAILY_DRAWDOWN",!input.requireProjectedDrawdownCheck||projectedDailyDd<=r.dailyDrawdownPct+1e-9],
+  ["PROJECTED_TOTAL_DRAWDOWN",!input.requireProjectedDrawdownCheck||projectedTotalDd<=r.totalDrawdownPct+1e-9],
   ["LOSS_STREAK_DATA_UNAVAILABLE",!input.requireLossStreakData||input.lossStreakVerified===true],
   ["LOSS_STREAK",!r.autoPauseOnLossStreak||consecutiveLosses<r.maxConsecutiveLosses]
  ];
  const blocked=checks.filter(x=>!x[1]).map(x=>x[0]);
- return {allowed:blocked.length===0,blockedReasons:blocked,dailyDrawdownPct:dailyDd,totalDrawdownPct:totalDd,consecutiveLosses,limits:r};
+ return {allowed:blocked.length===0,blockedReasons:blocked,dailyDrawdownPct:dailyDd,totalDrawdownPct:totalDd,projectedDailyDrawdownPct:projectedDailyDd,projectedTotalDrawdownPct:projectedTotalDd,consecutiveLosses,limits:r};
 }
 export function authorizeOrder(input={}){
  if(input.killSwitch===true)return {allowed:false,reason:"KILL_SWITCH_ACTIVE"};
