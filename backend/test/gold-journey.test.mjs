@@ -123,6 +123,25 @@ test("risk engine supports 12.5% but never normalizes above the requested hard c
   assert.ok(blocked.blockedReasons.includes("MAX_POSITIONS"));
 });
 
+test("a $200 USD Gold Journey requires a verified USD account currency", () => {
+  const missingCurrency = evaluateRisk({
+    equity: 200, dayStartEquity: 200, peakEquity: 200,
+    openPositions: 0, requestedRiskPct: 12.5,
+    requireGoldJourneyUsdAccount: true, goldJourneyAccountCurrency: "",
+    limits: { maxRiskPerTradePct: 12.5, maxPositions: 1 }
+  });
+  assert.equal(missingCurrency.allowed, false);
+  assert.ok(missingCurrency.blockedReasons.includes("GOLD_JOURNEY_USD_ACCOUNT_REQUIRED"));
+
+  const usdCurrency = evaluateRisk({
+    equity: 200, dayStartEquity: 200, peakEquity: 200,
+    openPositions: 0, requestedRiskPct: 12.5,
+    requireGoldJourneyUsdAccount: true, goldJourneyAccountCurrency: "USD",
+    limits: { maxRiskPerTradePct: 12.5, maxPositions: 1 }
+  });
+  assert.equal(usdCurrency.allowed, true);
+});
+
 test("three losses require a manual one-trade re-arm without bypassing drawdown", () => {
   const paused = evaluateRisk({
     equity: 190, dayStartEquity: 200, peakEquity: 200,
