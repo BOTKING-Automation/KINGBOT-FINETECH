@@ -67,7 +67,6 @@ export function applyGoldJourneyRiskProfile(settings = {}, symbol = "") {
 
   return {
     ...settings,
-    executionMode: GOLD_JOURNEY_PROFILE.executionMode,
     dailyDrawdownPct: GOLD_JOURNEY_PROFILE.dailyDrawdownPct,
     totalDrawdownPct: GOLD_JOURNEY_PROFILE.totalDrawdownPct,
     maxRiskPerTradePct: GOLD_JOURNEY_PROFILE.riskPerTradePct,
