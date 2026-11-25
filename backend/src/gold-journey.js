@@ -10,7 +10,7 @@ export const GOLD_JOURNEY_PROFILE = Object.freeze({
   dailyDrawdownPct: 12.5,
   totalDrawdownPct: 25,
   maxPositions: 1,
-  maxConsecutiveLosses: 1,
+  maxConsecutiveLosses: 3,
   autoPauseOnLossStreak: true,
   maxSpreadAtrRatio: 0.2,
   staleDataMs: 5000,
