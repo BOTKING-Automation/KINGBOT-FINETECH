@@ -1264,8 +1264,8 @@ async function execute(row){
   }
 
   let action="NO_ACTION",order=null,tradePlan=null;
-  if(s.goldJourneyEnabled&&!isGoldJourneyExecutionValidated()){
-    action="GOLD_JOURNEY_SHADOW_VALIDATION_REQUIRED";
+  if(s.goldJourneyEnabled&&s.executionMode==="LIVE"&&!isGoldJourneyExecutionValidated()){
+    action="GOLD_JOURNEY_LIVE_VALIDATION_REQUIRED";
   }else if(s.goldJourneyEnabled&&brokerName==="deriv"){
     action="GOLD_JOURNEY_DERIV_RISK_MODEL_UNSUPPORTED";
   }else if(brokerName==="deriv"){
