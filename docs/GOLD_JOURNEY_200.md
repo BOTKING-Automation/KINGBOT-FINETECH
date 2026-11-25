@@ -11,7 +11,7 @@
 - Maximum open account positions: **1**.
 - Pause after **3 consecutive losses**; use the dashboard’s **RE-ARM AFTER LOSS REVIEW** action after manual review. It permits one successfully submitted order, then automatically clears. It does not bypass daily/total drawdown, symbol, position, spread, data-quality or 4R controls. The pre-trade projected drawdown check can stop the journey earlier.
 - Auto-pause enabled, spread/ATR maximum 0.20, stale quote limit 5 seconds.
-- The preset saves DEMO mode. It does not activate a live account.
+- The preset defaults to DEMO mode. Verified demo trading is allowed for the shadow/demo validation phase; LIVE mode remains unavailable until all validation gates pass and an operator enables the approval flag.
 
 At exactly $200 of verified equity, 12.5% planned risk is $25 and a full 4R gross winner targets $100 before commission, spread, slippage, swaps and other execution costs. A full loss would leave $175. At a different account equity, the risk budget is recalculated from the broker's current verified equity; the $200 starting figure is a journey reference, not a fabricated or forced broker balance.
 
@@ -28,7 +28,7 @@ At exactly $200 of verified equity, 12.5% planned risk is $25 and a full 4R gros
 
 ## Validation gate
 
-The profile is **shadow-only by default**. New orders are blocked until the environment flag KINGBOT_GOLD_JOURNEY_VALIDATED is set to true in the backend/worker environment after all gates below pass. Do not set this variable merely because CI is green.
+The profile defaults to **DEMO**. Demo orders may be submitted on the connected, verified USD-denominated demo account so the required shadow/demo sample can be collected. **LIVE orders are blocked** until the environment flag KINGBOT_GOLD_JOURNEY_VALIDATED is set to true in both the API and worker environments after all gates below pass. Do not set this variable merely because CI is green.
 
 Before enabling the gate, require:
 - Preserve the existing KINGBOT V9/V10 model-acceptance gates without relaxation: ensemble balanced accuracy at least 0.36, macro-F1 at least 0.34, at least 30 untouched final test samples, and nonzero SELL, HOLD and BUY recall.
@@ -36,7 +36,7 @@ Before enabling the gate, require:
 - A reproducible cost-aware XAUUSD backtest using spread, commission, slippage and swaps, with a chronological train/development/final split and untouched final data.
 - At least 30 untouched final closed trades, positive net expectancy after costs, and profit factor of at least 1.20.
 - Peak drawdown no greater than 25%; no sizing calculation may exceed 12.5% planned risk after broker volume rounding.
-- At least 30 completed shadow/demo trades with no unexplained broker/order-journal reconciliation mismatch, stale-data execution, missing protective stop, or risk-limit bypass.
+- At least 30 completed shadow/demo trades on the Gold Journey profile with no unexplained broker/order-journal reconciliation mismatch, stale-data execution, missing protective stop, or risk-limit bypass.
 - A code review of the worker path and explicit operator approval.
 
 Passing CI only proves the code/tests ran. It does not prove a trading edge or authorize live execution. The profile is saved per bot and per authenticated user; it only activates when that bot is configured for XAUUSD.
