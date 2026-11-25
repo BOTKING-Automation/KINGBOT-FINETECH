@@ -93,7 +93,7 @@ export function applyGoldJourneyRiskProfile(settings = {}, symbol = "") {
 export function goldJourneyRiskBudget(equityUsd) {
   const equity = finite(equityUsd);
   if (equity === null || equity <= 0) return null;
-  return Number((equity * GOLD_JOURNEY_PROFILE.riskPerTradePct / 100).toFixed(2));
+  return Math.floor((equity * GOLD_JOURNEY_PROFILE.riskPerTradePct / 100 + 1e-9) * 100) / 100;
 }
 
 export function goldJourneyTargetPrice({ entryPrice, stopLoss, side, rewardToRisk = GOLD_JOURNEY_PROFILE.rewardToRisk } = {}) {
