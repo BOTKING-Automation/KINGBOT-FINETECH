@@ -12,7 +12,7 @@ import { monitorBotDecision } from "./ai-bot-supervisor.js";
 import { getAiStrategySignal, warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } from "./ai-trade-gate.js";
 import { recordMlFeedback } from "./ml-signal-client.js";
 import { authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
-import { applyGoldJourneyRiskProfile, isGoldJourneyExecutionValidated, validateGoldJourneyOrder } from "./gold-journey.js";
+import { applyGoldJourneyRiskProfile, isGoldJourneyExecutionValidated, isGoldJourneySymbol, validateGoldJourneyOrder } from "./gold-journey.js";
 import { calculateLadderV8Indicators, ladderRungLot, brokerLadderLots, normalizeLot, ladderLockStepPrice, ladderLockPrice, updateVelocitySamples, velocityPoints, withinLadderSession, ladderBasketRisk, LADDER_V8_DEFAULTS } from "./ladder-v8.js";
 import { ensureAuthSchema } from "./auth.js";
 import { ensureSubscriptionSchema, expireStaleSubscriptions } from "./subscriptions.js";
@@ -1115,7 +1115,7 @@ async function execute(row){
   const reconciliation=await reconcileBrokerState(userId,status,positions).catch(error=>({
     checked:false,status:"ERROR",reason:String(error?.message||"BROKER_RECONCILIATION_FAILED").slice(0,180)
   }));
-  const authorization=authorizeOrder({limits:s,executionMode:s.executionMode,killSwitch:s.killSwitch,globalKillSwitch:globalRisk.globalKillSwitch,globalTradingPaused:globalRisk.tradingPaused,equity:Number(account.equity),dayStartEquity:dayStart,peakEquity:peak,openPositions:positions.length,requestedRiskPct:s.maxRiskPerTradePct,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,dataAgeMs:Date.now()-quoteTime,consecutiveLosses:losses,requireLossStreakData:s.goldJourneyEnabled,lossStreakVerified:losses!==null&&losses!==undefined&&Number.isFinite(Number(losses)),skipSpreadAtr:botId==="ladder-flip"&&String(status.broker||"").toLowerCase()==="deriv"});
+  const authorization=authorizeOrder({limits:s,executionMode:s.executionMode,killSwitch:s.killSwitch,globalKillSwitch:globalRisk.globalKillSwitch,globalTradingPaused:globalRisk.tradingPaused,equity:Number(account.equity),dayStartEquity:dayStart,peakEquity:peak,openPositions:positions.length,requestedRiskPct:s.maxRiskPerTradePct,spread,atr:botId==="ladder-flip"?(ind.v8Atr||ind.atr):ind.atr,dataAgeMs:Date.now()-quoteTime,consecutiveLosses:losses,requireLossStreakData:s.goldJourneyEnabled,lossStreakVerified:losses!==null&&losses!==undefined&&Number.isFinite(Number(losses)),requireGoldJourneySymbol:s.goldJourneyConfigured,goldJourneySymbolVerified:isGoldJourneySymbol(config.symbol)&&botId!=="ladder-flip",skipSpreadAtr:botId==="ladder-flip"&&String(status.broker||"").toLowerCase()==="deriv"});
   const risk=authorization?.risk
     ? {...authorization.risk,allowed:Boolean(authorization.allowed),reason:authorization.reason||null}
     : authorization;
