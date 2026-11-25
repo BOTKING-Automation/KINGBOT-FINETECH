@@ -3,13 +3,13 @@
 ## Preset
 
 - Reference starting capital: **$200 USD**.
-- Priority market: **XAUUSD** (broker suffixes such as XAUUSDm are accepted).
+- Priority market: **XAUUSD** (broker suffixes such as XAUUSDm and the FRXXAUUSD ticker format are accepted).
 - Maximum planned risk per trade: **12.5% of current verified account equity**.
 - Minimum gross reward-to-risk: **1:4**.
 - Daily drawdown stop: **12.5%** from the broker-account day-start equity.
 - Peak-to-equity drawdown stop: **25%**.
 - Maximum open account positions: **1**.
-- Pause after **3 consecutive losses**; manual review is required before resuming. The pre-trade projected drawdown check can stop the journey earlier.
+- Pause after **3 consecutive losses**; use the dashboard’s **RE-ARM AFTER LOSS REVIEW** action after manual review. It permits one successfully submitted order, then automatically clears. It does not bypass daily/total drawdown, symbol, position, spread, data-quality or 4R controls. The pre-trade projected drawdown check can stop the journey earlier.
 - Auto-pause enabled, spread/ATR maximum 0.20, stale quote limit 5 seconds.
 - The preset saves DEMO mode. It does not activate a live account.
 
