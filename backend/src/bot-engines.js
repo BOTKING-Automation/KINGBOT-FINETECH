@@ -3,7 +3,7 @@ import { requireUser } from "./subscriptions.js";
 import { isAdminEmail } from "./admin-access.js";
 import { evaluateRisk, authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
 import { LADDER_V8_DEFAULTS } from "./ladder-v8.js";
-import { GOLD_JOURNEY_PROFILE_ID, normalizeGoldJourneyProfile } from "./gold-journey.js";
+import { GOLD_JOURNEY_PROFILE_ID, isGoldJourneyExecutionValidated, normalizeGoldJourneyProfile } from "./gold-journey.js";
 
 const BOT_DEFINITIONS = {
   strategic: {
@@ -551,8 +551,9 @@ export function createBotEngineRouter({ pool }) {
     if(!(await hasEntitlement(pool,user.id,bot.id,user.email)))return res.status(403).json({ok:false,allowed:false,reason:"BOT_NOT_INCLUDED_IN_SUBSCRIPTION"});
     const checked=validateUserRisk(req.body,bot); if(checked.error)return res.status(400).json({ok:false,error:checked.error});
     const s=checked.settings;
-    const requestedMode=s.journeyProfile===GOLD_JOURNEY_PROFILE_ID?"DEMO":String(req.body?.executionMode||"DEMO").toUpperCase();
+    const requestedMode=String(req.body?.executionMode||"DEMO").toUpperCase();
     if(!["DEMO","LIVE"].includes(requestedMode))return res.status(400).json({ok:false,error:"INVALID_EXECUTION_MODE"});
+    if(s.journeyProfile===GOLD_JOURNEY_PROFILE_ID&&requestedMode==="LIVE"&&!isGoldJourneyExecutionValidated())return res.status(403).json({ok:false,error:"GOLD_JOURNEY_LIVE_VALIDATION_REQUIRED"});
     try{
       await pool.query("INSERT INTO kingbot_bot_risk_settings(user_id,bot_id,daily_drawdown_pct,total_drawdown_pct,max_risk_per_trade_pct,max_positions,lot_size,max_spread_atr_ratio,stale_data_ms,max_consecutive_losses,auto_pause_on_loss_streak,execution_mode,kill_switch,journey_profile,journey_starting_capital_usd,journey_reward_to_risk,journey_loss_pause_acknowledged) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) ON CONFLICT(user_id,bot_id) DO UPDATE SET daily_drawdown_pct=EXCLUDED.daily_drawdown_pct,total_drawdown_pct=EXCLUDED.total_drawdown_pct,max_risk_per_trade_pct=EXCLUDED.max_risk_per_trade_pct,max_positions=EXCLUDED.max_positions,lot_size=EXCLUDED.lot_size,max_spread_atr_ratio=EXCLUDED.max_spread_atr_ratio,stale_data_ms=EXCLUDED.stale_data_ms,max_consecutive_losses=EXCLUDED.max_consecutive_losses,auto_pause_on_loss_streak=EXCLUDED.auto_pause_on_loss_streak,execution_mode=EXCLUDED.execution_mode,kill_switch=EXCLUDED.kill_switch,journey_profile=EXCLUDED.journey_profile,journey_starting_capital_usd=EXCLUDED.journey_starting_capital_usd,journey_reward_to_risk=EXCLUDED.journey_reward_to_risk,journey_loss_pause_acknowledged=EXCLUDED.journey_loss_pause_acknowledged,updated_at=NOW()",[user.id,bot.id,s.dailyDrawdownPct,s.totalDrawdownPct,s.maxRiskPerTradePct,s.maxPositions,s.lotSize,s.maxSpreadAtrRatio,s.staleDataMs,s.maxConsecutiveLosses,s.autoPauseOnLossStreak,requestedMode,Boolean(req.body?.killSwitch),s.journeyProfile,s.journeyStartingCapitalUsd,s.journeyRewardToRisk,Boolean(s.journeyLossPauseAcknowledged)]);
       await pool.query("INSERT INTO kingbot_audit_log(user_id,event_type,metadata) VALUES($1,'BOT_RISK_SETTINGS_UPDATED',$2::jsonb)",[user.id,JSON.stringify({botId:bot.id,executionMode:requestedMode==="PAPER"?"DEMO":requestedMode,settings:s,killSwitch:Boolean(req.body?.killSwitch)})]);
