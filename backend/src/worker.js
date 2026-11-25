@@ -1040,7 +1040,7 @@ async function execute(row){
   const journeyRows=await pool.query("SELECT bot_id FROM kingbot_bot_risk_settings WHERE user_id=$1 AND journey_profile=$2 ORDER BY bot_id",[userId,GOLD_JOURNEY_PROFILE_ID]);
   if(journeyRows.rowCount&&(journeyRows.rowCount!==1||journeyRows.rows[0].bot_id!==GOLD_JOURNEY_PROFILE.preferredBotId||botId!==GOLD_JOURNEY_PROFILE.preferredBotId)){
     const reason="GOLD_JOURNEY_SMC_PRO_EXCLUSIVE_ENGINE_LOCK";
-    await pool.query("UPDATE kingbot_bot_runtime SET last_error=$3,last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,reason]);
+    await pool.query("UPDATE kingbot_bot_runtime SET state='PAUSED',last_error=$3,last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,reason]);
     trace("GOLD_JOURNEY_EXCLUSIVE_ENGINE_BLOCK",{configuredBots:journeyRows.rows.map(x=>x.bot_id)});
     return;
   }
