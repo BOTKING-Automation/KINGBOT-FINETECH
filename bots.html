@@ -291,7 +291,7 @@ function renderAiMonitor(lastSignal){
 function putSettings(s,mode,kill){
  fields.executionMode.value=(mode==="PAPER"?"DEMO":mode)||"DEMO";fields.lotSize.value=Number(s.lotSize||0.01).toFixed(2);fields.maxRisk.value=s.maxRiskPerTradePct;fields.dailyDd.value=s.dailyDrawdownPct;fields.totalDd.value=s.totalDrawdownPct;fields.maxPositions.value=s.maxPositions;fields.spreadRatio.value=s.maxSpreadAtrRatio;fields.staleMs.value=s.staleDataMs;fields.lossStreak.value=s.maxConsecutiveLosses;fields.autoPause.checked=Boolean(s.autoPauseOnLossStreak);fields.killSwitch.checked=Boolean(kill);
  fields.journeyProfile.value=String(s.journeyProfile||"STANDARD");fields.journeyStartingCapitalUsd.value=Number(s.journeyStartingCapitalUsd||200);fields.journeyRewardToRisk.value=Number(s.journeyRewardToRisk||4);fields.journeyLossPauseAcknowledged.value=String(Boolean(s.journeyLossPauseAcknowledged));
- const journeyActive=fields.journeyProfile.value==="GOLD_JOURNEY_200";$("journeyState").textContent=journeyActive?"$200 XAUUSD · 12.5% RISK · 1:4":"STANDARD PROFILE";$("journeyNote").textContent=journeyActive?"Per-user Gold preset · DEMO only · shadow validation gate still active.":"Select a saved journey preset for this bot only."; 
+ const journeyActive=fields.journeyProfile.value==="GOLD_JOURNEY_200";$("journeyState").textContent=journeyActive?"$200 XAUUSD · 12.5% RISK · 1:4":"STANDARD PROFILE";$("journeyNote").textContent=journeyActive?"Per-user Gold preset · DEMO validation enabled · LIVE locked pending approval.":"Select a saved journey preset for this bot only."; 
  $("mLot").textContent=(Number(s.lotSize)||0.01).toFixed(2); $("mRisk").textContent=s.maxRiskPerTradePct+"%";$("mDaily").textContent=s.dailyDrawdownPct+"%";$("mTotal").textContent=s.totalDrawdownPct+"%";$("mPositions").textContent=s.maxPositions;
  $("mMode").textContent=mode||"NOT_CONNECTED";$("mRuntime").textContent=selected?.runtime||"STOPPED";$("mSymbol").textContent=selected?.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected?.timeframe||"—";
  $("riskPill").textContent=fields.killSwitch.checked?"KILL SWITCH":"CONFIGURED";$("enginePill").textContent=selected?.entitled?"ENTITLED":"LOCKED";
@@ -516,7 +516,7 @@ $("applyGoldJourneyBtn").addEventListener("click",()=>{
   fields.killSwitch.checked=false;
   $("journeyState").textContent="$200 XAUUSD · 12.5% RISK · 1:4";
   $("journeyNote").textContent="Preset loaded for "+selected.name+". Save risk profile and market configuration separately.";
-  msg("Gold Journey preset loaded. Press SAVE RISK PROFILE, then SAVE MARKET CONFIG. New orders remain shadow-only until the independent validation gate is approved.","ok");
+  msg("Gold Journey preset loaded. Press SAVE RISK PROFILE, then SAVE MARKET CONFIG. DEMO trades are allowed for validation; LIVE remains locked until the independent approval gate passes.","ok");
 });
 $("armGoldJourneyBtn").addEventListener("click",async()=>{
  if(!selected)return msg("Select an entitled bot first.","error");
