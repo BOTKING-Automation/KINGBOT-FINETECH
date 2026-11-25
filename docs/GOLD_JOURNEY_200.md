@@ -4,7 +4,8 @@
 
 - Reference starting capital: **$200 USD**; the connected broker account must report USD as its account currency before the profile can trade.
 - Priority market: **XAUUSD** (broker suffixes such as XAUUSDm and the FRXXAUUSD ticker format are accepted).
-- Maximum planned risk per trade: **12.5% of current verified account equity**.
+- Sole execution engine: **KINGBOT SMC PRO**. The preset cannot be saved on Strategic, Flipper, Breakout or Ladder Flip.
+- Maximum planned risk per trade: **12.5% of current verified USD account equity**, compounded before every new trade. Profits increase the next risk budget; losses reduce it. The $200 starting amount is a reference only, never the sizing base after the account begins trading.
 - Minimum gross reward-to-risk: **1:4**.
 - Daily drawdown stop: **12.5%** from the broker-account day-start equity.
 - Peak-to-equity drawdown stop: **25%**.
@@ -12,8 +13,9 @@
 - Pause after **3 consecutive losses**; use the dashboard’s **RE-ARM AFTER LOSS REVIEW** action after manual review. It permits one successfully submitted order, then automatically clears. It does not bypass daily/total drawdown, symbol, position, spread, data-quality or 4R controls. The pre-trade projected drawdown check can stop the journey earlier.
 - Auto-pause enabled, spread/ATR maximum 0.20, stale quote limit 5 seconds.
 - The preset defaults to DEMO mode. Verified demo trading is allowed for the shadow/demo validation phase; LIVE mode remains unavailable until all validation gates pass and an operator enables the approval flag.
+- SMC PRO uses its existing **4H regime → 15m setup → 5m execution** timeframe profile. A Gold Journey profile on the account locks other KINGBOT bot runtimes from submitting orders, avoiding overlapping strategy engines.
 
-At exactly $200 of verified equity, 12.5% planned risk is $25 and a full 4R gross winner targets $100 before commission, spread, slippage, swaps and other execution costs. A full loss would leave $175. At a different account equity, the risk budget is recalculated from the broker's current verified equity; the $200 starting figure is a journey reference, not a fabricated or forced broker balance.
+At exactly $200 of verified equity, 12.5% planned risk is $25 and a full 4R gross winner targets $100 before commission, spread, slippage, swaps and other execution costs. After that gross win, illustrative equity would be $300 and the next trade's 12.5% risk budget would compound to $37.50. After a full $25 loss, equity would be $175 and the next budget would reduce to $21.88. These are arithmetic examples, not return forecasts; realised results are affected by costs, slippage and gaps. The worker recalculates from current broker-reported equity on each new trade; it does not keep sizing at $25.
 
 ## Execution safeguards
 
@@ -22,9 +24,9 @@ At exactly $200 of verified equity, 12.5% planned risk is $25 and a full 4R gros
 3. Recompute the target from the final broker-valid stop distance and enforce at least 4R after stop-distance adjustments.
 4. Block entries if the account has an open position, current or projected daily/total drawdown breaches its limit, the loss-streak is reached, the spread is too wide, the quote is stale, the broker data or symbol specification is missing, or the kill switch is active. Projected drawdown assumes a full planned stop loss at the configured risk percentage.
 5. Require verified USD account currency and trade-history data for the loss-streak guard. Missing currency or a failed history request is a block, not an assumed value.
-6. Ladder Flip V8 is excluded because its multi-rung/pyramiding management does not implement a single-position fixed 1:4 journey. Existing Ladder positions must remain under their existing stop-management path; the Gold Journey does not open new Ladder cycles or add rungs.
+6. Only KINGBOT SMC PRO may execute this journey. The worker locks every other bot runtime for this user while the Gold Journey profile is configured. SMC PRO keeps its native market-structure, liquidity-sweep, order-block, fair-value-gap and displacement analysis; the Gold Journey overrides its take-profit distance to at least 4R.
 7. Deriv stake-based execution is excluded until its contract-specific monetary risk can be proven to equal the requested account-risk budget. The standard MT5/CFD volume path must pass broker sizing checks first.
-8. AI signals are advisory. Deterministic strategy, broker verification, risk authorization and order validation remain authoritative.
+8. AI signals are advisory. Deterministic SMC PRO strategy checks, broker verification, compounding risk authorization and order validation remain authoritative.
 
 ## Validation gate
 
@@ -39,4 +41,4 @@ Before enabling the gate, require:
 - At least 30 completed shadow/demo trades on the Gold Journey profile with no unexplained broker/order-journal reconciliation mismatch, stale-data execution, missing protective stop, or risk-limit bypass.
 - A code review of the worker path and explicit operator approval.
 
-Passing CI only proves the code/tests ran. It does not prove a trading edge or authorize live execution. The profile is saved per bot and per authenticated user; it only activates when that bot is configured for XAUUSD.
+Passing CI only proves the code/tests ran. It does not prove a trading edge or authorize live execution. The profile is saved per bot and per authenticated user. It is restricted to SMC PRO and only activates when that engine is configured for XAUUSD.
