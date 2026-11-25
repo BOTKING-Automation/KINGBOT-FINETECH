@@ -22,6 +22,9 @@ test("Gold Journey profile fixes the requested capital, risk and reward-to-risk"
   assert.equal(GOLD_JOURNEY_PROFILE.totalDrawdownPct, 25);
   assert.equal(GOLD_JOURNEY_PROFILE.maxPositions, 1);
   assert.equal(GOLD_JOURNEY_PROFILE.maxConsecutiveLosses, 3);
+  assert.equal(GOLD_JOURNEY_PROFILE.compoundingEnabled, true);
+  assert.equal(GOLD_JOURNEY_PROFILE.compoundingBasis, "CURRENT_VERIFIED_BROKER_EQUITY");
+  assert.equal(GOLD_JOURNEY_PROFILE.preferredBotId, "smc-pro");
   assert.equal(GOLD_JOURNEY_PROFILE.executionMode, "DEMO");
   assert.equal(goldJourneyRiskBudget(200), 25);
   assert.equal(goldJourneyRiskBudget(500), 62.5);
@@ -35,11 +38,13 @@ test("Gold symbol matching accepts common broker suffixes but not unrelated inst
   assert.equal(isGoldJourneySymbol("EURUSD"), false);
 });
 
-test("journey activation is restricted to XAUUSD and excludes Ladder Flip", () => {
-  const saved = { journeyProfile: GOLD_JOURNEY_PROFILE_ID, botId: "strategic" };
+test("journey activates only on SMC Pro and only for XAUUSD", () => {
+  const saved = { journeyProfile: GOLD_JOURNEY_PROFILE_ID, botId: "smc-pro" };
   assert.equal(applyGoldJourneyRiskProfile(saved, "XAUUSDm").goldJourneyEnabled, true);
   assert.equal(applyGoldJourneyRiskProfile(saved, "EURUSD").goldJourneyEnabled, false);
-  assert.equal(applyGoldJourneyRiskProfile({ ...saved, botId: "ladder-flip" }, "XAUUSD").goldJourneyEnabled, false);
+  const wrongEngine = applyGoldJourneyRiskProfile({ ...saved, botId: "strategic" }, "XAUUSD");
+  assert.equal(wrongEngine.goldJourneyEnabled, false);
+  assert.equal(wrongEngine.goldJourneyBotBlocked, true);
 });
 
 test("Gold Journey cannot silently change its $200 starting reference or 1:4 target", () => {
@@ -61,7 +66,7 @@ test("Gold Journey cannot silently change its $200 starting reference or 1:4 tar
 
 test("a saved Gold Journey profile is blocked after the bot changes away from XAUUSD", () => {
   const blocked = applyGoldJourneyRiskProfile({
-    journeyProfile: GOLD_JOURNEY_PROFILE_ID, botId: "strategic"
+    journeyProfile: GOLD_JOURNEY_PROFILE_ID, botId: "smc-pro"
   }, "EURUSD");
   assert.equal(blocked.goldJourneyConfigured, true);
   assert.equal(blocked.goldJourneyEnabled, false);
@@ -78,6 +83,8 @@ test("a saved Gold Journey profile is blocked after the bot changes away from XA
 
 test("Gold Journey sizes risk from current verified equity, not the reference capital", () => {
   assert.equal(goldJourneyRiskBudget(200), 25);
+  assert.equal(goldJourneyRiskBudget(300), 37.5);
+  assert.equal(goldJourneyRiskBudget(250), 31.25);
   assert.equal(goldJourneyRiskBudget(175), 21.88);
   assert.equal(goldJourneyRiskBudget(0), null);
 });
@@ -89,14 +96,14 @@ test("Gold Journey target calculation produces a gross 1:4 target for both direc
 });
 
 test("strategy trade plans override native targets to the Gold Journey 1:4 multiple", () => {
-  const plan = getTradePlan("strategic", {
+  const plan = getTradePlan("smc-pro", {
     symbol: "XAUUSD", timeframe: "5m", price: 2300, entryPrice: 2300, atr: 10
   }, "BUY", { rewardToRisk: 4 });
   assert.equal(plan.ok, true);
-  assert.equal(plan.stopDistance, 16);
-  assert.equal(plan.takeProfitDistance, 64);
+  assert.equal(plan.stopDistance, 15);
+  assert.equal(plan.takeProfitDistance, 60);
   assert.equal(plan.riskReward, 4);
-  assert.equal(plan.takeProfit, 2364);
+  assert.equal(plan.takeProfit, 2360);
 });
 
 test("final broker prices must still satisfy at least 1:4", () => {
