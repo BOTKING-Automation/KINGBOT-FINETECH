@@ -469,6 +469,7 @@ function validateUserRisk(body,bot){
  if(Number(body?.maxRiskPerTradePct)>12.5)return {error:"MAX_RISK_PER_TRADE_EXCEEDS_HARD_CEILING"};
  const journey=normalizeGoldJourneyProfile(body||{});
  if(journey.error)return {error:journey.error};
+ if(journey.journeyProfile!==GOLD_JOURNEY_PROFILE_ID&&s.maxRiskPerTradePct>bot.risk.maxRiskPerTradePct*3)return {error:"MAX_RISK_PER_TRADE_EXCEEDS_BOT_SAFETY_CEILING"};
  if(journey.journeyProfile===GOLD_JOURNEY_PROFILE_ID){
    if(bot.id==="ladder-flip")return {error:"GOLD_JOURNEY_LADDER_ENGINE_UNSUPPORTED"};
    Object.assign(s,{
