@@ -27,6 +27,7 @@ export function evaluateRisk(input={}){
   ["MAX_RISK_PER_TRADE",riskPct<=r.maxRiskPerTradePct],
   ["STALE_MARKET_DATA",dataAgeMs<=r.staleDataMs],
   ["SPREAD_FILTER",input.skipSpreadAtr===true||!(atr>0)||spread/atr<=r.maxSpreadAtrRatio],
+  ["GOLD_JOURNEY_SYMBOL_REQUIRED",!input.requireGoldJourneySymbol||input.goldJourneySymbolVerified===true],
   ["LOSS_STREAK_DATA_UNAVAILABLE",!input.requireLossStreakData||input.lossStreakVerified===true],
   ["LOSS_STREAK",!r.autoPauseOnLossStreak||consecutiveLosses<r.maxConsecutiveLosses]
  ];
