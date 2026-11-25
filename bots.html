@@ -495,7 +495,7 @@ $("stopBtn").addEventListener("click",async()=>{if(!selected)return msg("Select 
 $("applyGoldJourneyBtn").addEventListener("click",()=>{
   if(!selected)return msg("Select an entitled bot first.","error");
   if(selected.id==="ladder-flip")return msg("Ladder Flip is not compatible with the single-position 1:4 Gold Journey. Choose Strategic, Flipper, Breakout or SMC Pro.","error");
-  const brokerGold=brokerMarkets.find(x=>String(x.symbol||"").toUpperCase().startsWith("XAUUSD"));
+  const brokerGold=brokerMarkets.find(x=>(/^(XAUUSD|FRXXAUUSD)/).test(String(x.symbol||"").toUpperCase()));
   const symbol=brokerGold?.symbol||"XAUUSD";
   fields.journeyProfile.value="GOLD_JOURNEY_200";
   fields.journeyStartingCapitalUsd.value="200";
