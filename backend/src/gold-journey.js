@@ -51,11 +51,19 @@ export function normalizeGoldJourneyProfile(input = {}) {
 }
 
 export function applyGoldJourneyRiskProfile(settings = {}, symbol = "") {
-  const enabled = String(settings.journeyProfile || "STANDARD").toUpperCase() === GOLD_JOURNEY_PROFILE_ID
-    && isGoldJourneySymbol(symbol)
-    && String(settings.botId || "").toLowerCase() !== "ladder-flip";
+  const configured = String(settings.journeyProfile || "STANDARD").toUpperCase() === GOLD_JOURNEY_PROFILE_ID;
+  const symbolVerified = isGoldJourneySymbol(symbol);
+  const engineSupported = String(settings.botId || "").toLowerCase() !== "ladder-flip";
+  const enabled = configured && symbolVerified && engineSupported;
 
-  if (!enabled) return { ...settings, goldJourneyEnabled: false };
+  if (!enabled) {
+    return {
+      ...settings,
+      goldJourneyConfigured: configured,
+      goldJourneyEnabled: false,
+      goldJourneySymbolBlocked: configured && (!symbolVerified || !engineSupported)
+    };
+  }
 
   return {
     ...settings,
@@ -69,7 +77,9 @@ export function applyGoldJourneyRiskProfile(settings = {}, symbol = "") {
     autoPauseOnLossStreak: GOLD_JOURNEY_PROFILE.autoPauseOnLossStreak,
     journeyStartingCapitalUsd: GOLD_JOURNEY_PROFILE.startingCapitalUsd,
     journeyRewardToRisk: GOLD_JOURNEY_PROFILE.rewardToRisk,
-    goldJourneyEnabled: true
+    goldJourneyConfigured: true,
+    goldJourneyEnabled: true,
+    goldJourneySymbolBlocked: false
   };
 }
 
