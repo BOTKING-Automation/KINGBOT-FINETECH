@@ -475,7 +475,7 @@ function validateUserRisk(body,bot){
    Object.assign(s,{
      dailyDrawdownPct:12.5,totalDrawdownPct:25,maxRiskPerTradePct:12.5,
      maxPositions:1,maxSpreadAtrRatio:0.2,staleDataMs:5000,
-     maxConsecutiveLosses:1,autoPauseOnLossStreak:true,
+     maxConsecutiveLosses:3,autoPauseOnLossStreak:true,
      journeyProfile:journey.journeyProfile,
      journeyStartingCapitalUsd:journey.journeyStartingCapitalUsd,
      journeyRewardToRisk:journey.journeyRewardToRisk
