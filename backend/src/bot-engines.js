@@ -3,7 +3,7 @@ import { requireUser } from "./subscriptions.js";
 import { isAdminEmail } from "./admin-access.js";
 import { evaluateRisk, authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
 import { LADDER_V8_DEFAULTS } from "./ladder-v8.js";
-import { GOLD_JOURNEY_PROFILE_ID, isGoldJourneyExecutionValidated, normalizeGoldJourneyProfile } from "./gold-journey.js";
+import { GOLD_JOURNEY_PROFILE, GOLD_JOURNEY_PROFILE_ID, isGoldJourneyExecutionValidated, normalizeGoldJourneyProfile } from "./gold-journey.js";
 
 const BOT_DEFINITIONS = {
   strategic: {
@@ -471,7 +471,7 @@ function validateUserRisk(body,bot){
  if(journey.error)return {error:journey.error};
  if(journey.journeyProfile!==GOLD_JOURNEY_PROFILE_ID&&s.maxRiskPerTradePct>bot.risk.maxRiskPerTradePct*3)return {error:"MAX_RISK_PER_TRADE_EXCEEDS_BOT_SAFETY_CEILING"};
  if(journey.journeyProfile===GOLD_JOURNEY_PROFILE_ID){
-   if(bot.id==="ladder-flip")return {error:"GOLD_JOURNEY_LADDER_ENGINE_UNSUPPORTED"};
+   if(bot.id!==GOLD_JOURNEY_PROFILE.preferredBotId)return {error:"GOLD_JOURNEY_SMC_PRO_ONLY"};
    Object.assign(s,{
      dailyDrawdownPct:12.5,totalDrawdownPct:25,maxRiskPerTradePct:12.5,
      maxPositions:1,maxSpreadAtrRatio:0.2,staleDataMs:5000,
