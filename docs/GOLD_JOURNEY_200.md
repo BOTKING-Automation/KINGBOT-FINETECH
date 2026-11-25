@@ -31,6 +31,8 @@ At exactly $200 of verified equity, 12.5% planned risk is $25 and a full 4R gros
 The profile is **shadow-only by default**. New orders are blocked until the environment flag KINGBOT_GOLD_JOURNEY_VALIDATED is set to true in the backend/worker environment after all gates below pass. Do not set this variable merely because CI is green.
 
 Before enabling the gate, require:
+- Preserve the existing KINGBOT V9/V10 model-acceptance gates without relaxation: ensemble balanced accuracy at least 0.36, macro-F1 at least 0.34, at least 30 untouched final test samples, and nonzero SELL, HOLD and BUY recall.
+- Require a matched V9 benchmark on untouched forward data, robustness across market regimes/periods, and no automatic replacement of the currently accepted production model.
 - A reproducible cost-aware XAUUSD backtest using spread, commission, slippage and swaps, with a chronological train/development/final split and untouched final data.
 - At least 30 untouched final closed trades, positive net expectancy after costs, and profit factor of at least 1.20.
 - Peak drawdown no greater than 25%; no sizing calculation may exceed 12.5% planned risk after broker volume rounding.
