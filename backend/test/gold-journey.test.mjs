@@ -21,6 +21,7 @@ test("Gold Journey profile fixes the requested capital, risk and reward-to-risk"
   assert.equal(GOLD_JOURNEY_PROFILE.dailyDrawdownPct, 12.5);
   assert.equal(GOLD_JOURNEY_PROFILE.totalDrawdownPct, 25);
   assert.equal(GOLD_JOURNEY_PROFILE.maxPositions, 1);
+  assert.equal(GOLD_JOURNEY_PROFILE.maxConsecutiveLosses, 3);
   assert.equal(GOLD_JOURNEY_PROFILE.executionMode, "DEMO");
   assert.equal(goldJourneyRiskBudget(200), 25);
   assert.equal(goldJourneyRiskBudget(500), 62.5);
@@ -119,6 +120,27 @@ test("risk engine supports 12.5% but never normalizes above the requested hard c
   });
   assert.equal(blocked.allowed, false);
   assert.ok(blocked.blockedReasons.includes("MAX_POSITIONS"));
+});
+
+test("projected stop loss blocks a trade that would breach total drawdown", () => {
+  const first = evaluateRisk({
+    equity: 200, dayStartEquity: 200, peakEquity: 200,
+    openPositions: 0, requestedRiskPct: 12.5,
+    requireProjectedDrawdownCheck: true,
+    limits: { dailyDrawdownPct: 12.5, totalDrawdownPct: 25, maxRiskPerTradePct: 12.5, maxPositions: 1 }
+  });
+  assert.equal(first.allowed, true);
+  assert.equal(first.projectedDailyDrawdownPct, 12.5);
+
+  const thirdStop = evaluateRisk({
+    equity: 153.125, dayStartEquity: 153.125, peakEquity: 200,
+    openPositions: 0, requestedRiskPct: 12.5,
+    requireProjectedDrawdownCheck: true,
+    limits: { dailyDrawdownPct: 12.5, totalDrawdownPct: 25, maxRiskPerTradePct: 12.5, maxPositions: 1 }
+  });
+  assert.equal(thirdStop.allowed, false);
+  assert.ok(thirdStop.blockedReasons.includes("PROJECTED_TOTAL_DRAWDOWN"));
+  assert.ok(thirdStop.projectedTotalDrawdownPct > 25);
 });
 
 test("Gold Journey requires verified loss-streak data and an explicit validation flag", () => {
