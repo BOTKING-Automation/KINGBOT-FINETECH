@@ -2,7 +2,7 @@
 
 ## Preset
 
-- Reference starting capital: **$200 USD**.
+- Reference starting capital: **$200 USD**; the connected broker account must report USD as its account currency before the profile can trade.
 - Priority market: **XAUUSD** (broker suffixes such as XAUUSDm and the FRXXAUUSD ticker format are accepted).
 - Maximum planned risk per trade: **12.5% of current verified account equity**.
 - Minimum gross reward-to-risk: **1:4**.
@@ -21,7 +21,7 @@ At exactly $200 of verified equity, 12.5% planned risk is $25 and a full 4R gros
 2. Compute volume from the final stop distance, tick size, tick value and volume step. Round volume down; reject a trade if minimum volume would exceed the risk budget.
 3. Recompute the target from the final broker-valid stop distance and enforce at least 4R after stop-distance adjustments.
 4. Block entries if the account has an open position, current or projected daily/total drawdown breaches its limit, the loss-streak is reached, the spread is too wide, the quote is stale, the broker data or symbol specification is missing, or the kill switch is active. Projected drawdown assumes a full planned stop loss at the configured risk percentage.
-5. Require verified trade-history data for the loss-streak guard. A failed history request is a block, not a zero-loss assumption.
+5. Require verified USD account currency and trade-history data for the loss-streak guard. Missing currency or a failed history request is a block, not an assumed value.
 6. Ladder Flip V8 is excluded because its multi-rung/pyramiding management does not implement a single-position fixed 1:4 journey. Existing Ladder positions must remain under their existing stop-management path; the Gold Journey does not open new Ladder cycles or add rungs.
 7. Deriv stake-based execution is excluded until its contract-specific monetary risk can be proven to equal the requested account-risk budget. The standard MT5/CFD volume path must pass broker sizing checks first.
 8. AI signals are advisory. Deterministic strategy, broker verification, risk authorization and order validation remain authoritative.
