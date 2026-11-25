@@ -6,7 +6,7 @@ export function normalizeRiskSettings(input={},defaults=DEFAULTS){
  return {
   dailyDrawdownPct:clamp(x.dailyDrawdownPct,0.5,20),
   totalDrawdownPct:clamp(x.totalDrawdownPct,1,30),
-  maxRiskPerTradePct:clamp(x.maxRiskPerTradePct,0.1,5),
+  maxRiskPerTradePct:clamp(x.maxRiskPerTradePct,0.1,12.5),
   maxPositions:Math.round(clamp(x.maxPositions,1,50)),
   lotSize:Number(Math.max(0.01,Math.min(100,finite(x.lotSize,Number(defaults.lotSize||0.01))))),
   maxSpreadAtrRatio:clamp(x.maxSpreadAtrRatio,0.05,1),
@@ -27,6 +27,7 @@ export function evaluateRisk(input={}){
   ["MAX_RISK_PER_TRADE",riskPct<=r.maxRiskPerTradePct],
   ["STALE_MARKET_DATA",dataAgeMs<=r.staleDataMs],
   ["SPREAD_FILTER",input.skipSpreadAtr===true||!(atr>0)||spread/atr<=r.maxSpreadAtrRatio],
+  ["LOSS_STREAK_DATA_UNAVAILABLE",!input.requireLossStreakData||input.lossStreakVerified===true],
   ["LOSS_STREAK",!r.autoPauseOnLossStreak||consecutiveLosses<r.maxConsecutiveLosses]
  ];
  const blocked=checks.filter(x=>!x[1]).map(x=>x[0]);
