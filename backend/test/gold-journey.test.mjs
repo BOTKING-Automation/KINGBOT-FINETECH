@@ -31,6 +31,7 @@ test("Gold symbol matching accepts common broker suffixes but not unrelated inst
   assert.equal(isGoldJourneySymbol("XAUUSD"), true);
   assert.equal(isGoldJourneySymbol("XAUUSDm"), true);
   assert.equal(isGoldJourneySymbol("XAUUSD.pro"), true);
+  assert.equal(isGoldJourneySymbol("FRXXAUUSD"), true);
   assert.equal(isGoldJourneySymbol("EURUSD"), false);
 });
 
@@ -120,6 +121,23 @@ test("risk engine supports 12.5% but never normalizes above the requested hard c
   });
   assert.equal(blocked.allowed, false);
   assert.ok(blocked.blockedReasons.includes("MAX_POSITIONS"));
+});
+
+test("three losses require a manual one-trade re-arm without bypassing drawdown", () => {
+  const paused = evaluateRisk({
+    equity: 190, dayStartEquity: 200, peakEquity: 200,
+    openPositions: 0, requestedRiskPct: 12.5, consecutiveLosses: 3,
+    limits: { dailyDrawdownPct: 12.5, totalDrawdownPct: 25, maxRiskPerTradePct: 12.5, maxPositions: 1, maxConsecutiveLosses: 3, autoPauseOnLossStreak: true }
+  });
+  assert.equal(paused.allowed, false);
+  assert.ok(paused.blockedReasons.includes("LOSS_STREAK"));
+
+  const manuallyRearmed = evaluateRisk({
+    equity: 190, dayStartEquity: 200, peakEquity: 200,
+    openPositions: 0, requestedRiskPct: 12.5, consecutiveLosses: 3,
+    limits: { dailyDrawdownPct: 12.5, totalDrawdownPct: 25, maxRiskPerTradePct: 12.5, maxPositions: 1, maxConsecutiveLosses: 20, autoPauseOnLossStreak: true }
+  });
+  assert.equal(manuallyRearmed.allowed, true);
 });
 
 test("projected stop loss blocks a trade that would breach total drawdown", () => {
