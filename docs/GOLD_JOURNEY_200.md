@@ -9,7 +9,7 @@
 - Daily drawdown stop: **12.5%** from the broker-account day-start equity.
 - Peak-to-equity drawdown stop: **25%**.
 - Maximum open account positions: **1**.
-- Pause after **1 consecutive loss**; manual review is required before resuming.
+- Pause after **3 consecutive losses**; manual review is required before resuming. The pre-trade projected drawdown check can stop the journey earlier.
 - Auto-pause enabled, spread/ATR maximum 0.20, stale quote limit 5 seconds.
 - The preset saves DEMO mode. It does not activate a live account.
 
@@ -20,7 +20,7 @@ At exactly $200 of verified equity, 12.5% planned risk is $25 and a full 4R gros
 1. Use actual broker equity and broker symbol specifications for volume sizing. Never use the $200 reference as a substitute for account telemetry.
 2. Compute volume from the final stop distance, tick size, tick value and volume step. Round volume down; reject a trade if minimum volume would exceed the risk budget.
 3. Recompute the target from the final broker-valid stop distance and enforce at least 4R after stop-distance adjustments.
-4. Block entries if the account has an open position, daily/total drawdown is at its limit, the loss-streak is reached, the spread is too wide, the quote is stale, the broker data or symbol specification is missing, or the kill switch is active.
+4. Block entries if the account has an open position, current or projected daily/total drawdown breaches its limit, the loss-streak is reached, the spread is too wide, the quote is stale, the broker data or symbol specification is missing, or the kill switch is active. Projected drawdown assumes a full planned stop loss at the configured risk percentage.
 5. Require verified trade-history data for the loss-streak guard. A failed history request is a block, not a zero-loss assumption.
 6. Ladder Flip V8 is excluded because its multi-rung/pyramiding management does not implement a single-position fixed 1:4 journey. Existing Ladder positions must remain under their existing stop-management path; the Gold Journey does not open new Ladder cycles or add rungs.
 7. Deriv stake-based execution is excluded until its contract-specific monetary risk can be proven to equal the requested account-risk budget. The standard MT5/CFD volume path must pass broker sizing checks first.
