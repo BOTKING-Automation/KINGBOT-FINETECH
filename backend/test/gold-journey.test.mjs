@@ -57,6 +57,23 @@ test("Gold Journey cannot silently change its $200 starting reference or 1:4 tar
   }).error, "GOLD_JOURNEY_STARTING_CAPITAL_MUST_BE_200_USD");
 });
 
+test("a saved Gold Journey profile is blocked after the bot changes away from XAUUSD", () => {
+  const blocked = applyGoldJourneyRiskProfile({
+    journeyProfile: GOLD_JOURNEY_PROFILE_ID, botId: "strategic"
+  }, "EURUSD");
+  assert.equal(blocked.goldJourneyConfigured, true);
+  assert.equal(blocked.goldJourneyEnabled, false);
+  assert.equal(blocked.goldJourneySymbolBlocked, true);
+  const risk = evaluateRisk({
+    equity: 200, dayStartEquity: 200, peakEquity: 200,
+    openPositions: 0, requestedRiskPct: 12.5,
+    requireGoldJourneySymbol: true, goldJourneySymbolVerified: false,
+    limits: { maxRiskPerTradePct: 12.5, maxPositions: 1 }
+  });
+  assert.equal(risk.allowed, false);
+  assert.ok(risk.blockedReasons.includes("GOLD_JOURNEY_SYMBOL_REQUIRED"));
+});
+
 test("Gold Journey sizes risk from current verified equity, not the reference capital", () => {
   assert.equal(goldJourneyRiskBudget(200), 25);
   assert.equal(goldJourneyRiskBudget(175), 21.88);
