@@ -15,7 +15,7 @@
 - The preset defaults to DEMO mode. Verified demo trading is allowed for the shadow/demo validation phase; LIVE mode remains unavailable until all validation gates pass and an operator enables the approval flag.
 - SMC PRO uses its existing **4H regime → 15m setup → 5m execution** timeframe profile. A Gold Journey profile on the account locks other KINGBOT bot runtimes from submitting orders, avoiding overlapping strategy engines.
 
-At exactly $200 of verified equity, 12.5% planned risk is $25 and a full 4R gross winner targets $100 before commission, spread, slippage, swaps and other execution costs. After that gross win, illustrative equity would be $300 and the next trade's 12.5% risk budget would compound to $37.50. After a full $25 loss, equity would be $175 and the next budget would reduce to $21.88. These are arithmetic examples, not return forecasts; realised results are affected by costs, slippage and gaps. The worker recalculates from current broker-reported equity on each new trade; it does not keep sizing at $25.
+At exactly $200 of verified equity, 12.5% planned risk is $25 and a full 4R gross winner targets $100 before commission, spread, slippage, swaps and other execution costs. After that gross win, illustrative equity would be $300 and the next trade's 12.5% risk budget would compound to $37.50. After a full $25 loss, equity would be $175 and the next budget would reduce to $21.87 after rounding down to cents. These are arithmetic examples, not return forecasts; realised results are affected by costs, slippage and gaps. The worker recalculates from current broker-reported equity on each new trade; it does not keep sizing at $25.
 
 ## Execution safeguards
 
