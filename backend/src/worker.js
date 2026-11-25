@@ -12,7 +12,7 @@ import { monitorBotDecision } from "./ai-bot-supervisor.js";
 import { getAiStrategySignal, warmAiStrategySignal, routeAiSignalToEngine, aiExecutionGateEnabled } from "./ai-trade-gate.js";
 import { recordMlFeedback } from "./ml-signal-client.js";
 import { authorizeOrder, normalizeRiskSettings } from "./risk-engine.js";
-import { applyGoldJourneyRiskProfile, isGoldJourneyExecutionValidated, isGoldJourneySymbol, validateGoldJourneyOrder } from "./gold-journey.js";
+import { GOLD_JOURNEY_PROFILE, GOLD_JOURNEY_PROFILE_ID, applyGoldJourneyRiskProfile, goldJourneyRiskBudget, isGoldJourneyExecutionValidated, isGoldJourneySymbol, validateGoldJourneyOrder } from "./gold-journey.js";
 import { calculateLadderV8Indicators, ladderRungLot, brokerLadderLots, normalizeLot, ladderLockStepPrice, ladderLockPrice, updateVelocitySamples, velocityPoints, withinLadderSession, ladderBasketRisk, LADDER_V8_DEFAULTS } from "./ladder-v8.js";
 import { ensureAuthSchema } from "./auth.js";
 import { ensureSubscriptionSchema, expireStaleSubscriptions } from "./subscriptions.js";
@@ -1037,6 +1037,13 @@ async function execute(row){
   const config=(await pool.query("SELECT symbol,timeframe FROM kingbot_bot_runtime WHERE user_id=$1 AND bot_id=$2",[userId,botId])).rows[0];
   if(!config?.symbol){await pool.query("UPDATE kingbot_bot_runtime SET state='RUNNING',last_error='SYMBOL_NOT_CONFIGURED_RETRYING',last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);return;}
   const s=await settings(userId,botId,config.symbol);
+  const journeyRows=await pool.query("SELECT bot_id FROM kingbot_bot_risk_settings WHERE user_id=$1 AND journey_profile=$2 ORDER BY bot_id",[userId,GOLD_JOURNEY_PROFILE_ID]);
+  if(journeyRows.rowCount&&(journeyRows.rowCount!==1||journeyRows.rows[0].bot_id!==GOLD_JOURNEY_PROFILE.preferredBotId||botId!==GOLD_JOURNEY_PROFILE.preferredBotId)){
+    const reason="GOLD_JOURNEY_SMC_PRO_EXCLUSIVE_ENGINE_LOCK";
+    await pool.query("UPDATE kingbot_bot_runtime SET last_error=$3,last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId,reason]);
+    trace("GOLD_JOURNEY_EXCLUSIVE_ENGINE_BLOCK",{configuredBots:journeyRows.rows.map(x=>x.bot_id)});
+    return;
+  }
   if(s.killSwitch){await pool.query("UPDATE kingbot_bot_runtime SET state='PAUSED',last_error='KILL_SWITCH_ACTIVE',updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);return;}
   const status=await broker.getStatus(userId);
   if(!status.configured){await pool.query("UPDATE kingbot_bot_runtime SET state='RUNNING',last_error='BROKER_ACCOUNT_NOT_MAPPED_RETRYING',last_run_at=NOW(),updated_at=NOW() WHERE user_id=$1 AND bot_id=$2",[userId,botId]);return;}
@@ -1316,7 +1323,7 @@ async function execute(row){
       const planCheck=validateGoldJourneyOrder({symbol:config.symbol,side,entryPrice:entry,stopLoss,takeProfit});
       if(!planCheck.ok)throw new Error(planCheck.reason||"GOLD_JOURNEY_ORDER_VALIDATION_FAILED");
     }
-    const riskAmount=Number(account.equity)*(s.maxRiskPerTradePct/100);
+    const riskAmount=s.goldJourneyEnabled?goldJourneyRiskBudget(account.equity):Number(account.equity)*(s.maxRiskPerTradePct/100);
     const rawVolume=riskAmount/((stopDistance/tickSize)*tickValue);
     const volume=Number((Math.floor(rawVolume/volumeStep)*volumeStep).toFixed(12));
     if(!Number.isFinite(volume)||volume<minVolume||volume>maxVolume)throw new Error("RISK_SIZED_VOLUME_OUT_OF_RANGE");
