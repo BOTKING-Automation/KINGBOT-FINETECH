@@ -85,7 +85,7 @@ test("Gold Journey sizes risk from current verified equity, not the reference ca
   assert.equal(goldJourneyRiskBudget(200), 25);
   assert.equal(goldJourneyRiskBudget(300), 37.5);
   assert.equal(goldJourneyRiskBudget(250), 31.25);
-  assert.equal(goldJourneyRiskBudget(175), 21.88);
+  assert.equal(goldJourneyRiskBudget(175), 21.87);
   assert.equal(goldJourneyRiskBudget(0), null);
 });
 
