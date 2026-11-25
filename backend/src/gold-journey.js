@@ -5,6 +5,9 @@ export const GOLD_JOURNEY_PROFILE = Object.freeze({
   label: "$200 XAUUSD Gold Journey",
   startingCapitalUsd: 200,
   prioritySymbol: "XAUUSD",
+  preferredBotId: "smc-pro",
+  compoundingEnabled: true,
+  compoundingBasis: "CURRENT_VERIFIED_BROKER_EQUITY",
   riskPerTradePct: 12.5,
   rewardToRisk: 4,
   dailyDrawdownPct: 12.5,
@@ -53,7 +56,7 @@ export function normalizeGoldJourneyProfile(input = {}) {
 export function applyGoldJourneyRiskProfile(settings = {}, symbol = "") {
   const configured = String(settings.journeyProfile || "STANDARD").toUpperCase() === GOLD_JOURNEY_PROFILE_ID;
   const symbolVerified = isGoldJourneySymbol(symbol);
-  const engineSupported = String(settings.botId || "").toLowerCase() !== "ladder-flip";
+  const engineSupported = String(settings.botId || "").toLowerCase() === GOLD_JOURNEY_PROFILE.preferredBotId;
   const enabled = configured && symbolVerified && engineSupported;
 
   if (!enabled) {
@@ -61,7 +64,8 @@ export function applyGoldJourneyRiskProfile(settings = {}, symbol = "") {
       ...settings,
       goldJourneyConfigured: configured,
       goldJourneyEnabled: false,
-      goldJourneySymbolBlocked: configured && (!symbolVerified || !engineSupported)
+      goldJourneySymbolBlocked: configured && !symbolVerified,
+      goldJourneyBotBlocked: configured && !engineSupported
     };
   }
 
@@ -77,6 +81,9 @@ export function applyGoldJourneyRiskProfile(settings = {}, symbol = "") {
     autoPauseOnLossStreak: GOLD_JOURNEY_PROFILE.autoPauseOnLossStreak,
     journeyStartingCapitalUsd: GOLD_JOURNEY_PROFILE.startingCapitalUsd,
     journeyRewardToRisk: GOLD_JOURNEY_PROFILE.rewardToRisk,
+    journeyCompoundingEnabled: GOLD_JOURNEY_PROFILE.compoundingEnabled,
+    journeyCompoundingBasis: GOLD_JOURNEY_PROFILE.compoundingBasis,
+    journeyPreferredBotId: GOLD_JOURNEY_PROFILE.preferredBotId,
     goldJourneyConfigured: true,
     goldJourneyEnabled: true,
     goldJourneySymbolBlocked: false
