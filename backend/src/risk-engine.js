@@ -31,6 +31,7 @@ export function evaluateRisk(input={}){
   ["STALE_MARKET_DATA",dataAgeMs<=r.staleDataMs],
   ["SPREAD_FILTER",input.skipSpreadAtr===true||!(atr>0)||spread/atr<=r.maxSpreadAtrRatio],
   ["GOLD_JOURNEY_SYMBOL_REQUIRED",!input.requireGoldJourneySymbol||input.goldJourneySymbolVerified===true],
+  ["GOLD_JOURNEY_USD_ACCOUNT_REQUIRED",!input.requireGoldJourneyUsdAccount||String(input.goldJourneyAccountCurrency||"").toUpperCase()==="USD"],
   ["PROJECTED_DAILY_DRAWDOWN",!input.requireProjectedDrawdownCheck||projectedDailyDd<=r.dailyDrawdownPct+1e-9],
   ["PROJECTED_TOTAL_DRAWDOWN",!input.requireProjectedDrawdownCheck||projectedTotalDd<=r.totalDrawdownPct+1e-9],
   ["LOSS_STREAK_DATA_UNAVAILABLE",!input.requireLossStreakData||input.lossStreakVerified===true],
