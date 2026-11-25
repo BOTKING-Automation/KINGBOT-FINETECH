@@ -70,8 +70,10 @@ main{width:min(1500px,calc(100% - 34px));margin:auto;padding:28px 0 70px}
 <div id="botHero" class="bot-detail-hero"><div class="detail-image"><img id="detailImage" src="assets/images/hero-bot.png" alt="Selected KINGBOT bot"></div><div class="detail-copy"><span id="detailCode" class="bot-chip">BOT ENGINE / READY</span><h2 id="botTitle">Select a bot</h2><p id="detailRole">Choose an engine to inspect its architecture.</p></div></div>
 <p class="desc" id="botDesc">Choose an entitled bot to configure its independent risk profile.</p><div class="bot-symbol-default"><span>BROKER MARKET</span><strong>LIVE CATALOG</strong><span>· selected from your connected account</span></div>
 <div class="risk-grid">
+<div class="field full"><label>Trading journey preset <em>USER PROFILE</em></label><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px;border:1px solid rgba(246,185,59,.2);border-radius:12px;background:rgba(246,185,59,.035)"><div><strong id="journeyState" style="display:block;color:#f6c96b;font:800 10px Orbitron">STANDARD PROFILE</strong><small id="journeyNote" style="display:block;margin-top:5px;color:#8490a7;font-size:9px">Select a saved journey preset for this bot only.</small></div><button class="btn warn" id="applyGoldJourneyBtn" type="button">LOAD $200 GOLD JOURNEY</button></div></div>
+<input id="journeyProfile" type="hidden" value="STANDARD"><input id="journeyStartingCapitalUsd" type="hidden" value="200"><input id="journeyRewardToRisk" type="hidden" value="4">
 <div class="field"><label>Execution mode <em>ENGINE</em></label><select id="executionMode"><option value="DEMO">DEMO · BROKER API</option><option value="LIVE">LIVE · REAL</option></select></div><div class="field"><label>Broker market <em>BROKER CATALOG</em></label><div class="market-control"><select id="symbol"><option value="">CONNECT BROKER TO LOAD MARKETS…</option></select><button class="market-refresh" id="marketRefreshBtn" type="button" title="Refresh live broker market catalog" aria-label="Refresh live broker market catalog">↻</button></div></div><div class="field"><label>Timeframe <em>MARKET</em></label><select id="timeframe"><option>1m</option><option>2m</option><option>3m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
-<div class="field"><label>Max risk / trade <em>%</em></label><input id="maxRisk" type="number" min=".1" max="5" step=".05"></div><div class="field"><label>Base lot size <em>VOLUME</em></label><input id="lotSize" type="number" min=".01" max="100" step=".01" value=".01"></div>
+<div class="field"><label>Max risk / trade <em>%</em></label><input id="maxRisk" type="number" min=".1" max="12.5" step=".05"></div><div class="field"><label>Base lot size <em>VOLUME</em></label><input id="lotSize" type="number" min=".01" max="100" step=".01" value=".01"></div>
 <div class="field"><label>Daily drawdown limit <em>%</em></label><input id="dailyDd" type="number" min=".5" max="20" step=".1"></div>
 <div class="field"><label>Total drawdown limit <em>%</em></label><input id="totalDd" type="number" min="1" max="30" step=".1"></div>
 <div class="field"><label>Maximum open positions <em>COUNT</em></label><input id="maxPositions" type="number" min="1" max="50" step="1"></div>
@@ -135,7 +137,7 @@ function syncChangeBotVisibility(){
    btn.textContent="CHANGE BOT";
  }
 }
-const fields={executionMode:$("executionMode"),symbol:$("symbol"),timeframe:$("timeframe"),lotSize:$("lotSize"),maxRisk:$("maxRisk"),dailyDd:$("dailyDd"),totalDd:$("totalDd"),maxPositions:$("maxPositions"),spreadRatio:$("spreadRatio"),staleMs:$("staleMs"),lossStreak:$("lossStreak"),autoPause:$("autoPause"),killSwitch:$("killSwitch")};
+const fields={executionMode:$("executionMode"),symbol:$("symbol"),timeframe:$("timeframe"),lotSize:$("lotSize"),maxRisk:$("maxRisk"),dailyDd:$("dailyDd"),totalDd:$("totalDd"),maxPositions:$("maxPositions"),spreadRatio:$("spreadRatio"),staleMs:$("staleMs"),lossStreak:$("lossStreak"),autoPause:$("autoPause"),killSwitch:$("killSwitch"),journeyProfile:$("journeyProfile"),journeyStartingCapitalUsd:$("journeyStartingCapitalUsd"),journeyRewardToRisk:$("journeyRewardToRisk")};
 function msg(t,kind=""){const e=$("message");e.textContent=t;e.className="message "+kind}
 function setTelemetry(a,d){$("telemetryState").textContent=a;$("telemetryDetail").textContent=d}
 async function refreshBrokerExecutionStatus(){
@@ -288,6 +290,8 @@ function renderAiMonitor(lastSignal){
 }
 function putSettings(s,mode,kill){
  fields.executionMode.value=(mode==="PAPER"?"DEMO":mode)||"DEMO";fields.lotSize.value=Number(s.lotSize||0.01).toFixed(2);fields.maxRisk.value=s.maxRiskPerTradePct;fields.dailyDd.value=s.dailyDrawdownPct;fields.totalDd.value=s.totalDrawdownPct;fields.maxPositions.value=s.maxPositions;fields.spreadRatio.value=s.maxSpreadAtrRatio;fields.staleMs.value=s.staleDataMs;fields.lossStreak.value=s.maxConsecutiveLosses;fields.autoPause.checked=Boolean(s.autoPauseOnLossStreak);fields.killSwitch.checked=Boolean(kill);
+ fields.journeyProfile.value=String(s.journeyProfile||"STANDARD");fields.journeyStartingCapitalUsd.value=Number(s.journeyStartingCapitalUsd||200);fields.journeyRewardToRisk.value=Number(s.journeyRewardToRisk||4);
+ const journeyActive=fields.journeyProfile.value==="GOLD_JOURNEY_200";$("journeyState").textContent=journeyActive?"$200 XAUUSD · 12.5% RISK · 1:4":"STANDARD PROFILE";$("journeyNote").textContent=journeyActive?"Per-user Gold preset · DEMO only · shadow validation gate still active.":"Select a saved journey preset for this bot only."; 
  $("mLot").textContent=(Number(s.lotSize)||0.01).toFixed(2); $("mRisk").textContent=s.maxRiskPerTradePct+"%";$("mDaily").textContent=s.dailyDrawdownPct+"%";$("mTotal").textContent=s.totalDrawdownPct+"%";$("mPositions").textContent=s.maxPositions;
  $("mMode").textContent=mode||"NOT_CONNECTED";$("mRuntime").textContent=selected?.runtime||"STOPPED";$("mSymbol").textContent=selected?.symbol||"NOT CONFIGURED";$("mTimeframe").textContent=selected?.timeframe||"—";
  $("riskPill").textContent=fields.killSwitch.checked?"KILL SWITCH":"CONFIGURED";$("enginePill").textContent=selected?.entitled?"ENTITLED":"LOCKED";
@@ -488,9 +492,34 @@ $("startBtn").addEventListener("click",async()=>{
  }catch(e){msg(e.message,"error")}
 });
 $("stopBtn").addEventListener("click",async()=>{if(!selected)return msg("Select a bot first.","error");try{const d=await api("/runtime/"+encodeURIComponent(selected.id)+"/stop",{method:"POST",body:"{}"});selected.runtime=d.state;$("mRuntime").textContent=d.state;$("enginePill").textContent="STOPPED";msg("Engine stopped. No new autonomous orders will be submitted.","ok")}catch(e){msg(e.message,"error")}});
+$("applyGoldJourneyBtn").addEventListener("click",()=>{
+  if(!selected)return msg("Select an entitled bot first.","error");
+  if(selected.id==="ladder-flip")return msg("Ladder Flip is not compatible with the single-position 1:4 Gold Journey. Choose Strategic, Flipper, Breakout or SMC Pro.","error");
+  const brokerGold=brokerMarkets.find(x=>String(x.symbol||"").toUpperCase().startsWith("XAUUSD"));
+  const symbol=brokerGold?.symbol||"XAUUSD";
+  fields.journeyProfile.value="GOLD_JOURNEY_200";
+  fields.journeyStartingCapitalUsd.value="200";
+  fields.journeyRewardToRisk.value="4";
+  fields.executionMode.value="DEMO";
+  if(![...fields.symbol.options].some(x=>x.value===symbol))fields.symbol.add(new Option(symbol+" · VERIFY WITH BROKER",symbol));
+  fields.symbol.value=symbol;
+  fields.timeframe.value="5m";
+  fields.maxRisk.value="12.5";
+  fields.dailyDd.value="12.5";
+  fields.totalDd.value="25";
+  fields.maxPositions.value="1";
+  fields.spreadRatio.value="0.20";
+  fields.staleMs.value="5000";
+  fields.lossStreak.value="1";
+  fields.autoPause.checked=true;
+  fields.killSwitch.checked=false;
+  $("journeyState").textContent="$200 XAUUSD · 12.5% RISK · 1:4";
+  $("journeyNote").textContent="Preset loaded for "+selected.name+". Save risk profile and market configuration separately.";
+  msg("Gold Journey preset loaded. Press SAVE RISK PROFILE, then SAVE MARKET CONFIG. New orders remain shadow-only until the independent validation gate is approved.","ok");
+});
 $("saveBtn").addEventListener("click",async()=>{
  if(!selected)return msg("Select a bot first.","error");
- const payload={executionMode:fields.executionMode.value,lotSize:Number(fields.lotSize.value),maxRiskPerTradePct:Number(fields.maxRisk.value),dailyDrawdownPct:Number(fields.dailyDd.value),totalDrawdownPct:Number(fields.totalDd.value),maxPositions:Number(fields.maxPositions.value),maxSpreadAtrRatio:Number(fields.spreadRatio.value),staleDataMs:Number(fields.staleMs.value),maxConsecutiveLosses:Number(fields.lossStreak.value),autoPauseOnLossStreak:fields.autoPause.checked,killSwitch:fields.killSwitch.checked};
+ const payload={executionMode:fields.executionMode.value,lotSize:Number(fields.lotSize.value),maxRiskPerTradePct:Number(fields.maxRisk.value),dailyDrawdownPct:Number(fields.dailyDd.value),totalDrawdownPct:Number(fields.totalDd.value),maxPositions:Number(fields.maxPositions.value),maxSpreadAtrRatio:Number(fields.spreadRatio.value),staleDataMs:Number(fields.staleMs.value),maxConsecutiveLosses:Number(fields.lossStreak.value),autoPauseOnLossStreak:fields.autoPause.checked,killSwitch:fields.killSwitch.checked,journeyProfile:fields.journeyProfile.value,journeyStartingCapitalUsd:Number(fields.journeyStartingCapitalUsd.value),journeyRewardToRisk:Number(fields.journeyRewardToRisk.value)};
  if(payload.totalDrawdownPct<payload.dailyDrawdownPct)return msg("Total drawdown must be at least the daily drawdown limit.","error");
  msg("Saving…");
  try{const d=await api("/bots/"+encodeURIComponent(selected.id)+"/risk",{method:"PUT",body:JSON.stringify(payload)});putSettings(d.settings,d.executionMode,d.killSwitch);msg("Saved and enforced by the server-side risk engine.","ok")}catch(e){msg(e.message,"error")}
