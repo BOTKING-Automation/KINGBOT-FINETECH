@@ -4,6 +4,7 @@ import {
   GOLD_JOURNEY_PROFILE,
   GOLD_JOURNEY_PROFILE_ID,
   applyGoldJourneyRiskProfile,
+  canRunGoldJourneyBot,
   goldJourneyRiskBudget,
   goldJourneyTargetPrice,
   isGoldJourneyExecutionValidated,
@@ -45,6 +46,14 @@ test("journey activates only on SMC Pro and only for XAUUSD", () => {
   const wrongEngine = applyGoldJourneyRiskProfile({ ...saved, botId: "strategic" }, "XAUUSD");
   assert.equal(wrongEngine.goldJourneyEnabled, false);
   assert.equal(wrongEngine.goldJourneyBotBlocked, true);
+});
+
+test("only the single configured SMC Pro runtime may execute the Gold Journey", () => {
+  assert.equal(canRunGoldJourneyBot("smc-pro", []), true);
+  assert.equal(canRunGoldJourneyBot("smc-pro", ["smc-pro"]), true);
+  assert.equal(canRunGoldJourneyBot("strategic", ["smc-pro"]), false);
+  assert.equal(canRunGoldJourneyBot("smc-pro", ["strategic"]), false);
+  assert.equal(canRunGoldJourneyBot("smc-pro", ["smc-pro", "strategic"]), false);
 });
 
 test("Gold Journey cannot silently change its $200 starting reference or 1:4 target", () => {
